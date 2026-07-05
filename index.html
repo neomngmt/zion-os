@@ -1,0 +1,1900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Agency OS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+<style>html,body{margin:0;padding:0;background:#0A0A0B;}</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+"use strict";
+const { useState, useEffect, useCallback } = React;
+
+// ---------------------------------------------------------------------------
+// Inline icon set — replaces lucide-react so this file needs no bundler.
+// Exact path data pulled from lucide-react v0.383.0.
+// ---------------------------------------------------------------------------
+const ICON_DATA = {
+  Plus: [["path", { d: "M5 12h14" }], ["path", { d: "M12 5v14" }]],
+  X: [["path", { d: "M18 6 6 18" }], ["path", { d: "m6 6 12 12" }]],
+  Clapperboard: [
+    ["path", { d: "M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z" }],
+    ["path", { d: "m6.2 5.3 3.1 3.9" }],
+    ["path", { d: "m12.4 3.4 3.1 4" }],
+    ["path", { d: "M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" }],
+  ],
+  Users: [
+    ["path", { d: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" }],
+    ["circle", { cx: "9", cy: "7", r: "4" }],
+    ["path", { d: "M22 21v-2a4 4 0 0 0-3-3.87" }],
+    ["path", { d: "M16 3.13a4 4 0 0 1 0 7.75" }],
+  ],
+  ChevronRight: [["path", { d: "m9 18 6-6-6-6" }]],
+  MapPin: [
+    ["path", { d: "M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" }],
+    ["circle", { cx: "12", cy: "10", r: "3" }],
+  ],
+  Calendar: [
+    ["path", { d: "M8 2v4" }],
+    ["path", { d: "M16 2v4" }],
+    ["rect", { width: "18", height: "18", x: "3", y: "4", rx: "2" }],
+    ["path", { d: "M3 10h18" }],
+  ],
+  User: [
+    ["path", { d: "M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" }],
+    ["circle", { cx: "12", cy: "7", r: "4" }],
+  ],
+  Trash2: [
+    ["path", { d: "M3 6h18" }],
+    ["path", { d: "M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" }],
+    ["path", { d: "M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" }],
+    ["line", { x1: "10", x2: "10", y1: "11", y2: "17" }],
+    ["line", { x1: "14", x2: "14", y1: "11", y2: "17" }],
+  ],
+  Loader2: [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56" }]],
+  LayoutGrid: [
+    ["rect", { width: "7", height: "7", x: "3", y: "3", rx: "1" }],
+    ["rect", { width: "7", height: "7", x: "14", y: "3", rx: "1" }],
+    ["rect", { width: "7", height: "7", x: "14", y: "14", rx: "1" }],
+    ["rect", { width: "7", height: "7", x: "3", y: "14", rx: "1" }],
+  ],
+  Film: [
+    ["rect", { width: "18", height: "18", x: "3", y: "3", rx: "2" }],
+    ["path", { d: "M7 3v18" }],
+    ["path", { d: "M3 7.5h4" }],
+    ["path", { d: "M3 12h18" }],
+    ["path", { d: "M3 16.5h4" }],
+    ["path", { d: "M17 3v18" }],
+    ["path", { d: "M17 7.5h4" }],
+    ["path", { d: "M17 16.5h4" }],
+  ],
+  UserCircle2: [
+    ["path", { d: "M18 20a6 6 0 0 0-12 0" }],
+    ["circle", { cx: "12", cy: "10", r: "4" }],
+    ["circle", { cx: "12", cy: "12", r: "10" }],
+  ],
+  Send: [["path", { d: "m22 2-7 20-4-9-9-4Z" }], ["path", { d: "M22 2 11 13" }]],
+  Circle: [["circle", { cx: "12", cy: "12", r: "10" }]],
+  CheckCircle2: [
+    ["circle", { cx: "12", cy: "12", r: "10" }],
+    ["path", { d: "m9 12 2 2 4-4" }],
+  ],
+  Repeat: [
+    ["path", { d: "m17 2 4 4-4 4" }],
+    ["path", { d: "M3 11v-1a4 4 0 0 1 4-4h14" }],
+    ["path", { d: "m7 22-4-4 4-4" }],
+    ["path", { d: "M21 13v1a4 4 0 0 1-4 4H3" }],
+  ],
+  ChevronLeft: [["path", { d: "m15 18-6-6 6-6" }]],
+  CheckSquare: [
+    ["path", { d: "m9 11 3 3L22 4" }],
+    ["path", { d: "M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" }],
+  ],
+  Lock: [
+    ["rect", { width: "18", height: "11", x: "3", y: "11", rx: "2", ry: "2" }],
+    ["path", { d: "M7 11V7a5 5 0 0 1 10 0v4" }],
+  ],
+  LogOut: [
+    ["path", { d: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" }],
+    ["polyline", { points: "16 17 21 12 16 7" }],
+    ["line", { x1: "21", x2: "9", y1: "12", y2: "12" }],
+  ],
+  ShieldCheck: [
+    ["path", { d: "M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" }],
+    ["path", { d: "m9 12 2 2 4-4" }],
+  ],
+  TrendingUp: [
+    ["polyline", { points: "22 7 13.5 15.5 8.5 10.5 2 17" }],
+    ["polyline", { points: "16 7 22 7 22 13" }],
+  ],
+  TrendingDown: [
+    ["polyline", { points: "22 17 13.5 8.5 8.5 13.5 2 7" }],
+    ["polyline", { points: "16 17 22 17 22 11" }],
+  ],
+  DollarSign: [
+    ["line", { x1: "12", x2: "12", y1: "2", y2: "22" }],
+    ["path", { d: "M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" }],
+  ],
+  Instagram: [
+    ["rect", { width: "20", height: "20", x: "2", y: "2", rx: "5", ry: "5" }],
+    ["path", { d: "M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" }],
+    ["line", { x1: "17.5", x2: "17.51", y1: "6.5", y2: "6.5" }],
+  ],
+  Eye: [
+    ["path", { d: "M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" }],
+    ["circle", { cx: "12", cy: "12", r: "3" }],
+  ],
+  Minus: [["path", { d: "M5 12h14" }]],
+  Plug: [
+    ["path", { d: "M12 22v-5" }],
+    ["path", { d: "M9 8V2" }],
+    ["path", { d: "M15 8V2" }],
+    ["path", { d: "M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z" }],
+  ],
+};
+
+function makeIcon(name, elements) {
+  return function LucideIcon({ size = 24, color, className = "", style, ...rest }) {
+    return React.createElement(
+      "svg",
+      {
+        width: size, height: size, viewBox: "0 0 24 24", fill: "none",
+        stroke: color || "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round",
+        className: "icon-" + name.toLowerCase() + (className ? " " + className : ""),
+        style, ...rest,
+      },
+      elements.map(([tag, props], i) => React.createElement(tag, { key: i, ...props }))
+    );
+  };
+}
+
+const Icons = Object.fromEntries(Object.entries(ICON_DATA).map(([name, els]) => [name, makeIcon(name, els)]));
+const {
+  Plus, X, Clapperboard, Users, ChevronRight, MapPin, Calendar, User,
+  Trash2, Loader2, LayoutGrid, Film, UserCircle2, Send, Circle,
+  CheckCircle2, Repeat, ChevronLeft, CheckSquare, Lock, LogOut, ShieldCheck,
+  TrendingUp, TrendingDown, DollarSign, Instagram, Eye, Minus, Plug,
+} = Icons;
+
+// ---------------------------------------------------------------------------
+// Storage shim — localStorage-backed stand-in for Claude's window.storage API.
+// Same get/set/delete/list shape, so none of the app code below needs to change.
+// This is temporary: swap this block out once Supabase is wired in, so data is
+// shared between you and the models instead of living only in one browser.
+// ---------------------------------------------------------------------------
+if (!window.storage) {
+  const PREFIX = "agencyos:";
+  window.storage = {
+    async get(key) {
+      try {
+        const raw = localStorage.getItem(PREFIX + key);
+        return raw === null ? null : { key, value: raw };
+      } catch { return null; }
+    },
+    async set(key, value) {
+      try { localStorage.setItem(PREFIX + key, value); return { key, value }; }
+      catch { return null; }
+    },
+    async delete(key) {
+      try { localStorage.removeItem(PREFIX + key); return { key, deleted: true }; }
+      catch { return null; }
+    },
+    async list(prefix) {
+      try {
+        const keys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith(PREFIX + (prefix || ""))) keys.push(k.slice(PREFIX.length));
+        }
+        return { keys, prefix };
+      } catch { return null; }
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// App code (from agency-os.jsx)
+// ---------------------------------------------------------------------------
+
+
+const STAGES = [
+  { id: "idea", label: "Idea", code: "01", color: "#8B93A1" },
+  { id: "script", label: "Script Ready", code: "02", color: "#5B8FA8" },
+  { id: "filming", label: "Filming", code: "03", color: "#E2725B" },
+  { id: "edited", label: "Edited", code: "04", color: "#E5335C" },
+  { id: "posted", label: "Posted", code: "05", color: "#6FB07F" },
+];
+
+const uid = () => Math.random().toString(36).slice(2, 10);
+
+const fontImport = `
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg-app: #0A0A0B;
+  --bg-surface: #131316;
+  --bg-panel: #0D0D0F;
+  --border: #232326;
+  --border2: #34343A;
+  --text: #F2F2F4;
+  --muted: #9A9AA1;
+  --faint: #5C5C63;
+  --accent: #E5335C;
+  --accent-hover: #EF5779;
+  --onaccent: #0A0A0B;
+  --success: #6FB07F;
+  --warn: #E2725B;
+  --idea: #8B93A1;
+}
+
+.c-bg-app { background-color: var(--bg-app); }
+.c-bg-surface { background-color: var(--bg-surface); }
+.c-bg-panel { background-color: var(--bg-panel); }
+.c-bg-accent { background-color: var(--accent); }
+.c-bg-accent-a2 { background-color: rgba(229,51,92,0.13); }
+.c-bg-accent-a1 { background-color: rgba(229,51,92,0.1); }
+.c-bg-accent-a0 { background-color: rgba(229,51,92,0.06); }
+
+.c-text { color: var(--text); }
+.c-muted { color: var(--muted); }
+.c-faint { color: var(--faint); }
+.c-accent { color: var(--accent); }
+.c-onaccent { color: var(--onaccent); }
+.c-success { color: var(--success); }
+.c-warn { color: var(--warn); }
+.c-idea { color: var(--idea); }
+.c-border2 { color: var(--border2); }
+
+.c-border { border-color: var(--border); }
+.c-border-accent { border-color: var(--accent); }
+.c-border-warn-a { border-color: rgba(226,114,91,0.47); }
+
+.hover-bg-accent2:hover { background-color: var(--accent-hover) !important; }
+.hover-bg-surface:hover { background-color: var(--bg-surface) !important; }
+.hover-bg-app:hover { background-color: var(--bg-app) !important; }
+.hover-warn:hover { color: var(--warn) !important; }
+.hover-accent-text:hover { color: var(--accent) !important; }
+.hover-text-primary:hover { color: var(--text) !important; }
+.hover-border-accent:hover { border-color: var(--accent) !important; }
+.hover-border-warn:hover { border-color: var(--warn) !important; }
+.hover-border-2:hover { border-color: var(--border2) !important; }
+.focus-border-accent:focus { border-color: var(--accent) !important; }
+
+.fs-9 { font-size: 9px; }
+.fs-10 { font-size: 10px; }
+.fs-11 { font-size: 11px; }
+.fs-12 { font-size: 12px; }
+.fs-13 { font-size: 13px; }
+
+.minw-64 { min-width: 64px; }
+.minw-120 { min-width: 120px; }
+.minw-140 { min-width: 140px; }
+.minw-150 { min-width: 150px; }
+.minw-160 { min-width: 160px; }
+.minw-180 { min-width: 180px; }
+.minw-240 { min-width: 240px; }
+.w-240 { width: 240px; }
+.maxh-85vh { max-height: 85vh; }
+`;
+
+// ---------- storage hooks ----------
+
+function usePersisted(key, fallback, shared = true) {
+  const [value, setValue] = useState(fallback);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await window.storage.get(key, shared);
+      setValue(res ? JSON.parse(res.value) : fallback);
+    } catch {
+      setValue(fallback);
+    }
+    setLoading(false);
+  }, [key, shared]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const persist = async (next) => {
+    setValue(next);
+    try {
+      await window.storage.set(key, JSON.stringify(next), shared);
+    } catch (e) {
+      console.error("save failed", e);
+    }
+  };
+
+  return { value, loading, persist };
+}
+
+// ---------- shared bits ----------
+
+function Badge({ children, color }) {
+  return (
+    <span
+      style={{ borderColor: color, color }}
+      className="fs-10 tracking-widest uppercase font-mono border px-1.5 py-0.5 rounded-lg"
+    >
+      {children}
+    </span>
+  );
+}
+
+function StatCard({ label, value, color }) {
+  return (
+    <div className="c-bg-surface border c-border rounded-xl px-4 py-3.5 flex-1 minw-140">
+      <div className="fs-10 uppercase tracking-widest c-muted font-mono mb-1.5">{label}</div>
+      <div style={{ color: color || "#F2F2F4" }} className="text-2xl font-semibold" >{value}</div>
+    </div>
+  );
+}
+
+// ---------- content director (kanban) ----------
+
+function CardTile({ card, onAdvance, onDelete, onOpen }) {
+  const nextStage = STAGES[STAGES.findIndex((s) => s.id === card.stage) + 1];
+  return (
+    <div
+      className="relative c-bg-surface border c-border rounded-xl p-3 mb-3 group hover-border-2 transition-colors cursor-pointer"
+      onClick={() => onOpen(card)}
+    >
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className="font-mono fs-10 c-muted">SC.{card.seq}</span>
+          {card.source === "creator" && (
+            <span className="fs-9 tracking-wide uppercase c-bg-accent-a2 c-accent px-1.5 py-0.5 rounded-lg font-mono">
+              from {card.model}
+            </span>
+          )}
+        </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(card.id); }}
+          className="opacity-0 group-hover:opacity-100 c-muted hover-warn transition-opacity"
+        >
+          <Trash2 size={13} />
+        </button>
+      </div>
+      <div className="c-text text-sm font-medium leading-snug mb-2">
+        {card.title || "Untitled scene"}
+      </div>
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {card.model && <Badge color="#E5335C">{card.model}</Badge>}
+        {card.sceneType && <Badge color="#5B8FA8">{card.sceneType}</Badge>}
+      </div>
+      <div className="flex items-center justify-between fs-11 c-muted font-mono">
+        <div className="flex items-center gap-2 flex-wrap">
+          {card.location && <span className="flex items-center gap-1"><MapPin size={11} />{card.location}</span>}
+          {card.deadline && <span className="flex items-center gap-1"><Calendar size={11} />{card.deadline}</span>}
+        </div>
+      </div>
+      {card.assignee && (
+        <div className="flex items-center gap-1 fs-11 c-muted font-mono mt-1">
+          <User size={11} />{card.assignee}
+        </div>
+      )}
+      {nextStage && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onAdvance(card.id, nextStage.id); }}
+          className="mt-3 w-full flex items-center justify-center gap-1 fs-11 font-mono uppercase tracking-wide py-1.5 rounded-lg border c-border c-muted hover-border-accent hover-accent-text transition-colors"
+        >
+          Move to {nextStage.label} <ChevronRight size={12} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function CardDetail({ card, models, restrictModel, onClose, onSave, onDelete }) {
+  const [form, setForm] = useState(card);
+  useEffect(() => setForm(card), [card]);
+  if (!card) return null;
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="c-bg-surface border c-border rounded-2xl w-full max-w-md p-5 maxh-85vh overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <span className="font-mono text-xs c-muted tracking-widest">SCENE {form.seq}</span>
+          <button onClick={onClose} className="c-muted hover-text-primary"><X size={18} /></button>
+        </div>
+
+        <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Title / hook</label>
+        <input value={form.title} onChange={(e) => set("title", e.target.value)}
+          className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text mb-3 outline-none focus-border-accent" />
+
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Model</label>
+            {restrictModel ? (
+              <div className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text">{restrictModel}</div>
+            ) : (
+              <select value={form.model} onChange={(e) => set("model", e.target.value)}
+                className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent">
+                <option value="">—</option>
+                {models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
+              </select>
+            )}
+          </div>
+          <div>
+            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Scene type</label>
+            <input value={form.sceneType} onChange={(e) => set("sceneType", e.target.value)} placeholder="girl next door, POV..."
+              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Location</label>
+            <input value={form.location} onChange={(e) => set("location", e.target.value)}
+              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+          </div>
+          <div>
+            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Deadline</label>
+            <input type="date" value={form.deadline} onChange={(e) => set("deadline", e.target.value)}
+              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+          </div>
+        </div>
+
+        <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Assignee</label>
+        <input value={form.assignee} onChange={(e) => set("assignee", e.target.value)} placeholder="who's responsible"
+          className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text mb-3 outline-none focus-border-accent" />
+
+        <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Script / video link</label>
+        <input value={form.scriptLink} onChange={(e) => set("scriptLink", e.target.value)} placeholder="https://..."
+          className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text mb-3 outline-none focus-border-accent" />
+
+        <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Notes</label>
+        <textarea value={form.notes} onChange={(e) => set("notes", e.target.value)} rows={3}
+          className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text mb-4 outline-none focus-border-accent resize-none" />
+
+        <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Stage</label>
+        <div className="flex gap-1.5 mb-5">
+          {STAGES.map((s) => (
+            <button key={s.id} onClick={() => set("stage", s.id)}
+              style={form.stage === s.id ? { borderColor: s.color, color: s.color } : {}}
+              className={`flex-1 fs-10 font-mono uppercase py-1.5 rounded-lg border ${form.stage === s.id ? "" : "c-border c-muted"}`}>
+              {s.code}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-2">
+          <button onClick={() => onDelete(form.id)}
+            className="px-3 py-2 rounded-lg border c-border c-warn text-xs font-mono uppercase hover-border-warn">
+            Delete
+          </button>
+          <button onClick={() => onSave(form)}
+            className="flex-1 py-2 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold hover-bg-accent2">
+            Save changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ContentDirector({ cards, persistCards, models, restrictModel }) {
+  const [detail, setDetail] = useState(null);
+  const [adding, setAdding] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newModel, setNewModel] = useState(restrictModel || "");
+  const [filter, setFilter] = useState(restrictModel || "all");
+
+  const nextSeq = () => (cards.reduce((m, c) => Math.max(m, c.seq || 0), 0) + 1);
+
+  const addCard = async () => {
+    if (!newTitle.trim()) return;
+    const card = {
+      id: uid(), seq: nextSeq(), title: newTitle, model: restrictModel || newModel, sceneType: "",
+      location: "", deadline: "", assignee: "", scriptLink: "", notes: "",
+      stage: "idea", source: restrictModel ? "creator" : "team", createdAt: Date.now(),
+    };
+    await persistCards([...cards, card]);
+    setNewTitle(""); setNewModel(restrictModel || ""); setAdding(false);
+  };
+
+  const advance = async (id, stageId) => {
+    await persistCards(cards.map((c) => (c.id === id ? { ...c, stage: stageId } : c)));
+  };
+  const saveCard = async (updated) => {
+    await persistCards(cards.map((c) => (c.id === updated.id ? updated : c)));
+    setDetail(null);
+  };
+  const deleteCard = async (id) => {
+    await persistCards(cards.filter((c) => c.id !== id));
+    setDetail(null);
+  };
+
+  const visible = filter === "all" ? cards : cards.filter((c) => c.model === filter);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+        {!restrictModel && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button onClick={() => setFilter("all")}
+              className={`fs-11 font-mono uppercase px-2.5 py-1 rounded-lg border ${filter === "all" ? "c-border-accent c-accent" : "c-border c-muted"}`}>
+              All
+            </button>
+            {models.map((m) => (
+              <button key={m.name} onClick={() => setFilter(m.name)}
+                className={`fs-11 font-mono uppercase px-2.5 py-1 rounded-lg border ${filter === m.name ? "c-border-accent c-accent" : "c-border c-muted"}`}>
+                {m.name}
+              </button>
+            ))}
+          </div>
+        )}
+        {restrictModel && <span className="fs-11 font-mono uppercase c-accent">{restrictModel}'s scenes</span>}
+        <button onClick={() => setAdding(true)}
+          className="flex items-center gap-1.5 fs-11 font-mono uppercase tracking-wide c-bg-accent c-onaccent px-3 py-1.5 rounded-lg font-semibold hover-bg-accent2">
+          <Plus size={13} /> New scene
+        </button>
+      </div>
+
+      {adding && (
+        <div className="mb-4 c-bg-surface border c-border rounded-xl p-3 flex gap-2 flex-wrap">
+          <input autoFocus value={newTitle} onChange={(e) => setNewTitle(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && addCard()} placeholder="Scene title / hook..."
+            className="flex-1 minw-160 c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+          {!restrictModel && (
+            <select value={newModel} onChange={(e) => setNewModel(e.target.value)}
+              className="c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none">
+              <option value="">Model</option>
+              {models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
+            </select>
+          )}
+          <button onClick={addCard} className="px-3 py-2 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase font-semibold">Add</button>
+          <button onClick={() => setAdding(false)} className="px-3 py-2 rounded-lg border c-border c-muted text-xs font-mono uppercase">Cancel</button>
+        </div>
+      )}
+
+      <div className="flex gap-3 overflow-x-auto pb-4 snap-x snap-proximity -mx-4 px-4 md:mx-0 md:px-0">
+        {STAGES.map((stage) => {
+          const stageCards = visible.filter((c) => c.stage === stage.id);
+          return (
+            <div key={stage.id} className="minw-240 w-240 flex-shrink-0 snap-start">
+              <div className="flex items-center gap-2 mb-3 pb-2 border-b" style={{ borderColor: stage.color + "55" }}>
+                <span className="font-mono fs-10" style={{ color: stage.color }}>{stage.code}</span>
+                <span className="fs-11 uppercase tracking-widest font-semibold" style={{ color: stage.color }}>{stage.label}</span>
+                <span className="ml-auto fs-10 font-mono c-muted">{stageCards.length}</span>
+              </div>
+              {stageCards.length === 0 && (
+                <div className="fs-11 c-faint font-mono italic py-6 text-center border border-dashed c-border rounded-xl">empty</div>
+              )}
+              {stageCards.map((card) => (
+                <CardTile key={card.id} card={card} onAdvance={advance} onDelete={deleteCard} onOpen={setDetail} />
+              ))}
+            </div>
+          );
+        })}
+      </div>
+
+      {detail && <CardDetail card={detail} models={models} restrictModel={restrictModel} onClose={() => setDetail(null)} onSave={saveCard} onDelete={deleteCard} />}
+    </div>
+  );
+}
+
+// ---------- model manager ----------
+
+function ModelManager({ models, persistModels, cards }) {
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+  const [note, setNote] = useState("");
+  const [pin, setPin] = useState("");
+
+  const addModel = async () => {
+    if (!name.trim()) return;
+    await persistModels([...models, { name: name.trim(), note, pin: pin.trim(), onboarded: false, addedAt: Date.now() }]);
+    setName(""); setNote(""); setPin(""); setAdding(false);
+  };
+  const removeModel = async (n) => {
+    await persistModels(models.filter((m) => m.name !== n));
+  };
+  const setModelPin = async (n, newPin) => {
+    await persistModels(models.map((m) => (m.name === n ? { ...m, pin: newPin } : m)));
+  };
+  const toggleAlwaysOnboard = async (n) => {
+    await persistModels(models.map((m) => (m.name === n ? { ...m, alwaysOnboard: !m.alwaysOnboard } : m)));
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <p className="c-muted text-sm">Roster and per-model production load.</p>
+        <button onClick={() => setAdding(true)}
+          className="flex items-center gap-1.5 fs-11 font-mono uppercase tracking-wide c-bg-accent c-onaccent px-3 py-1.5 rounded-lg font-semibold hover-bg-accent2">
+          <Plus size={13} /> Add model
+        </button>
+      </div>
+
+      {adding && (
+        <div className="mb-5 c-bg-surface border c-border rounded-xl p-3 flex gap-2 flex-wrap">
+          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Name"
+            className="flex-1 minw-120 c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Niche / persona note"
+            className="flex-1 minw-160 c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+          <input value={pin} onChange={(e) => setPin(e.target.value)} placeholder="Password (optional)"
+            className="w-36 c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+          <button onClick={addModel} className="px-3 py-2 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase font-semibold">Add</button>
+          <button onClick={() => setAdding(false)} className="px-3 py-2 rounded-lg border c-border c-muted text-xs font-mono uppercase">Cancel</button>
+        </div>
+      )}
+
+      {models.length === 0 && (
+        <div className="fs-12 c-faint font-mono italic py-10 text-center border border-dashed c-border rounded-xl">
+          no models yet — add your first one
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {models.map((m) => {
+          const own = cards.filter((c) => c.model === m.name);
+          const active = own.filter((c) => c.stage !== "posted").length;
+          const posted = own.filter((c) => c.stage === "posted").length;
+          return (
+            <div key={m.name} className="c-bg-surface border c-border rounded-xl p-4 group relative">
+              <button onClick={() => removeModel(m.name)}
+                className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 c-muted hover-warn transition-opacity">
+                <Trash2 size={13} />
+              </button>
+              <div className="flex items-center gap-2.5 mb-2">
+                <UserCircle2 size={20} className="c-accent" />
+                <div className="c-text font-medium text-sm">{m.name}</div>
+              </div>
+              {m.note && <div className="c-muted text-xs mb-3">{m.note}</div>}
+              <div className="flex gap-4 font-mono fs-11 c-muted mb-3">
+                <span><span className="c-text">{active}</span> active</span>
+                <span><span className="c-success">{posted}</span> posted</span>
+                <span><span className="c-text">{own.length}</span> total</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Lock size={11} className="c-faint" />
+                <input value={m.pin || ""} onChange={(e) => setModelPin(m.name, e.target.value)}
+                  placeholder="no password set"
+                  className="w-32 c-bg-app border c-border rounded-lg px-2 py-1 text-xs c-text outline-none focus-border-accent font-mono" />
+              </div>
+              <label className="flex items-center gap-1.5 fs-10 font-mono uppercase c-faint mt-2 cursor-pointer">
+                <input type="checkbox" checked={!!m.alwaysOnboard} onChange={() => toggleAlwaysOnboard(m.name)} />
+                Always show Creator Bible on login (testing)
+              </label>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ---------- creator submission ----------
+
+function CreatorForm({ models, cards, persistCards, restrictModel }) {
+  const [model, setModel] = useState(restrictModel || "");
+  const [title, setTitle] = useState("");
+  const [sceneType, setSceneType] = useState("");
+  const [location, setLocation] = useState("");
+  const [notes, setNotes] = useState("");
+  const [sent, setSent] = useState(false);
+
+  const nextSeq = () => (cards.reduce((m, c) => Math.max(m, c.seq || 0), 0) + 1);
+
+  const submit = async () => {
+    const chosenModel = restrictModel || model;
+    if (!chosenModel || !title.trim()) return;
+    const card = {
+      id: uid(), seq: nextSeq(), title, model: chosenModel, sceneType, location,
+      deadline: "", assignee: "", scriptLink: "", notes,
+      stage: "idea", source: "creator", createdAt: Date.now(),
+    };
+    await persistCards([...cards, card]);
+    setSent(true);
+    setTitle(""); setSceneType(""); setLocation(""); setNotes("");
+    setTimeout(() => setSent(false), 2500);
+  };
+
+  return (
+    <div className="max-w-md">
+      <p className="c-muted text-sm mb-5">Tell us what you want to shoot next. It lands straight on the board as a new idea.</p>
+
+      {!restrictModel && (
+        <>
+          <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Your name</label>
+          <select value={model} onChange={(e) => setModel(e.target.value)}
+            className="w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text mb-3 outline-none focus-border-accent">
+            <option value="">Select your name</option>
+            {models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
+          </select>
+        </>
+      )}
+
+      <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">What do you want to shoot?</label>
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. cooking breakfast, morning routine bit..."
+        className="w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text mb-3 outline-none focus-border-accent" />
+
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Vibe / type</label>
+          <input value={sceneType} onChange={(e) => setSceneType(e.target.value)} placeholder="girl next door..."
+            className="w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text outline-none focus-border-accent" />
+        </div>
+        <div>
+          <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Where</label>
+          <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="bedroom, kitchen..."
+            className="w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text outline-none focus-border-accent" />
+        </div>
+      </div>
+
+      <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Anything else</label>
+      <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="outfit ideas, props, timing..."
+        className="w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text mb-4 outline-none focus-border-accent resize-none" />
+
+      <button onClick={submit}
+        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold hover-bg-accent2">
+        <Send size={13} /> Send idea to team
+      </button>
+      {sent && <p className="c-success text-xs font-mono text-center mt-3">Sent. It's on the board.</p>}
+    </div>
+  );
+}
+
+// ---------- dashboard ----------
+
+function Dashboard({ cards, models, stats, reels, onNavigate }) {
+  const activeCount = cards.filter((c) => c.stage !== "posted").length;
+  const filmingToday = cards.filter((c) => c.stage === "filming").length;
+  const pendingIdeas = cards.filter((c) => c.stage === "idea" && c.source === "creator").length;
+  const recent = [...cards].sort((a, b) => b.createdAt - a.createdAt).slice(0, 6);
+
+  // Latest weekly entry per model, summed for total agency revenue
+  const latestPerModel = models.map((m) => {
+    const own = stats.filter((s) => s.model === m.name).sort((a, b) => b.weekOf.localeCompare(a.weekOf));
+    return own[0];
+  }).filter(Boolean);
+  const totalRevenue = latestPerModel.reduce((sum, s) => sum + (s.ofEarnings || 0), 0);
+  const mostRecentWeek = latestPerModel.length ? latestPerModel.map((s) => s.weekOf).sort().slice(-1)[0] : null;
+  const prevWeekTotal = mostRecentWeek
+    ? models.reduce((sum, m) => {
+        const own = stats.filter((s) => s.model === m.name && s.weekOf < mostRecentWeek).sort((a, b) => b.weekOf.localeCompare(a.weekOf));
+        return sum + (own[0]?.ofEarnings || 0);
+      }, 0)
+    : null;
+
+  // Best reel from the most recent week that has any reels logged
+  const latestReelWeek = reels.length ? [...reels].map((r) => r.weekOf).sort().slice(-1)[0] : null;
+  const reelOfWeek = latestReelWeek
+    ? reels.filter((r) => r.weekOf === latestReelWeek).sort((a, b) => b.views - a.views)[0]
+    : null;
+
+  return (
+    <div>
+      <div className="c-bg-surface border c-border rounded-xl p-5 mb-6">
+        <div className="flex items-center justify-between mb-1">
+          <span className="fs-11 uppercase tracking-widest c-muted font-mono">Agency weekly revenue</span>
+          {mostRecentWeek && <DeltaTag current={totalRevenue} previous={prevWeekTotal} />}
+        </div>
+        {latestPerModel.length === 0 ? (
+          <div className="fs-12 c-faint font-mono italic py-4">No stats logged yet, add weekly entries in Stats.</div>
+        ) : (
+          <>
+            <div className="text-4xl md:text-5xl font-extrabold c-accent mb-1">${totalRevenue.toLocaleString()}</div>
+            <div className="fs-11 c-faint font-mono">across {latestPerModel.length} model{latestPerModel.length === 1 ? "" : "s"}, week of {fmtDay(mostRecentWeek)}</div>
+          </>
+        )}
+      </div>
+
+      <div className="flex gap-3 flex-wrap mb-6">
+        <StatCard label="Active scenes" value={activeCount} color="#E5335C" />
+        <StatCard label="In filming" value={filmingToday} color="#E2725B" />
+        <StatCard label="Ideas to review" value={pendingIdeas} color="#8B93A1" />
+        <StatCard label="Models" value={models.length} color="#F2F2F4" />
+      </div>
+
+      <div className="c-bg-surface border c-border rounded-xl p-4 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <span className="fs-11 uppercase tracking-widest c-muted font-mono">Reel of the week</span>
+          <button onClick={() => onNavigate("stats")} className="fs-11 font-mono uppercase c-accent hover:underline">Log a reel →</button>
+        </div>
+        {!reelOfWeek ? (
+          <div className="fs-12 c-faint font-mono italic py-4">No reels logged yet, add them in Stats.</div>
+        ) : (
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="c-text text-sm font-medium">{reelOfWeek.title || "Untitled reel"}</span>
+              <span className="fs-10 font-mono c-accent uppercase">{reelOfWeek.model}</span>
+            </div>
+            <div className="flex gap-5 flex-wrap fs-11 font-mono c-muted mb-2">
+              <span><span className="c-text">{reelOfWeek.views.toLocaleString()}</span> views</span>
+              <span><span className="c-text">{reelOfWeek.likes.toLocaleString()}</span> likes</span>
+              <span><span className="c-text">{reelOfWeek.shares.toLocaleString()}</span> shares</span>
+              <span><span className="c-text">{reelOfWeek.comments.toLocaleString()}</span> comments</span>
+            </div>
+            {reelOfWeek.link && (
+              <a href={reelOfWeek.link} target="_blank" rel="noopener noreferrer" className="fs-11 font-mono c-accent hover-accent-text">Open reel →</a>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        <div className="lg:col-span-3 c-bg-surface border c-border rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="fs-11 uppercase tracking-widest c-muted font-mono">Pipeline snapshot</span>
+            <button onClick={() => onNavigate("content")} className="fs-11 font-mono uppercase c-accent hover:underline">Open board →</button>
+          </div>
+          <div className="space-y-2.5">
+            {STAGES.map((s) => {
+              const n = cards.filter((c) => c.stage === s.id).length;
+              const max = Math.max(1, cards.length);
+              return (
+                <div key={s.id} className="flex items-center gap-3">
+                  <span className="fs-10 font-mono w-16" style={{ color: s.color }}>{s.label}</span>
+                  <div className="flex-1 h-2 c-bg-app rounded-full overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${(n / max) * 100}%`, backgroundColor: s.color }} />
+                  </div>
+                  <span className="fs-11 font-mono c-muted w-5 text-right">{n}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="lg:col-span-2 c-bg-surface border c-border rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="fs-11 uppercase tracking-widest c-muted font-mono">Recent activity</span>
+          </div>
+          {recent.length === 0 ? (
+            <div className="fs-11 c-faint font-mono italic py-6 text-center">nothing yet</div>
+          ) : (
+            <div className="space-y-2">
+              {recent.map((c) => {
+                const stage = STAGES.find((s) => s.id === c.stage);
+                return (
+                  <div key={c.id} className="flex items-center gap-2 text-xs">
+                    <Circle size={6} fill={stage.color} color={stage.color} />
+                    <span className="c-text truncate flex-1">{c.title || "Untitled"}</span>
+                    <span className="c-muted font-mono fs-10">{c.model || "—"}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- date helpers ----------
+
+const toISO = (d) => d.toISOString().slice(0, 10);
+const todayISO = () => toISO(new Date());
+const addDays = (iso, n) => {
+  const d = new Date(iso + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return toISO(d);
+};
+const fmtDay = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
+
+// ---------- tasks ----------
+
+function TaskManager({ tasks, persistTasks, models, restrictModel }) {
+  const [adding, setAdding] = useState(false);
+  const [title, setTitle] = useState("");
+  const [model, setModel] = useState(restrictModel || "");
+  const [assignee, setAssignee] = useState("");
+  const [dueDate, setDueDate] = useState(todayISO());
+  const [recurring, setRecurring] = useState(false);
+  const [filter, setFilter] = useState(restrictModel || "all");
+
+  const nextSeq = () => (tasks.reduce((m, t) => Math.max(m, t.seq || 0), 0) + 1);
+
+  const addTask = async () => {
+    if (!title.trim()) return;
+    const task = {
+      id: uid(), seq: nextSeq(), title, model: restrictModel || model, assignee, dueDate, recurring,
+      status: "todo", notes: "", createdAt: Date.now(),
+    };
+    await persistTasks([...tasks, task]);
+    setTitle(""); setModel(restrictModel || ""); setAssignee(""); setDueDate(todayISO()); setRecurring(false); setAdding(false);
+  };
+
+  const toggleDone = async (task) => {
+    const done = task.status !== "done";
+    let next = tasks.map((t) => (t.id === task.id ? { ...t, status: done ? "done" : "todo" } : t));
+    if (done && task.recurring) {
+      next = [...next, {
+        id: uid(), seq: nextSeq() + 1, title: task.title, model: task.model, assignee: task.assignee,
+        dueDate: addDays(task.dueDate || todayISO(), 7), recurring: true,
+        status: "todo", notes: task.notes, createdAt: Date.now(),
+      }];
+    }
+    await persistTasks(next);
+  };
+
+  const deleteTask = async (id) => {
+    await persistTasks(tasks.filter((t) => t.id !== id));
+  };
+
+  const visible = (filter === "all" ? tasks : tasks.filter((t) => t.model === filter))
+    .sort((a, b) => (a.dueDate || "").localeCompare(b.dueDate || ""));
+  const overdue = (t) => t.status !== "done" && t.dueDate && t.dueDate < todayISO();
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+        {!restrictModel && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button onClick={() => setFilter("all")}
+              className={`fs-11 font-mono uppercase px-2.5 py-1 rounded-lg border ${filter === "all" ? "c-border-accent c-accent" : "c-border c-muted"}`}>
+              All
+            </button>
+            {models.map((m) => (
+              <button key={m.name} onClick={() => setFilter(m.name)}
+                className={`fs-11 font-mono uppercase px-2.5 py-1 rounded-lg border ${filter === m.name ? "c-border-accent c-accent" : "c-border c-muted"}`}>
+                {m.name}
+              </button>
+            ))}
+          </div>
+        )}
+        {restrictModel && <span className="fs-11 font-mono uppercase c-accent">{restrictModel}'s tasks</span>}
+        <button onClick={() => setAdding(true)}
+          className="flex items-center gap-1.5 fs-11 font-mono uppercase tracking-wide c-bg-accent c-onaccent px-3 py-1.5 rounded-lg font-semibold hover-bg-accent2">
+          <Plus size={13} /> New task
+        </button>
+      </div>
+
+      {adding && (
+        <div className="mb-4 c-bg-surface border c-border rounded-xl p-3 flex gap-2 flex-wrap items-center">
+          <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && addTask()} placeholder="Task, e.g. upload weekly photo set..."
+            className="flex-1 minw-180 c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+          {!restrictModel && (
+            <select value={model} onChange={(e) => setModel(e.target.value)}
+              className="c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none">
+              <option value="">Model</option>
+              {models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
+            </select>
+          )}
+          <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
+            className="c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none" />
+          {!restrictModel && (
+            <input value={assignee} onChange={(e) => setAssignee(e.target.value)} placeholder="Assignee (Martin, chatter...)"
+              className="minw-180 c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+          )}
+          <label className="flex items-center gap-1.5 fs-11 font-mono uppercase c-muted">
+            <input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} />
+            weekly
+          </label>
+          <button onClick={addTask} className="px-3 py-2 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase font-semibold">Add</button>
+          <button onClick={() => setAdding(false)} className="px-3 py-2 rounded-lg border c-border c-muted text-xs font-mono uppercase">Cancel</button>
+        </div>
+      )}
+
+      {visible.length === 0 ? (
+        <div className="fs-12 c-faint font-mono italic py-10 text-center border border-dashed c-border rounded-xl">no tasks</div>
+      ) : (
+        <div className="space-y-2">
+          {visible.map((t) => (
+            <div key={t.id}
+              className={`flex items-center gap-3 c-bg-surface border rounded-xl px-3 py-2.5 group ${t.status === "done" ? "c-border opacity-50" : overdue(t) ? "c-border-warn-a" : "c-border"}`}>
+              <button onClick={() => toggleDone(t)} className="flex-shrink-0">
+                <CheckCircle2 size={18} className={t.status === "done" ? "c-success" : "c-border2"} />
+              </button>
+              <div className="flex-1 min-w-0">
+                <div className={`text-sm c-text ${t.status === "done" ? "line-through" : ""}`}>{t.title}</div>
+                <div className="flex items-center gap-2 fs-10 font-mono c-muted mt-0.5">
+                  {t.model && <span>{t.model}</span>}
+                  {t.assignee && <span className="flex items-center gap-0.5"><User size={10} />{t.assignee}</span>}
+                  {t.dueDate && <span className={overdue(t) ? "c-warn" : ""}>{fmtDay(t.dueDate)}</span>}
+                  {t.recurring && <span className="flex items-center gap-0.5"><Repeat size={10} />weekly</span>}
+                </div>
+              </div>
+              <button onClick={() => deleteTask(t.id)}
+                className="opacity-0 group-hover:opacity-100 c-muted hover-warn transition-opacity flex-shrink-0">
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- calendar ----------
+
+function CalendarView({ cards, tasks, onNavigate, restrictModel }) {
+  const [cursor, setCursor] = useState(() => {
+    const t = new Date();
+    return { year: t.getFullYear(), month: t.getMonth() };
+  });
+  const [selected, setSelected] = useState(todayISO());
+
+  const first = new Date(cursor.year, cursor.month, 1);
+  const startOffset = (first.getDay() + 6) % 7; // Monday-first
+  const daysInMonth = new Date(cursor.year, cursor.month + 1, 0).getDate();
+  const monthLabel = first.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+  const scopedCards = restrictModel ? cards.filter((c) => c.model === restrictModel) : cards;
+  const scopedTasks = restrictModel ? tasks.filter((t) => t.model === restrictModel) : tasks;
+
+  const itemsByDate = {};
+  scopedCards.forEach((c) => {
+    if (!c.deadline) return;
+    (itemsByDate[c.deadline] ||= []).push({ type: "scene", label: c.title, color: STAGES.find((s) => s.id === c.stage)?.color, model: c.model });
+  });
+  scopedTasks.forEach((t) => {
+    if (!t.dueDate || t.status === "done") return;
+    (itemsByDate[t.dueDate] ||= []).push({ type: "task", label: t.title, color: "#8B93A1", model: t.model });
+  });
+
+  const cells = [];
+  for (let i = 0; i < startOffset; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const shiftMonth = (delta) => {
+    let m = cursor.month + delta, y = cursor.year;
+    if (m < 0) { m = 11; y -= 1; } else if (m > 11) { m = 0; y += 1; }
+    setCursor({ year: y, month: m });
+  };
+
+  const dayISO = (d) => `${cursor.year}-${String(cursor.month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+      <div className="lg:col-span-3 c-bg-surface border c-border rounded-xl p-4">
+        <div className="flex items-center justify-between mb-4">
+          <span className="fs-13 c-text font-medium">{monthLabel}</span>
+          <div className="flex gap-1">
+            <button onClick={() => shiftMonth(-1)} className="p-1 rounded-lg border c-border c-muted hover-accent-text hover-border-accent"><ChevronLeft size={14} /></button>
+            <button onClick={() => shiftMonth(1)} className="p-1 rounded-lg border c-border c-muted hover-accent-text hover-border-accent"><ChevronRight size={14} /></button>
+          </div>
+        </div>
+        <div className="grid grid-cols-7 gap-1 mb-1">
+          {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((d) => (
+            <div key={d} className="fs-9 font-mono uppercase c-faint text-center py-1">{d}</div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((d, i) => {
+            if (!d) return <div key={i} />;
+            const iso = dayISO(d);
+            const items = itemsByDate[iso] || [];
+            const isToday = iso === todayISO();
+            const isSelected = iso === selected;
+            return (
+              <button key={i} onClick={() => setSelected(iso)}
+                className={`aspect-square rounded-lg border p-1 flex flex-col items-start text-left transition-colors ${isSelected ? "c-border-accent" : "c-border"} ${isToday ? "c-bg-accent-a0" : "hover-bg-app"}`}>
+                <span className={`fs-10 font-mono ${isToday ? "c-accent" : "c-muted"}`}>{d}</span>
+                <div className="flex flex-wrap gap-0.5 mt-auto">
+                  {items.slice(0, 3).map((it, idx) => (
+                    <span key={idx} style={{ backgroundColor: it.color }} className="w-1.5 h-1.5 rounded-full" />
+                  ))}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="lg:col-span-2 c-bg-surface border c-border rounded-xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <span className="fs-11 uppercase tracking-widest c-muted font-mono">{fmtDay(selected) || "—"}</span>
+          <button onClick={() => onNavigate("content")} className="fs-11 font-mono uppercase c-accent hover:underline">Board →</button>
+        </div>
+        {(itemsByDate[selected] || []).length === 0 ? (
+          <div className="fs-11 c-faint font-mono italic py-6 text-center">nothing scheduled</div>
+        ) : (
+          <div className="space-y-2">
+            {(itemsByDate[selected] || []).map((it, idx) => (
+              <div key={idx} className="flex items-center gap-2 text-xs">
+                {it.type === "task" ? <CheckSquare size={12} className="c-idea flex-shrink-0" /> : <Circle size={8} fill={it.color} color={it.color} className="flex-shrink-0" />}
+                <span className="c-text truncate flex-1">{it.label || "Untitled"}</span>
+                <span className="c-muted font-mono fs-10">{it.model || "—"}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------- login ----------
+
+function LoginScreen({ models, settings, onLogin, onRegisterPassword }) {
+  const [tab, setTab] = useState("team");
+  const [teamPin, setTeamPin] = useState("");
+  const [creatorName, setCreatorName] = useState("");
+  const [creatorPassword, setCreatorPassword] = useState("");
+  const [error, setError] = useState("");
+
+  const submitTeam = () => {
+    const required = settings.adminPin || "";
+    if (required && teamPin !== required) { setError("Wrong PIN."); return; }
+    onLogin({ role: "admin", name: "Team" });
+  };
+
+  const matchedModel = models.find((mm) => mm.name.trim().toLowerCase() === creatorName.trim().toLowerCase());
+  const needsRegistration = creatorName.trim() && matchedModel && !matchedModel.pin;
+
+  const submitCreator = async () => {
+    const typed = creatorName.trim().toLowerCase();
+    const m = models.find((mm) => mm.name.trim().toLowerCase() === typed);
+    if (!m) { setError("No account with that name. Ask your manager to add you first."); return; }
+    if (!m.pin) {
+      if (!creatorPassword) { setError("Choose a password to finish setting up your account."); return; }
+      await onRegisterPassword(m.name, creatorPassword);
+      onLogin({ role: "creator", name: m.name });
+      return;
+    }
+    if (creatorPassword !== m.pin) { setError("Wrong name or password."); return; }
+    onLogin({ role: "creator", name: m.name });
+  };
+
+  return (
+    <div className="min-h-screen c-bg-app flex items-center justify-center px-4" style={{ fontFamily: "Inter, sans-serif" }}>
+      <style>{fontImport}</style>
+      <div className="w-full max-w-sm">
+        <div className="flex items-center justify-center gap-2 mb-8">
+          <Clapperboard size={22} className="c-accent" />
+          <span className="text-2xl font-extrabold tracking-tight c-text">AGENCY OS</span>
+        </div>
+
+        <div className="flex gap-1.5 c-bg-surface border c-border rounded-lg p-1 mb-5">
+          <button onClick={() => { setTab("team"); setError(""); }}
+            className={`flex-1 flex items-center justify-center gap-1.5 fs-11 font-mono uppercase py-2 rounded-lg ${tab === "team" ? "c-bg-accent c-onaccent font-semibold" : "c-muted"}`}>
+            <ShieldCheck size={13} /> Team
+          </button>
+          <button onClick={() => { setTab("creator"); setError(""); }}
+            className={`flex-1 flex items-center justify-center gap-1.5 fs-11 font-mono uppercase py-2 rounded-lg ${tab === "creator" ? "c-bg-accent c-onaccent font-semibold" : "c-muted"}`}>
+            <UserCircle2 size={13} /> Creator
+          </button>
+        </div>
+
+        <div className="c-bg-surface border c-border rounded-xl p-5">
+          {tab === "team" ? (
+            <>
+              <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">PIN</label>
+              <input type="password" value={teamPin} onChange={(e) => setTeamPin(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && submitTeam()} autoFocus
+                className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2.5 text-sm c-text mb-4 outline-none focus-border-accent" />
+              <button onClick={submitTeam}
+                className="w-full py-2.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold hover-bg-accent2">
+                Enter dashboard
+              </button>
+            </>
+          ) : (
+            <>
+              <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Your name</label>
+              <input value={creatorName} onChange={(e) => { setCreatorName(e.target.value); setError(""); }}
+                placeholder="Type your name" autoFocus
+                className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2.5 text-sm c-text mb-3 outline-none focus-border-accent" />
+              <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">
+                {needsRegistration ? "Choose a password" : "Password"}
+              </label>
+              <input type="password" value={creatorPassword} onChange={(e) => setCreatorPassword(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && submitCreator()}
+                className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2.5 text-sm c-text mb-1 outline-none focus-border-accent" />
+              {needsRegistration && (
+                <p className="fs-10 c-accent font-mono mb-3">First time here — this sets your password for next time.</p>
+              )}
+              <button onClick={submitCreator}
+                className={`w-full py-2.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold hover-bg-accent2 ${needsRegistration ? "mt-3" : "mt-3"}`}>
+                {needsRegistration ? "Create password & enter" : "Enter"}
+              </button>
+            </>
+          )}
+          {error && <p className="c-warn text-xs font-mono text-center mt-3">{error}</p>}
+        </div>
+        <p className="fs-10 c-faint font-mono text-center mt-4">
+          Password is a convenience gate for this internal tool, not encrypted security.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ---------- settings (admin pin) ----------
+
+const DEFAULT_INTEGRATIONS = [
+  { id: "onlyfans", name: "OnlyFans", status: "manual", note: "", help: "No official public API. Live sync not recommended, manual entry only." },
+  { id: "instagram", name: "Instagram / Social", status: "planned", note: "", help: "Needs a Business/Creator account linked to a Facebook Page, via Instagram Graph API." },
+  { id: "infloww", name: "Infloww", status: "planned", note: "", help: "API is in Beta, request access from your Infloww contact." },
+  { id: "buffer", name: "Buffer", status: "planned", note: "", help: "Has a real public API (personal API key from Buffer settings)." },
+  { id: "drive", name: "Google Drive", status: "planned", note: "", help: "Needs OAuth, only possible once this runs on a real backend." },
+];
+
+const STATUS_STYLES = {
+  connected: { label: "Connected", color: "#6FB07F" },
+  manual: { label: "Manual only", color: "#8B93A1" },
+  planned: { label: "Not connected", color: "#5C5C63" },
+};
+
+function SettingsPanel({ settings, persistSettings, integrations, persistIntegrations }) {
+  const [pin, setPin] = useState(settings.adminPin || "");
+  const [bibleUrl, setBibleUrl] = useState(settings.creatorBibleUrl || "");
+  const [saved, setSaved] = useState(false);
+  const save = async () => {
+    await persistSettings({ ...settings, adminPin: pin.replace(/\D/g, "").slice(0, 4), creatorBibleUrl: bibleUrl.trim() });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const list = integrations && integrations.length ? integrations : DEFAULT_INTEGRATIONS;
+  const updateIntegration = async (id, patch) => {
+    const next = list.map((i) => (i.id === id ? { ...i, ...patch } : i));
+    await persistIntegrations(next);
+  };
+
+  return (
+    <div className="max-w-lg">
+      <div className="mb-8">
+        <p className="c-muted text-sm mb-5">Set the team PIN used on the login screen.</p>
+        <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Team PIN</label>
+        <input value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="e.g. 4821"
+          className="w-full max-w-xs c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text mb-4 outline-none focus-border-accent" />
+        <button onClick={save}
+          className="py-2.5 px-4 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold hover-bg-accent2">
+          Save
+        </button>
+        {saved && <p className="c-success text-xs font-mono mt-3">Saved.</p>}
+        <p className="fs-10 c-faint font-mono mt-4">Model passwords are set per creator in Model Manager.</p>
+      </div>
+
+      <div className="border-t c-border pt-6 mb-8">
+        <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Creator Bible URL</label>
+        <p className="c-muted text-xs mb-2">Shown once to each creator right after her first login, embedded directly on the page via iframe. Can be a full URL on a separate site (e.g. your Creator Bible on its own GitHub Pages repo) — GitHub Pages doesn't block being embedded by default. This just won't render inside this Claude preview's own sandbox; test it after deploying for real.</p>
+        <input value={bibleUrl} onChange={(e) => setBibleUrl(e.target.value)} placeholder="https://yourname.github.io/creator-bible"
+          className="w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text mb-3 outline-none focus-border-accent" />
+        <button onClick={save}
+          className="py-2.5 px-4 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold hover-bg-accent2">
+          Save
+        </button>
+      </div>
+
+      <div className="border-t c-border pt-6">
+        <div className="flex items-center gap-2 mb-1.5">
+          <Plug size={15} className="c-accent" />
+          <span className="text-sm c-text font-medium">Integrations</span>
+        </div>
+        <p className="c-muted text-xs mb-4">Team-only. Placeholders for now, wired up one at a time as real API access comes through.</p>
+
+        <div className="space-y-2.5">
+          {list.map((i) => {
+            const st = STATUS_STYLES[i.status] || STATUS_STYLES.planned;
+            return (
+              <div key={i.id} className="c-bg-surface border c-border rounded-xl p-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm c-text">{i.name}</span>
+                  <span style={{ color: st.color, borderColor: st.color }} className="fs-9 font-mono uppercase border px-1.5 py-0.5 rounded-lg">
+                    {st.label}
+                  </span>
+                </div>
+                <p className="fs-10 c-muted font-mono mb-2">{i.help}</p>
+                <input value={i.note} onChange={(e) => updateIntegration(i.id, { note: e.target.value })}
+                  placeholder="API key / account note (kept in this workspace only)"
+                  className="w-full c-bg-app border c-border rounded-lg px-2.5 py-1.5 text-xs c-text outline-none focus-border-accent" />
+              </div>
+            );
+          })}
+        </div>
+        <p className="fs-10 c-faint font-mono mt-4">
+          Nothing here calls out to these services yet, it's a place to hold notes and keys until each is actually wired in.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ---------- stats (admin entry) ----------
+
+function StatsManager({ stats, persistStats, models, reels, persistReels }) {
+  const [adding, setAdding] = useState(false);
+  const [model, setModel] = useState("");
+  const [weekOf, setWeekOf] = useState(todayISO());
+  const [ofEarnings, setOfEarnings] = useState("");
+  const [ofSubs, setOfSubs] = useState("");
+  const [igFollowers, setIgFollowers] = useState("");
+  const [igReach, setIgReach] = useState("");
+  const [filter, setFilter] = useState(models[0]?.name || "");
+
+  const [reelAdding, setReelAdding] = useState(false);
+  const [reelModel, setReelModel] = useState("");
+  const [reelWeekOf, setReelWeekOf] = useState(todayISO());
+  const [reelTitle, setReelTitle] = useState("");
+  const [reelLink, setReelLink] = useState("");
+  const [reelViews, setReelViews] = useState("");
+  const [reelLikes, setReelLikes] = useState("");
+  const [reelShares, setReelShares] = useState("");
+  const [reelComments, setReelComments] = useState("");
+
+  const addEntry = async () => {
+    if (!model || !weekOf) return;
+    const entry = {
+      id: uid(), model, weekOf,
+      ofEarnings: Number(ofEarnings) || 0, ofSubs: Number(ofSubs) || 0,
+      igFollowers: Number(igFollowers) || 0, igReach: Number(igReach) || 0,
+      createdAt: Date.now(),
+    };
+    await persistStats([...stats, entry]);
+    setModel(""); setOfEarnings(""); setOfSubs(""); setIgFollowers(""); setIgReach(""); setAdding(false);
+  };
+
+  const deleteEntry = async (id) => {
+    await persistStats(stats.filter((s) => s.id !== id));
+  };
+
+  const addReel = async () => {
+    if (!reelModel || !reelWeekOf) return;
+    const entry = {
+      id: uid(), model: reelModel, weekOf: reelWeekOf, title: reelTitle, link: reelLink,
+      views: Number(reelViews) || 0, likes: Number(reelLikes) || 0,
+      shares: Number(reelShares) || 0, comments: Number(reelComments) || 0,
+      createdAt: Date.now(),
+    };
+    await persistReels([...reels, entry]);
+    setReelModel(""); setReelTitle(""); setReelLink(""); setReelViews(""); setReelLikes(""); setReelShares(""); setReelComments(""); setReelAdding(false);
+  };
+
+  const deleteReel = async (id) => {
+    await persistReels(reels.filter((r) => r.id !== id));
+  };
+
+  const visible = stats.filter((s) => s.model === filter).sort((a, b) => b.weekOf.localeCompare(a.weekOf));
+  const reelsSorted = [...reels].sort((a, b) => b.weekOf.localeCompare(a.weekOf) || b.views - a.views);
+
+  return (
+    <div>
+      <p className="c-muted text-sm mb-4">Manual entry for now, weekly OF earnings and IG stats per model. This is what feeds each creator's own dashboard and the agency dashboard.</p>
+
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {models.map((m) => (
+            <button key={m.name} onClick={() => setFilter(m.name)}
+              className={`fs-11 font-mono uppercase px-2.5 py-1 rounded-lg border ${filter === m.name ? "c-border-accent c-accent" : "c-border c-muted"}`}>
+              {m.name}
+            </button>
+          ))}
+        </div>
+        <button onClick={() => { setAdding(true); setModel(filter); }}
+          className="flex items-center gap-1.5 fs-11 font-mono uppercase tracking-wide c-bg-accent c-onaccent px-3 py-1.5 rounded-lg font-semibold hover-bg-accent2">
+          <Plus size={13} /> Add entry
+        </button>
+      </div>
+
+      {adding && (
+        <div className="mb-5 c-bg-surface border c-border rounded-xl p-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div>
+            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Model</label>
+            <select value={model} onChange={(e) => setModel(e.target.value)}
+              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent">
+              <option value="">—</option>
+              {models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Week of</label>
+            <input type="date" value={weekOf} onChange={(e) => setWeekOf(e.target.value)}
+              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+          </div>
+          <div>
+            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">OF earnings ($)</label>
+            <input type="number" value={ofEarnings} onChange={(e) => setOfEarnings(e.target.value)}
+              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+          </div>
+          <div>
+            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">OF subs</label>
+            <input type="number" value={ofSubs} onChange={(e) => setOfSubs(e.target.value)}
+              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+          </div>
+          <div>
+            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">IG followers</label>
+            <input type="number" value={igFollowers} onChange={(e) => setIgFollowers(e.target.value)}
+              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+          </div>
+          <div>
+            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">IG reach (7d)</label>
+            <input type="number" value={igReach} onChange={(e) => setIgReach(e.target.value)}
+              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+          </div>
+          <div className="col-span-2 md:col-span-3 flex gap-2">
+            <button onClick={addEntry} className="px-3 py-2 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase font-semibold">Save entry</button>
+            <button onClick={() => setAdding(false)} className="px-3 py-2 rounded-lg border c-border c-muted text-xs font-mono uppercase">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {!filter ? (
+        <div className="fs-12 c-faint font-mono italic py-10 text-center border border-dashed c-border rounded-xl">add a model first in Model Manager</div>
+      ) : visible.length === 0 ? (
+        <div className="fs-12 c-faint font-mono italic py-10 text-center border border-dashed c-border rounded-xl">no entries yet for {filter}</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="c-muted font-mono uppercase fs-10 border-b c-border">
+                <th className="text-left py-2 pr-3">Week</th>
+                <th className="text-right py-2 px-3">OF $</th>
+                <th className="text-right py-2 px-3">OF subs</th>
+                <th className="text-right py-2 px-3">IG followers</th>
+                <th className="text-right py-2 px-3">IG reach</th>
+                <th className="py-2 pl-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((s) => (
+                <tr key={s.id} className="border-b c-border c-text group">
+                  <td className="py-2 pr-3 font-mono">{fmtDay(s.weekOf)}</td>
+                  <td className="py-2 px-3 text-right font-mono">${s.ofEarnings.toLocaleString()}</td>
+                  <td className="py-2 px-3 text-right font-mono">{s.ofSubs.toLocaleString()}</td>
+                  <td className="py-2 px-3 text-right font-mono">{s.igFollowers.toLocaleString()}</td>
+                  <td className="py-2 px-3 text-right font-mono">{s.igReach.toLocaleString()}</td>
+                  <td className="py-2 pl-3 text-right">
+                    <button onClick={() => deleteEntry(s.id)} className="opacity-0 group-hover:opacity-100 c-muted hover-warn">
+                      <Trash2 size={12} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="border-t c-border pt-6 mt-8">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-sm c-text font-medium">Top reels</span>
+          <button onClick={() => setReelAdding(true)}
+            className="flex items-center gap-1.5 fs-11 font-mono uppercase tracking-wide c-bg-accent c-onaccent px-3 py-1.5 rounded-lg font-semibold hover-bg-accent2">
+            <Plus size={13} /> Add reel
+          </button>
+        </div>
+        <p className="c-muted text-xs mb-4">Log the top-performing reel per model per week. The single best one across all models feeds "Reel of the Week" on the Dashboard.</p>
+
+        {reelAdding && (
+          <div className="mb-5 c-bg-surface border c-border rounded-xl p-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div>
+              <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Model</label>
+              <select value={reelModel} onChange={(e) => setReelModel(e.target.value)}
+                className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent">
+                <option value="">—</option>
+                {models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Week of</label>
+              <input type="date" value={reelWeekOf} onChange={(e) => setReelWeekOf(e.target.value)}
+                className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+            </div>
+            <div>
+              <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Title / caption</label>
+              <input value={reelTitle} onChange={(e) => setReelTitle(e.target.value)}
+                className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+            </div>
+            <div className="col-span-2 md:col-span-3">
+              <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Link</label>
+              <input value={reelLink} onChange={(e) => setReelLink(e.target.value)} placeholder="https://instagram.com/reel/..."
+                className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+            </div>
+            <div>
+              <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Views</label>
+              <input type="number" value={reelViews} onChange={(e) => setReelViews(e.target.value)}
+                className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+            </div>
+            <div>
+              <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Likes</label>
+              <input type="number" value={reelLikes} onChange={(e) => setReelLikes(e.target.value)}
+                className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+            </div>
+            <div>
+              <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Shares</label>
+              <input type="number" value={reelShares} onChange={(e) => setReelShares(e.target.value)}
+                className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+            </div>
+            <div>
+              <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Comments</label>
+              <input type="number" value={reelComments} onChange={(e) => setReelComments(e.target.value)}
+                className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+            </div>
+            <div className="col-span-2 md:col-span-3 flex gap-2">
+              <button onClick={addReel} className="px-3 py-2 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase font-semibold">Save reel</button>
+              <button onClick={() => setReelAdding(false)} className="px-3 py-2 rounded-lg border c-border c-muted text-xs font-mono uppercase">Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {reelsSorted.length === 0 ? (
+          <div className="fs-12 c-faint font-mono italic py-10 text-center border border-dashed c-border rounded-xl">no reels logged yet</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="c-muted font-mono uppercase fs-10 border-b c-border">
+                  <th className="text-left py-2 pr-3">Week</th>
+                  <th className="text-left py-2 px-3">Model</th>
+                  <th className="text-left py-2 px-3">Title</th>
+                  <th className="text-right py-2 px-3">Views</th>
+                  <th className="text-right py-2 px-3">Likes</th>
+                  <th className="text-right py-2 px-3">Shares</th>
+                  <th className="text-right py-2 px-3">Comments</th>
+                  <th className="py-2 pl-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {reelsSorted.map((r) => (
+                  <tr key={r.id} className="border-b c-border c-text group">
+                    <td className="py-2 pr-3 font-mono">{fmtDay(r.weekOf)}</td>
+                    <td className="py-2 px-3">{r.model}</td>
+                    <td className="py-2 px-3 max-w-[200px] truncate">{r.link ? <a href={r.link} target="_blank" rel="noopener noreferrer" className="c-accent hover-accent-text">{r.title || "untitled"}</a> : (r.title || "untitled")}</td>
+                    <td className="py-2 px-3 text-right font-mono">{r.views.toLocaleString()}</td>
+                    <td className="py-2 px-3 text-right font-mono">{r.likes.toLocaleString()}</td>
+                    <td className="py-2 px-3 text-right font-mono">{r.shares.toLocaleString()}</td>
+                    <td className="py-2 px-3 text-right font-mono">{r.comments.toLocaleString()}</td>
+                    <td className="py-2 pl-3 text-right">
+                      <button onClick={() => deleteReel(r.id)} className="opacity-0 group-hover:opacity-100 c-muted hover-warn">
+                        <Trash2 size={12} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------- creator dashboard ----------
+
+function DeltaTag({ current, previous }) {
+  if (previous === undefined || previous === null) return null;
+  const diff = current - previous;
+  const pct = previous !== 0 ? (diff / previous) * 100 : 0;
+  if (diff === 0) return <span className="flex items-center gap-0.5 fs-10 font-mono c-muted"><Minus size={10} />0%</span>;
+  const up = diff > 0;
+  return (
+    <span className={`flex items-center gap-0.5 fs-10 font-mono ${up ? "c-success" : "c-warn"}`}>
+      {up ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+      {up ? "+" : ""}{pct.toFixed(0)}%
+    </span>
+  );
+}
+
+function StatCardBig({ icon: Icon, label, value, delta, color }) {
+  return (
+    <div className="c-bg-surface border c-border rounded-xl p-4 flex-1 minw-150">
+      <div className="flex items-center justify-between mb-2">
+        <Icon size={15} style={{ color }} />
+        {delta}
+      </div>
+      <div className="fs-10 uppercase tracking-widest c-muted font-mono mb-1">{label}</div>
+      <div className="text-xl md:text-2xl font-semibold c-text">{value}</div>
+    </div>
+  );
+}
+
+function CreatorDashboard({ stats, restrictModel }) {
+  const mine = stats.filter((s) => s.model === restrictModel).sort((a, b) => b.weekOf.localeCompare(a.weekOf));
+  const latest = mine[0];
+  const prev = mine[1];
+
+  if (!latest) {
+    return (
+      <div className="fs-12 c-faint font-mono italic py-16 text-center border border-dashed c-border rounded-xl">
+        No stats yet. Ask your manager to add this week's numbers.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex gap-3 flex-wrap mb-6">
+        <StatCardBig icon={DollarSign} label="OF earnings this week" value={`$${latest.ofEarnings.toLocaleString()}`}
+          delta={<DeltaTag current={latest.ofEarnings} previous={prev?.ofEarnings} />} color="#6FB07F" />
+        <StatCardBig icon={Users} label="OF subscribers" value={latest.ofSubs.toLocaleString()}
+          delta={<DeltaTag current={latest.ofSubs} previous={prev?.ofSubs} />} color="#E5335C" />
+        <StatCardBig icon={Instagram} label="IG followers" value={latest.igFollowers.toLocaleString()}
+          delta={<DeltaTag current={latest.igFollowers} previous={prev?.igFollowers} />} color="#E2725B" />
+        <StatCardBig icon={Eye} label="IG reach (7d)" value={latest.igReach.toLocaleString()}
+          delta={<DeltaTag current={latest.igReach} previous={prev?.igReach} />} color="#8B93A1" />
+      </div>
+
+      <div className="c-bg-surface border c-border rounded-xl p-4">
+        <span className="fs-11 uppercase tracking-widest c-muted font-mono mb-3 block">History</span>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="c-muted font-mono uppercase fs-10 border-b c-border">
+                <th className="text-left py-2 pr-3">Week</th>
+                <th className="text-right py-2 px-3">OF $</th>
+                <th className="text-right py-2 px-3">OF subs</th>
+                <th className="text-right py-2 px-3">IG followers</th>
+                <th className="text-right py-2 pl-3">IG reach</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mine.map((s) => (
+                <tr key={s.id} className="border-b c-border c-text">
+                  <td className="py-2 pr-3 font-mono">{fmtDay(s.weekOf)}</td>
+                  <td className="py-2 px-3 text-right font-mono">${s.ofEarnings.toLocaleString()}</td>
+                  <td className="py-2 px-3 text-right font-mono">{s.ofSubs.toLocaleString()}</td>
+                  <td className="py-2 px-3 text-right font-mono">{s.igFollowers.toLocaleString()}</td>
+                  <td className="py-2 pl-3 text-right font-mono">{s.igReach.toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <p className="fs-10 c-faint font-mono mt-3">Entered manually by your manager each week.</p>
+    </div>
+  );
+}
+
+// ---------- creator onboarding (first login) ----------
+
+function OnboardingScreen({ name, url, onContinue }) {
+  return (
+    <div className="min-h-screen c-bg-app flex flex-col" style={{ fontFamily: "Inter, sans-serif" }}>
+      <style>{fontImport}</style>
+      <div className="px-4 py-3 text-center border-b c-border">
+        <div className="flex items-center justify-center gap-2">
+          <Clapperboard size={16} className="c-accent" />
+          <span className="text-base font-extrabold tracking-tight c-text">Welcome, {name}</span>
+        </div>
+      </div>
+
+      <div className="flex-1 min-h-0">
+        {url ? (
+          <iframe src={url} title="Creator Bible" className="w-full h-full border-0" style={{ minHeight: "70vh" }} />
+        ) : (
+          <div className="flex items-center justify-center h-full py-16">
+            <p className="fs-11 c-faint font-mono text-center px-4">(Creator Bible link not set yet, ask your manager.)</p>
+          </div>
+        )}
+      </div>
+
+      <div className="px-4 py-3 border-t c-border space-y-2">
+        {url && (
+          <a href={url} target="_blank" rel="noopener noreferrer"
+            className="block w-full max-w-sm mx-auto text-center fs-11 font-mono c-muted hover-accent-text">
+            Not loading? Open it directly →
+          </a>
+        )}
+        <button onClick={onContinue}
+          className="w-full max-w-sm mx-auto block py-2.5 rounded-lg border c-border c-muted text-xs font-mono uppercase tracking-wide hover-border-accent hover-accent-text">
+          Continue to my dashboard (testing only)
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------- app shell ----------
+
+const NAV_ADMIN = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutGrid },
+  { id: "content", label: "Content Director", icon: Film },
+  { id: "calendar", label: "Calendar", icon: Calendar },
+  { id: "tasks", label: "Tasks", icon: CheckSquare },
+  { id: "stats", label: "Stats", icon: TrendingUp },
+  { id: "models", label: "Model Manager", icon: Users },
+  { id: "submit", label: "Submit Idea", icon: Send },
+  { id: "settings", label: "Settings", icon: Lock },
+];
+
+const NAV_CREATOR = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutGrid },
+  { id: "content", label: "My Scenes", icon: Film },
+  { id: "calendar", label: "My Calendar", icon: Calendar },
+  { id: "tasks", label: "My Tasks", icon: CheckSquare },
+  { id: "submit", label: "Submit Idea", icon: Send },
+];
+
+// ---------- persistent login (7 days) ----------
+// Uses real browser localStorage since this needs to survive closing the tab/browser.
+// Note: localStorage is disabled inside the Claude artifact preview sandbox, so this
+// only actually persists once the site is deployed for real (e.g. on GitHub Pages).
+
+const SESSION_KEY = "agencyos_session";
+const SESSION_DAYS = 7;
+
+function loadSavedSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed.expiresAt || parsed.expiresAt < Date.now()) {
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    return { role: parsed.role, name: parsed.name };
+  } catch {
+    return null;
+  }
+}
+
+function saveSession(session) {
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      ...session,
+      expiresAt: Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000,
+    }));
+  } catch {
+    // localStorage unavailable (e.g. inside the Claude preview sandbox) — session just won't persist here.
+  }
+}
+
+function clearSavedSession() {
+  try {
+    localStorage.removeItem(SESSION_KEY);
+  } catch {}
+}
+
+function App() {
+  const { value: cards, loading: cardsLoading, persist: persistCards } = usePersisted("pipeline:cards", []);
+  const { value: models, loading: modelsLoading, persist: persistModels } = usePersisted("pipeline:models", [
+    { name: "Anna", note: "", pin: "", onboarded: false, addedAt: Date.now() },
+    { name: "Vivien", note: "", pin: "", onboarded: false, addedAt: Date.now() },
+    { name: "Kuro", note: "", pin: "", onboarded: false, addedAt: Date.now() },
+    { name: "Lucie", note: "", pin: "", onboarded: false, addedAt: Date.now() },
+  ]);
+  const { value: tasks, loading: tasksLoading, persist: persistTasks } = usePersisted("pipeline:tasks", []);
+  const { value: stats, loading: statsLoading, persist: persistStats } = usePersisted("pipeline:stats", []);
+  const { value: reels, loading: reelsLoading, persist: persistReels } = usePersisted("pipeline:reels", []);
+  const { value: settings, loading: settingsLoading, persist: persistSettings } = usePersisted("pipeline:settings", { adminPin: "2748", creatorBibleUrl: "" });
+  const { value: integrations, loading: integrationsLoading, persist: persistIntegrations } = usePersisted("pipeline:integrations", DEFAULT_INTEGRATIONS);
+  const [session, setSession] = useState(() => loadSavedSession());
+  const [view, setView] = useState(null);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
+  const loading = cardsLoading || modelsLoading || tasksLoading || settingsLoading || statsLoading || reelsLoading || integrationsLoading;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen c-bg-app flex items-center justify-center">
+        <Loader2 className="animate-spin c-muted" size={20} />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <LoginScreen
+        models={models}
+        settings={settings}
+        onLogin={(s) => { saveSession(s); setSession(s); setView("dashboard"); setOnboardingDismissed(false); }}
+        onRegisterPassword={async (name, password) => {
+          await persistModels(models.map((m) => (m.name === name ? { ...m, pin: password } : m)));
+        }}
+      />
+    );
+  }
+
+  if (session.role === "creator" && !onboardingDismissed) {
+    const record = models.find((m) => m.name === session.name);
+    if (record && (!record.onboarded || record.alwaysOnboard)) {
+      return (
+        <OnboardingScreen
+          name={session.name}
+          url={settings.creatorBibleUrl}
+          onContinue={async () => {
+            setOnboardingDismissed(true);
+            await persistModels(models.map((m) => (m.name === session.name ? { ...m, onboarded: true } : m)));
+          }}
+        />
+      );
+    }
+  }
+
+  const NAV = session.role === "admin" ? NAV_ADMIN : NAV_CREATOR;
+  const restrictModel = session.role === "creator" ? session.name : undefined;
+  const currentView = view || "dashboard";
+
+  return (
+    <div className="min-h-screen c-bg-app" style={{ fontFamily: "Inter, sans-serif" }}>
+      <style>{fontImport}</style>
+
+      <div className="flex min-h-screen">
+        {/* Desktop sidebar */}
+        <aside className="hidden md:flex w-56 border-r c-border c-bg-panel flex-shrink-0 flex-col">
+          <div className="px-4 py-5 flex items-center gap-2 border-b c-border">
+            <Clapperboard size={18} className="c-accent" />
+            <span className="text-xl font-extrabold tracking-tight c-text">
+              AGENCY OS
+            </span>
+          </div>
+          <nav className="flex-1 px-2 py-3 space-y-1">
+            {NAV.map((n) => {
+              const Icon = n.icon;
+              const activeNav = currentView === n.id;
+              return (
+                <button key={n.id} onClick={() => setView(n.id)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg fs-13 transition-colors ${activeNav ? "c-bg-accent-a1 c-accent" : "c-muted hover-bg-surface hover-text-primary"}`}>
+                  <Icon size={15} />
+                  {n.label}
+                </button>
+              );
+            })}
+          </nav>
+          <div className="px-4 py-3 border-t c-border">
+            <div className="flex items-center gap-2 mb-3">
+              <Circle size={7} fill="#6FB07F" color="#6FB07F" />
+              <span className="fs-10 font-mono uppercase tracking-widest c-muted">All systems online</span>
+            </div>
+            <button onClick={() => { clearSavedSession(); setSession(null); setView(null); setOnboardingDismissed(false); }}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg fs-12 c-muted hover-bg-surface hover-warn transition-colors">
+              <LogOut size={14} /> Sign out {session.role === "creator" ? `(${session.name})` : ""}
+            </button>
+          </div>
+        </aside>
+
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Mobile top bar */}
+          <div className="md:hidden flex items-center justify-between px-4 py-3 border-b c-border c-bg-panel sticky top-0 z-30">
+            <div className="flex items-center gap-2">
+              <Clapperboard size={17} className="c-accent" />
+              <span className="text-lg font-extrabold tracking-tight c-text">
+                AGENCY OS
+              </span>
+            </div>
+            <button onClick={() => { clearSavedSession(); setSession(null); setView(null); setOnboardingDismissed(false); }} className="c-muted p-1.5" aria-label="Sign out">
+              <LogOut size={17} />
+            </button>
+          </div>
+
+          <main className="flex-1 px-4 md:px-6 py-4 md:py-6 overflow-x-hidden pb-24 md:pb-6">
+            <div className="mb-5 md:mb-6">
+              <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight c-text">
+                {NAV.find((n) => n.id === currentView)?.label}
+              </h1>
+            </div>
+
+            {currentView === "dashboard" && (session.role === "admin"
+              ? <Dashboard cards={cards} models={models} stats={stats} reels={reels} onNavigate={setView} />
+              : <CreatorDashboard stats={stats} restrictModel={restrictModel} />)}
+            {currentView === "content" && <ContentDirector cards={cards} persistCards={persistCards} models={models} restrictModel={restrictModel} />}
+            {currentView === "calendar" && <CalendarView cards={cards} tasks={tasks} onNavigate={setView} restrictModel={restrictModel} />}
+            {currentView === "tasks" && <TaskManager tasks={tasks} persistTasks={persistTasks} models={models} restrictModel={restrictModel} />}
+            {currentView === "stats" && <StatsManager stats={stats} persistStats={persistStats} models={models} reels={reels} persistReels={persistReels} />}
+            {currentView === "models" && <ModelManager models={models} persistModels={persistModels} cards={cards} />}
+            {currentView === "submit" && <CreatorForm models={models} cards={cards} persistCards={persistCards} restrictModel={restrictModel} />}
+            {currentView === "settings" && <SettingsPanel settings={settings} persistSettings={persistSettings} integrations={integrations} persistIntegrations={persistIntegrations} />}
+          </main>
+        </div>
+      </div>
+
+      {/* Mobile bottom tab bar */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 c-bg-panel border-t c-border flex overflow-x-auto">
+        {NAV.map((n) => {
+          const Icon = n.icon;
+          const activeNav = currentView === n.id;
+          return (
+            <button key={n.id} onClick={() => setView(n.id)}
+              className={`flex-1 minw-64 flex flex-col items-center gap-1 py-2.5 ${activeNav ? "c-accent" : "c-muted"}`}>
+              <Icon size={17} />
+              <span className="fs-9 font-mono uppercase tracking-wide leading-none text-center px-0.5">{n.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+</script>
+</body>
+</html>
