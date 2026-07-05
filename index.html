@@ -183,14 +183,14 @@ const TABLES = {
       ig_handle: m.igHandle || "", x_handle: m.xHandle || "", tiktok_handle: m.tiktokHandle || "",
       of_url: m.ofUrl || "", drive_url: m.driveUrl || "", bio: m.bio || "",
       bio_received_at: m.bioReceivedAt ? new Date(m.bioReceivedAt).toISOString() : null,
-      always_onboard: !!m.alwaysOnboard, agency: m.agency || "CZ",
+      always_onboard: !!m.alwaysOnboard, agency: m.agency || "CZ", buffer_channel_id: m.bufferChannelId || "",
     }),
     fromDb: (r) => ({
       name: r.name, note: r.note || "", pin: r.pin || "", onboarded: !!r.onboarded,
       igHandle: r.ig_handle || "", xHandle: r.x_handle || "", tiktokHandle: r.tiktok_handle || "",
       ofUrl: r.of_url || "", driveUrl: r.drive_url || "", bio: r.bio || "",
       bioReceivedAt: r.bio_received_at ? new Date(r.bio_received_at).getTime() : null,
-      alwaysOnboard: !!r.always_onboard, agency: r.agency || "CZ",
+      alwaysOnboard: !!r.always_onboard, agency: r.agency || "CZ", bufferChannelId: r.buffer_channel_id || "",
       addedAt: r.added_at ? new Date(r.added_at).getTime() : Date.now(),
     }),
   },
@@ -850,6 +850,11 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard }
             <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Google Drive folder</label>
             <input value={form.driveUrl || ""} onChange={(e) => set("driveUrl", e.target.value)} placeholder="https://drive.google.com/..."
               className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+          </div>
+          <div>
+            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Buffer Channel ID</label>
+            <input value={form.bufferChannelId || ""} onChange={(e) => set("bufferChannelId", e.target.value)} placeholder="from Buffer's channels query"
+              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
           </div>
         </div>
 
@@ -2221,7 +2226,6 @@ const NAV_ADMIN = [
   { id: "stats", label: "Stats", icon: TrendingUp },
   { id: "trends", label: "Trends", icon: Flame },
   { id: "models", label: "Model Manager", icon: Users },
-  { id: "submit", label: "Submit Idea", icon: Send },
   { id: "settings", label: "Settings", icon: Lock },
 ];
 
@@ -2231,7 +2235,6 @@ const NAV_CREATOR = [
   { id: "calendar", label: "My Calendar", icon: Calendar },
   { id: "tasks", label: "My Tasks", icon: CheckSquare },
   { id: "trending", label: "Trending", icon: Flame },
-  { id: "submit", label: "Submit Idea", icon: Send },
 ];
 
 // ---------- persistent login (7 days) ----------
@@ -2440,7 +2443,6 @@ function App() {
             {currentView === "trends" && <TrendManager trends={trends} persistTrends={persistTrends} />}
             {currentView === "trending" && <CreatorTrending trends={trends} agency={session.agency} />}
             {currentView === "models" && <ModelManager models={agencyModels} persistModels={scopedPersistModels} cards={scopedCards} agency={session.agency} />}
-            {currentView === "submit" && <CreatorForm models={models} cards={cards} persistCards={persistCards} restrictModel={restrictModel} />}
             {currentView === "settings" && <SettingsPanel settings={settings} persistSettings={persistSettings} integrations={integrations} persistIntegrations={scopedPersistIntegrations} agency={session.agency} />}
           </main>
         </div>
