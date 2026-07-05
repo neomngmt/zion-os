@@ -1648,34 +1648,30 @@ function CreatorDashboard({ stats, restrictModel }) {
 
 function OnboardingScreen({ name, url, onContinue }) {
   return (
-    <div className="min-h-screen c-bg-app flex flex-col" style={{ fontFamily: "Inter, sans-serif" }}>
+    <div className="c-bg-app" style={{ fontFamily: "Inter, sans-serif", height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <style>{fontImport}</style>
-      <div className="px-4 py-3 text-center border-b c-border">
-        <div className="flex items-center justify-center gap-2">
-          <Clapperboard size={16} className="c-accent" />
-          <span className="text-base font-extrabold tracking-tight c-text">Welcome, {name}</span>
-        </div>
-      </div>
 
-      <div className="flex-1 min-h-0">
+      <div style={{ flex: 1, position: "relative" }}>
         {url ? (
-          <iframe src={url} title="Creator Bible" className="w-full h-full border-0" style={{ minHeight: "70vh" }} />
+          <iframe
+            src={url}
+            title="Creator Bible"
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
+          />
         ) : (
-          <div className="flex items-center justify-center h-full py-16">
+          <div className="flex items-center justify-center h-full">
             <p className="fs-11 c-faint font-mono text-center px-4">(Creator Bible link not set yet, ask your manager.)</p>
           </div>
         )}
       </div>
 
-      <div className="px-4 py-3 border-t c-border space-y-2">
+      <div className="c-bg-panel px-4 py-2 flex-shrink-0" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px" }}>
         {url && (
-          <a href={url} target="_blank" rel="noopener noreferrer"
-            className="block w-full max-w-sm mx-auto text-center fs-11 font-mono c-muted hover-accent-text">
-            Not loading? Open it directly →
+          <a href={url} target="_blank" rel="noopener noreferrer" className="fs-10 font-mono c-faint hover-accent-text">
+            Not loading? Open directly →
           </a>
         )}
-        <button onClick={onContinue}
-          className="w-full max-w-sm mx-auto block py-2.5 rounded-lg border c-border c-muted text-xs font-mono uppercase tracking-wide hover-border-accent hover-accent-text">
+        <button onClick={onContinue} className="fs-10 font-mono c-faint hover-accent-text uppercase tracking-wide">
           Continue to my dashboard (testing only)
         </button>
       </div>
