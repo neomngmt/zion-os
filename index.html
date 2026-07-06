@@ -149,6 +149,10 @@ const ICON_DATA = {
     ["path", { d: "M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" }],
     ["path", { d: "M10.3 21a1.94 1.94 0 0 0 3.4 0" }],
   ],
+  Settings: [
+    ["path", { d: "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" }],
+    ["circle", { cx: "12", cy: "12", r: "3" }],
+  ],
   Plug: [
     ["path", { d: "M12 22v-5" }],
     ["path", { d: "M9 8V2" }],
@@ -177,7 +181,7 @@ const {
   Plus, X, Clapperboard, Users, ChevronRight, MapPin, Calendar, User,
   Trash2, Loader2, LayoutGrid, Film, UserCircle2, Send, Circle,
   CheckCircle2, Repeat, ChevronLeft, CheckSquare, Lock, LogOut, ShieldCheck,
-  TrendingUp, TrendingDown, DollarSign, Instagram, Eye, Minus, Plug, Flame, Sparkles, Mic, Bell,
+  TrendingUp, TrendingDown, DollarSign, Instagram, Eye, Minus, Plug, Flame, Sparkles, Mic, Bell, Settings,
 } = Icons;
 
 // ---------------------------------------------------------------------------
@@ -2049,6 +2053,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
   const [listening, setListening] = useState(false);
   const [heard, setHeard] = useState("");
   const [speaking, setSpeaking] = useState(false);
+  const speakingRef = useRef(false);
   const scrollRef = useRef(null);
   const recognitionRef = useRef(null);
   const thinkingRef = useRef(false);
@@ -2100,9 +2105,9 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
       if (window.speechSynthesis) {
         const utter = new window.SpeechSynthesisUtterance(reply);
         utter.rate = 1.02;
-        utter.onstart = () => setSpeaking(true);
-        utter.onend = () => setSpeaking(false);
-        utter.onerror = () => setSpeaking(false);
+        utter.onstart = () => { setSpeaking(true); speakingRef.current = true; };
+        utter.onend = () => { setSpeaking(false); speakingRef.current = false; };
+        utter.onerror = () => { setSpeaking(false); speakingRef.current = false; };
         window.speechSynthesis.speak(utter);
       }
     } catch (e) {
@@ -2142,16 +2147,16 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
     try { oneShot.start(); } catch {}
   };
 
-  // Always-on listener: since you're already on the Neo page, anything you
-  // say (once speech recognition finalizes it) is sent straight to Neo — no
-  // wake word needed here (that's still useful for the "click the orb"
-  // one-shot flow via orbClick, but on this page every phrase is for Neo).
+  // Always-on listener: runs one recognition "session" at a time (continuous
+  // mode was unreliable — isFinal often never fired on longer sentences).
+  // Each session ends on a natural pause, which reliably finalizes, then we
+  // immediately restart a new session so it's always ready again.
   useEffect(() => {
     if (!speechSupported) return;
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     const rec = new SR();
     rec.lang = "en-US";
-    rec.continuous = true;
+    rec.continuous = false;
     rec.interimResults = true;
     rec.maxAlternatives = 1;
     let stoppedByUs = false;
@@ -2159,9 +2164,15 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
     rec.onstart = () => setListening(true);
     rec.onend = () => {
       setListening(false);
-      if (!stoppedByUs) { try { rec.start(); } catch {} } // keep it always-on
+      if (stoppedByUs) return;
+      const tryRestart = () => {
+        if (stoppedByUs) return;
+        if (speakingRef.current || thinkingRef.current) { setTimeout(tryRestart, 300); return; }
+        try { rec.start(); } catch {}
+      };
+      tryRestart();
     };
-    rec.onerror = () => { /* mic denied, or silence timeout — onend will retry */ };
+    rec.onerror = () => { /* mic denied, or nothing heard — onend will retry */ };
     rec.onresult = (e) => {
       const res = e.results[e.results.length - 1];
       const transcript = res[0].transcript.trim();
@@ -2833,7 +2844,7 @@ const NAV_ADMIN = [
   { id: "trends", label: "Trends", icon: Flame },
   { id: "neo", label: "Neo", icon: Sparkles },
   { id: "models", label: "Model Manager", icon: Users },
-  { id: "settings", label: "Settings", icon: Lock },
+  { id: "settings", label: "Settings", icon: Settings },
 ];
 
 const NAV_CREATOR = [
@@ -2983,39 +2994,47 @@ function App() {
     : persistIntegrations;
 
   return (
-    <div className="min-h-screen c-bg-app" style={{ fontFamily: "Inter, sans-serif" }}>
+    <div className="min-h-screen c-bg-app flex flex-col" style={{ fontFamily: "Inter, sans-serif" }}>
       <style>{fontImport}</style>
 
-      <div className="flex min-h-screen">
-        {/* Desktop sidebar */}
-        <aside className="hidden md:flex w-56 border-r c-border c-bg-panel flex-shrink-0 flex-col">
-          <div className="px-3 py-4 flex items-center justify-between border-b c-border gap-1">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <Clapperboard size={16} className="c-accent flex-shrink-0" />
-              <span className="text-sm font-extrabold tracking-tight c-text truncate">
-                AGENCY OS
-              </span>
+      {/* Desktop full-width top bar */}
+      <div className="hidden md:flex items-center justify-between px-4 py-3 border-b c-border c-bg-panel flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <Clapperboard size={18} className="c-accent" />
+          <span className="text-lg font-extrabold tracking-tight c-text">
+            AGENCY OS
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {session.role === "admin" && (
+            <button onClick={() => setView("settings")} title="Settings"
+              className="p-1.5 rounded-lg c-muted hover-text-primary hover-bg-surface transition-colors">
+              <Settings size={15} />
+            </button>
+          )}
+          {session.role === "creator" && (
+            <NotificationBell model={models.find((m) => m.name === session.name)} cards={cards} tasks={tasks} trends={trends}
+              agency={session.agency} models={models} persistModels={persistModels} onNavigate={setView} />
+          )}
+          <div className="flex items-center gap-2 pl-1">
+            <div title={`${session.name} — ${session.agency}`} className="w-7 h-7 rounded-full c-bg-accent c-onaccent flex items-center justify-center fs-12 font-mono font-bold flex-shrink-0">
+              {(session.name || "?").slice(0, 1).toUpperCase()}
             </div>
-            <div className="flex items-center gap-0.5 flex-shrink-0">
-              {session.role === "admin" && (
-                <button onClick={() => setView("settings")} title="Settings"
-                  className="p-1 rounded-lg c-muted hover-text-primary hover-bg-surface transition-colors">
-                  <Lock size={13} />
-                </button>
-              )}
-              {session.role === "creator" && (
-                <NotificationBell model={models.find((m) => m.name === session.name)} cards={cards} tasks={tasks} trends={trends}
-                  agency={session.agency} models={models} persistModels={persistModels} onNavigate={setView} />
-              )}
-              <div title={`${session.name} — ${session.agency}`} className="w-6 h-6 rounded-full c-bg-accent c-onaccent flex items-center justify-center fs-10 font-mono font-bold flex-shrink-0">
-                {(session.name || "?").slice(0, 1).toUpperCase()}
-              </div>
-              <button onClick={() => { clearSavedSession(); setSession(null); setView(null); setOnboardingDismissed(false); }}
-                title="Sign out" className="p-1 rounded-lg c-muted hover-warn hover-bg-surface transition-colors">
-                <LogOut size={13} />
-              </button>
+            <div className="leading-tight">
+              <div className="fs-12 font-semibold c-text">{session.name}</div>
+              <div className="fs-9 font-mono uppercase tracking-wide c-faint">{session.agency} {session.role === "admin" ? "team" : ""}</div>
             </div>
           </div>
+          <button onClick={() => { clearSavedSession(); setSession(null); setView(null); setOnboardingDismissed(false); }}
+            title="Sign out" className="p-1.5 rounded-lg c-muted hover-warn hover-bg-surface transition-colors ml-1">
+            <LogOut size={15} />
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-1 min-h-0">
+        {/* Desktop sidebar */}
+        <aside className="hidden md:flex w-56 border-r c-border c-bg-panel flex-shrink-0 flex-col">
           <nav className="flex-1 px-2 py-3 space-y-1">
             {NAV.map((n) => {
               const Icon = n.icon;
@@ -3049,7 +3068,7 @@ function App() {
             <div className="flex items-center gap-1.5">
               {session.role === "admin" && (
                 <button onClick={() => setView("settings")} title="Settings" className="c-muted p-1.5" aria-label="Settings">
-                  <Lock size={16} />
+                  <Settings size={16} />
                 </button>
               )}
               {session.role === "creator" && (
