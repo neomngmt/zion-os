@@ -3507,6 +3507,8 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
           message: text,
           agency,
           context: {
+            viewerRole: session.role,
+            viewerName: session.name,
             cardCount: cards.length,
             openTasks: tasks.filter((t) => t.status !== "done").length,
             overdueTasks: tasks.filter((t) => t.status !== "done" && t.dueDate && t.dueDate < todayISO()).length,
@@ -3575,6 +3577,11 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
       setThinking(false);
       setMessages((m) => [...m, { role: "neo", text: "(stopped)" }]);
       return;
+    }
+    if (speakingRef.current) {
+      window.speechSynthesis.cancel();
+      speakingRef.current = false;
+      setSpeaking(false);
     }
     startActiveListen();
   };
@@ -3691,7 +3698,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
     <div className="-m-6 p-6" style={{ background: "radial-gradient(ellipse at 50% 0%, #07090a 0%, #050605 70%)", minHeight: "calc(100vh - 160px)", fontFamily: "'JetBrains Mono', monospace" }}>
       {/* mini topbar */}
       <div className="flex items-center justify-between pb-3 mb-5" style={{ borderBottom: `1px solid ${border}` }}>
-        <div className="fs-11 font-bold tracking-widest" style={{ color: neoGreen, textShadow: `0 0 8px ${neoGreen}88` }}>
+        <div className="font-bold tracking-widest" style={{ color: neoGreen, textShadow: `0 0 8px ${neoGreen}88`, fontSize: "20px" }}>
           NEO <span style={{ color: textDim, fontWeight: 400 }}>// AGENCY OS INTELLIGENCE SYSTEM</span>
         </div>
         <NeoClock />
@@ -4657,11 +4664,13 @@ function App() {
           </div>
 
           <main key={currentView} className="flex-1 px-4 md:px-6 py-4 md:py-6 overflow-x-hidden pb-24 md:pb-6 anim-view">
-            <div className="mb-5 md:mb-6">
-              <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight c-text">
-                {NAV.find((n) => n.id === currentView)?.label}
-              </h1>
-            </div>
+            {currentView !== "neo" && (
+              <div className="mb-5 md:mb-6">
+                <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight c-text">
+                  {NAV.find((n) => n.id === currentView)?.label}
+                </h1>
+              </div>
+            )}
 
             {currentView === "dashboard" && (session.role === "admin"
               ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} />
