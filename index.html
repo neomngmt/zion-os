@@ -1624,7 +1624,10 @@ a:focus-visible, button:focus-visible{ outline:2px solid var(--lp-green); outlin
 @media (max-width:860px){ .connector{ display:none; } }
 
 
-.panel{ margin-top:0; border:1px solid var(--lp-border); border-radius:16px; background:linear-gradient(180deg, rgba(18,179,76,0.04), transparent 40%), var(--lp-panel); overflow:hidden; }
+.panel{ margin-top:0; border:1px solid var(--lp-border); border-radius:16px; background:linear-gradient(180deg, rgba(18,179,76,0.04), transparent 40%), var(--lp-panel); overflow:hidden; transition:box-shadow .5s ease, border-color .5s ease; }
+.panel.connector-lit{ border-color:var(--lp-green); box-shadow:0 0 44px rgba(18,179,76,0.32), inset 0 0 30px rgba(18,179,76,0.08); }
+.instruments-grid::before{ transition:box-shadow .4s ease, background-color .4s ease, border-color .4s ease; }
+.instruments-grid.connector-lit::before{ background:var(--lp-green); border-color:var(--lp-green); box-shadow:0 0 18px var(--lp-green); }
 
 /* ---------- system map ---------- */
 .map-panel{ padding:26px 30px 36px; }
@@ -1829,7 +1832,46 @@ a:focus-visible, button:focus-visible{ outline:2px solid var(--lp-green); outlin
 .closing h2{ font-size:clamp(28px,5vw,44px); font-weight:800; margin-bottom:18px; letter-spacing:-0.01em; }
 .closing p{ color:var(--lp-text-dim); margin-bottom:32px; }
 
-footer{ border-top:1px solid var(--lp-border); padding:26px 0; text-align:center; font-size:11px; color:var(--lp-text-dim); letter-spacing:1px; }
+.site-footer{ border-top:1px solid var(--lp-border); padding:26px 24px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; font-size:11px; color:var(--lp-text-dim); letter-spacing:1px; max-width:1180px; margin:0 auto; }
+.footer-mark{ color:var(--lp-green); }
+.footer-links{ display:flex; align-items:center; gap:26px; flex-wrap:wrap; }
+.footer-links a{ color:var(--lp-text-dim); text-decoration:none; transition:color .15s ease; }
+.footer-links a:hover{ color:var(--lp-green-soft); }
+.footer-copy{ color:var(--lp-text-dim); }
+@media (max-width:700px){
+  .site-footer{ flex-direction:column-reverse; align-items:center; gap:16px; }
+  .footer-links{ flex-wrap:nowrap; justify-content:center; gap:16px; font-size:10px; width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .footer-links a, .footer-copy{ white-space:nowrap; flex-shrink:0; }
+  .footer-brand{ width:100%; text-align:center; }
+}
+
+.legal-page{ display:none; min-height:100vh; }
+.legal-page.active{ display:block; }
+.legal-wrap{ max-width:760px; padding:60px 24px 100px; }
+.legal-back{ color:var(--lp-text-dim); text-decoration:none; font-size:13px; display:inline-block; margin-bottom:40px; }
+.legal-back:hover{ color:var(--lp-green); }
+.legal-badge{ display:inline-block; font-size:11px; letter-spacing:1.5px; color:var(--lp-green-soft); border:1px solid var(--lp-border); padding:6px 14px; border-radius:999px; margin-bottom:20px; }
+.legal-page h1{ font-size:clamp(30px,5vw,44px); font-weight:800; margin-bottom:10px; }
+.legal-date{ color:var(--lp-text-dim); font-size:13px; margin-bottom:32px; }
+.legal-intro{ color:var(--lp-text-dim); font-size:16px; line-height:1.7; margin-bottom:40px; }
+.legal-page h2{ font-size:20px; font-weight:700; margin:40px 0 14px; }
+.legal-page p{ color:var(--lp-text-dim); font-size:15px; line-height:1.7; margin-bottom:14px; }
+.legal-list{ list-style:none; margin:16px 0; }
+.legal-list li{ font-size:15px; color:var(--lp-text-dim); line-height:1.7; padding:8px 0 8px 20px; position:relative; }
+.legal-list li::before{ content:"•"; position:absolute; left:0; color:var(--lp-green); }
+.legal-list li b{ color:var(--lp-text); font-weight:600; }
+
+.status-banner{ display:flex; align-items:center; gap:16px; border:1px solid var(--lp-green-dim); background:rgba(18,179,76,0.08); border-radius:14px; padding:22px 24px; margin:30px 0 36px; }
+.status-check{ width:34px; height:34px; border-radius:50%; border:2px solid var(--lp-green); color:var(--lp-green); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+.status-banner-title{ color:var(--lp-green-soft); font-weight:700; font-size:17px; }
+.status-banner-sub{ color:var(--lp-text-dim); font-size:13px; margin-top:4px; }
+.status-tag{ font-size:11px; letter-spacing:2px; color:var(--lp-text-dim); margin-bottom:14px; }
+.status-row{ display:flex; align-items:center; gap:14px; border:1px solid var(--lp-border); border-radius:12px; padding:16px 20px; margin-bottom:12px; }
+.status-dot{ width:8px; height:8px; border-radius:50%; background:var(--lp-green); box-shadow:0 0 6px var(--lp-green); flex-shrink:0; }
+.status-row > div:nth-child(2){ flex:1; }
+.status-name{ font-size:15px; font-weight:600; }
+.status-sub{ font-size:11px; color:var(--lp-text-dim); margin-top:3px; letter-spacing:1px; }
+.status-ok{ color:var(--lp-green-soft); font-size:13px; }
 
 /* ---------- interactivity ---------- */
 .nav-bar{ position:sticky; top:0; z-index:50; transition:background-color .35s ease, backdrop-filter .35s ease, border-color .35s ease; border-bottom:1px solid transparent; }
@@ -1880,6 +1922,8 @@ const LANDING_PAGE_BODY = `
 </svg>
 
 <div class="page-glow" id="pageGlow"></div>
+
+<div id="mainContent">
 
 <div class="nav-bar" id="navBar">
   <div class="wrap">
@@ -2001,7 +2045,7 @@ const LANDING_PAGE_BODY = `
       <p class="section-sub">Four numbered instruments, tuned daily. The arrows take you to the floor.</p>
     </div>
 
-    <div class="connector"><svg class="connector-svg" viewBox="0 0 60 240" preserveAspectRatio="none"><path class="connector-path" d="M 15 0 L 30 240"/></svg><div class="connector-dot"></div></div>
+    <div class="connector"><svg class="connector-svg" viewBox="0 0 60 240" preserveAspectRatio="none"><path class="connector-path" d="M 30 0 L 30 240"/></svg><div class="connector-dot"></div></div>
 
     <div class="panel instruments-grid" data-reveal>
       <div class="instrument">
@@ -2395,7 +2439,97 @@ const LANDING_PAGE_BODY = `
   </div>
 </div>
 
-<footer class="mono">AGENCY OS — INTERNAL TOOL, BUILT FOR ONE AGENCY, USED EVERY MORNING</footer>
+<footer class="site-footer mono">
+  <div class="footer-brand"><span class="footer-mark">◈</span> AGENCY OS · THE CREATOR COMMAND ROOM</div>
+  <div class="footer-links">
+    <a href="#" data-page="privacy">Privacy</a>
+    <a href="#" data-page="terms">Terms</a>
+    <a href="#" data-page="status">Status</a>
+    <a href="#" data-page="contact">Contact</a>
+    <a href="https://neomngmt.github.io/agencyos/" class="footer-signin">Sign in</a>
+    <span class="footer-copy">© 2026</span>
+  </div>
+</footer>
+
+</div>
+
+<div class="legal-page" id="page-privacy">
+  <div class="wrap legal-wrap">
+    <a href="#" class="legal-back mono">← Back</a>
+    <div class="legal-badge mono">LEGAL</div>
+    <h1>Privacy Policy</h1>
+    <div class="legal-date mono">Effective January 12, 2026</div>
+    <p class="legal-intro">Agency OS ("we", "us") is a private, invite-only tool built to run one agency's roster. This page explains what data it stores, why, and how long it keeps it. It is not sold or shared with advertisers.</p>
+
+    <h2>1. Data we store</h2>
+    <p>Only what's needed to run the board:</p>
+    <ul class="legal-list">
+      <li><b>Account identifiers</b> — name, role (Team or Creator), and the agency (CZ/US) you belong to.</li>
+      <li><b>Authentication data</b> — Team PINs and Creator passwords, stored hashed, never in plain text.</li>
+      <li><b>Operational data you enter</b> — model names, social handles, content pipeline cards, task notes.</li>
+      <li><b>Buffer &amp; revenue data</b> — post metrics synced daily via the Buffer API, and OnlyFans earnings entered manually each week.</li>
+      <li><b>Assistant queries</b> — messages sent to Neo, used only to generate an answer from your own data.</li>
+    </ul>
+    <p>We do not collect advertising identifiers, browsing history outside the app, or precise location.</p>
+
+    <h2>2. Where it lives</h2>
+    <p>Everything is stored in Supabase (hosted Postgres), encrypted at rest. The Buffer sync and Neo assistant run as serverless functions that read and write to that same database, nothing is copied elsewhere.</p>
+
+    <h2>3. Your rights</h2>
+    <p>Since this is a private tool with a small, known roster, access or deletion requests go directly to the agency owner rather than through a support form.</p>
+  </div>
+</div>
+
+<div class="legal-page" id="page-terms">
+  <div class="wrap legal-wrap">
+    <a href="#" class="legal-back mono">← Back</a>
+    <div class="legal-badge mono">LEGAL</div>
+    <h1>Terms of Service</h1>
+    <div class="legal-date mono">Effective January 12, 2026</div>
+    <p class="legal-intro">These terms govern access to and use of Agency OS. By signing in, you agree to them.</p>
+
+    <h2>1. The service</h2>
+    <p>Agency OS is an internal operations tool for one agency: content pipeline, model roster, revenue ledger, and Neo, an assistant that answers from your own data. Features may be added, changed, or removed at any time.</p>
+
+    <h2>2. Accounts</h2>
+    <p>Team members sign in with a PIN set per agency. Each creator signs in with her own name and sets a password the first time she logs in. Credentials are personal; sharing a login between people isn't allowed.</p>
+
+    <h2>3. Acceptable use</h2>
+    <p>The tool is for running this agency's own roster. No unauthorized access, no scraping beyond what the Buffer integration already does, no using the assistant to generate anything unrelated to the agency's own content.</p>
+  </div>
+</div>
+
+<div class="legal-page" id="page-status">
+  <div class="wrap legal-wrap">
+    <a href="#" class="legal-back mono">← Back</a>
+    <div class="legal-badge mono">STATUS</div>
+    <h1>Agency OS Status</h1>
+    <p class="legal-intro">Health of the platform, updated by hand when something changes.</p>
+
+    <div class="status-banner">
+      <span class="status-check">✓</span>
+      <div>
+        <div class="status-banner-title">All systems operational</div>
+        <div class="status-banner-sub mono">Everything is running as it should.</div>
+      </div>
+    </div>
+
+    <div class="status-tag mono">COMPONENTS</div>
+    <div class="status-row"><span class="status-dot"></span><div><div class="status-name">Web app &amp; login</div><div class="status-sub mono">WEB</div></div><div class="status-ok mono">Operational</div></div>
+    <div class="status-row"><span class="status-dot"></span><div><div class="status-name">Supabase database</div><div class="status-sub mono">DB</div></div><div class="status-ok mono">Operational</div></div>
+    <div class="status-row"><span class="status-dot"></span><div><div class="status-name">Buffer sync</div><div class="status-sub mono">BUFFER</div></div><div class="status-ok mono">Operational</div></div>
+    <div class="status-row"><span class="status-dot"></span><div><div class="status-name">Neo assistant</div><div class="status-sub mono">GROQ</div></div><div class="status-ok mono">Operational</div></div>
+  </div>
+</div>
+
+<div class="legal-page" id="page-contact">
+  <div class="wrap legal-wrap">
+    <a href="#" class="legal-back mono">← Back</a>
+    <div class="legal-badge mono">CONTACT</div>
+    <h1>Get in touch</h1>
+    <p class="legal-intro">This is a private tool built and run by the agency itself. If you're on the roster and something's not working, message the team the way you normally would, not through a support form.</p>
+  </div>
+</div>
 `;
 
 function LandingPage({ onSignIn }) {
@@ -2564,6 +2698,9 @@ function LandingPage({ onSignIn }) {
             dot.style.opacity = "0";
           }
         });
+        let target = c.nextElementSibling;
+        while (target && !target.classList.contains("panel")) target = target.nextElementSibling;
+        if (target) target.classList.toggle("connector-lit", progress >= 0.97);
       });
     };
     const onScrollConnectors = () => requestAnimationFrame(updateConnectors);
@@ -2574,6 +2711,29 @@ function LandingPage({ onSignIn }) {
       window.removeEventListener("scroll", onScrollConnectors);
       window.removeEventListener("resize", updateConnectors);
     });
+
+    // footer legal pages (Privacy / Terms / Status / Contact)
+    const mainContentEl = root.querySelector("#mainContent");
+    const legalPages = root.querySelectorAll(".legal-page");
+    function showPage(name) {
+      if (mainContentEl) mainContentEl.style.display = "none";
+      legalPages.forEach((p) => p.classList.toggle("active", p.id === "page-" + name));
+      window.scrollTo(0, 0);
+    }
+    function showMain() {
+      if (mainContentEl) mainContentEl.style.display = "";
+      legalPages.forEach((p) => p.classList.remove("active"));
+      window.scrollTo(0, 0);
+    }
+    const pageLinks = Array.from(root.querySelectorAll("[data-page]"));
+    const onPageLinkClick = function (e) { e.preventDefault(); showPage(this.dataset.page); };
+    pageLinks.forEach((el) => el.addEventListener("click", onPageLinkClick));
+    cleanups.push(() => pageLinks.forEach((el) => el.removeEventListener("click", onPageLinkClick)));
+
+    const backLinks = Array.from(root.querySelectorAll(".legal-back"));
+    const onBackClick = (e) => { e.preventDefault(); showMain(); };
+    backLinks.forEach((el) => el.addEventListener("click", onBackClick));
+    cleanups.push(() => backLinks.forEach((el) => el.removeEventListener("click", onBackClick)));
 
     return () => { cleanups.forEach((fn) => fn()); };
   }, []);
