@@ -721,7 +721,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel }) {
   const [newModel, setNewModel] = useState(restrictModel || "");
   const [newPlatform, setNewPlatform] = useState("ig");
   const [filter, setFilter] = useState(restrictModel || "all");
-  const [network, setNetwork] = useState("all");
+  const [network, setNetwork] = useState(null); // null = show the platform picker popup first
 
   const nextSeq = () => (cards.reduce((m, c) => Math.max(m, c.seq || 0), 0) + 1);
 
@@ -749,12 +749,47 @@ function ContentDirector({ cards, persistCards, models, restrictModel }) {
   };
 
   const byModel = filter === "all" ? cards : cards.filter((c) => c.model === filter);
-  const visible = network === "all" ? byModel : byModel.filter((c) => (c.platform || "ig") === network);
+  const visible = !network || network === "all" ? byModel : byModel.filter((c) => (c.platform || "ig") === network);
   const countFor = (netId) => (netId === "all" ? byModel.length : byModel.filter((c) => (c.platform || "ig") === netId).length);
+
+  // Platform picker: shown first, every time this page is opened, before
+  // any board is visible — clicking a platform below opens that platform's
+  // Content Director. "All" opens the combined view like before.
+  if (!network) {
+    return (
+      <div className="flex items-center justify-center" style={{ minHeight: "60vh" }}>
+        <div className="w-full max-w-md">
+          <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-1 text-center">Content Director</div>
+          <div className="text-xl font-extrabold c-text text-center mb-6">Which platform?</div>
+          <div className="space-y-2">
+            {PLATFORMS.map((p) => {
+              const Icon = p.icon === "Instagram" ? Instagram : p.icon === "Flame" ? Flame : X;
+              const count = countFor(p.id);
+              return (
+                <button key={p.id} onClick={() => setNetwork(p.id)}
+                  className="w-full flex items-center justify-between px-4 py-3.5 rounded-xl border c-border c-bg-surface hover-bg-accent-a1 transition-colors">
+                  <span className="flex items-center gap-2.5 font-mono fs-13 c-text font-semibold"><Icon size={15} className="c-accent" />{p.label}</span>
+                  <span className="fs-11 font-mono c-faint">{count} scene{count === 1 ? "" : "s"}</span>
+                </button>
+              );
+            })}
+            <button onClick={() => setNetwork("all")}
+              className="w-full text-center px-4 py-2.5 rounded-xl fs-11 font-mono uppercase tracking-wide c-muted hover-bg-surface transition-colors">
+              or see everything at once →
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex gap-5">
       <div className="minw-140 w-140 flex-shrink-0 hidden md:block">
+        <button onClick={() => setNetwork(null)}
+          className="w-full flex items-center gap-1.5 fs-10 font-mono uppercase tracking-wide c-muted hover-bg-surface px-3 py-2 rounded-lg mb-3">
+          <ChevronLeft size={12} /> Switch platform
+        </button>
         <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2 px-1">Network</div>
         <div className="space-y-1">
           <button onClick={() => setNetwork("all")}
@@ -777,6 +812,10 @@ function ContentDirector({ cards, persistCards, models, restrictModel }) {
       <div className="flex-1 min-w-0">
       {/* Mobile network selector (no left column on small screens) */}
       <div className="flex items-center gap-1.5 mb-3 md:hidden overflow-x-auto">
+        <button onClick={() => setNetwork(null)}
+          className="fs-10 font-mono uppercase px-2.5 py-1 rounded-lg border c-border c-muted flex-shrink-0">
+          <ChevronLeft size={11} className="inline -mt-0.5" />
+        </button>
         <button onClick={() => setNetwork("all")}
           className={`fs-10 font-mono uppercase px-2.5 py-1 rounded-lg border flex-shrink-0 ${network === "all" ? "c-border-accent c-accent" : "c-border c-muted"}`}>
           All
@@ -3547,6 +3586,14 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
             topReels: [...(reels || [])].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 12)
               .map((r) => ({ model: r.model, title: r.title, weekOf: r.weekOf, views: r.views, likes: r.likes, shares: r.shares, comments: r.comments })),
             recentTrends: trends.filter((t) => (agency === "US" ? t.showUS : t.showCZ)).slice(-6).map((t) => ({ title: t.title, category: t.category })),
+            // Buffer-synced social reach per model, last 7 days, so Neo can
+            // answer "how's Anna's X doing" or "who's growing on Instagram."
+            socialImpressions7d: models.map((m) => ({
+              model: m.name,
+              instagram: impressionsFor(m.name, "ig"),
+              x: impressionsFor(m.name, "x"),
+              tiktok: impressionsFor(m.name, "tiktok"),
+            })),
           },
         },
       });
