@@ -516,22 +516,25 @@ function usePersisted(key, fallback, shared = true) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await window.storage.get(key, shared);
-      setValue(res ? JSON.parse(res.value) : fallback);
-    } catch {
+      const { data, error } = await supabaseClient.from("app_state").select("value").eq("key", key).maybeSingle();
+      if (error) throw error;
+      setValue(data ? data.value : fallback);
+    } catch (e) {
+      console.error("load failed for " + key, e);
       setValue(fallback);
     }
     setLoading(false);
-  }, [key, shared]);
+  }, [key]);
 
   useEffect(() => { load(); }, [load]);
 
   const persist = async (next) => {
     setValue(next);
     try {
-      await window.storage.set(key, JSON.stringify(next), shared);
+      const { error } = await supabaseClient.from("app_state").upsert({ key, value: next, updated_at: new Date().toISOString() });
+      if (error) throw error;
     } catch (e) {
-      console.error("save failed", e);
+      console.error("save failed for " + key, e);
     }
   };
 
