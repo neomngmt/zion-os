@@ -630,6 +630,7 @@ const modelsToJS = (r) => ({
   bufferChannelId: r.buffer_channel_id || "", bufferChannelIdIg: r.buffer_channel_id_ig || "",
   bufferChannelIdX: r.buffer_channel_id_x || "", bufferChannelIdTiktok: r.buffer_channel_id_tiktok || "",
   bufferChannelIdFb: r.buffer_channel_id_fb || "",
+  onlyfansAccountId: r.onlyfansapi_account_id || "", onlyfansUsername: r.onlyfansapi_username || "",
 });
 const modelsToDB = (m) => ({
   name: m.name, note: m.note || "", pin: m.pin || "", onboarded: !!m.onboarded,
@@ -641,6 +642,7 @@ const modelsToDB = (m) => ({
   buffer_channel_id: m.bufferChannelId || "", buffer_channel_id_ig: m.bufferChannelIdIg || "",
   buffer_channel_id_x: m.bufferChannelIdX || "", buffer_channel_id_tiktok: m.bufferChannelIdTiktok || "",
   buffer_channel_id_fb: m.bufferChannelIdFb || "",
+  onlyfansapi_account_id: m.onlyfansAccountId || "", onlyfansapi_username: m.onlyfansUsername || "",
 });
 
 const cardsToJS = (r) => ({
@@ -3098,6 +3100,41 @@ const STATUS_STYLES = {
   planned: { label: "Not connected", color: "#5c6e65" },
 };
 
+function CreatorSettingsPanel({ model, persistModels, models }) {
+  const connected = !!model?.onlyfansAccountId;
+
+  return (
+    <div className="max-w-lg">
+      <h1 className="text-2xl font-extrabold tracking-tight c-text mb-1">Settings</h1>
+      <p className="fs-12 c-faint font-mono mb-6">Your personal account connections.</p>
+
+      <div className="c-bg-surface border c-border rounded-xl p-5">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <DollarSign size={16} className="c-accent" />
+            <span className="font-semibold c-text text-sm">OnlyFans</span>
+          </div>
+          <Badge color={connected ? "#39e673" : "#5c6e65"}>{connected ? "Connected" : "Not connected"}</Badge>
+        </div>
+        <p className="fs-11 c-muted mb-4">
+          Connect your OnlyFans account so your earnings and subscriber stats show up automatically on your dashboard. You'll log in through OnlyFans' own secure window — the agency never sees or stores your OnlyFans password.
+        </p>
+        {connected ? (
+          <div className="fs-11 font-mono c-faint">Linked account: <span className="c-text">{model.onlyfansUsername || model.onlyfansAccountId}</span></div>
+        ) : (
+          <button disabled className="tap w-full py-2.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold opacity-50 cursor-not-allowed">
+            Connect OnlyFans (coming soon)
+          </button>
+        )}
+      </div>
+
+      <p className="fs-10 c-faint font-mono mt-4">
+        Your Instagram, X, and TikTok stats are connected by your agency team on their end — you don't need to do anything for those.
+      </p>
+    </div>
+  );
+}
+
 function SettingsPanel({ settings, persistSettings, integrations, persistIntegrations, agency }) {
   const [pinCZ, setPinCZ] = useState(settings.adminPinCZ || "");
   const [pinUS, setPinUS] = useState(settings.adminPinUS || "");
@@ -4763,6 +4800,7 @@ const NAV_CREATOR = [
   { id: "calendar", label: "My Calendar", icon: Calendar },
   { id: "tasks", label: "My Tasks", icon: CheckSquare },
   { id: "trending", label: "Trending", icon: Flame },
+  { id: "settings", label: "Settings", icon: Settings },
 ];
 
 // ---------- persistent login (7 days) ----------
@@ -5041,7 +5079,9 @@ function App() {
               cards={scopedCards} tasks={scopedTasks} models={agencyModels} stats={scopedStats} reels={scopedReels} trends={trends} bufferDailyStats={bufferDailyStats} />}
             {currentView === "trending" && <CreatorTrending trends={trends} agency={session.agency} />}
             {currentView === "models" && <ModelManager models={agencyModels} persistModels={scopedPersistModels} cards={scopedCards} agency={session.agency} />}
-            {currentView === "settings" && <SettingsPanel settings={settings} persistSettings={persistSettings} integrations={integrations} persistIntegrations={scopedPersistIntegrations} agency={session.agency} />}
+            {currentView === "settings" && (isAdmin
+              ? <SettingsPanel settings={settings} persistSettings={persistSettings} integrations={integrations} persistIntegrations={scopedPersistIntegrations} agency={session.agency} />
+              : <CreatorSettingsPanel model={models.find((m) => m.name === session.name)} persistModels={persistModels} models={models} />)}
           </main>
         </div>
       </div>
