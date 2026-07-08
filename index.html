@@ -729,6 +729,20 @@ function CountUp({ value, prefix = "", duration = 600 }) {
   return <>{prefix}{display.toLocaleString()}</>;
 }
 
+function Sparkline({ data, color = "#39e673", height = 36 }) {
+  if (!data || data.length < 2) return null;
+  const max = Math.max(...data, 1);
+  const min = Math.min(...data, 0);
+  const range = max - min || 1;
+  const w = 100;
+  const points = data.map((v, i) => `${(i / (data.length - 1)) * w},${height - ((v - min) / range) * height}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${w} ${height}`} preserveAspectRatio="none" className="w-full" style={{ height }}>
+      <polyline points={points} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function Badge({ children, color }) {
   return (
     <span
@@ -4697,15 +4711,21 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
   const ofWeek = myOfRows.filter((r) => r.statDate >= sevenDaysAgoStr);
   const ofMonth = myOfRows.filter((r) => r.statDate && r.statDate.slice(0, 7) === monthStr);
   const hasOfData = myOfRows.length > 0;
+  const last7Dates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d.toISOString().slice(0, 10);
+  });
+  const earningsSeries = last7Dates.map((d) => sumOf(myOfRows.filter((r) => r.statDate === d), "earnings"));
+
   const ofSection = hasOfData && (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
       {[["Today", ofToday], ["Last 7 days", ofWeek], ["This month", ofMonth]].map(([label, rows]) => (
         <div key={label} className="c-bg-surface border c-border rounded-xl px-4 py-3.5 hover-lift">
           <div className="fs-10 uppercase tracking-widest c-muted font-mono mb-2">{label} — OnlyFans</div>
-          <div className="text-xl font-semibold c-accent mb-2">${sumOf(rows, "earnings").toLocaleString()}</div>
+          <div className="text-xl font-semibold c-accent mb-2"><CountUp value={sumOf(rows, "earnings")} prefix="$" /></div>
+          {label === "Last 7 days" && <div className="mb-2"><Sparkline data={earningsSeries} /></div>}
           <div className="flex gap-4 fs-10 font-mono c-faint uppercase">
-            <span>{sumOf(rows, "fansChatted")} fans chatted</span>
-            <span>{sumOf(rows, "ppvsSent")} PPVs sent</span>
+            <span><CountUp value={sumOf(rows, "fansChatted")} /> fans chatted</span>
+            <span><CountUp value={sumOf(rows, "ppvsSent")} /> PPVs sent</span>
           </div>
         </div>
       ))}
