@@ -933,8 +933,8 @@ function ModelManager({ models, persistModels, cards, agency }) {
             className="flex-1 minw-120 c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Niche / persona note"
             className="flex-1 minw-160 c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
-          <input value={pin} onChange={(e) => setPin(e.target.value)} placeholder="Password (optional)"
-            className="w-36 c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+          <input value={pin} onChange={(e) => setPin(e.target.value)} placeholder="Leave blank — she'll set her own password"
+            className="w-56 c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
           <button onClick={addModel} className="px-3 py-2 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase font-semibold">Add</button>
           <button onClick={() => setAdding(false)} className="px-3 py-2 rounded-lg border c-border c-muted text-xs font-mono uppercase">Cancel</button>
         </div>
