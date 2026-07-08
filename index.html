@@ -1237,6 +1237,18 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard }
             className="w-32 c-bg-app border c-border rounded-lg px-2 py-1 text-xs c-text outline-none focus-border-accent font-mono" />
           <span className="fs-10 c-faint font-mono">password</span>
         </div>
+
+        <div className="flex items-center justify-between c-bg-app border c-border rounded-lg px-3 py-2 mb-4">
+          <div className="flex items-center gap-2">
+            <DollarSign size={13} className="c-accent" />
+            <span className="fs-11 font-mono c-muted">OnlyFans</span>
+          </div>
+          {model.onlyfansAccountId ? (
+            <span className="fs-11 font-mono c-success">Connected — {model.onlyfansUsername || model.onlyfansAccountId}</span>
+          ) : (
+            <span className="fs-11 font-mono c-faint">Not connected (she connects this herself in her Settings)</span>
+          )}
+        </div>
         <label className="flex items-center gap-1.5 fs-10 font-mono uppercase c-faint mb-4 cursor-pointer">
           <input type="checkbox" checked={!!model.alwaysOnboard} onChange={() => onToggleAlwaysOnboard(model.name)} />
           Always show Creator Bible on login (testing)
@@ -3102,10 +3114,34 @@ const STATUS_STYLES = {
 
 function CreatorSettingsPanel({ model, persistModels, models }) {
   const connected = !!model?.onlyfansAccountId;
+  const [connecting, setConnecting] = useState(false);
+  const [connectError, setConnectError] = useState("");
+
+  const connectOnlyFans = async () => {
+    setConnecting(true);
+    setConnectError("");
+    try {
+      const { data, error } = await supabaseClient.functions.invoke("of-client-session", { body: { modelName: model.name } });
+      if (error || !data?.clientSecret) throw new Error(data?.error || error?.message || "Couldn't start the connection.");
+      const { startOnlyFansAuthentication } = await import("https://esm.sh/@onlyfansapi/auth");
+      startOnlyFansAuthentication(data.clientSecret, {
+        onSuccess: async (result) => {
+          await persistModels(models.map((m) => (m.name === model.name ? { ...m, onlyfansAccountId: result.accountId, onlyfansUsername: result.username || "" } : m)));
+          setConnecting(false);
+        },
+        onError: (err) => {
+          setConnectError(err?.message || "Connection failed.");
+          setConnecting(false);
+        },
+      });
+    } catch (e) {
+      setConnectError(e.message);
+      setConnecting(false);
+    }
+  };
 
   return (
     <div className="max-w-lg">
-      <h1 className="text-2xl font-extrabold tracking-tight c-text mb-1">Settings</h1>
       <p className="fs-12 c-faint font-mono mb-6">Your personal account connections.</p>
 
       <div className="c-bg-surface border c-border rounded-xl p-5">
@@ -3122,9 +3158,13 @@ function CreatorSettingsPanel({ model, persistModels, models }) {
         {connected ? (
           <div className="fs-11 font-mono c-faint">Linked account: <span className="c-text">{model.onlyfansUsername || model.onlyfansAccountId}</span></div>
         ) : (
-          <button disabled className="tap w-full py-2.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold opacity-50 cursor-not-allowed">
-            Connect OnlyFans (coming soon)
-          </button>
+          <>
+            <button onClick={connectOnlyFans} disabled={connecting}
+              className="tap w-full py-2.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold hover-bg-accent2 disabled:opacity-60">
+              {connecting ? "Opening secure window…" : "Connect OnlyFans"}
+            </button>
+            {connectError && <p className="fs-10 c-warn font-mono mt-2">{connectError}</p>}
+          </>
         )}
       </div>
 
