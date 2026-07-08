@@ -4616,7 +4616,31 @@ function ThisWeeksAsks({ tasks, restrictModel, onNavigate }) {
   );
 }
 
-function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDailyStats }) {
+function useSupaOfDailyStats() {
+  const [value, setValue] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabaseClient.from("of_daily_stats").select("*");
+        if (error) throw error;
+        setValue((data || []).map((r) => ({
+          id: r.id, model: r.model, statDate: r.stat_date, earnings: r.earnings || 0,
+          fansChatted: r.fans_chatted || 0, ppvsSent: r.ppvs_sent || 0, ppvsUnlocked: r.ppvs_unlocked || 0,
+          newSubs: r.new_subs || 0, syncedAt: r.synced_at,
+        })));
+      } catch (e) {
+        console.error("load failed for of_daily_stats", e);
+        setValue([]);
+      }
+      setLoading(false);
+    })();
+  }, []);
+  return { value, loading };
+}
+
+function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDailyStats, ofDailyStats }) {
   const mine = stats.filter((s) => s.model === restrictModel).sort((a, b) => b.weekOf.localeCompare(a.weekOf));
   const latest = mine[0];
   const prev = mine[1];
@@ -4624,6 +4648,29 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const sevenDaysAgoStr = sevenDaysAgo.toISOString().slice(0, 10);
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const monthStr = todayStr.slice(0, 7);
+  const myOfRows = (ofDailyStats || []).filter((r) => r.model === restrictModel);
+  const sumOf = (rows, field) => rows.reduce((t, r) => t + (r[field] || 0), 0);
+  const ofToday = myOfRows.filter((r) => r.statDate === todayStr);
+  const ofWeek = myOfRows.filter((r) => r.statDate >= sevenDaysAgoStr);
+  const ofMonth = myOfRows.filter((r) => r.statDate && r.statDate.slice(0, 7) === monthStr);
+  const hasOfData = myOfRows.length > 0;
+  const ofSection = hasOfData && (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+      {[["Today", ofToday], ["Last 7 days", ofWeek], ["This month", ofMonth]].map(([label, rows]) => (
+        <div key={label} className="c-bg-surface border c-border rounded-xl px-4 py-3.5 hover-lift">
+          <div className="fs-10 uppercase tracking-widest c-muted font-mono mb-2">{label} — OnlyFans</div>
+          <div className="text-xl font-semibold c-accent mb-2">${sumOf(rows, "earnings").toLocaleString()}</div>
+          <div className="flex gap-4 fs-10 font-mono c-faint uppercase">
+            <span>{sumOf(rows, "fansChatted")} fans chatted</span>
+            <span>{sumOf(rows, "ppvsSent")} PPVs sent</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
   const myBufferRows = (bufferDailyStats || []).filter((r) => r.model === restrictModel && r.statDate >= sevenDaysAgoStr);
   const platformTotals = {};
   myBufferRows.forEach((r) => {
@@ -4664,7 +4711,9 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
     return (
       <div>
         <ThisWeeksAsks tasks={tasks} restrictModel={restrictModel} onNavigate={onNavigate} />
-        {bufferSection}
+        {ofSection}
+        {ofSection}
+      {bufferSection}
         <div className="fs-12 c-faint font-mono italic py-16 text-center border border-dashed c-border rounded-xl">
           No stats yet. Ask your manager to add this week's numbers.
         </div>
@@ -4857,6 +4906,7 @@ function App() {
   const { value: reels, loading: reelsLoading, persist: persistReels } = useSupaTable("reels", "id", [], reelsToJS, reelsToDB);
   const { value: trends, loading: trendsLoading, persist: persistTrends } = useSupaTable("trends", "id", [], trendsToJS, trendsToDB);
   const { value: bufferDailyStats, loading: bufferDailyStatsLoading } = useSupaBufferStats();
+  const { value: ofDailyStats, loading: ofDailyStatsLoading } = useSupaOfDailyStats();
   const { value: settings, loading: settingsLoading, persist: persistSettings } = useSupaSettings({ adminPinCZ: "2748", adminPinUS: "1234" });
   const { value: integrations, loading: integrationsLoading, persist: persistIntegrations } = useSupaTable("integrations", "id", DEFAULT_INTEGRATIONS, integrationsToJS, integrationsToDB);
   const [session, setSession] = useState(() => loadSavedSession());
@@ -5068,7 +5118,7 @@ function App() {
 
             {currentView === "dashboard" && (session.role === "admin"
               ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} />
-              : <CreatorDashboard stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} />)}
+              : <CreatorDashboard stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} ofDailyStats={ofDailyStats} />)}
             {currentView === "content" && <ContentDirector cards={isAdmin ? scopedCards : cards} persistCards={isAdmin ? scopedPersistCards : persistCards} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} forcedNetwork={contentPlatform} />}
             {currentView === "calendar" && <CalendarView cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks} onNavigate={setView} restrictModel={restrictModel} />}
             {currentView === "tasks" && <TaskManager tasks={isAdmin ? scopedTasks : tasks} persistTasks={isAdmin ? scopedPersistTasks : persistTasks} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} />}
