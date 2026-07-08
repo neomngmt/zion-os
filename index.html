@@ -4829,6 +4829,7 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
     <div>
       <GoalCard latest={latest} />
       <ThisWeeksAsks tasks={tasks} restrictModel={restrictModel} onNavigate={onNavigate} />
+      {ofSection}
       {bufferSection}
 
       <div className="flex gap-3 flex-wrap mb-6">
@@ -4936,7 +4937,8 @@ function OnboardingScreen({ name, url, onContinue, onQuestionnaireReceived }) {
 // ---------- trend scraper ----------
 
 function TrendScraper({ models, persistModels }) {
-  const apifyKey = "apify_api_v1zS38dcGJFb4it5afeC7oH9kqVNzj0BnIY4";
+  const [apifyKey, setApifyKey] = React.useState(() => { try { return localStorage.getItem("apify_key_v1") || ""; } catch { return ""; } });
+  const [showKey, setShowKey] = React.useState(false);
   const [selectedModel, setSelectedModel] = React.useState(models[0]?.name || "");
   const [scraping, setScraping] = React.useState(false);
   const [results, setResults] = React.useState([]);
@@ -4948,6 +4950,7 @@ function TrendScraper({ models, persistModels }) {
   const model = models.find(m => m.name === selectedModel);
   const inspoProfiles = model?.inspoProfiles || [];
 
+  const saveKey = (k) => { setApifyKey(k); try { localStorage.setItem("apify_key_v1", k); } catch {} };
 
   const addProfile = async () => {
     if (!addingHandle.trim() || !model) return;
@@ -4998,16 +5001,24 @@ function TrendScraper({ models, persistModels }) {
 
   return (
     <div>
-      <div className="c-bg-surface border c-border rounded-xl p-4 mb-5">
-        <div className="fs-10 uppercase tracking-widest c-muted font-mono mb-3">Viral práh — post je virální pokud překračuje průměr profilu o</div>
-        <div className="flex gap-2">
-          {[1.5, 2, 2.5, 3].map(t => (
-            <button key={t} onClick={() => setThreshold(t)}
-              style={threshold === t ? { borderColor: "var(--accent)", color: "var(--accent)", background: "rgba(18,179,76,0.1)" } : {}}
-              className={`flex-1 py-2 rounded-lg border c-border fs-12 font-mono font-semibold transition-colors hover-border-accent hover-accent-text ${threshold === t ? "" : "c-muted"}`}>
-              {t}×
-            </button>
-          ))}
+      <div className="c-bg-surface border c-border rounded-xl p-4 mb-5 flex flex-wrap gap-3 items-end">
+        <div className="flex-1 minw-240">
+          <div className="fs-10 uppercase tracking-widest c-muted font-mono mb-1.5">Apify API Key</div>
+          <div className="flex gap-2">
+            <input type={showKey ? "text" : "password"} value={apifyKey} onChange={e => saveKey(e.target.value)} placeholder="apify_api_..."
+              className="flex-1 c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
+            <button onClick={() => setShowKey(s => !s)} className="px-3 py-2 rounded-lg border c-border c-muted fs-11 font-mono">{showKey ? "Skryt" : "Ukazat"}</button>
+          </div>
+          {!apifyKey && <p className="fs-10 c-faint font-mono mt-1.5">Najdes na apify.com - Settings - API & Integrations</p>}
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className="fs-10 c-muted font-mono uppercase">Viral prah</span>
+          <select value={threshold} onChange={e => setThreshold(Number(e.target.value))} className="c-bg-app border c-border rounded-lg px-2.5 py-2 fs-12 c-text font-mono outline-none">
+            <option value={1.5}>1.5x prumer</option>
+            <option value={2}>2x prumer</option>
+            <option value={2.5}>2.5x prumer</option>
+            <option value={3}>3x prumer</option>
+          </select>
         </div>
       </div>
       <div className="flex flex-col lg:flex-row gap-5">
@@ -5045,7 +5056,7 @@ function TrendScraper({ models, persistModels }) {
           <div className="flex items-center gap-3 mb-4">
             <button onClick={scrape} disabled={scraping || !apifyKey || !selectedModel || !inspoProfiles.length}
               className="flex items-center gap-2 px-4 py-2.5 rounded-lg c-bg-accent c-onaccent fs-12 font-mono uppercase tracking-wide font-semibold hover-bg-accent2 disabled:opacity-40 tap">
-              {scraping ? <><Loader2 size={14} /> Scraping...</> : <><Zap size={14} /> Scan viralich reels</>}
+              {scraping ? <><Loader2 size={14} className="animate-spin" /> Scraping...</> : <><Zap size={14} /> Scan viralich reels</>}
             </button>
           </div>
           {error && <div className="c-bg-surface border c-border-warn-a rounded-xl p-3 mb-4 fs-12 c-warn font-mono break-all">{error}</div>}
