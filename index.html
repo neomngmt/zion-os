@@ -4794,10 +4794,10 @@ function App() {
 
         {/* Sidebar — icon-only rail on phones (tap the menu icon to pop out
             full labels), always full-width from the sm breakpoint up. */}
-        <aside className={`${mobileNavOpen ? "fixed inset-y-0 left-0 z-50 w-56 shadow-2xl" : "w-16 sm:w-56"} flex border-r c-border c-bg-panel flex-shrink-0 flex-col transition-all sm:static sm:z-auto sm:shadow-none`}>
+        <aside className={`${mobileNavOpen ? "fixed inset-y-0 left-0 z-50 w-56 shadow-2xl" : "w-14 sm:w-56"} flex border-r c-border c-bg-panel flex-shrink-0 flex-col transition-all sm:static sm:z-auto sm:shadow-none`}>
           <button onClick={() => setMobileNavOpen((v) => !v)}
             className="tap sm:hidden flex items-center justify-center p-3 c-muted hover-text-primary flex-shrink-0">
-            {mobileNavOpen ? <X size={26} /> : <Menu size={26} />}
+            {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
           <nav className="flex-1 px-2 py-3 space-y-1 overflow-y-auto">
             {NAV.map((n) => {
@@ -4810,9 +4810,9 @@ function App() {
                     <button
                       onClick={() => { setMobileNavOpen(true); setContentNavOpen((v) => !v); }}
                       className={`tap w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg fs-13 transition-colors ${activeNav ? "c-bg-accent-a1 c-accent" : "c-muted hover-bg-surface hover-text-primary"}`}>
-                      <Icon size={28} />
+                      <Icon size={20} />
                       <span className={`flex-1 text-left ${labelCls}`}>{n.label}</span>
-                      <ChevronRight size={18} className={`transition-transform ${labelCls}`} style={{ transform: contentNavOpen ? "rotate(90deg)" : "none" }} />
+                      <ChevronRight size={15} className={`transition-transform ${labelCls}`} style={{ transform: contentNavOpen ? "rotate(90deg)" : "none" }} />
                     </button>
                     {contentNavOpen && (
                       <div className={`ml-6 mt-1 space-y-0.5 border-l c-border pl-2 ${mobileNavOpen ? "" : "hidden sm:block"}`}>
@@ -4823,7 +4823,7 @@ function App() {
                             <button key={p.id}
                               onClick={() => { setView("content"); setContentPlatform(p.id); setMobileNavOpen(false); }}
                               className={`tap w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg fs-12 font-mono transition-colors ${platformActive ? "c-bg-accent-a2 c-accent font-semibold" : "c-muted hover-bg-surface"}`}>
-                              <PIcon size={20} />{p.label}
+                              <PIcon size={16} />{p.label}
                             </button>
                           );
                         })}
@@ -4835,7 +4835,7 @@ function App() {
               return (
                 <button key={n.id} onClick={() => { setView(n.id); setMobileNavOpen(false); }}
                   className={`tap w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg fs-13 transition-colors ${activeNav ? "c-bg-accent-a1 c-accent" : "c-muted hover-bg-surface hover-text-primary"}`}>
-                  <Icon size={28} />
+                  <Icon size={20} />
                   <span className={labelCls}>{n.label}</span>
                 </button>
               );
