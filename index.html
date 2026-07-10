@@ -4317,7 +4317,7 @@ function AdminNotificationBell({ cards, tasks, onNavigate }) {
 
 // Global search across cards, tasks, models, and trends — click the icon to
 // open a small dropdown search box, results are grouped and clickable.
-function GlobalSearch({ cards, tasks, models, trends, onNavigate, trendsNavId, showModels }) {
+function GlobalSearch({ cards, tasks, models, trends, onNavigate, trendsNavId, showModels, showTrends, navItems }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const ref = useRef(null);
@@ -4330,11 +4330,14 @@ function GlobalSearch({ cards, tasks, models, trends, onNavigate, trendsNavId, s
   }, [open]);
 
   const query = q.trim().toLowerCase();
+  const matchPages = query ? (navItems || []).filter((n) => n.label.toLowerCase().includes(query)).slice(0, 5) : [];
   const matchCards = query ? cards.filter((c) => (c.title || "").toLowerCase().includes(query)).slice(0, 5) : [];
   const matchTasks = query ? tasks.filter((t) => (t.title || "").toLowerCase().includes(query)).slice(0, 5) : [];
   const matchModels = query && showModels ? models.filter((m) => (m.name || "").toLowerCase().includes(query)).slice(0, 5) : [];
-  const matchTrends = query ? trends.filter((t) => (t.title || "").toLowerCase().includes(query)).slice(0, 5) : [];
-  const totalMatches = matchCards.length + matchTasks.length + matchModels.length + matchTrends.length;
+  const matchTrends = query && showTrends ? trends.filter((t) =>
+    (t.caption || "").toLowerCase().includes(query) || (t.profile || "").toLowerCase().includes(query) || (t.category || "").toLowerCase().includes(query)
+  ).slice(0, 5) : [];
+  const totalMatches = matchPages.length + matchCards.length + matchTasks.length + matchModels.length + matchTrends.length;
 
   const go = (view) => { onNavigate(view); setOpen(false); setQ(""); };
 
@@ -4347,10 +4350,16 @@ function GlobalSearch({ cards, tasks, models, trends, onNavigate, trendsNavId, s
       </button>
       {open && (
         <div className="fixed left-3 right-3 top-14 sm:absolute sm:left-auto sm:top-full sm:right-0 sm:mt-2 sm:w-80 c-bg-surface border c-border rounded-xl shadow-2xl z-50 p-2">
-          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search scenes, tasks, models, trends..."
+          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search pages, scenes, tasks, models, trends..."
             className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent mb-1" />
           {query && totalMatches === 0 && <div className="fs-12 c-faint font-mono italic text-center py-4">No matches.</div>}
           <div className="max-h-72 overflow-y-auto">
+            {matchPages.map((n) => (
+              <button key={n.id} onClick={() => go(n.id)} className="w-full text-left px-2.5 py-2 rounded-lg hover-bg-app transition-colors">
+                <div className="fs-10 font-mono uppercase" style={{ color: "#8b93a1" }}>Page</div>
+                <div className="fs-12 c-text">{n.label}</div>
+              </button>
+            ))}
             {matchCards.map((c) => (
               <button key={c.id} onClick={() => go("content")} className="w-full text-left px-2.5 py-2 rounded-lg hover-bg-app transition-colors">
                 <div className="fs-10 font-mono uppercase c-accent">Scene</div>
@@ -4372,7 +4381,7 @@ function GlobalSearch({ cards, tasks, models, trends, onNavigate, trendsNavId, s
             {matchTrends.map((t) => (
               <button key={t.id} onClick={() => go(trendsNavId)} className="w-full text-left px-2.5 py-2 rounded-lg hover-bg-app transition-colors">
                 <div className="fs-10 font-mono uppercase" style={{ color: "#E2725B" }}>Trend</div>
-                <div className="fs-12 c-text">{t.title}</div>
+                <div className="fs-12 c-text">@{t.profile}{t.category ? ` — ${t.category}` : ""}</div>
               </button>
             ))}
           </div>
@@ -5597,9 +5606,11 @@ function ReelSorterPage() {
 
 function TrendsPage({ weeklyTrendReels }) {
   const [filter, setFilter] = useState("all");
+  const [topN, setTopN] = useState(15);
   const fmt = (n) => (!n ? "0" : n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n));
   const all = [...(weeklyTrendReels || [])].sort((a, b) => (b.ratio || 0) - (a.ratio || 0) || new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
-  const sorted = filter === "all" ? all : all.filter((r) => (r.category || "Other") === filter);
+  const inCategory = filter === "all" ? all : all.filter((r) => (r.category || "Other") === filter);
+  const sorted = filter === "all" ? inCategory : inCategory.slice(0, topN);
   const lastSync = all.reduce((latest, r) => (r.syncedAt && (!latest || r.syncedAt > latest) ? r.syncedAt : latest), null);
   const counts = TREND_CATEGORIES.reduce((acc, c) => { acc[c] = all.filter((r) => (r.category || "Other") === c).length; return acc; }, {});
 
@@ -5607,12 +5618,13 @@ function TrendsPage({ weeklyTrendReels }) {
     <div>
       <div className="c-bg-surface border c-border rounded-xl p-4 mb-5">
         <p className="fs-11 c-muted">
-          Auto-scraped every Sunday from the profiles tracked in the <span className="c-text">weekly-trends-scrape</span> edge function. Nothing to click here — just check back weekly for fresh ideas.
+          Auto-scraped every Sunday from the profiles tracked in the <span className="c-text">weekly-trends-scrape</span> edge function. Pick a category for its top viral reels across every tracked profile in it, ranked by how far each beat its own account's average.
         </p>
         {lastSync && <p className="fs-10 c-faint font-mono mt-2">Last synced {new Date(lastSync).toLocaleString("en-US")}</p>}
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-5">
+      <div className="fs-10 c-muted font-mono uppercase mb-2">Style</div>
+      <div className="flex flex-wrap gap-2 mb-4">
         <button onClick={() => setFilter("all")}
           className={`px-3 py-1.5 rounded-full border fs-11 font-mono font-semibold transition-colors ${filter === "all" ? "c-border-accent c-accent c-bg-accent-a2" : "c-border c-muted hover-bg-surface"}`}>
           All ({all.length})
@@ -5624,6 +5636,22 @@ function TrendsPage({ weeklyTrendReels }) {
           </button>
         ))}
       </div>
+
+      {filter !== "all" && (
+        <>
+          <div className="fs-10 c-muted font-mono uppercase mb-2">How many</div>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {[10, 15, 20, 30].map((n) => (
+              <button key={n} onClick={() => setTopN(n)}
+                className={`px-3 py-1.5 rounded-full border fs-11 font-mono font-semibold transition-colors ${topN === n ? "c-border-accent c-accent c-bg-accent-a2" : "c-border c-muted hover-bg-surface"}`}>
+                Top {n}
+              </button>
+            ))}
+          </div>
+          <p className="fs-10 c-faint font-mono mb-5">Showing top {Math.min(topN, inCategory.length)} of {inCategory.length}</p>
+        </>
+      )}
+      {filter === "all" && <div className="mb-5" />}
 
       {sorted.length === 0 && (
         <div className="fs-12 c-faint font-mono italic py-16 text-center border border-dashed c-border rounded-xl">
@@ -5735,13 +5763,7 @@ function clearSavedSession() {
 
 function App() {
   const { value: cards, loading: cardsLoading, persist: persistCards } = useSupaTable("cards", "id", [], cardsToJS, cardsToDB);
-  const { value: models, loading: modelsLoading, persist: persistModels } = useSupaTable("models", "name", [
-    { name: "Anna", note: "", pin: "", onboarded: false, agency: "CZ", addedAt: Date.now() },
-    { name: "Vivien", note: "", pin: "", onboarded: false, agency: "CZ", addedAt: Date.now() },
-    { name: "Kuro", note: "", pin: "", onboarded: false, agency: "CZ", addedAt: Date.now() },
-    { name: "Lucie", note: "", pin: "", onboarded: false, agency: "CZ", addedAt: Date.now() },
-    { name: "model", note: "Testing account", pin: "model", onboarded: false, alwaysOnboard: true, agency: "CZ", addedAt: Date.now() },
-  ], modelsToJS, modelsToDB);
+  const { value: models, loading: modelsLoading, persist: persistModels } = useSupaTable("models", "name", [], modelsToJS, modelsToDB);
   const { value: tasks, loading: tasksLoading, persist: persistTasks } = useSupaTable("tasks", "id", [], tasksToJS, tasksToDB);
   const { value: stats, loading: statsLoading, persist: persistStats } = useSupaTable("stats", "id", [], statsToJS, statsToDB);
   const { value: reels, loading: reelsLoading, persist: persistReels } = useSupaTable("reels", "id", [], reelsToJS, reelsToDB);
@@ -5854,8 +5876,8 @@ function App() {
         </div>
         <div className="flex items-center gap-1.5">
           <GlobalSearch cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks}
-            models={isAdmin ? agencyModels : models} trends={trends} onNavigate={setView}
-            trendsNavId={session.role === "admin" ? "trends" : "trending"} showModels={isAdmin} />
+            models={isAdmin ? agencyModels : models} trends={weeklyTrendReels} onNavigate={setView}
+            trendsNavId="weeklytrends" showModels={isAdmin} showTrends={isAdmin} navItems={NAV} />
           {session.role === "admin" && (
             <AdminNotificationBell cards={scopedCards} tasks={scopedTasks} onNavigate={setView} />
           )}
