@@ -1217,6 +1217,15 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, 
   const [form, setForm] = useState(model);
   useEffect(() => setForm(model), [model]);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const [newRefHandle, setNewRefHandle] = useState("");
+  const refProfiles = form.inspoProfiles || [];
+  const addRefProfile = () => {
+    const handle = newRefHandle.trim().replace(/https?:\/\/(www\.)?instagram\.com\//i, "").replace(/\//g, "").replace(/^@/, "");
+    if (!handle) return;
+    set("inspoProfiles", [...refProfiles, { id: Math.random().toString(36).slice(2), igHandle: handle }]);
+    setNewRefHandle("");
+  };
+  const removeRefProfile = (id) => set("inspoProfiles", refProfiles.filter(p => p.id !== id));
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -1263,6 +1272,24 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, 
 
         <div className="flex gap-3 mb-4 fs-11 font-mono">
           {form.driveUrl && <a href={form.driveUrl} target="_blank" rel="noopener noreferrer" className="c-accent hover-accent-text">Open Drive →</a>}
+        </div>
+
+        <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1.5">Reference profiles (for Viral Feed scan)</label>
+        <div className="c-bg-app border c-border rounded-lg p-2.5 mb-4">
+          {refProfiles.length === 0 && <p className="fs-11 c-faint font-mono italic mb-2">None yet</p>}
+          <div className="space-y-1 mb-2">
+            {refProfiles.map(p => (
+              <div key={p.id} className="flex items-center justify-between py-1 border-b c-border last:border-0">
+                <div className="flex items-center gap-1.5"><Instagram size={11} className="c-muted" /><span className="fs-12 c-text">@{p.igHandle}</span></div>
+                <button onClick={() => removeRefProfile(p.id)} className="c-muted hover-warn ml-2"><X size={12} /></button>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-1.5">
+            <input value={newRefHandle} onChange={(e) => setNewRefHandle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addRefProfile()} onBlur={addRefProfile}
+              placeholder="@handle or link" className="flex-1 c-bg-surface border c-border rounded-lg px-2 py-1.5 fs-12 c-text outline-none focus-border-accent" />
+            <button onClick={addRefProfile} className="px-2.5 py-1.5 rounded-lg c-bg-accent c-onaccent font-mono font-semibold"><Plus size={13} /></button>
+          </div>
         </div>
 
         <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Questionnaire / bio</label>
@@ -5082,19 +5109,14 @@ function TrendScraper({ models, persistModels, restrictModel }) {
             <div className="c-bg-surface border c-border rounded-xl p-3">
               <div className="fs-10 uppercase tracking-widest c-muted font-mono mb-2">Reference profiles</div>
               {inspoProfiles.length === 0 && <p className="fs-11 c-faint font-mono italic mb-2">None yet</p>}
-              <div className="space-y-1 mb-2">
+              <div className="space-y-1 mb-1">
                 {inspoProfiles.map(p => (
-                  <div key={p.id} className="flex items-center justify-between py-1 border-b c-border last:border-0">
-                    <div className="flex items-center gap-1.5"><Instagram size={11} className="c-muted" /><span className="fs-12 c-text">@{p.igHandle}</span></div>
-                    <button onClick={() => removeProfile(p.id)} className="c-muted hover-warn ml-2"><X size={12} /></button>
+                  <div key={p.id} className="flex items-center gap-1.5 py-1 border-b c-border last:border-0">
+                    <Instagram size={11} className="c-muted" /><span className="fs-12 c-text">@{p.igHandle}</span>
                   </div>
                 ))}
               </div>
-              <div className="flex gap-1.5">
-                <input value={addingHandle} onChange={e => setAddingHandle(e.target.value)} onKeyDown={e => e.key === "Enter" && addProfile()} onBlur={() => addProfile()}
-                  placeholder="@handle or link" className="flex-1 c-bg-app border c-border rounded-lg px-2 py-1.5 fs-12 c-text outline-none focus-border-accent" />
-                <button onClick={addProfile} className="px-2.5 py-1.5 rounded-lg c-bg-accent c-onaccent font-mono font-semibold"><Plus size={13} /></button>
-              </div>
+              <p className="fs-10 c-faint font-mono mt-2">Managed in Model Manager →</p>
             </div>
           )}
         </div>
@@ -5113,13 +5135,18 @@ function TrendScraper({ models, persistModels, restrictModel }) {
               <div className="fs-11 c-muted font-mono mb-3"><span className="c-accent font-semibold">{results.length}</span> viral reels from {profileCount} profiles</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                 {results.map((post, i) => (
-                  <a key={post.url || i} href={post.url} target="_blank" rel="noopener noreferrer"
-                    className="c-bg-surface border c-border rounded-xl overflow-hidden hover-border-accent hover-lift transition-all group block" style={{ textDecoration: "none" }}>
-                    {post.displayUrl && (
+                  <div key={post.url || i}
+                    className="c-bg-surface border c-border rounded-xl overflow-hidden hover-border-accent hover-lift transition-all">
+                    {(post.videoUrl || post.displayUrl) && (
                       <div className="relative w-full bg-black" style={{ paddingTop: "56.25%" }}>
-                        <img src={post.displayUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                        <div className="absolute top-2 right-2 c-bg-accent c-onaccent fs-9 font-mono font-bold px-1.5 py-0.5 rounded-lg">{post._ratio.toFixed(1)}x avg</div>
-                        <div className="absolute bottom-2 left-2 fs-10 font-mono px-1.5 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.6)", color: "#fff" }}>@{post._username}</div>
+                        {post.videoUrl ? (
+                          <video src={post.videoUrl} poster={post.displayUrl} controls muted playsInline preload="none"
+                            className="absolute inset-0 w-full h-full object-cover" />
+                        ) : (
+                          <img src={post.displayUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                        )}
+                        <div className="absolute top-2 right-2 c-bg-accent c-onaccent fs-9 font-mono font-bold px-1.5 py-0.5 rounded-lg" style={{ pointerEvents: "none" }}>{post._ratio.toFixed(1)}x avg</div>
+                        <div className="absolute top-2 left-2 fs-10 font-mono px-1.5 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.6)", color: "#fff", pointerEvents: "none" }}>@{post._username}</div>
                       </div>
                     )}
                     <div className="p-3">
@@ -5127,10 +5154,13 @@ function TrendScraper({ models, persistModels, restrictModel }) {
                         <span className="flex items-center gap-1 c-text"><Eye size={12} />{fmt(post.videoViewCount)}</span>
                         <span style={{ color: "#E1306C" }}>&#9829; {fmt(post.likesCount)}</span>
                       </div>
-                      {post.caption && <div className="fs-11 c-muted leading-snug" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{post.caption}</div>}
-                      {post.timestamp && <div className="fs-10 c-faint font-mono mt-1">{new Date(post.timestamp).toLocaleDateString("en-US")}</div>}
+                      {post.caption && <div className="fs-11 c-muted leading-snug mb-1.5" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{post.caption}</div>}
+                      <div className="flex items-center justify-between">
+                        {post.timestamp && <div className="fs-10 c-faint font-mono">{new Date(post.timestamp).toLocaleDateString("en-US")}</div>}
+                        <a href={post.url} target="_blank" rel="noopener noreferrer" className="fs-10 c-accent hover-accent-text font-mono">Open on Instagram →</a>
+                      </div>
                     </div>
-                  </a>
+                  </div>
                 ))}
               </div>
             </>
