@@ -5763,30 +5763,17 @@ function ReelSorterPage() {
 // ---------- weekly trends (auto-scraped every Sunday from tracked profiles) ----------
 
 function TrendReelCard({ post, fmt }) {
-  const [videoError, setVideoError] = useState(false);
   const dateStr = post.timestamp ? new Date(post.timestamp).toLocaleDateString("en-US") : null;
 
   return (
     <div className="c-bg-surface border c-border rounded-xl overflow-hidden hover-border-accent hover-lift transition-all">
       {(post.videoUrl || post.displayUrl) && (
         <div className="relative w-full bg-black" style={{ paddingTop: "177.78%" }}>
-          {post.videoUrl && !videoError ? (
+          {post.videoUrl ? (
             <video src={post.videoUrl} poster={post.displayUrl} controls playsInline preload="none"
-              onError={() => setVideoError(true)}
               className="absolute inset-0 w-full h-full object-cover" />
           ) : (
-            <>
-              {post.displayUrl && <img src={post.displayUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />}
-              {videoError && (
-                <a href={post.url} target="_blank" rel="noopener noreferrer"
-                  className="absolute inset-0 flex items-center justify-center text-center p-3"
-                  style={{ background: "rgba(0,0,0,0.6)" }}>
-                  <span className="fs-10 font-mono px-3 py-1.5 rounded-lg c-bg-accent c-onaccent font-semibold">
-                    Video expired — open on Instagram →
-                  </span>
-                </a>
-              )}
-            </>
+            <img src={post.displayUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
           )}
           <div className="absolute top-2 right-2 c-bg-accent c-onaccent fs-9 font-mono font-bold px-1.5 py-0.5 rounded-lg" style={{ pointerEvents: "none" }}>{(post.ratio || 0).toFixed(1)}x avg</div>
           <div className="absolute top-2 left-2 fs-10 font-mono px-1.5 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.6)", color: "#fff", pointerEvents: "none" }}>@{post.username || post.profile}</div>
