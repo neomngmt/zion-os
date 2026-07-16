@@ -5730,6 +5730,19 @@ function ReelSorterPage() {
     }
 
     loadBtn.addEventListener("click", loadUrls);
+    // Some mobile browsers (notably iOS Safari) flatten a multi-line clipboard
+    // of URLs into a single line with literal "%0A" text instead of real line
+    // breaks. Clean that up immediately after paste so it displays properly
+    // line-by-line right away, not just when "Spustit" is clicked.
+    urlInput.addEventListener("input", () => {
+      if (/%0D%0A|%0A|%0D/i.test(urlInput.value)) {
+        const cursor = urlInput.selectionStart;
+        const before = urlInput.value;
+        urlInput.value = urlInput.value.replace(/%0D%0A|%0A|%0D/gi, "\n");
+        const diff = before.length - urlInput.value.length;
+        urlInput.selectionStart = urlInput.selectionEnd = Math.max(0, cursor - diff);
+      }
+    });
     addCatBtn.addEventListener("click", addCategory);
     newCatInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addCategory(); });
     exportBtn.addEventListener("click", openResults);
