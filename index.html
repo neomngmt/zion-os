@@ -245,7 +245,7 @@ const TABLES = {
       always_onboard: !!m.alwaysOnboard, agency: m.agency || "CZ",
       buffer_channel_id_ig: m.bufferChannelIdIg || "", buffer_channel_id_x: m.bufferChannelIdX || "",
       buffer_channel_id_tiktok: m.bufferChannelIdTiktok || "", buffer_channel_id_fb: m.bufferChannelIdFb || "",
-      infloww_creator_id: m.inflowwCreatorId || "",
+      infloww_creator_id_free: m.inflowwCreatorIdFree || "", infloww_creator_id_paid: m.inflowwCreatorIdPaid || "",
       notif_last_seen: m.notifLastSeen ? new Date(m.notifLastSeen).toISOString() : new Date().toISOString(),
     }),
     fromDb: (r) => ({
@@ -256,7 +256,7 @@ const TABLES = {
       alwaysOnboard: !!r.always_onboard, agency: r.agency || "CZ",
       bufferChannelIdIg: r.buffer_channel_id_ig || "", bufferChannelIdX: r.buffer_channel_id_x || "",
       bufferChannelIdTiktok: r.buffer_channel_id_tiktok || "", bufferChannelIdFb: r.buffer_channel_id_fb || "",
-      inflowwCreatorId: r.infloww_creator_id || "",
+      inflowwCreatorIdFree: r.infloww_creator_id_free || "", inflowwCreatorIdPaid: r.infloww_creator_id_paid || "",
       notifLastSeen: r.notif_last_seen ? new Date(r.notif_last_seen).getTime() : Date.now(),
       addedAt: r.added_at ? new Date(r.added_at).getTime() : Date.now(),
     }),
@@ -667,7 +667,7 @@ const modelsToJS = (r) => ({
   bufferChannelIdX: r.buffer_channel_id_x || "", bufferChannelIdTiktok: r.buffer_channel_id_tiktok || "",
   bufferChannelIdFb: r.buffer_channel_id_fb || "",
   onlyfansAccountId: r.onlyfansapi_account_id || "", onlyfansUsername: r.onlyfansapi_username || "",
-  inflowwCreatorId: r.infloww_creator_id || "",
+  inflowwCreatorIdFree: r.infloww_creator_id_free || "", inflowwCreatorIdPaid: r.infloww_creator_id_paid || "",
   inspoProfiles: Array.isArray(r.inspo_profiles) ? r.inspo_profiles : (r.inspo_profiles ? JSON.parse(r.inspo_profiles) : []),
 });
 const modelsToDB = (m) => ({
@@ -681,7 +681,7 @@ const modelsToDB = (m) => ({
   buffer_channel_id_x: m.bufferChannelIdX || "", buffer_channel_id_tiktok: m.bufferChannelIdTiktok || "",
   buffer_channel_id_fb: m.bufferChannelIdFb || "",
   onlyfansapi_account_id: m.onlyfansAccountId || "", onlyfansapi_username: m.onlyfansUsername || "",
-  infloww_creator_id: m.inflowwCreatorId || "",
+  infloww_creator_id_free: m.inflowwCreatorIdFree || "", infloww_creator_id_paid: m.inflowwCreatorIdPaid || "",
   inspo_profiles: m.inspoProfiles || [],
 });
 
@@ -1281,8 +1281,13 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, 
               className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
           </div>
           <div>
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Infloww Creator ID</label>
-            <input value={form.inflowwCreatorId || ""} onChange={(e) => set("inflowwCreatorId", e.target.value)} placeholder="id from Infloww /v1/creators"
+            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Infloww Creator ID (Free OF)</label>
+            <input value={form.inflowwCreatorIdFree || ""} onChange={(e) => set("inflowwCreatorIdFree", e.target.value)} placeholder="id from /v1/creators, free profile"
+              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
+          </div>
+          <div>
+            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Infloww Creator ID (Paid OF)</label>
+            <input value={form.inflowwCreatorIdPaid || ""} onChange={(e) => set("inflowwCreatorIdPaid", e.target.value)} placeholder="id from /v1/creators, paid profile"
               className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
           </div>
         </div>
@@ -4891,7 +4896,7 @@ function useSupaInflowwDailyStats() {
         const { data, error } = await supabaseClient.from("infloww_daily_stats").select("*");
         if (error) throw error;
         setValue((data || []).map((r) => ({
-          id: r.id, model: r.model, statDate: r.stat_date,
+          id: r.id, model: r.model, accountType: r.account_type || "paid", statDate: r.stat_date,
           earningsNet: Number(r.earnings_net) || 0, earningsGross: Number(r.earnings_gross) || 0,
           transactionCount: r.transaction_count || 0, messagesCount: r.messages_count || 0,
           tipsCount: r.tips_count || 0, subsCount: r.subs_count || 0, syncedAt: r.synced_at,
@@ -4929,25 +4934,37 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().slice(0, 10);
-  const inflowwWeek = myInflowwRows.filter((r) => r.statDate >= sevenDaysAgoStr);
-  const inflowwLast30 = myInflowwRows.filter((r) => r.statDate >= thirtyDaysAgoStr);
-  const hasInflowwData = myInflowwRows.length > 0;
-  const inflowwEarningsSeries = last7Dates.map((d) => sumInfloww(myInflowwRows.filter((r) => r.statDate === d), "earningsNet"));
 
-  const inflowwSection = hasInflowwData && (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-      {[["Last 7 days", inflowwWeek], ["Last 30 days", inflowwLast30]].map(([label, rows]) => (
-        <div key={label} className="c-bg-surface border c-border rounded-xl px-4 py-3.5 hover-lift">
-          <div className="fs-10 uppercase tracking-widest c-muted font-mono mb-2">{label} — Infloww</div>
-          <div className="text-xl font-semibold c-accent mb-2"><CountUp value={sumInfloww(rows, "earningsNet")} prefix="$" /></div>
-          {label === "Last 7 days" && <div className="mb-2"><Sparkline data={inflowwEarningsSeries} /></div>}
-          <div className="flex gap-4 fs-10 font-mono c-faint uppercase">
-            <span><CountUp value={sumInfloww(rows, "messagesCount")} /> messages</span>
-            <span><CountUp value={sumInfloww(rows, "tipsCount")} /> tips</span>
-            <span><CountUp value={sumInfloww(rows, "subsCount")} /> subs</span>
+  const inflowwBlock = (accountType, title) => {
+    const rowsAll = myInflowwRows.filter((r) => r.accountType === accountType);
+    if (!rowsAll.length) return null;
+    const week = rowsAll.filter((r) => r.statDate >= sevenDaysAgoStr);
+    const last30 = rowsAll.filter((r) => r.statDate >= thirtyDaysAgoStr);
+    const series = last7Dates.map((d) => sumInfloww(rowsAll.filter((r) => r.statDate === d), "earningsNet"));
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+        {[["Last 7 days", week], ["Last 30 days", last30]].map(([label, rows]) => (
+          <div key={label} className="c-bg-surface border c-border rounded-xl px-4 py-3.5 hover-lift">
+            <div className="fs-10 uppercase tracking-widest c-muted font-mono mb-2">{label} — {title}</div>
+            <div className="text-xl font-semibold c-accent mb-2"><CountUp value={sumInfloww(rows, "earningsNet")} prefix="$" /></div>
+            {label === "Last 7 days" && <div className="mb-2"><Sparkline data={series} /></div>}
+            <div className="flex gap-4 fs-10 font-mono c-faint uppercase">
+              <span><CountUp value={sumInfloww(rows, "messagesCount")} /> messages</span>
+              <span><CountUp value={sumInfloww(rows, "tipsCount")} /> tips</span>
+              <span><CountUp value={sumInfloww(rows, "subsCount")} /> subs</span>
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
+    );
+  };
+
+  const inflowwFreeBlock = inflowwBlock("free", "Infloww · Free OF");
+  const inflowwPaidBlock = inflowwBlock("paid", "Infloww · Paid OF");
+  const inflowwSection = (inflowwFreeBlock || inflowwPaidBlock) && (
+    <div className="mb-6">
+      {inflowwPaidBlock}
+      {inflowwFreeBlock}
     </div>
   );
   const myBufferRows = (bufferDailyStats || []).filter((r) => r.model === restrictModel && r.statDate >= sevenDaysAgoStr);
