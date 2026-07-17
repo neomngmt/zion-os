@@ -4920,44 +4920,23 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
   const yesterdayStr = yesterday.toISOString().slice(0, 10);
-  const myOfRows = (ofDailyStats || []).filter((r) => r.model === restrictModel);
-  const sumOf = (rows, field) => rows.reduce((t, r) => t + (r[field] || 0), 0);
-  const ofYesterday = myOfRows.filter((r) => r.statDate === yesterdayStr);
-  const ofWeek = myOfRows.filter((r) => r.statDate >= sevenDaysAgoStr);
-  const ofMonth = myOfRows.filter((r) => r.statDate && r.statDate.slice(0, 7) === monthStr);
-  const hasOfData = myOfRows.length > 0;
   const last7Dates = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d.toISOString().slice(0, 10);
   });
-  const earningsSeries = last7Dates.map((d) => sumOf(myOfRows.filter((r) => r.statDate === d), "earnings"));
-
-  const ofSection = (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-      {[["Yesterday", ofYesterday], ["Last 7 days", ofWeek], ["This month", ofMonth]].map(([label, rows]) => (
-        <div key={label} className="c-bg-surface border c-border rounded-xl px-4 py-3.5 hover-lift">
-          <div className="fs-10 uppercase tracking-widest c-muted font-mono mb-2">{label} — OnlyFans</div>
-          <div className="text-xl font-semibold c-accent mb-2"><CountUp value={sumOf(rows, "earnings")} prefix="$" /></div>
-          {label === "Last 7 days" && <div className="mb-2"><Sparkline data={earningsSeries} /></div>}
-          <div className="flex gap-4 fs-10 font-mono c-faint uppercase">
-            <span><CountUp value={sumOf(rows, "fansChatted")} /> fans chatted</span>
-            <span><CountUp value={sumOf(rows, "ppvsSent")} /> PPVs sent</span>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
 
   const myInflowwRows = (inflowwDailyStats || []).filter((r) => r.model === restrictModel);
   const sumInfloww = (rows, field) => rows.reduce((t, r) => t + (r[field] || 0), 0);
-  const inflowwYesterday = myInflowwRows.filter((r) => r.statDate === yesterdayStr);
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().slice(0, 10);
   const inflowwWeek = myInflowwRows.filter((r) => r.statDate >= sevenDaysAgoStr);
-  const inflowwMonth = myInflowwRows.filter((r) => r.statDate && r.statDate.slice(0, 7) === monthStr);
+  const inflowwLast30 = myInflowwRows.filter((r) => r.statDate >= thirtyDaysAgoStr);
   const hasInflowwData = myInflowwRows.length > 0;
   const inflowwEarningsSeries = last7Dates.map((d) => sumInfloww(myInflowwRows.filter((r) => r.statDate === d), "earningsNet"));
 
   const inflowwSection = hasInflowwData && (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-      {[["Yesterday", inflowwYesterday], ["Last 7 days", inflowwWeek], ["This month", inflowwMonth]].map(([label, rows]) => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+      {[["Last 7 days", inflowwWeek], ["Last 30 days", inflowwLast30]].map(([label, rows]) => (
         <div key={label} className="c-bg-surface border c-border rounded-xl px-4 py-3.5 hover-lift">
           <div className="fs-10 uppercase tracking-widest c-muted font-mono mb-2">{label} — Infloww</div>
           <div className="text-xl font-semibold c-accent mb-2"><CountUp value={sumInfloww(rows, "earningsNet")} prefix="$" /></div>
@@ -5011,7 +4990,6 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
     return (
       <div>
         <ThisWeeksAsks tasks={tasks} restrictModel={restrictModel} onNavigate={onNavigate} />
-        {ofSection}
         {inflowwSection}
         {bufferSection}
         <div className="fs-12 c-faint font-mono italic py-16 text-center border border-dashed c-border rounded-xl">
@@ -5025,7 +5003,6 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
     <div>
       <GoalCard latest={latest} />
       <ThisWeeksAsks tasks={tasks} restrictModel={restrictModel} onNavigate={onNavigate} />
-      {ofSection}
       {inflowwSection}
       {bufferSection}
 
