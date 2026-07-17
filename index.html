@@ -5870,7 +5870,7 @@ function TrendsPage({ weeklyTrendReels, onReload }) {
       // each firing several concurrent Apify calls internally, was enough
       // simultaneous pay-per-event requests to trip Apify's 402 rate limit
       // even with credit remaining.
-      for (const chunk of [0, 1, 2, 3]) {
+      for (const chunk of [0, 1, 2, 3, 4, 5, 6]) {
         try {
           const r = await fetch(`${SUPABASE_URL}/functions/v1/weekly-trends-scrape?chunk=${chunk}`, {
             method: "POST",
@@ -5884,7 +5884,7 @@ function TrendsPage({ weeklyTrendReels, onReload }) {
           failedChunks.push(e);
         }
       }
-      if (failedChunks.length) setGenerateError(`${failedChunks.length} of 4 chunks failed outright — check Edge Function logs.`);
+      if (failedChunks.length) setGenerateError(`${failedChunks.length} of 7 chunks failed outright — check Edge Function logs.`);
       setScrapeErrors(allScrapeErrors);
       if (onReload) await onReload();
     } catch (e) {
