@@ -4546,7 +4546,11 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
       // as the mesh, every frame — direct DOM write (not React state) so
       // there's zero lag or desync between the two.
       if (glowElRef?.current) {
-        const glowScale = scaleVec.x;
+        // Clamped separately from the mesh's own scale — the glow is a plain
+        // CSS element inside a box that can clip it if it grows too far
+        // (unlike the mesh, which has real camera safety margin built in),
+        // so cap it well before it could ever reach the container edge.
+        const glowScale = Math.min(scaleVec.x, 1.06);
         const glowOpacity = 0.75 + pulse * 0.25 + voiceSwell * 0.8;
         glowElRef.current.style.transform = `scale(${glowScale})`;
         glowElRef.current.style.opacity = glowOpacity;
@@ -5129,6 +5133,8 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
     setThinking(true);
     const myRequestId = ++requestIdRef.current;
     setMessages((m) => [...m, { role: "user", text }]);
+    // heroModels (defined below) already scopes creators down to just their
+    // own record — reused here so Neo's context matches what's on screen.
     try {
       const { data, error } = await supabaseClient.functions.invoke("clever-service", {
         body: {
@@ -5140,10 +5146,10 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
             cardCount: cards.length,
             openTasks: tasks.filter((t) => t.status !== "done").length,
             overdueTasks: tasks.filter((t) => t.status !== "done" && t.dueDate && t.dueDate < todayISO()).length,
-            modelNames: models.map((m) => m.name),
+            modelNames: heroModels.map((m) => m.name),
             // Per-model earnings/subs history, most recent week first, so Neo can
             // answer "how much did X earn" or "who's growing fastest" directly.
-            earningsByModel: models.map((m) => ({
+            earningsByModel: heroModels.map((m) => ({
               model: m.name,
               weeks: stats.filter((s) => s.model === m.name)
                 .sort((a, b) => (b.weekOf || "").localeCompare(a.weekOf || ""))
@@ -5151,12 +5157,12 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
                 .map((s) => ({ weekOf: s.weekOf, ofEarnings: s.ofEarnings, ofSubs: s.ofSubs, igFollowers: s.igFollowers, igReach: s.igReach })),
             })),
             // Best/worst performing reels so Neo can say what's working.
-            topReels: [...(reels || [])].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 12)
+            topReels: [...(reels || [])].filter((r) => heroModels.some((m) => m.name === r.model)).sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 12)
               .map((r) => ({ model: r.model, title: r.title, weekOf: r.weekOf, views: r.views, likes: r.likes, shares: r.shares, comments: r.comments })),
             recentTrends: trends.filter((t) => (agency === "US" ? t.showUS : t.showCZ)).slice(-6).map((t) => ({ title: t.title, category: t.category })),
             // Buffer-synced social reach per model, last 7 days, so Neo can
             // answer "how's Anna's X doing" or "who's growing on Instagram."
-            socialImpressions7d: models.map((m) => ({
+            socialImpressions7d: heroModels.map((m) => ({
               model: m.name,
               instagram: impressionsFor(m.name, "ig"),
               x: impressionsFor(m.name, "x"),
@@ -5165,7 +5171,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
             // Real OnlyFans earnings synced from Infloww (Free + Paid accounts
             // combined), last 7 and last 30 days per model — this is the
             // primary source of truth for "how much did X earn" now.
-            inflowwEarningsByModel: models.map((m) => {
+            inflowwEarningsByModel: heroModels.map((m) => {
               const rows = (inflowwDailyStats || []).filter((r) => r.model === m.name);
               const sum = (days) => {
                 const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
@@ -5328,14 +5334,17 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
   const amber = "#39e673";
 
   // ---- real telemetry ----
-  const openTasksCount = tasks.filter((t) => t.status !== "done").length;
+  // Creators only ever see numbers derived from their own record here —
+  // never the rest of the roster's tasks, revenue, or performance.
+  const heroModels = session.role === "creator" ? models.filter((m) => m.name === session.name) : models;
+  const openTasksCount = (session.role === "creator" ? tasks.filter((t) => t.model === session.name) : tasks).filter((t) => t.status !== "done").length;
   const relevantTrends = trends.filter((t) => (agency === "US" ? t.showUS : t.showCZ));
 
   // ---- financial strip: this calendar month's real Infloww revenue (all
   // models, Free + Paid combined) vs a fixed $20k agency goal ----
   const now = new Date();
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-  const agencyModelNames = new Set(models.map((m) => m.name));
+  const agencyModelNames = new Set(heroModels.map((m) => m.name));
   const inflowwThisMonth = (inflowwDailyStats || []).filter((r) => agencyModelNames.has(r.model) && r.statDate >= monthStart);
   const monthRevenue = inflowwThisMonth.reduce((sum, r) => sum + (r.earningsNet || 0), 0);
   const monthGoal = (settings && settings.monthlyRevenueGoal) || 20000;
@@ -5351,12 +5360,12 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
 
   // ---- agency stats grid ----
-  const latestPerModel = models.map((m) => stats.filter((s) => s.model === m.name).sort((a, b) => (b.weekOf || "").localeCompare(a.weekOf || ""))[0]).filter(Boolean);
-  const prevPerModel = models.map((m) => stats.filter((s) => s.model === m.name).sort((a, b) => (b.weekOf || "").localeCompare(a.weekOf || ""))[1]).filter(Boolean);
+  const latestPerModel = heroModels.map((m) => stats.filter((s) => s.model === m.name).sort((a, b) => (b.weekOf || "").localeCompare(a.weekOf || ""))[0]).filter(Boolean);
+  const prevPerModel = heroModels.map((m) => stats.filter((s) => s.model === m.name).sort((a, b) => (b.weekOf || "").localeCompare(a.weekOf || ""))[1]).filter(Boolean);
   const activeSubs = latestPerModel.reduce((a, s) => a + (s.ofSubs || 0), 0);
   const prevSubs = prevPerModel.reduce((a, s) => a + (s.ofSubs || 0), 0);
   const newSubs7d = activeSubs - prevSubs;
-  const topReel = [...(reels || [])].sort((a, b) => (b.views || 0) - (a.views || 0))[0];
+  const topReel = [...(reels || [])].filter((r) => heroModels.some((m) => m.name === r.model)).sort((a, b) => (b.views || 0) - (a.views || 0))[0];
   const revLastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 10);
   const revThisMonthPrior = stats.filter((s) => (s.weekOf || "") >= revLastMonthStart && (s.weekOf || "") < monthStart).reduce((a, s) => a + (s.ofEarnings || 0), 0);
   const revMomPct = revThisMonthPrior > 0 ? Math.round(((monthRevenue - revThisMonthPrior) / revThisMonthPrior) * 100) : null;
@@ -5431,7 +5440,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
 
             {/* HUD-bracketed mini stats, stacked under the identity block — desktop only */}
             <div className="mt-6 flex flex-col gap-4 neo-fade-in" style={{ animationDelay: "0.7s" }}>
-              {[["ACTIVE MODELS", models.length], ["OPEN TASKS", openTasksCount], ["TRENDS SHARED", relevantTrends.length]].map(([label, val]) => (
+              {[[session.role === "creator" ? "MY PROFILE" : "ACTIVE MODELS", session.role === "creator" ? "\u2713" : heroModels.length], ["OPEN TASKS", openTasksCount], ["TRENDS SHARED", relevantTrends.length]].map(([label, val]) => (
                 <div key={label} className="relative pl-3 pr-4 py-1.5" style={{ borderLeft: `2px solid ${neoGreen}`, background: "rgba(57,230,115,0.04)" }}>
                   <div className="fs-9 tracking-widest" style={{ color: textDim, letterSpacing: "1.5px" }}>{label}</div>
                   <div className="text-xl font-bold" style={{ color: neoGreen, textShadow: `0 0 8px ${neoGreen}88` }}>{val}</div>
@@ -5457,7 +5466,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
               breathes as one thing with the mesh instead of just sitting
               there statically. */}
           <div className="relative neo-orb-fade-in w-full max-w-[300px] sm:max-w-[520px] sm:justify-self-center" style={{ aspectRatio: "1 / 1", animationDelay: "0.3s" }}>
-            <div ref={glowElRef} style={{ position: "absolute", inset: "2%", background: "radial-gradient(circle, rgba(57,230,115,0.45) 0%, rgba(57,230,115,0.18) 45%, transparent 75%)", filter: "blur(14px)", pointerEvents: "none", willChange: "transform, opacity" }} />
+            <div ref={glowElRef} style={{ position: "absolute", inset: "8%", background: "radial-gradient(circle, rgba(57,230,115,0.45) 0%, rgba(57,230,115,0.18) 45%, transparent 75%)", filter: "blur(14px)", pointerEvents: "none", willChange: "transform, opacity" }} />
             {thinking && (
               <div className="absolute left-1/2 -translate-x-1/2 font-mono uppercase tracking-widest flex items-baseline"
                 style={{ top: -6, color: amber, fontSize: "13px", letterSpacing: "4px", textShadow: `0 0 10px ${amber}aa`, animation: "neoThinkPulse 1.1s ease-in-out infinite" }}>
@@ -5543,10 +5552,12 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
         </div>
       </div>
 
-      {/* agency stats (team only) + primary objective strip + 3-card grid —
-          mobile only now; on desktop this same data already lives in the
-          columns flanking the orb above, so showing it again here would
-          just be scrolled-to duplicate content. */}
+      {/* agency stats (team only) + primary objective strip + 3-card grid +
+          model roster — actually gated by role now, not just labeled "team
+          only": a creator logged in just to talk to Neo about her own
+          numbers should never see the rest of the roster. */}
+      {session.role === "admin" && (
+      <>
       <div className="sm:hidden">
         <div className="flex items-center gap-3 mt-8 mb-4 neo-fade-in" style={{ animationDelay: "0.8s" }}>
           <div className="fs-11 tracking-widest px-2.5 py-1 rounded" style={{ color: textDim, letterSpacing: "3px", border: `1px solid ${border}` }}>
@@ -5624,6 +5635,8 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
           );
         })}
       </div>
+      </>
+      )}
     </div>
   );
 }
@@ -7599,6 +7612,7 @@ const NAV_CREATOR = [
   { id: "calendar", label: "My Calendar", icon: Calendar },
   { id: "tasks", label: "My Tasks", icon: CheckSquare },
   { id: "viral", label: "Viral Feed", icon: Zap },
+  { id: "neo", label: "Neo", icon: Sparkles },
   { id: "whatsnew", label: "OF News", icon: Megaphone },
   { id: "settings", label: "Settings", icon: Settings },
 ];
@@ -7884,6 +7898,7 @@ function App() {
                 <button key={n.id} onClick={() => {
                   if (n.id === "neo") {
                     primeNeoAudioUnlock();
+                    setNeoBooting(true);
                     const gName = session.role === "admin" ? "Boss" : (session.name || "there");
                     prefetchNeoGreeting(`Hi ${gName}! How can I help you today?`);
                   }
