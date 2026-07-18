@@ -545,6 +545,16 @@ button.c-bg-accent.rounded-xl,
 @media (min-width: 641px) {
   .login-desktop-scale { transform: scale(1.1); }
 }
+.nav-neo-item { position: relative; }
+.nav-neo-item:hover {
+  color: #39e673 !important;
+  box-shadow: 0 0 0 1px rgba(57,230,115,0.35), 0 0 18px rgba(57,230,115,0.35), inset 0 0 14px rgba(57,230,115,0.08);
+  animation: navNeoPulse 1.4s ease-in-out infinite;
+}
+@keyframes navNeoPulse {
+  0%,100% { box-shadow: 0 0 0 1px rgba(57,230,115,0.3), 0 0 12px rgba(57,230,115,0.25); }
+  50% { box-shadow: 0 0 0 1px rgba(57,230,115,0.5), 0 0 22px rgba(57,230,115,0.55); }
+}
 `;
 
 // ---------- storage hooks ----------
@@ -3868,6 +3878,38 @@ function NeoOrb({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onCli
       drawRing(R + 22, R + 10, [], 0.18, -r * 0.5);
       drawRing(R + 22, R + 10, [4, 4], 0.15, Math.PI / 2 - r * 0.5);
 
+      // HUD-style hexagon reticle + tick marks — the "JARVIS" touch
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(-r * 0.22);
+      ctx.strokeStyle = `rgba(57,230,115,${0.22 + pulse * 0.15})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      const hexR = R + 46;
+      for (let i = 0; i <= 6; i++) {
+        const a = (Math.PI / 3) * i - Math.PI / 2;
+        const hx = Math.cos(a) * hexR, hy = Math.sin(a) * hexR;
+        if (i === 0) ctx.moveTo(hx, hy); else ctx.lineTo(hx, hy);
+      }
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(r * 0.15);
+      ctx.strokeStyle = `rgba(57,230,115,${0.35 + pulse * 0.25})`;
+      ctx.lineWidth = 1.2;
+      const tickR1 = R + 54, tickR2 = R + 62;
+      for (let i = 0; i < 24; i++) {
+        const a = (Math.PI * 2 * i) / 24;
+        if (i % 3 !== 0) continue;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * tickR1, Math.sin(a) * tickR1);
+        ctx.lineTo(Math.cos(a) * tickR2, Math.sin(a) * tickR2);
+        ctx.stroke();
+      }
+      ctx.restore();
+
       const glowScale = speaking ? 1.12 : 1;
       const grad = ctx.createRadialGradient(cx, cy, 4, cx, cy, R * 0.95 * glowScale);
       grad.addColorStop(0, `rgba(18,179,76,${0.16 + pulse * 0.12})`);
@@ -4019,6 +4061,82 @@ function NeoClock() {
     <div className="fs-11 font-mono text-right leading-tight" style={{ color: "#6f9a7a" }}>
       <div style={{ color: "#39e673" }}>{pad(now.getHours())}:{pad(now.getMinutes())}:{pad(now.getSeconds())}</div>
       <div>{now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase()}</div>
+    </div>
+  );
+}
+
+function MatrixRain({ opacity = 0.16 }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const chars = "アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789ZION";
+    const fontSize = 15;
+    let cols, drops;
+
+    const resize = () => {
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      canvas.style.width = "100%";
+      canvas.style.height = "100%";
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+      cols = Math.floor(window.innerWidth / fontSize);
+      drops = Array.from({ length: cols }, () => Math.random() * -window.innerHeight / fontSize);
+    };
+    resize();
+    window.addEventListener("resize", resize);
+
+    let raf;
+    const draw = () => {
+      ctx.fillStyle = "rgba(3,7,5,0.09)";
+      ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+      ctx.font = `${fontSize}px 'JetBrains Mono', monospace`;
+      for (let i = 0; i < cols; i++) {
+        const char = chars[Math.floor(Math.random() * chars.length)];
+        const y = drops[i] * fontSize;
+        ctx.fillStyle = Math.random() > 0.985 ? "rgba(200,255,220,0.9)" : "rgba(57,230,115,0.55)";
+        ctx.fillText(char, i * fontSize, y);
+        if (y > window.innerHeight && Math.random() > 0.975) drops[i] = 0;
+        drops[i]++;
+      }
+      raf = requestAnimationFrame(draw);
+    };
+    draw();
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
+  }, []);
+  return <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, zIndex: 0, opacity, pointerEvents: "none" }} />;
+}
+
+function NeoBootSequence({ onDone }) {
+  const lines = [
+    "INITIALIZING N.E.O. CORE...",
+    "ESTABLISHING NEURAL LINK...",
+    "LOADING AGENCY DATASTREAM...",
+    "CALIBRATING VOICE MATRIX...",
+    "ALL SYSTEMS ONLINE.",
+  ];
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    if (shown >= lines.length) {
+      const t = setTimeout(onDone, 350);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => setShown((s) => s + 1), 260);
+    return () => clearTimeout(t);
+  }, [shown]);
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center" style={{ background: "#030705" }}>
+      <MatrixRain opacity={0.3} />
+      <div className="relative z-10 font-mono text-left" style={{ minWidth: 320 }}>
+        {lines.slice(0, shown).map((l, i) => (
+          <div key={i} className="fs-13" style={{ color: "#39e673", textShadow: "0 0 6px rgba(57,230,115,0.6)", marginBottom: 6 }}>
+            <span style={{ opacity: 0.6 }}>{">"}</span> {l}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -6535,6 +6653,12 @@ function App() {
   const [contentNavOpen, setContentNavOpen] = useState(false);
   const [contentPlatform, setContentPlatform] = useState(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [neoBooting, setNeoBooting] = useState(false);
+  const prevViewRef = useRef(null);
+  useEffect(() => {
+    if (view === "neo" && prevViewRef.current !== "neo") setNeoBooting(true);
+    prevViewRef.current = view;
+  }, [view]);
   const loading = cardsLoading || modelsLoading || tasksLoading || settingsLoading || statsLoading || reelsLoading || trendsLoading || integrationsLoading;
 
   if (loading) {
@@ -6621,6 +6745,23 @@ function App() {
     <div className="min-h-screen c-bg-app flex flex-col" style={{ fontFamily: "Inter, sans-serif" }}>
       <style>{fontImport}</style>
 
+      {currentView === "neo" ? (
+        <div className="fixed inset-0 z-40" style={{ background: "#030705" }}>
+          {neoBooting && <NeoBootSequence onDone={() => setNeoBooting(false)} />}
+          <MatrixRain />
+          <button onClick={() => setView("dashboard")}
+            className="tap fixed top-4 right-4 z-50 flex items-center gap-2 px-3 py-2 rounded-lg border font-mono fs-11 uppercase tracking-widest transition-colors"
+            style={{ borderColor: "rgba(57,230,115,0.35)", color: "#39e673", background: "rgba(3,7,5,0.6)", backdropFilter: "blur(6px)" }}>
+            <X size={14} /> Leave Neo
+          </button>
+          <div className="relative z-10 h-full overflow-y-auto px-4 md:px-6 py-4 md:py-6">
+            <NeoPage agency={session.agency} session={session} onNavigate={setView}
+              onSignOut={() => { clearSavedSession(); setSession(null); setView(null); setOnboardingDismissed(false); }}
+              cards={scopedCards} tasks={scopedTasks} models={agencyModels} stats={scopedStats} reels={scopedReels} trends={trends} bufferDailyStats={bufferDailyStats} />
+          </div>
+        </div>
+      ) : (
+      <>
       {/* Full-width top bar (desktop + mobile — sidebar nav now covers both) */}
       <div className="flex items-center justify-between border-b c-border c-bg-panel flex-shrink-0">
         <button onClick={() => setView("dashboard")} title="Go to Dashboard"
@@ -6729,7 +6870,7 @@ function App() {
               }
               return (
                 <button key={n.id} onClick={() => { setView(n.id); setMobileNavOpen(false); }}
-                  className={`tap w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg fs-13 transition-colors ${activeNav ? "c-bg-accent-a1 c-accent" : "c-muted hover-bg-surface hover-text-primary"}`}>
+                  className={`tap w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg fs-13 transition-colors ${activeNav ? "c-bg-accent-a1 c-accent" : "c-muted hover-bg-surface hover-text-primary"} ${n.id === "neo" ? "nav-neo-item" : ""}`}>
                   <Icon size={20} />
                   <span className={labelCls}>{n.label}</span>
                 </button>
@@ -6774,9 +6915,6 @@ function App() {
               : <TrendScraper models={models} persistModels={persistModels} restrictModel={restrictModel} />)}
             {currentView === "reelsorter" && isAdmin && <ReelSorterPage />}
             {currentView === "weeklytrends" && isAdmin && <TrendsPage weeklyTrendReels={weeklyTrendReels} onReload={reloadWeeklyTrendReels} />}
-            {currentView === "neo" && <NeoPage agency={session.agency} session={session} onNavigate={setView}
-              onSignOut={() => { clearSavedSession(); setSession(null); setView(null); setOnboardingDismissed(false); }}
-              cards={scopedCards} tasks={scopedTasks} models={agencyModels} stats={scopedStats} reels={scopedReels} trends={trends} bufferDailyStats={bufferDailyStats} />}
             {currentView === "trending" && <CreatorTrending trends={trends} agency={session.agency} />}
             {currentView === "models" && <ModelManager models={agencyModels} persistModels={scopedPersistModels} cards={scopedCards} agency={session.agency} />}
             {currentView === "whatsnew" && <WhatsNewPage />}
@@ -6786,6 +6924,8 @@ function App() {
           </main>
         </div>
       </div>
+      </>
+      )}
 
     </div>
   );
