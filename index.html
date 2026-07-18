@@ -5421,15 +5421,15 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: neoGreen, boxShadow: `0 0 8px ${neoGreen}`, animation: "neoDotBlink 1.6s ease-in-out infinite" }} />
               <span className="fs-10 tracking-widest" style={{ color: textDim, letterSpacing: "3px" }}>SERVERS ACTIVE</span>
             </div>
-            <div className="neo-fade-in font-bold tracking-widest" style={{ color: neoGreen, textShadow: `0 0 16px ${neoGreen}aa`, fontSize: "56px", lineHeight: 1, animationDelay: "0.25s" }}>
+            <div className="neo-fade-in font-bold tracking-widest" style={{ color: "#f2f5f0", fontSize: "30px", lineHeight: 1, animationDelay: "0.25s" }}>
               NEO
             </div>
             {/* fixed-height status area — content changes but the box never does, so it can't shove other elements around */}
             <div className="mt-4 neo-fade-in" style={{ minHeight: 64, maxWidth: 280, animationDelay: "0.4s" }}>
-              <div className="fs-13 italic" style={{ color: neoGreen, opacity: 0.9 }}>
+              <div className="fs-13 italic" style={{ color: "#f2f5f0", opacity: 0.9 }}>
                 {thinking ? "thinking — click the orb to stop." : speaking ? "speaking — click the orb to stop." : listening ? "listening — click the orb to stop." : "click the orb to ask something."}
               </div>
-              {heard && <div className="fs-10 italic mt-1 truncate" style={{ color: neoGreen, opacity: 0.4, maxWidth: 280 }}>heard: "{heard}"</div>}
+              {heard && <div className="fs-10 italic mt-1 truncate" style={{ color: "#f2f5f0", opacity: 0.4, maxWidth: 280 }}>heard: "{heard}"</div>}
               {voiceError && <div className="fs-10 italic mt-1 truncate" style={{ color: "#e07a5f", maxWidth: 280 }}>voice error: {voiceError}</div>}
             </div>
 
@@ -5465,7 +5465,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
               own scale/pulse via direct refs (not React state), so it
               breathes as one thing with the mesh instead of just sitting
               there statically. */}
-          <div className="relative neo-orb-fade-in w-full max-w-[300px] sm:max-w-[624px] sm:justify-self-center" style={{ aspectRatio: "1 / 1", animationDelay: "0.3s" }}>
+          <div className="relative neo-orb-fade-in w-full max-w-[300px] sm:max-w-[811px] sm:justify-self-center" style={{ aspectRatio: "1 / 1", animationDelay: "0.3s" }}>
             <div ref={glowElRef} style={{ position: "absolute", inset: "8%", background: "radial-gradient(circle, rgba(57,230,115,0.45) 0%, rgba(57,230,115,0.18) 45%, transparent 75%)", filter: "blur(14px)", pointerEvents: "none", willChange: "transform, opacity" }} />
             {thinking && (
               <div className="absolute left-1/2 -translate-x-1/2 font-mono uppercase tracking-widest flex items-baseline"
