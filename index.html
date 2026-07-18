@@ -3914,6 +3914,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
   const [queriesToday, setQueriesToday] = useState(0);
   const [listening, setListening] = useState(false);
   const [heard, setHeard] = useState("");
+  const [voiceError, setVoiceError] = useState("");
   const [speaking, setSpeaking] = useState(false);
   const speakingRef = useRef(false);
   const speakBumpRef = useRef(0);
@@ -3997,6 +3998,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
       audio.dataset.blobUrl = url;
 
       audio.onplay = () => {
+        setVoiceError("");
         setSpeaking(true);
         speakingRef.current = true;
 
@@ -4041,7 +4043,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
         const mediaErr = audio.error;
         const codeNames = { 1: "ABORTED", 2: "NETWORK", 3: "DECODE", 4: "SRC_NOT_SUPPORTED" };
         const codeName = mediaErr ? (codeNames[mediaErr.code] || `code ${mediaErr.code}`) : "unknown";
-        setHeard(`(voice error: failed to play audio — ${codeName}, ${rawBytes.byteLength} bytes)`);
+        setVoiceError(`failed to play audio — ${codeName}, ${rawBytes.byteLength} bytes`);
       };
       if (audioCtxRef.current?.state === "suspended") await audioCtxRef.current.resume();
       await audio.play();
@@ -4049,7 +4051,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
       setSpeaking(false);
       speakingRef.current = false;
       stopSpeakPulse();
-      setHeard(`(voice error: ${err?.message || "failed to speak"})`);
+      setVoiceError(err?.message || "failed to speak");
     }
   };
 
@@ -4342,6 +4344,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
               {thinking ? "thinking — click the orb to stop." : speaking ? "speaking — click the orb to stop." : listening ? "listening — click the orb to stop." : "click the orb to ask something."}
             </div>
             {heard && <div className="fs-10 italic mt-1" style={{ color: neoGreen, opacity: 0.4 }}>heard: "{heard}"</div>}
+            {voiceError && <div className="fs-10 italic mt-1" style={{ color: "#e07a5f" }}>voice error: {voiceError}</div>}
           </div>
 
           {/* right radar + waveform */}
