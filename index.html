@@ -4418,8 +4418,16 @@ function NotificationBell({ model, cards, tasks, trends, agency, models, persist
   const [open, setOpen] = useState(false);
   const [frozen, setFrozen] = useState(null);
   const { value: changelogEntries } = useSupaChangelog();
+  const bellRef = useRef(null);
   const lastSeen = model?.notifLastSeen || 0;
   const myName = model?.name;
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e) => { if (bellRef.current && !bellRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [open]);
 
   const newIdeas = cards.filter((c) => c.model === myName && c.source === "team" && c.createdAt > lastSeen);
   const newCalendar = tasks.filter((t) => t.model === myName && t.createdAt > lastSeen);
@@ -4447,8 +4455,7 @@ function NotificationBell({ model, cards, tasks, trends, agency, models, persist
   const shownTotal = shown.newIdeas.length + shown.newCalendar.length + shown.newTrends.length + shown.newChangelog.length;
 
   return (
-    <div className="relative">
-      <button onClick={toggle} className="tap relative p-1.5 rounded-lg c-muted hover-text-primary hover-bg-surface transition-colors">
+    <div className="relative" ref={bellRef}>
         <Bell size={16} />
         {total > 0 && (
           <span className="absolute -top-0.5 -right-0.5 min-w-[15px] h-[15px] px-1 rounded-full c-bg-accent c-onaccent fs-9 font-mono font-bold flex items-center justify-center">
@@ -4545,6 +4552,15 @@ function AdminNotificationBell({ cards, tasks, onNavigate }) {
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState(new Set());
   const { value: changelogEntries } = useSupaChangelog();
+  const bellRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e) => { if (bellRef.current && !bellRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [open]);
+
   const overdueAll = tasks.filter((t) => t.status !== "done" && t.dueDate && t.dueDate < todayISO());
   const stuckIdeasAll = cards.filter((c) => c.stage === "idea");
   const sevenDaysAgoTs = Date.now() - 7 * 24 * 60 * 60 * 1000;
@@ -4563,7 +4579,7 @@ function AdminNotificationBell({ cards, tasks, onNavigate }) {
   };
 
   return (
-    <div className="relative">
+    <div className="relative" ref={bellRef}>
       <button onClick={() => setOpen((v) => !v)} className="tap relative p-1.5 rounded-lg c-muted hover-text-primary hover-bg-surface transition-colors">
         <Bell size={16} />
         {total > 0 && (
