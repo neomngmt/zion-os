@@ -584,6 +584,7 @@ button.c-bg-accent.rounded-xl,
 }
 @media (min-width: 641px) {
   .login-desktop-scale { transform: scale(1.1); }
+  .neo-orb-size { max-width: 950px !important; }
 }
 .nav-neo-item { position: relative; }
 .nav-neo-item:hover {
@@ -5411,25 +5412,32 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
           centered together. Mobile stacks (orb on top, text below); desktop
           sits side by side. Status/heard text has a fixed-height box so a
           long reply can never push anything else around. */}
-      <div className="sm:grid sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center sm:gap-8 sm:min-h-[70vh] overflow-x-hidden">
+      <div className="sm:grid sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center sm:gap-4 sm:min-h-[70vh] overflow-x-hidden">
         <div className="flex flex-col-reverse sm:contents items-center gap-8">
 
           {/* left: identity + live status — desktop only now; mobile keeps
               its earlier simpler version below instead */}
           <div className="hidden sm:flex sm:flex-col items-center sm:items-start text-center sm:text-left sm:justify-self-end">
             <div className="flex items-center gap-2 mb-2 neo-fade-in" style={{ animationDelay: "0.15s" }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: neoGreen, boxShadow: `0 0 8px ${neoGreen}`, animation: "neoDotBlink 1.6s ease-in-out infinite" }} />
-              <span className="fs-10 tracking-widest" style={{ color: textDim, letterSpacing: "3px" }}>SERVERS ACTIVE</span>
+              <span style={{
+                width: 8, height: 8, borderRadius: "50%",
+                background: thinking ? amber : speaking ? neoGreen : listening ? neoGreen : neoGreen,
+                boxShadow: `0 0 8px ${thinking ? amber : neoGreen}`,
+                animation: (thinking || speaking || listening) ? "neoDotBlink 0.8s ease-in-out infinite" : "neoDotBlink 1.6s ease-in-out infinite",
+              }} />
+              <span className="fs-10 tracking-widest" style={{ color: thinking ? amber : (speaking || listening) ? neoGreen : textDim, letterSpacing: "3px" }}>
+                {thinking ? "THINKING" : speaking ? "SPEAKING" : listening ? "LISTENING" : "SERVERS ACTIVE"}
+              </span>
             </div>
-            <div className="neo-fade-in font-bold tracking-widest" style={{ color: "#f2f5f0", fontSize: "30px", lineHeight: 1, animationDelay: "0.25s" }}>
+            <div className="neo-fade-in font-bold tracking-widest" style={{ color: neoGreen, textShadow: `0 0 16px ${neoGreen}aa`, fontSize: "30px", lineHeight: 1, animationDelay: "0.25s" }}>
               NEO
             </div>
             {/* fixed-height status area — content changes but the box never does, so it can't shove other elements around */}
             <div className="mt-4 neo-fade-in" style={{ minHeight: 64, maxWidth: 280, animationDelay: "0.4s" }}>
-              <div className="fs-13 italic" style={{ color: "#f2f5f0", opacity: 0.9 }}>
+              <div className="fs-13 italic" style={{ color: neoGreen, opacity: 0.9 }}>
                 {thinking ? "thinking — click the orb to stop." : speaking ? "speaking — click the orb to stop." : listening ? "listening — click the orb to stop." : "click the orb to ask something."}
               </div>
-              {heard && <div className="fs-10 italic mt-1 truncate" style={{ color: "#f2f5f0", opacity: 0.4, maxWidth: 280 }}>heard: "{heard}"</div>}
+              {heard && <div className="fs-10 italic mt-1 truncate" style={{ color: neoGreen, opacity: 0.4, maxWidth: 280 }}>heard: "{heard}"</div>}
               {voiceError && <div className="fs-10 italic mt-1 truncate" style={{ color: "#e07a5f", maxWidth: 280 }}>voice error: {voiceError}</div>}
             </div>
 
@@ -5465,7 +5473,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
               own scale/pulse via direct refs (not React state), so it
               breathes as one thing with the mesh instead of just sitting
               there statically. */}
-          <div className="relative neo-orb-fade-in w-full max-w-[300px] sm:max-w-[811px] sm:justify-self-center" style={{ aspectRatio: "1 / 1", animationDelay: "0.3s" }}>
+          <div className="relative neo-orb-fade-in neo-orb-size w-full max-w-[300px] sm:justify-self-center" style={{ aspectRatio: "1 / 1", animationDelay: "0.3s" }}>
             <div ref={glowElRef} style={{ position: "absolute", inset: "8%", background: "radial-gradient(circle, rgba(57,230,115,0.45) 0%, rgba(57,230,115,0.18) 45%, transparent 75%)", filter: "blur(14px)", pointerEvents: "none", willChange: "transform, opacity" }} />
             {thinking && (
               <div className="absolute left-1/2 -translate-x-1/2 font-mono uppercase tracking-widest flex items-baseline"
