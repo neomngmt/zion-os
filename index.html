@@ -1422,7 +1422,7 @@ function CreatorForm({ models, cards, persistCards, restrictModel }) {
 
 // ---------- dashboard ----------
 
-function Dashboard({ cards, models, stats, reels, onNavigate }) {
+function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats }) {
   const activeCount = cards.filter((c) => c.stage !== "posted").length;
   const filmingToday = cards.filter((c) => c.stage === "filming").length;
   const pendingIdeas = cards.filter((c) => c.stage === "idea" && c.source === "creator").length;
@@ -1448,6 +1448,17 @@ function Dashboard({ cards, models, stats, reels, onNavigate }) {
     ? reels.filter((r) => r.weekOf === latestReelWeek).sort((a, b) => b.views - a.views)[0]
     : null;
 
+  // Infloww: sum every tracked model's Free + Paid earnings for this agency,
+  // last 7 / last 30 days.
+  const agencyModelNames = new Set(models.map((m) => m.name));
+  const myInflowwRows = (inflowwDailyStats || []).filter((r) => agencyModelNames.has(r.model));
+  const sevenDaysAgoStr = (() => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); })();
+  const thirtyDaysAgoStr = (() => { const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().slice(0, 10); })();
+  const inflowwWeek = myInflowwRows.filter((r) => r.statDate >= sevenDaysAgoStr);
+  const inflowwMonth = myInflowwRows.filter((r) => r.statDate >= thirtyDaysAgoStr);
+  const sumInfloww = (rows) => rows.reduce((t, r) => t + (r.earningsNet || 0), 0);
+  const hasInflowwData = myInflowwRows.length > 0;
+
   return (
     <div>
       <div className="c-bg-surface border c-border rounded-xl p-5 mb-6">
@@ -1464,6 +1475,19 @@ function Dashboard({ cards, models, stats, reels, onNavigate }) {
           </>
         )}
       </div>
+
+      {hasInflowwData && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+          <div className="c-bg-surface border c-border rounded-xl px-4 py-3.5">
+            <div className="fs-10 uppercase tracking-widest c-muted font-mono mb-2">Infloww — Last 7 days (all models)</div>
+            <div className="text-2xl font-extrabold c-accent">$<CountUp value={sumInfloww(inflowwWeek)} /></div>
+          </div>
+          <div className="c-bg-surface border c-border rounded-xl px-4 py-3.5">
+            <div className="fs-10 uppercase tracking-widest c-muted font-mono mb-2">Infloww — Last 30 days (all models)</div>
+            <div className="text-2xl font-extrabold c-accent">$<CountUp value={sumInfloww(inflowwMonth)} /></div>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-3 flex-wrap mb-6">
         <StatCard label="Active scenes" value={activeCount} color="#12b34c" />
@@ -6625,7 +6649,7 @@ function App() {
             )}
 
             {currentView === "dashboard" && (session.role === "admin"
-              ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} />
+              ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} inflowwDailyStats={inflowwDailyStats} />
               : <CreatorDashboard stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} ofDailyStats={ofDailyStats} inflowwDailyStats={inflowwDailyStats} />)}
             {currentView === "content" && <ContentDirector cards={isAdmin ? scopedCards : cards} persistCards={isAdmin ? scopedPersistCards : persistCards} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} forcedNetwork={contentPlatform} />}
             {currentView === "calendar" && <CalendarView cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks} onNavigate={setView} restrictModel={restrictModel} />}
