@@ -56,6 +56,30 @@ function primeNeoAudioUnlock() {
   sharedNeoAudioEl.play().catch(() => {});
 }
 
+// Kicked off in parallel with the boot sequence (right when the Neo nav
+// item is clicked) instead of waiting until NeoPage mounts — the greeting's
+// TTS fetch is the slow part, and running it during the ~1.6s boot animation
+// means the actual audio.play() call, once NeoPage mounts, happens much
+// sooner after the original tap. iOS Safari in particular won't allow
+// autoplay if too much real time has passed since the last user gesture.
+let prefetchedGreetingUrl = null;
+function prefetchNeoGreeting(text) {
+  prefetchedGreetingUrl = (async () => {
+    try {
+      const { data, error } = await supabaseClient.functions.invoke("neo-tts", { body: { text } });
+      if (error) throw error;
+      const rawBytes = data instanceof Blob ? await data.arrayBuffer() : data;
+      const header = new Uint8Array(rawBytes.slice(0, 3));
+      const isId3 = header[0] === 0x49 && header[1] === 0x44 && header[2] === 0x33;
+      const isMpegSync = header[0] === 0xFF && (header[1] & 0xE0) === 0xE0;
+      if (!isId3 && !isMpegSync) return null;
+      return URL.createObjectURL(new Blob([rawBytes], { type: "audio/mpeg" }));
+    } catch {
+      return null;
+    }
+  })();
+}
+
 // ---------------------------------------------------------------------------
 // Inline icon set — replaces lucide-react so this file needs no bundler.
 // Exact path data pulled from lucide-react v0.383.0.
@@ -4375,7 +4399,7 @@ function NeoOrbLayered({ thinking, speaking, listening, liveAmpRef, onClick }) {
   return (
     <div ref={mountRef} onClick={onClick}
       className="mx-auto cursor-pointer"
-      style={{ width: "100%", maxWidth: 380, aspectRatio: "1 / 1" }} />
+      style={{ width: "100%", height: "100%", aspectRatio: "1 / 1" }} />
   );
 }
 
@@ -4812,20 +4836,22 @@ function CircuitBoardBG() {
           </g>
         ))}
       </svg>
-      {/* corner brackets, like an instrument-panel frame */}
-      {[
-        { top: 20, left: 20, rotate: 0 },
-        { top: 20, right: 20, rotate: 90 },
-        { bottom: 20, right: 20, rotate: 180 },
-        { bottom: 20, left: 20, rotate: 270 },
-      ].map((pos, i) => (
-        <svg key={i} width="120" height="120" viewBox="0 0 120 120"
-          style={{ position: "absolute", ...pos, transform: `rotate(${pos.rotate}deg)`, filter: "drop-shadow(0 0 4px rgba(57,230,115,0.5))" }}>
-          <path d="M2 50 V2 H50" fill="none" stroke="rgba(57,230,115,0.6)" strokeWidth="2" />
-          <path d="M14 2 V14 H2" fill="none" stroke="rgba(57,230,115,0.35)" strokeWidth="1.5" />
-          <circle cx="2" cy="2" r="4" fill="rgba(180,255,205,0.9)" />
-        </svg>
-      ))}
+      {/* corner brackets, like an instrument-panel frame — desktop only, look cramped/messy at phone size */}
+      <div className="hidden sm:block">
+        {[
+          { top: 20, left: 20, rotate: 0 },
+          { top: 20, right: 20, rotate: 90 },
+          { bottom: 20, right: 20, rotate: 180 },
+          { bottom: 20, left: 20, rotate: 270 },
+        ].map((pos, i) => (
+          <svg key={i} width="120" height="120" viewBox="0 0 120 120"
+            style={{ position: "absolute", ...pos, transform: `rotate(${pos.rotate}deg)`, filter: "drop-shadow(0 0 4px rgba(57,230,115,0.5))" }}>
+            <path d="M2 50 V2 H50" fill="none" stroke="rgba(57,230,115,0.6)" strokeWidth="2" />
+            <path d="M14 2 V14 H2" fill="none" stroke="rgba(57,230,115,0.35)" strokeWidth="1.5" />
+            <circle cx="2" cy="2" r="4" fill="rgba(180,255,205,0.9)" />
+          </svg>
+        ))}
+      </div>
     </div>
   );
 }
@@ -4948,17 +4974,31 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
   const [queriesToday, setQueriesToday] = useState(0);
   const [listening, setListening] = useState(false);
   const [heard, setHeard] = useState("");
+  const greetedRef = useRef(false);
 
   // Auto-greeting: the moment this page mounts (right after the boot
   // sequence clears), Neo speaks first instead of waiting to be clicked —
   // and speakText's own onended handler already chains into hands-free
   // listening once the greeting finishes, so no extra wiring needed there.
+  // greetedRef guards against ever firing this twice, in case the effect
+  // somehow re-runs (defensive — the actual cause of a double-greeting
+  // would be a remount, which this can't fix, but it stops the symptom).
   useEffect(() => {
+    if (greetedRef.current) return;
+    greetedRef.current = true;
     unlockAudio();
     const name = session.role === "admin" ? "Boss" : (session.name || "there");
     const greeting = `Hi ${name}! How can I help you today?`;
     setMessages([{ role: "neo", text: greeting }]);
-    speakText(greeting);
+    // If the nav click already kicked off a prefetch, wait for that instead
+    // of starting a brand new (slower) fetch — this is what keeps the delay
+    // between the original tap and actual audio.play() short enough for
+    // strict mobile autoplay policies.
+    if (prefetchedGreetingUrl) {
+      prefetchedGreetingUrl.then((url) => speakText(greeting, url));
+    } else {
+      speakText(greeting);
+    }
   }, []);
   const [voiceError, setVoiceError] = useState("");
   const [speaking, setSpeaking] = useState(false);
@@ -4986,50 +5026,53 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
     liveAmpRef.current = 0;
   };
 
-  const speakText = async (text) => {
+  const speakText = async (text, prefetchedUrl) => {
     try {
       // Stop anything currently playing before starting the next line.
       if (audioRef.current) audioRef.current.pause();
       stopSpeakPulse();
 
-      const { data, error } = await supabaseClient.functions.invoke("neo-tts", {
-        body: { text },
-      });
-      if (error) {
-        // supabase-js's FunctionsHttpError hides the real response body
-        // behind a generic "non-2xx status code" message — the actual
-        // reason (e.g. a Groq error) is in error.context, the raw Response.
-        let detail = error.message;
-        try {
-          if (error.context && typeof error.context.text === "function") {
-            const bodyText = await error.context.text();
-            try {
-              const parsed = JSON.parse(bodyText);
-              detail = parsed.error || bodyText;
-            } catch {
-              detail = bodyText || detail;
+      let url = prefetchedUrl;
+      if (!url) {
+        const { data, error } = await supabaseClient.functions.invoke("neo-tts", {
+          body: { text },
+        });
+        if (error) {
+          // supabase-js's FunctionsHttpError hides the real response body
+          // behind a generic "non-2xx status code" message — the actual
+          // reason (e.g. a Groq error) is in error.context, the raw Response.
+          let detail = error.message;
+          try {
+            if (error.context && typeof error.context.text === "function") {
+              const bodyText = await error.context.text();
+              try {
+                const parsed = JSON.parse(bodyText);
+                detail = parsed.error || bodyText;
+              } catch {
+                detail = bodyText || detail;
+              }
             }
-          }
-        } catch {}
-        throw new Error(detail);
+          } catch {}
+          throw new Error(detail);
+        }
+
+        // supabase-js returns edge function binary responses as a Blob.
+        const rawBytes = data instanceof Blob ? await data.arrayBuffer() : data;
+
+        // Sanity check: a real MP3 starts with an ID3 tag or an MPEG frame
+        // sync byte. If it doesn't, something upstream (OpenAI or the edge
+        // function) likely returned an error body instead of audio.
+        const header = new Uint8Array(rawBytes.slice(0, 3));
+        const isId3 = header[0] === 0x49 && header[1] === 0x44 && header[2] === 0x33; // "ID3"
+        const isMpegSync = header[0] === 0xFF && (header[1] & 0xE0) === 0xE0;
+        if (!isId3 && !isMpegSync) {
+          const errText = new TextDecoder().decode(rawBytes).slice(0, 300);
+          throw new Error(`unexpected response (${rawBytes.byteLength} bytes): ${errText || "empty"}`);
+        }
+
+        const blob = new Blob([rawBytes], { type: "audio/mpeg" });
+        url = URL.createObjectURL(blob);
       }
-
-      // supabase-js returns edge function binary responses as a Blob.
-      const rawBytes = data instanceof Blob ? await data.arrayBuffer() : data;
-
-      // Sanity check: a real MP3 starts with an ID3 tag or an MPEG frame
-      // sync byte. If it doesn't, something upstream (OpenAI or the edge
-      // function) likely returned an error body instead of audio.
-      const header = new Uint8Array(rawBytes.slice(0, 3));
-      const isId3 = header[0] === 0x49 && header[1] === 0x44 && header[2] === 0x33; // "ID3"
-      const isMpegSync = header[0] === 0xFF && (header[1] & 0xE0) === 0xE0;
-      if (!isId3 && !isMpegSync) {
-        const text = new TextDecoder().decode(rawBytes).slice(0, 300);
-        throw new Error(`unexpected response (${rawBytes.byteLength} bytes): ${text || "empty"}`);
-      }
-
-      const blob = new Blob([rawBytes], { type: "audio/mpeg" });
-      const url = URL.createObjectURL(blob);
 
       // Reuse the single persistent <audio> element created on the user's
       // first click (unlockAudio) — creating a fresh Audio() each turn is
@@ -5298,6 +5341,13 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
   const monthGoal = (settings && settings.monthlyRevenueGoal) || 20000;
   const monthPct = Math.min(100, Math.round((monthRevenue / monthGoal) * 100));
   const dayOfMonth = now.getDate();
+
+  // last-7-days revenue series, for a small sparkline in the HUD panel
+  const last7Series = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (6 - i));
+    const dayStr = d.toISOString().slice(0, 10);
+    return (inflowwDailyStats || []).filter((r) => agencyModelNames.has(r.model) && r.statDate === dayStr).reduce((s, r) => s + (r.earningsNet || 0), 0);
+  });
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
 
   // ---- agency stats grid ----
@@ -5352,11 +5402,12 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
           centered together. Mobile stacks (orb on top, text below); desktop
           sits side by side. Status/heard text has a fixed-height box so a
           long reply can never push anything else around. */}
-      <div className="sm:flex sm:items-center sm:justify-center sm:gap-20 sm:min-h-[70vh] overflow-x-hidden">
-        <div className="flex flex-col-reverse sm:flex-row items-center gap-8 sm:gap-20">
+      <div className="sm:grid sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center sm:gap-8 sm:min-h-[70vh] overflow-x-hidden">
+        <div className="flex flex-col-reverse sm:contents items-center gap-8">
 
-          {/* left: identity + live status */}
-          <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
+          {/* left: identity + live status — desktop only now; mobile keeps
+              its earlier simpler version below instead */}
+          <div className="hidden sm:flex sm:flex-col items-center sm:items-start text-center sm:text-left sm:justify-self-end">
             <div className="flex items-center gap-2 mb-2 neo-fade-in" style={{ animationDelay: "0.15s" }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: neoGreen, boxShadow: `0 0 8px ${neoGreen}`, animation: "neoDotBlink 1.6s ease-in-out infinite" }} />
               <span className="fs-10 tracking-widest" style={{ color: textDim, letterSpacing: "3px" }}>SERVERS ACTIVE</span>
@@ -5365,20 +5416,47 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
               NEO
             </div>
             {/* fixed-height status area — content changes but the box never does, so it can't shove other elements around */}
-            <div className="mt-4 neo-fade-in" style={{ minHeight: 64, maxWidth: 320, animationDelay: "0.4s" }}>
+            <div className="mt-4 neo-fade-in" style={{ minHeight: 64, maxWidth: 280, animationDelay: "0.4s" }}>
               <div className="fs-13 italic" style={{ color: neoGreen, opacity: 0.9 }}>
                 {thinking ? "thinking — click the orb to stop." : speaking ? "speaking — click the orb to stop." : listening ? "listening — click the orb to stop." : "click the orb to ask something."}
               </div>
-              {heard && <div className="fs-10 italic mt-1 truncate" style={{ color: neoGreen, opacity: 0.4, maxWidth: 320 }}>heard: "{heard}"</div>}
-              {voiceError && <div className="fs-10 italic mt-1 truncate" style={{ color: "#e07a5f", maxWidth: 320 }}>voice error: {voiceError}</div>}
+              {heard && <div className="fs-10 italic mt-1 truncate" style={{ color: neoGreen, opacity: 0.4, maxWidth: 280 }}>heard: "{heard}"</div>}
+              {voiceError && <div className="fs-10 italic mt-1 truncate" style={{ color: "#e07a5f", maxWidth: 280 }}>voice error: {voiceError}</div>}
+            </div>
+
+            {/* radar sweep — a bit of pure sci-fi visual flair */}
+            <div className="mt-6 neo-fade-in" style={{ animationDelay: "0.65s", opacity: 0.85 }}>
+              <NeoRadar active={listening || thinking} />
+            </div>
+
+            {/* HUD-bracketed mini stats, stacked under the identity block — desktop only */}
+            <div className="mt-6 flex flex-col gap-4 neo-fade-in" style={{ animationDelay: "0.7s" }}>
+              {[["ACTIVE MODELS", models.length], ["OPEN TASKS", openTasksCount], ["TRENDS SHARED", relevantTrends.length]].map(([label, val]) => (
+                <div key={label} className="relative pl-3 pr-4 py-1.5" style={{ borderLeft: `2px solid ${neoGreen}`, background: "rgba(57,230,115,0.04)" }}>
+                  <div className="fs-9 tracking-widest" style={{ color: textDim, letterSpacing: "1.5px" }}>{label}</div>
+                  <div className="text-xl font-bold" style={{ color: neoGreen, textShadow: `0 0 8px ${neoGreen}88` }}>{val}</div>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* right: the orb + a glow that's kept in lockstep with the orb's
+          {/* mobile-only text block — exactly how it worked before, unchanged */}
+          <div className="sm:hidden flex flex-col items-center text-center">
+            <div className="fs-10 tracking-widest mt-4 neo-fade-in" style={{ color: textDim, letterSpacing: "3px", animationDelay: "0.5s" }}>
+              N.E.O. — <b style={{ color: amber }}>NEURAL ENGAGEMENT ORCHESTRATOR</b>
+            </div>
+            <div className="fs-13 italic mt-3 max-w-sm neo-fade-in" style={{ color: neoGreen, opacity: 0.9, animationDelay: "0.6s" }}>
+              {thinking ? "thinking — click the orb to stop." : speaking ? "speaking — click the orb to stop." : listening ? "listening — click the orb to stop." : "click the orb to ask something."}
+            </div>
+            {heard && <div className="fs-10 italic mt-1" style={{ color: neoGreen, opacity: 0.4 }}>heard: "{heard}"</div>}
+            {voiceError && <div className="fs-10 italic mt-1" style={{ color: "#e07a5f" }}>voice error: {voiceError}</div>}
+          </div>
+
+          {/* center: the orb + a glow that's kept in lockstep with the orb's
               own scale/pulse via direct refs (not React state), so it
               breathes as one thing with the mesh instead of just sitting
               there statically. */}
-          <div className="relative neo-orb-fade-in w-full max-w-[300px] sm:max-w-[600px]" style={{ aspectRatio: "1 / 1", animationDelay: "0.3s" }}>
+          <div className="relative neo-orb-fade-in w-full max-w-[300px] sm:max-w-[520px] sm:justify-self-center" style={{ aspectRatio: "1 / 1", animationDelay: "0.3s" }}>
             <div ref={glowElRef} style={{ position: "absolute", inset: "2%", background: "radial-gradient(circle, rgba(57,230,115,0.45) 0%, rgba(57,230,115,0.18) 45%, transparent 75%)", filter: "blur(14px)", pointerEvents: "none", willChange: "transform, opacity" }} />
             {thinking && (
               <div className="absolute left-1/2 -translate-x-1/2 font-mono uppercase tracking-widest flex items-baseline"
@@ -5392,12 +5470,46 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
             <NeoOrb3D thinking={thinking} speaking={speaking} listening={listening} speakBumpRef={speakBumpRef} liveAmpRef={liveAmpRef} onClick={orbClick} glowElRef={glowElRef} />
           </div>
 
+          {/* audio waveform — sits centered under the orb, only really comes
+              alive while Neo is actually speaking */}
+          <div className="hidden sm:flex sm:justify-self-center sm:col-start-2 mt-3 neo-fade-in" style={{ animationDelay: "0.8s", opacity: speaking ? 1 : 0.3 }}>
+            <NeoWaveform amplitude={speaking ? 4 : listening ? 3 : 1} liveAmpRef={liveAmpRef} speaking={speaking} />
+          </div>
+
+          {/* right: HUD-bracketed mini stats + a real sparkline chart — desktop only */}
+          <div className="hidden sm:flex sm:flex-col sm:gap-4 sm:justify-self-start neo-fade-in" style={{ animationDelay: "0.7s" }}>
+            <div className="relative pr-3 pl-4 py-2" style={{ borderRight: `2px solid ${amber}`, background: "rgba(57,230,115,0.04)", textAlign: "right" }}>
+              <div className="fs-9 tracking-widest mb-1" style={{ color: textDim, letterSpacing: "1.5px" }}>REVENUE — LAST 7D</div>
+              <div className="text-xl font-bold mb-1" style={{ color: amber, textShadow: `0 0 8px ${amber}88` }}>${Math.round(monthRevenue).toLocaleString()}</div>
+              <Sparkline data={last7Series} color={amber} height={30} />
+            </div>
+            {[["ACTIVE SUBS", activeSubs.toLocaleString(), neoGreen], ["NEW SUBS (7D)", Math.max(0, newSubs7d), neoGreen], ["TOP REEL VIEWS", topReel ? fmtK(topReel.views) : "—", neoGreen]].map(([label, val, color]) => (
+              <div key={label} className="relative pr-3 pl-4 py-1.5" style={{ borderRight: `2px solid ${color}`, background: "rgba(57,230,115,0.04)", textAlign: "right" }}>
+                <div className="fs-9 tracking-widest" style={{ color: textDim, letterSpacing: "1.5px" }}>{label}</div>
+                <div className="text-xl font-bold" style={{ color, textShadow: `0 0 8px ${color}88` }}>{val}</div>
+              </div>
+            ))}
+            {/* circular goal ring */}
+            <div className="flex items-center gap-3 justify-end mt-2">
+              <div style={{ textAlign: "right" }}>
+                <div className="fs-9 tracking-widest" style={{ color: textDim, letterSpacing: "1.5px" }}>MONTHLY GOAL</div>
+                <div className="text-lg font-bold" style={{ color: neoGreen }}>{monthPct}%</div>
+              </div>
+              <svg width="48" height="48" viewBox="0 0 48 48">
+                <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(57,230,115,0.15)" strokeWidth="4" />
+                <circle cx="24" cy="24" r="20" fill="none" stroke={neoGreen} strokeWidth="4" strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 20} strokeDashoffset={2 * Math.PI * 20 * (1 - monthPct / 100)}
+                  transform="rotate(-90 24 24)" style={{ filter: `drop-shadow(0 0 4px ${neoGreen})` }} />
+              </svg>
+            </div>
+          </div>
+
         </div>
       </div>
 
-      {/* all the quick stats, spread across the page below the hero — not
-          crammed only around the orb */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-5 mt-10 neo-fade-in" style={{ animationDelay: "0.7s" }}>
+      {/* all the quick stats — mobile only now; desktop shows this same data
+          in the HUD panels flanking the orb above instead */}
+      <div className="grid grid-cols-2 sm:hidden gap-5 mt-10 neo-fade-in" style={{ animationDelay: "0.7s" }}>
         <div className="text-center sm:text-left">
           <div className="fs-9 tracking-widest" style={{ color: textDim, letterSpacing: "1.5px" }}>ACTIVE MODELS</div>
           <div className="text-2xl font-bold" style={{ color: neoGreen, textShadow: `0 0 8px ${neoGreen}88` }}>{models.length}</div>
@@ -7644,7 +7756,7 @@ function App() {
       <style>{fontImport}</style>
 
       {currentView === "neo" ? (
-        <div className="fixed inset-0 z-40" style={{ background: "#030705" }}>
+        <div className="fixed inset-0 z-40" style={{ background: "#030705", overflowX: "hidden", maxWidth: "100vw" }}>
           {neoBooting && <NeoBootSequence onDone={() => setNeoBooting(false)} />}
           <CircuitBoardBG />
           <button onClick={() => setView("dashboard")}
@@ -7652,7 +7764,7 @@ function App() {
             style={{ borderColor: "rgba(57,230,115,0.35)", color: "#39e673", background: "rgba(3,7,5,0.6)", backdropFilter: "blur(6px)" }}>
             <X size={14} /> Leave Neo
           </button>
-          <div className="relative z-10 h-full overflow-y-auto px-4 md:px-6 py-4 md:py-6">
+          <div className="relative z-10 h-full overflow-y-auto overflow-x-hidden px-4 md:px-6 py-4 md:py-6" style={{ maxWidth: "100vw" }}>
             {!neoBooting && (
               <NeoPage agency={session.agency} session={session} onNavigate={setView}
                 onSignOut={() => { clearSavedSession(); setSession(null); setView(null); setOnboardingDismissed(false); }}
@@ -7769,7 +7881,14 @@ function App() {
                 );
               }
               return (
-                <button key={n.id} onClick={() => { if (n.id === "neo") primeNeoAudioUnlock(); setView(n.id); setMobileNavOpen(false); }}
+                <button key={n.id} onClick={() => {
+                  if (n.id === "neo") {
+                    primeNeoAudioUnlock();
+                    const gName = session.role === "admin" ? "Boss" : (session.name || "there");
+                    prefetchNeoGreeting(`Hi ${gName}! How can I help you today?`);
+                  }
+                  setView(n.id); setMobileNavOpen(false);
+                }}
                   className={`tap w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg fs-13 transition-colors ${activeNav ? "c-bg-accent-a1 c-accent" : "c-muted hover-bg-surface hover-text-primary"} ${n.id === "neo" ? "nav-neo-item" : ""}`}>
                   <Icon size={20} />
                   <span className={labelCls}>{n.label}</span>
