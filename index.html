@@ -568,9 +568,71 @@ button.c-bg-accent.rounded-xl,
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
+/* JARVIS-style "materialize" reveal: a scan-line wipe uncovers the element
+   left-to-right, with a couple of quick brightness flickers right as it
+   lands, plus a brief glow flash — reads as HUD text booting up, not a
+   plain fade. Uses clip-path/filter, so ONLY ever apply to text/HTML
+   elements — never to the orb's own container, since those properties can
+   break WebGL canvas compositing in some browsers (was making the orb
+   render gray). */
+@keyframes neoScanReveal {
+  0%   { clip-path: inset(0 100% 0 0); opacity: 0; }
+  55%  { clip-path: inset(0 0% 0 0); opacity: 1; }
+  100% { clip-path: inset(0 0% 0 0); opacity: 1; }
+}
+@keyframes neoScanRevealR {
+  0%   { clip-path: inset(0 0 0 100%); opacity: 0; }
+  55%  { clip-path: inset(0 0 0 0%); opacity: 1; }
+  100% { clip-path: inset(0 0 0 0%); opacity: 1; }
+}
+@keyframes neoMaterializeFlicker {
+  0%   { opacity: 0; filter: brightness(1) drop-shadow(0 0 0 transparent); text-shadow: 0 0 0 transparent; }
+  6%   { opacity: 1; filter: brightness(2.4) drop-shadow(0 0 10px currentColor); text-shadow: -2px 0 rgba(255,90,90,0.7), 2px 0 rgba(90,180,255,0.7); }
+  12%  { opacity: 0.15; text-shadow: none; }
+  18%  { opacity: 1; filter: brightness(2) drop-shadow(0 0 8px currentColor); text-shadow: 2px 0 rgba(255,90,90,0.6), -2px 0 rgba(90,180,255,0.6); }
+  26%  { opacity: 0.2; text-shadow: none; }
+  34%  { opacity: 1; filter: brightness(1.6) drop-shadow(0 0 5px currentColor); }
+  42%  { opacity: 0.5; }
+  50%  { opacity: 1; filter: brightness(1.2) drop-shadow(0 0 2px currentColor); }
+  100% { opacity: 1; filter: brightness(1) drop-shadow(0 0 0 transparent); text-shadow: none; }
+}
 .neo-fade-in {
   opacity: 0;
-  animation: neoFadeInUp 0.5s ease-out forwards;
+  animation: neoScanReveal 0.5s steps(14, end) forwards, neoMaterializeFlicker 0.85s ease-out forwards;
+}
+.neo-fade-in-r {
+  opacity: 0;
+  animation: neoScanRevealR 0.5s steps(14, end) forwards, neoMaterializeFlicker 0.85s ease-out forwards;
+}
+/* Safe fade for anything wrapping a canvas/WebGL element — opacity only,
+   no filter or clip-path. */
+@keyframes neoOrbFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.neo-orb-fade-in {
+  opacity: 0;
+  animation: neoOrbFadeIn 0.8s ease-out forwards;
+}
+/* Slowly flowing circuit-board background: dashed current running along
+   the traces, dots breathing — subtle, not distracting. */
+.circuit-line {
+  stroke-dasharray: 300;
+  stroke-dashoffset: 300;
+  animation: neoCircuitTrace 5s ease-in-out infinite;
+}
+.circuit-dot {
+  animation: neoCircuitDotPulse 3.5s ease-in-out infinite;
+}
+@keyframes neoCircuitTrace {
+  0%   { stroke-dashoffset: 300; }   /* fully hidden */
+  35%  { stroke-dashoffset: 0; }     /* fully drawn in */
+  65%  { stroke-dashoffset: 0; }     /* holds, fully visible */
+  100% { stroke-dashoffset: -300; }  /* erases away, same direction */
+}
+@keyframes neoCircuitDotPulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.9; }
 }
 `;
 
@@ -4321,7 +4383,7 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
     if (!window.THREE) return;
     const THREE = window.THREE;
     const mount = mountRef.current;
-    const size = Math.min(mount.clientWidth || 540, 540);
+    const size = Math.min(mount.clientWidth || 680, 680);
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
@@ -4418,38 +4480,37 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
       mesh.rotation.y += th ? 0.006 : sp ? 0.0045 : li ? 0.003 : 0.0015;
       mesh.rotation.x += 0.0006;
 
-      // A brief overshoot right at the moment of a state change — makes the
-      // transition itself feel like a deliberate "event" instead of the
-      // scale just drifting smoothly from one resting value to another.
+      // A slow, fully eased-in/eased-out swell right at the moment of a
+      // state change — no instant jumps anywhere, everything ramps up and
+      // back down smoothly over about 1.4s so a click never looks like a
+      // flicker.
       const sinceTransition = Date.now() - transitionRef.current;
-      const burstT = sinceTransition < 500 ? sinceTransition / 500 : 1; // 0..1
-      const burstOvershoot = sinceTransition < 500 ? Math.sin(burstT * Math.PI) * 0.06 : 0;
+      const BURST_DURATION = 1400;
+      const burstT = sinceTransition < BURST_DURATION ? sinceTransition / BURST_DURATION : 1; // 0..1
+      const burstEase = sinceTransition < BURST_DURATION ? Math.sin(burstT * Math.PI) : 0; // eases in AND out
+      const burstOvershoot = burstEase * 0.05;
 
-      // Gentle, smoothed scale — no sudden jump the instant speaking starts.
+      // Gentle, smoothed scale — slow lerp so it eases toward its target
+      // rather than snapping, on every transition.
       const targetScale = (active ? 1.04 + pulse * 0.015 : 1) + burstOvershoot;
-      scaleVec.x += (targetScale - scaleVec.x) * 0.12;
+      scaleVec.x += (targetScale - scaleVec.x) * 0.035;
       scaleVec.y = scaleVec.z = scaleVec.x;
       mesh.scale.copy(scaleVec);
 
       material.opacity = 0.5 + pulse * 0.12;
 
-      // Shockwave ring — expands and fades over ~450ms from the same
-      // transition moment, then sits idle (opacity 0) until the next one.
-      // Kept small/short so it fades out well before reaching the frame edge.
-      if (sinceTransition < 450) {
-        const bt = sinceTransition / 450;
-        const ringScale = scaleVec.x * (1 + bt * 0.45);
-        burstMesh.scale.set(ringScale, ringScale, ringScale);
-        burstMesh.material.opacity = Math.pow(1 - bt, 2) * 0.5;
-        burstMesh.lookAt(camera.position);
-      } else {
-        burstMesh.material.opacity = 0;
-      }
+      // Shockwave ring — fades in, expands gently, fades back out, all
+      // smoothly, over the same slow window. Kept small so it never nears
+      // the frame edge.
+      const ringScale = scaleVec.x * (1 + burstEase * 0.35);
+      burstMesh.scale.set(ringScale, ringScale, ringScale);
+      burstMesh.material.opacity = burstEase * 0.4;
+      burstMesh.lookAt(camera.position);
 
       // Rays only extend/glow while speaking; each has its own phase so
       // they don't all burst in perfect unison (reads as more organic).
       rays.forEach((ray) => {
-        if (speaking) {
+        if (sp) {
           const rayPulse = 0.5 + 0.5 * Math.sin(elapsed * 3.2 + ray.phase);
           const startLen = scaleVec.x * 1.0;
           const endLen = scaleVec.x * (1.15 + rayPulse * 0.35);
@@ -4690,15 +4751,15 @@ function CircuitBoardBG() {
       <svg width="100%" height="100%" style={{ position: "absolute", inset: 0 }}>
         <defs>
           <pattern id="circuitPattern" width="180" height="180" patternUnits="userSpaceOnUse">
-            <path d="M0 30 H70 V90 H150" fill="none" stroke="rgba(57,230,115,0.28)" strokeWidth="1.5" />
-            <path d="M180 130 H110 V70 H50" fill="none" stroke="rgba(57,230,115,0.22)" strokeWidth="1.5" />
-            <path d="M30 0 V50 H90 V0" fill="none" stroke="rgba(57,230,115,0.24)" strokeWidth="1.5" />
-            <path d="M130 180 V140 H60" fill="none" stroke="rgba(57,230,115,0.18)" strokeWidth="1.5" />
-            <circle cx="70" cy="90" r="3.5" fill="rgba(120,255,160,0.5)" />
-            <circle cx="150" cy="30" r="3" fill="rgba(120,255,160,0.4)" />
-            <circle cx="110" cy="70" r="3" fill="rgba(120,255,160,0.4)" />
-            <circle cx="30" cy="50" r="3" fill="rgba(120,255,160,0.4)" />
-            <circle cx="90" cy="0" r="2.5" fill="rgba(120,255,160,0.35)" />
+            <path className="circuit-line" d="M0 30 H70 V90 H150" fill="none" stroke="rgba(57,230,115,0.28)" strokeWidth="1.5" />
+            <path className="circuit-line" d="M180 130 H110 V70 H50" fill="none" stroke="rgba(57,230,115,0.22)" strokeWidth="1.5" style={{ animationDelay: "-2s" }} />
+            <path className="circuit-line" d="M30 0 V50 H90 V0" fill="none" stroke="rgba(57,230,115,0.24)" strokeWidth="1.5" style={{ animationDelay: "-4s" }} />
+            <path className="circuit-line" d="M130 180 V140 H60" fill="none" stroke="rgba(57,230,115,0.18)" strokeWidth="1.5" style={{ animationDelay: "-1s" }} />
+            <circle className="circuit-dot" cx="70" cy="90" r="3.5" fill="rgba(120,255,160,0.5)" />
+            <circle className="circuit-dot" cx="150" cy="30" r="3" fill="rgba(120,255,160,0.4)" style={{ animationDelay: "-0.8s" }} />
+            <circle className="circuit-dot" cx="110" cy="70" r="3" fill="rgba(120,255,160,0.4)" style={{ animationDelay: "-1.6s" }} />
+            <circle className="circuit-dot" cx="30" cy="50" r="3" fill="rgba(120,255,160,0.4)" style={{ animationDelay: "-2.4s" }} />
+            <circle className="circuit-dot" cx="90" cy="0" r="2.5" fill="rgba(120,255,160,0.35)" style={{ animationDelay: "-3.1s" }} />
           </pattern>
         </defs>
         <rect width="100%" height="100%" fill="url(#circuitPattern)" />
@@ -5204,19 +5265,19 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
       </div>
 
       {/* Hero: one big orb, minimal chrome around it */}
-      <div className="relative flex flex-col justify-center sm:justify-center min-h-[90vh] sm:min-h-[600px]">
+      <div className="relative flex flex-col justify-center sm:justify-center min-h-[90vh] sm:min-h-[780px]">
         <div className="fs-10 tracking-widest absolute top-0 left-0 neo-fade-in" style={{ color: textDim, letterSpacing: "3px", animationDelay: "0.15s" }}>
           STATUS <b style={{ color: neoGreen }}>{thinking ? "PROCESSING" : speaking ? "SPEAKING" : "ONLINE"}</b>
         </div>
 
         {/* compact readouts, top-right — matches a "retrievals / decisions" style strip */}
-        <div className="absolute top-0 right-0 text-right neo-fade-in" style={{ animationDelay: "0.2s" }}>
+        <div className="absolute top-0 right-0 text-right neo-fade-in-r" style={{ animationDelay: "0.2s" }}>
           <div className="fs-9 tracking-widest" style={{ color: textDim, letterSpacing: "2px" }}>OPEN TASKS / CARDS</div>
           <div className="text-2xl font-bold" style={{ color: neoGreen, textShadow: `0 0 8px ${neoGreen}88` }}>{openTasksCount} <span style={{ color: textDim, fontSize: "16px" }}>/</span> {cards.length}</div>
         </div>
 
         <div className="flex flex-col items-center justify-center" style={{ minHeight: 460 }}>
-          <div className="neo-fade-in" style={{ position: "relative", width: "100%", maxWidth: 540, aspectRatio: "1 / 1", animationDelay: "0.3s" }}>
+          <div className="neo-orb-fade-in" style={{ position: "relative", width: "100%", maxWidth: 680, aspectRatio: "1 / 1", animationDelay: "0.3s" }}>
             {thinking && (
               <div className="absolute left-1/2 -translate-x-1/2 font-mono uppercase tracking-widest flex items-baseline"
                 style={{ top: -6, color: amber, fontSize: "13px", letterSpacing: "4px", textShadow: `0 0 10px ${amber}aa`, animation: "neoThinkPulse 1.1s ease-in-out infinite" }}>
@@ -5228,7 +5289,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
             )}
             <NeoOrb3D thinking={thinking} speaking={speaking} listening={listening} speakBumpRef={speakBumpRef} liveAmpRef={liveAmpRef} onClick={orbClick} />
           </div>
-          <div className="fs-10 tracking-widest -mt-28 sm:mt-2 neo-fade-in" style={{ color: textDim, letterSpacing: "3px", animationDelay: "0.5s" }}>
+          <div className="fs-10 tracking-widest -mt-28 sm:-mt-40 neo-fade-in" style={{ color: textDim, letterSpacing: "3px", animationDelay: "0.5s" }}>
             N.E.O. — <b style={{ color: amber }}>NEURAL ENGAGEMENT ORCHESTRATOR</b>
           </div>
           <div className="fs-13 italic mt-3 text-center max-w-sm neo-fade-in" style={{ color: neoGreen, opacity: 0.9, animationDelay: "0.6s" }}>
@@ -7460,9 +7521,11 @@ function App() {
             <X size={14} /> Leave Neo
           </button>
           <div className="relative z-10 h-full overflow-y-auto px-4 md:px-6 py-4 md:py-6">
-            <NeoPage agency={session.agency} session={session} onNavigate={setView}
-              onSignOut={() => { clearSavedSession(); setSession(null); setView(null); setOnboardingDismissed(false); }}
-              cards={scopedCards} tasks={scopedTasks} models={agencyModels} stats={scopedStats} reels={scopedReels} trends={trends} bufferDailyStats={bufferDailyStats} inflowwDailyStats={inflowwDailyStats} settings={settings} />
+            {!neoBooting && (
+              <NeoPage agency={session.agency} session={session} onNavigate={setView}
+                onSignOut={() => { clearSavedSession(); setSession(null); setView(null); setOnboardingDismissed(false); }}
+                cards={scopedCards} tasks={scopedTasks} models={agencyModels} stats={scopedStats} reels={scopedReels} trends={trends} bufferDailyStats={bufferDailyStats} inflowwDailyStats={inflowwDailyStats} settings={settings} />
+            )}
           </div>
         </div>
       ) : (
