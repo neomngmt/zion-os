@@ -4383,17 +4383,32 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
     if (!window.THREE) return;
     const THREE = window.THREE;
     const mount = mountRef.current;
-    const size = Math.min(mount.clientWidth || 820, 820);
+    const size = Math.min(mount.clientWidth || 950, 950);
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-    camera.position.z = 3.4;
+    camera.position.z = 3.6;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(size, size);
     mount.innerHTML = "";
     mount.appendChild(renderer.domElement);
+
+    // Keep the canvas exactly matched to its actual container size at all
+    // times — a one-time measurement on mount could be wrong if CSS layout
+    // (aspect-ratio, responsive classes) hadn't fully settled yet, making
+    // the orb look mismatched/oversized relative to its box. This corrects
+    // it continuously instead.
+    const resizeObserver = new ResizeObserver((entries) => {
+      const box = entries[0].contentRect;
+      if (box.width > 0 && box.height > 0) {
+        renderer.setSize(box.width, box.height);
+        camera.aspect = box.width / box.height;
+        camera.updateProjectionMatrix();
+      }
+    });
+    resizeObserver.observe(mount);
 
     const geometry = new THREE.IcosahedronGeometry(1, 24);
     const basePositions = geometry.attributes.position.array.slice();
@@ -4423,8 +4438,11 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
       // One smooth, fully predictable pulse (a plain sine wave) drives
       // everything while active — deliberately NOT tied to the raw audio
       // amplitude signal, which jumps around too unpredictably and made the
-      // orb look like it was glitching.
-      const pulse = active ? 0.5 + 0.5 * Math.sin(elapsed * 2.2) : 0;
+      // orb look like it was glitching. Listening gets a much bigger,
+      // slightly faster pulse than thinking/speaking so it clearly reads
+      // as "waiting for you to talk."
+      const pulse = active ? 0.5 + 0.5 * Math.sin(elapsed * (li ? 3.4 : 2.2)) : 0;
+      const listenSwell = li ? pulse * 0.11 : 0;
 
       const noiseSpeed = th ? 0.3 : sp ? 0.24 : li ? 0.16 : 0.08;
       const noiseAmp = 0.09 + pulse * 0.02;
@@ -4465,7 +4483,7 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
 
       // Gentle, smoothed scale — slow lerp so it eases toward its target
       // rather than snapping, on every transition.
-      const targetScale = (active ? 1.04 + pulse * 0.015 : 1) + burstOvershoot + voiceSwell;
+      const targetScale = (active ? 1.04 + pulse * 0.015 : 1) + burstOvershoot + voiceSwell + listenSwell;
       scaleVec.x += (targetScale - scaleVec.x) * 0.12;
       scaleVec.y = scaleVec.z = scaleVec.x;
       mesh.scale.copy(scaleVec);
@@ -4479,6 +4497,7 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
 
     return () => {
       cancelAnimationFrame(raf);
+      resizeObserver.disconnect();
       geometry.dispose();
       material.dispose();
       renderer.dispose();
@@ -5255,52 +5274,60 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
         <NeoClock />
       </div>
 
-      {/* Hero: one big orb, minimal chrome around it */}
-      <div className="relative flex flex-col justify-center sm:justify-center min-h-[90vh] sm:min-h-[780px] overflow-x-hidden">
-        <div className="fs-10 tracking-widest absolute top-0 left-0 neo-fade-in" style={{ color: textDim, letterSpacing: "3px", animationDelay: "0.15s" }}>
+      {/* status row — simple flow, no absolute positioning so it can never end up far from the orb */}
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-6 neo-fade-in" style={{ animationDelay: "0.15s" }}>
+        <div className="fs-10 tracking-widest" style={{ color: textDim, letterSpacing: "3px" }}>
           STATUS <b style={{ color: neoGreen }}>{thinking ? "PROCESSING" : speaking ? "SPEAKING" : "ONLINE"}</b>
         </div>
-
-        {/* compact readouts, top-right — matches a "retrievals / decisions" style strip. Hidden on mobile: fixed-width absolute text here was the cause of horizontal scroll on small screens. */}
-        <div className="hidden sm:block absolute top-0 right-0 text-right neo-fade-in-r" style={{ animationDelay: "0.2s" }}>
+        <div className="text-right">
           <div className="fs-9 tracking-widest" style={{ color: textDim, letterSpacing: "2px" }}>OPEN TASKS / CARDS</div>
-          <div className="text-2xl font-bold" style={{ color: neoGreen, textShadow: `0 0 8px ${neoGreen}88` }}>{openTasksCount} <span style={{ color: textDim, fontSize: "16px" }}>/</span> {cards.length}</div>
+          <div className="text-xl font-bold" style={{ color: neoGreen, textShadow: `0 0 8px ${neoGreen}88` }}>{openTasksCount} <span style={{ color: textDim, fontSize: "14px" }}>/</span> {cards.length}</div>
+        </div>
+      </div>
+
+      {/* Hero: the orb — fixed, predictable sizing (not vw/vh tricks), centered via simple flex, plain document flow so nothing can end up off-frame */}
+      <div className="flex flex-col items-center overflow-x-hidden">
+        <div className="relative neo-orb-fade-in w-full max-w-[300px] sm:max-w-[520px]" style={{ aspectRatio: "1 / 1", animationDelay: "0.3s" }}>
+          <div style={{ position: "absolute", inset: "2%", background: "radial-gradient(circle, rgba(57,230,115,0.45) 0%, rgba(57,230,115,0.18) 45%, transparent 75%)", filter: "blur(14px)", pointerEvents: "none" }} />
+          {thinking && (
+            <div className="absolute left-1/2 -translate-x-1/2 font-mono uppercase tracking-widest flex items-baseline"
+              style={{ top: -6, color: amber, fontSize: "13px", letterSpacing: "4px", textShadow: `0 0 10px ${amber}aa`, animation: "neoThinkPulse 1.1s ease-in-out infinite" }}>
+              THINKING
+              <span style={{ display: "inline-block", width: "3px", height: "3px", borderRadius: "50%", background: amber, marginLeft: "6px", animation: "neoDotBlink 1.2s ease-in-out infinite" }} />
+              <span style={{ display: "inline-block", width: "3px", height: "3px", borderRadius: "50%", background: amber, marginLeft: "3px", animation: "neoDotBlink 1.2s ease-in-out infinite 0.2s" }} />
+              <span style={{ display: "inline-block", width: "3px", height: "3px", borderRadius: "50%", background: amber, marginLeft: "3px", animation: "neoDotBlink 1.2s ease-in-out infinite 0.4s" }} />
+            </div>
+          )}
+          <NeoOrb3D thinking={thinking} speaking={speaking} listening={listening} speakBumpRef={speakBumpRef} liveAmpRef={liveAmpRef} onClick={orbClick} />
         </div>
 
-        <div className="flex flex-col items-center justify-center" style={{ minHeight: 460 }}>
-          <div className="neo-orb-fade-in" style={{ position: "relative", width: "100%", maxWidth: "min(86vw, 820px)", aspectRatio: "1 / 1", animationDelay: "0.3s" }}>
-            <div style={{ position: "absolute", top: "-2%", left: "-2%", right: "-2%", bottom: "14%", background: "radial-gradient(circle, rgba(57,230,115,0.24) 0%, rgba(57,230,115,0.08) 45%, transparent 72%)", filter: "blur(14px)", pointerEvents: "none" }} />
-            {thinking && (
-              <div className="absolute left-1/2 -translate-x-1/2 font-mono uppercase tracking-widest flex items-baseline"
-                style={{ top: -6, color: amber, fontSize: "13px", letterSpacing: "4px", textShadow: `0 0 10px ${amber}aa`, animation: "neoThinkPulse 1.1s ease-in-out infinite" }}>
-                THINKING
-                <span style={{ display: "inline-block", width: "3px", height: "3px", borderRadius: "50%", background: amber, marginLeft: "6px", animation: "neoDotBlink 1.2s ease-in-out infinite" }} />
-                <span style={{ display: "inline-block", width: "3px", height: "3px", borderRadius: "50%", background: amber, marginLeft: "3px", animation: "neoDotBlink 1.2s ease-in-out infinite 0.2s" }} />
-                <span style={{ display: "inline-block", width: "3px", height: "3px", borderRadius: "50%", background: amber, marginLeft: "3px", animation: "neoDotBlink 1.2s ease-in-out infinite 0.4s" }} />
-              </div>
-            )}
-            <NeoOrb3D thinking={thinking} speaking={speaking} listening={listening} speakBumpRef={speakBumpRef} liveAmpRef={liveAmpRef} onClick={orbClick} />
-          </div>
-          <div className="fs-10 tracking-widest -mt-28 sm:-mt-40 neo-fade-in" style={{ color: textDim, letterSpacing: "3px", animationDelay: "0.5s" }}>
-            N.E.O. — <b style={{ color: amber }}>NEURAL ENGAGEMENT ORCHESTRATOR</b>
-          </div>
-          <div className="fs-13 italic mt-3 text-center max-w-sm neo-fade-in" style={{ color: neoGreen, opacity: 0.9, animationDelay: "0.6s" }}>
-            {thinking ? "thinking — click the orb to stop." : speaking ? "speaking — click the orb to stop." : listening ? "listening — click the orb to stop." : "click the orb to ask something."}
-          </div>
-          {heard && <div className="fs-10 italic mt-1" style={{ color: neoGreen, opacity: 0.4 }}>heard: "{heard}"</div>}
-          {voiceError && <div className="fs-10 italic mt-1" style={{ color: "#e07a5f" }}>voice error: {voiceError}</div>}
+        <div className="fs-10 tracking-widest mt-4 neo-fade-in text-center" style={{ color: textDim, letterSpacing: "3px", animationDelay: "0.5s" }}>
+          N.E.O. — <b style={{ color: amber }}>NEURAL ENGAGEMENT ORCHESTRATOR</b>
         </div>
-
-        {/* small model/trends readout, bottom-left — de-emphasized so it doesn't compete with the orb. Hidden on mobile for the same overflow reason as the top-right block. */}
-        <div className="hidden sm:block absolute bottom-0 left-0 fs-10 neo-fade-in" style={{ color: textDim, animationDelay: "0.7s" }}>
-          <div>ACTIVE MODELS <b style={{ color: neoGreen }}>{models.length}</b></div>
-          <div className="mt-1">TRENDS SHARED <b style={{ color: neoGreen }}>{relevantTrends.length}</b></div>
+        <div className="fs-13 italic mt-3 text-center max-w-sm neo-fade-in" style={{ color: neoGreen, opacity: 0.9, animationDelay: "0.6s" }}>
+          {thinking ? "thinking — click the orb to stop." : speaking ? "speaking — click the orb to stop." : listening ? "listening — click the orb to stop." : "click the orb to ask something."}
         </div>
+        {heard && <div className="fs-10 italic mt-1" style={{ color: neoGreen, opacity: 0.4 }}>heard: "{heard}"</div>}
+        {voiceError && <div className="fs-10 italic mt-1" style={{ color: "#e07a5f" }}>voice error: {voiceError}</div>}
 
-        {/* matching readout, bottom-right — balances the layout around the orb */}
-        <div className="hidden sm:block absolute bottom-0 right-0 fs-10 text-right neo-fade-in-r" style={{ color: textDim, animationDelay: "0.7s" }}>
-          <div>REVENUE THIS MONTH <b style={{ color: neoGreen }}>${Math.round(monthRevenue).toLocaleString()}</b></div>
-          <div className="mt-1">ACTIVE SUBS <b style={{ color: neoGreen }}>{activeSubs.toLocaleString()}</b></div>
+        {/* the four quick stats, right under the orb, in plain flow — always visible, never off-frame */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 w-full max-w-xl neo-fade-in" style={{ animationDelay: "0.7s" }}>
+          <div className="text-center">
+            <div className="fs-9 tracking-widest" style={{ color: textDim, letterSpacing: "1.5px" }}>ACTIVE MODELS</div>
+            <div className="fs-13 font-bold" style={{ color: neoGreen }}>{models.length}</div>
+          </div>
+          <div className="text-center">
+            <div className="fs-9 tracking-widest" style={{ color: textDim, letterSpacing: "1.5px" }}>TRENDS SHARED</div>
+            <div className="fs-13 font-bold" style={{ color: neoGreen }}>{relevantTrends.length}</div>
+          </div>
+          <div className="text-center">
+            <div className="fs-9 tracking-widest" style={{ color: textDim, letterSpacing: "1.5px" }}>REVENUE / MO</div>
+            <div className="fs-13 font-bold" style={{ color: neoGreen }}>${Math.round(monthRevenue).toLocaleString()}</div>
+          </div>
+          <div className="text-center">
+            <div className="fs-9 tracking-widest" style={{ color: textDim, letterSpacing: "1.5px" }}>ACTIVE SUBS</div>
+            <div className="fs-13 font-bold" style={{ color: neoGreen }}>{activeSubs.toLocaleString()}</div>
+          </div>
         </div>
       </div>
 
