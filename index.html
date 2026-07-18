@@ -41,6 +41,21 @@ body{ background-color:#07090a; }
 "use strict";
 const { useState, useEffect, useCallback, useRef, useMemo } = React;
 
+// Shared across the whole app (not inside any component) so it can be
+// "unlocked" the instant someone clicks the Neo nav item — well before
+// NeoPage itself mounts (boot sequence + render both take real time, and by
+// then a fresh audio element would be past the browser's autoplay-permission
+// window). NeoPage reuses this exact element instead of creating its own.
+let sharedNeoAudioEl = null;
+function primeNeoAudioUnlock() {
+  if (!sharedNeoAudioEl) {
+    sharedNeoAudioEl = new Audio(
+      "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA="
+    );
+  }
+  sharedNeoAudioEl.play().catch(() => {});
+}
+
 // ---------------------------------------------------------------------------
 // Inline icon set — replaces lucide-react so this file needs no bundler.
 // Exact path data pulled from lucide-react v0.383.0.
@@ -4939,6 +4954,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
   // and speakText's own onended handler already chains into hands-free
   // listening once the greeting finishes, so no extra wiring needed there.
   useEffect(() => {
+    unlockAudio();
     const name = session.role === "admin" ? "Boss" : (session.name || "there");
     const greeting = `Hi ${name}! How can I help you today?`;
     setMessages([{ role: "neo", text: greeting }]);
@@ -5221,11 +5237,17 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
     // click if the very first successful play() on this exact element
     // happened inside a real user gesture. A src-less element doesn't count
     // as "successful" — it needs an actual (even silent) audio source.
+    // Reuse the element already unlocked by the nav click if one exists,
+    // instead of creating a brand-new (still-locked) one.
     if (!audioRef.current) {
-      audioRef.current = new Audio(
-        "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA="
-      );
-      audioRef.current.play().catch(() => {});
+      if (sharedNeoAudioEl) {
+        audioRef.current = sharedNeoAudioEl;
+      } else {
+        audioRef.current = new Audio(
+          "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA="
+        );
+        audioRef.current.play().catch(() => {});
+      }
     }
   };
 
@@ -7747,7 +7769,7 @@ function App() {
                 );
               }
               return (
-                <button key={n.id} onClick={() => { setView(n.id); setMobileNavOpen(false); }}
+                <button key={n.id} onClick={() => { if (n.id === "neo") primeNeoAudioUnlock(); setView(n.id); setMobileNavOpen(false); }}
                   className={`tap w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg fs-13 transition-colors ${activeNav ? "c-bg-accent-a1 c-accent" : "c-muted hover-bg-surface hover-text-primary"} ${n.id === "neo" ? "nav-neo-item" : ""}`}>
                   <Icon size={20} />
                   <span className={labelCls}>{n.label}</span>
