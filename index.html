@@ -4152,12 +4152,14 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
       const active = th || sp || li;
       const elapsed = clock.getElapsedTime();
 
-      const sinceBump = Date.now() - (speakBumpRef?.current || 0);
-      const bump = sp && sinceBump < 220 ? (1 - sinceBump / 220) : 0;
-      const liveAmp = sp ? (liveAmpRef?.current || 0) : 0;
+      // One smooth, fully predictable pulse (a plain sine wave) drives
+      // everything while active — deliberately NOT tied to the raw audio
+      // amplitude signal, which jumps around too unpredictably and made the
+      // orb look like it was glitching.
+      const pulse = active ? 0.5 + 0.5 * Math.sin(elapsed * 2.2) : 0;
 
-      const noiseSpeed = th ? 0.35 : sp ? 0.28 : li ? 0.18 : 0.08;
-      const noiseAmp = 0.10 + bump * 0.16 + liveAmp * 0.22 + (active ? 0.04 : 0);
+      const noiseSpeed = th ? 0.3 : sp ? 0.24 : li ? 0.16 : 0.08;
+      const noiseAmp = 0.09 + pulse * 0.02;
       const t = elapsed * noiseSpeed;
 
       const posAttr = geometry.attributes.position;
@@ -4177,15 +4179,13 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
       mesh.rotation.x += 0.0006;
 
       // Gentle, smoothed scale — no sudden jump the instant speaking starts.
-      // A slow lerp factor (0.05) means it eases in/out over roughly half a
-      // second instead of snapping, so it "pops" only a little.
-      const targetScale = active ? 1.05 + liveAmp * 0.04 : 1;
-      scaleVec.x += (targetScale - scaleVec.x) * 0.05;
+      const targetScale = active ? 1.04 + pulse * 0.015 : 1;
+      scaleVec.x += (targetScale - scaleVec.x) * 0.04;
       scaleVec.y = scaleVec.z = scaleVec.x;
       mesh.scale.copy(scaleVec);
       glowMesh.scale.copy(scaleVec);
 
-      material.opacity = 0.45 + bump * 0.2 + liveAmp * 0.15;
+      material.opacity = 0.5 + pulse * 0.12;
 
       renderer.render(scene, camera);
       raf = requestAnimationFrame(animate);
@@ -4744,7 +4744,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
     } catch (e) {
       if (myRequestId !== requestIdRef.current) return;
       const detail = e?.message || e?.context?.error || (typeof e === "string" ? e : JSON.stringify(e));
-      setMessages((m) => [...m, { role: "neo", text: `Couldn't reach Neo — ${detail || "unknown error"}. Check the clever-service function and OPENAI_API_KEY secret in Supabase.` }]);
+      setMessages((m) => [...m, { role: "neo", text: `Couldn't reach Neo — ${detail || "unknown error"}. Check the clever-service function and GROQ_API_KEY secret in Supabase.` }]);
     } finally {
       if (myRequestId === requestIdRef.current) {
         thinkingRef.current = false;
