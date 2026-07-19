@@ -100,6 +100,7 @@ const ICON_DATA = {
     ["path", { d: "M16 3.13a4 4 0 0 1 0 7.75" }],
   ],
   ChevronRight: [["path", { d: "m9 18 6-6-6-6" }]],
+  ChevronDown: [["path", { d: "m6 9 6 6 6-6" }]],
   MapPin: [
     ["path", { d: "M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" }],
     ["circle", { cx: "12", cy: "10", r: "3" }],
@@ -261,7 +262,7 @@ function makeIcon(name, elements) {
 
 const Icons = Object.fromEntries(Object.entries(ICON_DATA).map(([name, els]) => [name, makeIcon(name, els)]));
 const {
-  Plus, X, Clapperboard, Users, ChevronRight, MapPin, Calendar, User,
+  Plus, X, Clapperboard, Users, ChevronRight, ChevronDown, MapPin, Calendar, User,
   Trash2, Loader2, LayoutGrid, Film, UserCircle2, Send, Circle,
   CheckCircle2, Repeat, ChevronLeft, CheckSquare, Lock, LogOut, ShieldCheck,
   TrendingUp, TrendingDown, DollarSign, Instagram, Eye, Minus, Plug, Flame, Sparkles, Mic, Bell, Settings, Search, XLogo, TikTokLogo, Menu, Zap, Megaphone,
@@ -604,6 +605,13 @@ canvas { display: block; }
 @keyframes neoDotBlink {
   0%,80%,100% { opacity: 0.25; }
   40% { opacity: 1; }
+}
+@keyframes neoArrowBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(6px); }
+}
+@media (min-width: 641px) {
+  .neo-scroll-container { overflow-y: hidden !important; }
 }
 @keyframes neoFadeInUp {
   from { opacity: 0; transform: translateY(8px); }
@@ -1688,7 +1696,10 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats 
     <div>
       <div className="c-bg-surface border c-border rounded-xl p-5 mb-6">
         <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-          <span className="fs-11 uppercase tracking-widest c-muted font-mono">Agency Revenue</span>
+          <span className="fs-11 uppercase tracking-widest c-muted font-mono">
+            Agency Revenue
+            <span className="fs-9 ml-2 normal-case c-muted" style={{ opacity: 0.6 }}>· synced hourly</span>
+          </span>
           <div className="flex items-center gap-2">
             {hasInflowwData && <DeltaTag current={rangeTotal} previous={prevTotal} />}
             <div className="flex rounded-lg border c-border overflow-hidden">
@@ -4982,6 +4993,7 @@ function NeoBootSequence({ onDone }) {
 function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models, stats, reels, trends, bufferDailyStats, inflowwDailyStats, settings, persistSettings }) {
   const [messages, setMessages] = useState([]);
   const [winWidth, setWinWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
+  const rosterRef = useRef(null);
   useEffect(() => {
     const onResize = () => setWinWidth(window.innerWidth);
     window.addEventListener("resize", onResize);
@@ -5003,11 +5015,6 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
   useEffect(() => { loadNeoMemories(); }, [loadNeoMemories]);
   const [thinking, setThinking] = useState(false);
   const [showThinkingLabel, setShowThinkingLabel] = useState(false);
-  useEffect(() => {
-    if (!thinking) { setShowThinkingLabel(false); return; }
-    const id = setTimeout(() => setShowThinkingLabel(true), 500);
-    return () => clearTimeout(id);
-  }, [thinking]);
   const [queriesToday, setQueriesToday] = useState(0);
   const [listening, setListening] = useState(false);
   const [heard, setHeard] = useState("");
@@ -5052,6 +5059,12 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
   }, []);
   const [voiceError, setVoiceError] = useState("");
   const [speaking, setSpeaking] = useState(false);
+  useEffect(() => {
+    if (speaking || listening) { setShowThinkingLabel(false); return; }
+    if (!thinking) return; // don't hide here — stay up through the thinking→speaking gap
+    const id = setTimeout(() => setShowThinkingLabel(true), 500);
+    return () => clearTimeout(id);
+  }, [thinking, speaking, listening]);
   const speakingRef = useRef(false);
   const speakBumpRef = useRef(0);
   const glowElRef = useRef(null);
@@ -5130,6 +5143,12 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
       // turns of the hands-free loop.
       if (!audioRef.current) audioRef.current = new Audio();
       const audio = audioRef.current;
+      // Best-effort nudge for iOS Safari, which sometimes routes audio to
+      // the earpiece speaker instead of the main one after the mic has been
+      // used — there's no reliable web API to force this, so this only
+      // helps sometimes.
+      audio.setAttribute("playsinline", "");
+      audio.setAttribute("webkit-playsinline", "");
       const prevUrl = audio.dataset.blobUrl;
       audio.src = url;
       audio.dataset.blobUrl = url;
@@ -5626,7 +5645,10 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
       {/* financial strip — shown on all screen sizes now, it reads nicer as a full-width strip than the small circular ring */}
       <div className="flex items-center gap-7 flex-wrap mt-8 pt-5 pb-5 neo-fade-in" style={{ borderTop: `1px solid ${border}`, animationDelay: "0.85s", transform: `translate(0px, -20px) scale(1.02)` }}>
         <div>
-          <div className="fs-9 tracking-widest" style={{ color: textDim, letterSpacing: "2px" }}>PRIMARY OBJECTIVE — MONTHLY REVENUE</div>
+          <div className="fs-9 tracking-widest flex items-center gap-2" style={{ color: textDim, letterSpacing: "2px" }}>
+            PRIMARY OBJECTIVE — MONTHLY REVENUE
+            <span className="fs-9" style={{ color: textDim, opacity: 0.6, letterSpacing: "0.5px", textTransform: "none" }}>· synced hourly</span>
+          </div>
           <div className="text-3xl font-bold" style={{ color: amber, textShadow: "0 0 12px rgba(255,210,74,0.45)" }}><CountUp value={monthRevenue} prefix="$" /></div>
         </div>
         <div className="flex gap-5">
@@ -5676,7 +5698,8 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
         </div>
       </div>
 
-      <div className="hidden sm:flex items-center gap-3 mt-6 mb-3 neo-fade-in" style={{ animationDelay: "1.05s" }}>
+      <div className="sm:hidden">
+      <div ref={rosterRef} className="hidden sm:flex items-center gap-3 mt-6 mb-3 neo-fade-in" style={{ animationDelay: "1.05s" }}>
         <div className="fs-11 tracking-widest px-2.5 py-1 rounded" style={{ color: textDim, letterSpacing: "3px", border: `1px solid ${border}` }}>
           MODEL ROSTER
         </div>
@@ -5699,6 +5722,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
             </div>
           );
         })}
+      </div>
       </div>
       </>
       )}
@@ -6558,7 +6582,10 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
     return (
       <div className="c-bg-surface border c-border rounded-xl p-4 mb-3">
         <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-          <span className="fs-10 uppercase tracking-widest c-muted font-mono">{title}</span>
+          <span className="fs-10 uppercase tracking-widest c-muted font-mono">
+            {title}
+            <span className="fs-9 ml-2 normal-case c-muted" style={{ opacity: 0.6 }}>· synced hourly</span>
+          </span>
           <div className="flex items-center gap-2">
             <DeltaTag current={rangeTotal} previous={prevTotal} />
             <div className="flex rounded-lg border c-border overflow-hidden">
@@ -7843,7 +7870,7 @@ function App() {
             style={{ borderColor: "rgba(57,230,115,0.35)", color: "#39e673", background: "rgba(3,7,5,0.6)", backdropFilter: "blur(6px)" }}>
             <X size={14} /> Leave Neo
           </button>
-          <div className="relative z-10 h-full overflow-y-auto overflow-x-hidden px-4 md:px-6 py-4 md:py-6 sm:pt-10" style={{ maxWidth: "100vw" }}>
+          <div className="relative z-10 h-full overflow-y-auto overflow-x-hidden px-4 md:px-6 py-4 md:py-6 sm:pt-10 neo-scroll-container" style={{ maxWidth: "100vw" }}>
             {!neoBooting && (
               <NeoPage agency={session.agency} session={session} onNavigate={setView}
                 onSignOut={() => { clearSavedSession(); setSession(null); setView(null); setOnboardingDismissed(false); }}
