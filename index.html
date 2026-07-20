@@ -7087,6 +7087,120 @@ https://www.instagram.com/reel/XyZ456.../
 </div>
 `;
 
+// ---------- title generator (transcribes creators' own reels into scripts) ----------
+
+function cleanIgUrl(url) {
+  try {
+    const u = new URL(url.trim());
+    u.search = ""; // strips ?igsh=... and any other tracking params
+    return u.toString();
+  } catch {
+    return url.trim().split("?")[0];
+  }
+}
+
+const ORDINALS_CS = ["První", "Druhé", "Třetí", "Čtvrté", "Páté", "Šesté", "Sedmé", "Osmé", "Deváté", "Desáté"];
+
+function TitleGeneratorPage() {
+  const [linksText, setLinksText] = useState("");
+  const [lang, setLang] = useState("cs"); // "cs" or "en"
+  const [results, setResults] = useState([]); // [{url, script, status, error}]
+  const [running, setRunning] = useState(false);
+  const [copiedMsg, setCopiedMsg] = useState("");
+
+  const runGenerate = async () => {
+    const urls = linksText.split("\n").map((l) => l.trim()).filter(Boolean).map(cleanIgUrl);
+    if (!urls.length) return;
+    setRunning(true);
+    setResults(urls.map((url) => ({ url, script: "", status: "pending" })));
+    for (let i = 0; i < urls.length; i++) {
+      try {
+        const { data, error } = await supabaseClient.functions.invoke("reel-transcribe", {
+          body: { url: urls[i], lang },
+        });
+        if (error) throw error;
+        setResults((prev) => prev.map((r, idx) => idx === i ? { ...r, script: data?.script || "", status: "done" } : r));
+      } catch (e) {
+        setResults((prev) => prev.map((r, idx) => idx === i ? { ...r, status: "error", error: e.message || "failed" } : r));
+      }
+    }
+    setRunning(false);
+  };
+
+  const exportText = results
+    .filter((r) => r.status === "done")
+    .map((r, i) => `${ORDINALS_CS[i] || `${i + 1}.`} video: \n${r.url}\nScénář: \n${r.script}`)
+    .join("\n\n");
+
+  const copyExport = async () => {
+    try {
+      await navigator.clipboard.writeText(exportText);
+      setCopiedMsg("Zkopírováno!");
+      setTimeout(() => setCopiedMsg(""), 2000);
+    } catch {
+      setCopiedMsg("Nepodařilo se zkopírovat — zkopíruj ručně níže.");
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-end mb-4 flex-wrap gap-2">
+        <div className="flex rounded-lg border c-border overflow-hidden">
+          {[["cs", "Česky"], ["en", "English"]].map(([val, label]) => (
+            <button key={val} onClick={() => setLang(val)}
+              className={`tap px-3 py-1.5 fs-11 font-mono uppercase transition-colors ${lang === val ? "c-bg-accent c-onaccent" : "c-muted hover-bg-surface"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="c-bg-surface border c-border rounded-xl p-5 mb-5">
+        <label className="block fs-11 uppercase tracking-widest c-muted font-mono mb-2">
+          IG Reel odkazy (jeden na řádek)
+        </label>
+        <textarea value={linksText} onChange={(e) => setLinksText(e.target.value)}
+          placeholder={"https://www.instagram.com/reel/.../?igsh=...\nhttps://www.instagram.com/reel/.../?igsh=..."}
+          className="w-full min-h-[160px] c-bg-app border c-border rounded-lg px-3 py-2 text-sm c-text font-mono outline-none focus-border-accent" />
+        <button onClick={runGenerate} disabled={running || !linksText.trim()}
+          className="tap mt-3 px-4 py-2 rounded-lg c-bg-accent c-onaccent fs-12 font-bold disabled:opacity-40">
+          {running ? "Zpracovávám…" : "Vygenerovat scénáře"}
+        </button>
+      </div>
+
+      {results.length > 0 && (
+        <div className="c-bg-surface border c-border rounded-xl p-5 mb-5">
+          <div className="fs-11 uppercase tracking-widest c-muted font-mono mb-3">Výsledky</div>
+          <div className="flex flex-col gap-3">
+            {results.map((r, i) => (
+              <div key={i} className="c-bg-app border c-border rounded-lg p-3">
+                <div className="fs-11 font-mono c-muted mb-1 truncate">{r.url}</div>
+                {r.status === "pending" && <div className="fs-12 c-muted italic">zpracovávám…</div>}
+                {r.status === "error" && <div className="fs-12" style={{ color: "#e07a5f" }}>chyba: {r.error}</div>}
+                {r.status === "done" && <div className="fs-13 c-text whitespace-pre-wrap">{r.script}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {results.some((r) => r.status === "done") && (
+        <div className="c-bg-surface border c-border rounded-xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="fs-11 uppercase tracking-widest c-muted font-mono">Export</div>
+            <button onClick={copyExport} className="tap px-3 py-1.5 rounded-lg c-bg-accent c-onaccent fs-11 font-bold">
+              {copiedMsg || "Zkopírovat"}
+            </button>
+          </div>
+          <pre className="fs-12 c-text whitespace-pre-wrap font-mono c-bg-app border c-border rounded-lg p-3" style={{ maxHeight: 300, overflowY: "auto" }}>
+            {exportText}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ReelSorterPage() {
   const rootRef = useRef(null);
 
@@ -7692,6 +7806,7 @@ const NAV_ADMIN = [
   { id: "viral", label: "Viral Feed", icon: Zap },
   { id: "weeklytrends", label: "Trends", icon: Flame },
   { id: "reelsorter", label: "Reels Sorter", icon: Repeat },
+  { id: "titlegen", label: "Title Generator", icon: Mic },
   { id: "neo", label: "Neo", icon: Sparkles },
   { id: "models", label: "Model Manager", icon: Users },
   { id: "whatsnew", label: "OF News", icon: Megaphone },
@@ -8040,6 +8155,7 @@ function App() {
               ? <TrendScraper models={agencyModels} persistModels={scopedPersistModels} />
               : <TrendScraper models={models} persistModels={persistModels} restrictModel={restrictModel} />)}
             {currentView === "reelsorter" && isAdmin && <ReelSorterPage />}
+            {currentView === "titlegen" && isAdmin && <TitleGeneratorPage />}
             {currentView === "weeklytrends" && isAdmin && <TrendsPage weeklyTrendReels={weeklyTrendReels} onReload={reloadWeeklyTrendReels} />}
             {currentView === "trending" && <CreatorTrending trends={trends} agency={session.agency} />}
             {currentView === "models" && <ModelManager models={agencyModels} persistModels={scopedPersistModels} cards={scopedCards} agency={session.agency} />}
