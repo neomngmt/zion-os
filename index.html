@@ -7106,23 +7106,48 @@ function TitleGeneratorPage() {
   const [lang, setLang] = useState("cs"); // "cs" or "en"
   const [results, setResults] = useState([]); // [{url, script, status, error}]
   const [running, setRunning] = useState(false);
+  const stopRequestedRef = useRef(false);
   const [copiedMsg, setCopiedMsg] = useState("");
+
+  const runOne = async (i, urlForLookup) => {
+    setResults((prev) => prev.map((r, idx) => idx === i ? { ...r, status: "pending", error: null } : r));
+    try {
+      const { data, error } = await supabaseClient.functions.invoke("reel-transcribe-ts", {
+        body: { url: urlForLookup, lang },
+      });
+      if (error) {
+        // supabase-js only gives a generic message by default — the real
+        // reason (from our function's own error response) is in
+        // error.context, which is the raw fetch Response object.
+        let detail = error.message || "failed";
+        try {
+          if (error.context && typeof error.context.json === "function") {
+            const body = await error.context.json();
+            if (body?.error) detail = body.error;
+          }
+        } catch {}
+        setResults((prev) => prev.map((r, idx) => idx === i ? { ...r, status: "error", error: detail } : r));
+        return;
+      }
+      setResults((prev) => prev.map((r, idx) => idx === i ? { ...r, script: data?.script || "", status: "done" } : r));
+    } catch (e) {
+      setResults((prev) => prev.map((r, idx) => idx === i ? { ...r, status: "error", error: e.message || "failed" } : r));
+    }
+  };
 
   const runGenerate = async () => {
     const urls = linksText.split("\n").map((l) => l.trim()).filter((l) => l && /^https?:\/\//i.test(l)).map(cleanIgUrl);
     if (!urls.length) return;
+    stopRequestedRef.current = false;
     setRunning(true);
     setResults(urls.map((url) => ({ url, script: "", status: "pending" })));
     for (let i = 0; i < urls.length; i++) {
-      try {
-        const { data, error } = await supabaseClient.functions.invoke("reel-transcribe", {
-          body: { url: urls[i], lang },
-        });
-        if (error) throw error;
-        setResults((prev) => prev.map((r, idx) => idx === i ? { ...r, script: data?.script || "", status: "done" } : r));
-      } catch (e) {
-        setResults((prev) => prev.map((r, idx) => idx === i ? { ...r, status: "error", error: e.message || "failed" } : r));
+      if (stopRequestedRef.current) {
+        setResults((prev) => prev.map((r, idx) => idx >= i ? { ...r, status: "error", error: "zastaveno" } : r));
+        break;
       }
+      if (i > 0) await new Promise((res) => setTimeout(res, 8000)); // space requests out — back-to-back scraping is what was triggering Instagram's block
+      await runOne(i, urls[i]);
     }
     setRunning(false);
   };
@@ -7162,10 +7187,18 @@ function TitleGeneratorPage() {
         <textarea value={linksText} onChange={(e) => setLinksText(e.target.value)}
           placeholder={"https://www.instagram.com/reel/.../?igsh=...\nhttps://www.instagram.com/reel/.../?igsh=..."}
           className="w-full min-h-[160px] c-bg-app border c-border rounded-lg px-3 py-2 text-sm c-text font-mono outline-none focus-border-accent" />
-        <button onClick={runGenerate} disabled={running || !linksText.trim()}
-          className="tap mt-3 px-4 py-2 rounded-lg c-bg-accent c-onaccent fs-12 font-bold disabled:opacity-40">
-          {running ? "Zpracovávám…" : "Vygenerovat scénáře"}
-        </button>
+        <div className="flex gap-2 mt-3">
+          <button onClick={runGenerate} disabled={running || !linksText.trim()}
+            className="tap px-4 py-2 rounded-lg c-bg-accent c-onaccent fs-12 font-bold disabled:opacity-40">
+            {running ? "Zpracovávám…" : "Vygenerovat scénáře"}
+          </button>
+          {running && (
+            <button onClick={() => { stopRequestedRef.current = true; }}
+              className="tap px-4 py-2 rounded-lg fs-12 font-bold" style={{ background: "#e07a5f", color: "#1a0a05" }}>
+              Zastavit
+            </button>
+          )}
+        </div>
       </div>
 
       {results.length > 0 && (
@@ -7642,8 +7675,9 @@ function TrendsPage({ weeklyTrendReels, onReload }) {
   const [verifying, setVerifying] = useState(false);
   const [verifyBroken, setVerifyBroken] = useState(null); // null = not run yet
   const [verifyError, setVerifyError] = useState("");
+  const [justStartedGenerate, setJustStartedGenerate] = useState(false);
   const fmt = (n) => (!n ? "0" : n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n));
-  const all = [...(weeklyTrendReels || [])].sort((a, b) => (b.ratio || 0) - (a.ratio || 0) || new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+  const all = justStartedGenerate ? [] : [...(weeklyTrendReels || [])].sort((a, b) => (b.ratio || 0) - (a.ratio || 0) || new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
   const inCategory = filter === "all" ? all : all.filter((r) => (r.category || "Other") === filter);
   const sorted = filter === "all" ? inCategory : inCategory.slice(0, topN);
   const lastSync = all.reduce((latest, r) => (r.syncedAt && (!latest || r.syncedAt > latest) ? r.syncedAt : latest), null);
@@ -7653,6 +7687,7 @@ function TrendsPage({ weeklyTrendReels, onReload }) {
     setGenerating(true);
     setGenerateError("");
     setScrapeErrors([]);
+    setJustStartedGenerate(true); // hide the old (now stale) reels immediately
     const failedChunks = [];
     const allScrapeErrors = [];
     try {
@@ -7660,7 +7695,7 @@ function TrendsPage({ weeklyTrendReels, onReload }) {
       // each firing several concurrent Apify calls internally, was enough
       // simultaneous pay-per-event requests to trip Apify's 402 rate limit
       // even with credit remaining.
-      for (const chunk of [0, 1, 2, 3, 4, 5, 6]) {
+      for (const chunk of Array.from({ length: 17 }, (_, i) => i)) {
         try {
           const r = await fetch(`${SUPABASE_URL}/functions/v1/weekly-trends-scrape?chunk=${chunk}`, {
             method: "POST",
@@ -7674,11 +7709,13 @@ function TrendsPage({ weeklyTrendReels, onReload }) {
           failedChunks.push(e);
         }
       }
-      if (failedChunks.length) setGenerateError(`${failedChunks.length} of 7 chunks failed outright — check Edge Function logs.`);
+      if (failedChunks.length) setGenerateError(`${failedChunks.length} of 17 chunks failed outright — check Edge Function logs.`);
       setScrapeErrors(allScrapeErrors);
       if (onReload) await onReload();
+      setJustStartedGenerate(false); // fresh data is in now, safe to show again
     } catch (e) {
       setGenerateError(e.message || "Failed to trigger scrape.");
+      setJustStartedGenerate(false);
     }
     setGenerating(false);
   };
@@ -7689,7 +7726,7 @@ function TrendsPage({ weeklyTrendReels, onReload }) {
     setVerifyBroken(null);
     const allChecks = [];
     try {
-      for (const chunk of [0, 1, 2, 3, 4, 5, 6]) {
+      for (const chunk of Array.from({ length: 17 }, (_, i) => i)) {
         const r = await fetch(`${SUPABASE_URL}/functions/v1/weekly-trends-scrape?chunk=${chunk}&verify=1`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
