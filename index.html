@@ -3336,9 +3336,15 @@ function RevenueChart({ data, height = 240 }) {
   const tickStep = niceStep(max);
   const ticks = [];
   for (let v = 0; v <= max; v += tickStep) ticks.push(v);
-  // A tick landing on (or very near) the single highest point makes its dot sit right on top
-  // of that label, reading as a collision — drop that one tick rather than fight the overlap.
-  const ticksFiltered = ticks.filter((v) => Math.abs(v - rawMax) > tickStep * 0.12);
+  // A tick whose gridline lands close to the highest point's actual pixel row makes its
+  // dot/label sit right on top of that tick's label — measured in real pixels (not a
+  // fraction of tickStep, which was too easy to land just inside the old threshold and
+  // still collide), so it's dropped whenever it would visually touch the top point.
+  const rawMaxY = padTop + plotH - (rawMax / max) * plotH;
+  const ticksFiltered = ticks.filter((v) => {
+    const ty = padTop + plotH - (v / max) * plotH;
+    return Math.abs(ty - rawMaxY) > 18 * fontScale;
+  });
   const fmtTick = (v) => `$${Math.round(v).toLocaleString()}`;
 
   const points = data.map((d, i) => {
@@ -3381,8 +3387,9 @@ function RevenueChart({ data, height = 240 }) {
     }
   });
   bars.push({ x: points[points.length - 1].x, y: points[points.length - 1].y });
-  // capped so a handful of bars (e.g. day 1 of a new month) doesn't blow up into one giant blurred blob
-  const barWidth = Math.min(36, Math.max(2, (plotW / bars.length) * 0.62));
+  // capped at the same width bars normally are (roughly what Week shows) so day 1 of a new
+  // month reads as one normal bar, not one giant blown-up blob filling the whole chart
+  const barWidth = Math.min(14, Math.max(2, (plotW / bars.length) * 0.62));
 
   // show at most ~7 date labels regardless of range, spaced evenly
   const labelEvery = Math.max(1, Math.ceil(n / 7));
