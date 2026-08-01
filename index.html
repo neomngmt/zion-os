@@ -3325,18 +3325,16 @@ function RevenueChart({ data, height = 240 }) {
   const n = data.length || 1;
   const stepX = n > 1 ? plotW / (n - 1) : 0;
 
-  // "nice" axis step (1/2/5 * 10^n) so the left-hand scale reads 1k, 2k, 2.5k — not 1.15k, 2.3k
-  const niceStep = (m) => {
-    if (m <= 0) return 1;
-    const rough = m / 4;
-    const mag = Math.pow(10, Math.floor(Math.log10(rough)));
-    const norm = rough / mag;
-    return (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag;
-  };
-  const tickStep = niceStep(max);
+  // Fixed $500 steps (0, 500, 1000, 1500, 2000, ...) — a stable, predictable scale instead
+  // of one that jumps between different "nice" steps as the data changes, extending further
+  // only when real numbers actually grow past it.
+  const tickStep = 500;
   const ticks = [];
   for (let v = 0; v <= max; v += tickStep) ticks.push(v);
-  const fmtTick = (v) => (v >= 1000 ? `$${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : `$${Math.round(v)}`);
+  // A tick landing on (or very near) the single highest point makes its dot sit right on top
+  // of that label, reading as a collision — drop that one tick rather than fight the overlap.
+  const ticksFiltered = ticks.filter((v) => Math.abs(v - rawMax) > tickStep * 0.12);
+  const fmtTick = (v) => `$${Math.round(v).toLocaleString()}`;
 
   const points = data.map((d, i) => {
     const x = padLeft + i * stepX;
@@ -3404,7 +3402,7 @@ function RevenueChart({ data, height = 240 }) {
         </filter>
       </defs>
 
-      {ticks.map((v, i) => {
+      {ticksFiltered.map((v, i) => {
         const ty = padTop + plotH - (v / max) * plotH;
         return (
           <g key={`tick-${i}`}>
