@@ -3480,7 +3480,7 @@ function RevenueChart({ data, height = 240 }) {
   );
 }
 
-function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats }) {
+function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats, inflowwSyncing, refreshInfloww }) {
   const activeCount = cards.filter((c) => c.stage !== "posted").length;
   const filmingToday = cards.filter((c) => c.stage === "filming").length;
   const pendingIdeas = cards.filter((c) => c.stage === "idea" && c.source === "creator").length;
@@ -3565,6 +3565,15 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats 
           <span className="fs-11 uppercase tracking-widest c-muted font-mono">
             Agency Revenue
             <span className="fs-9 ml-2 normal-case c-muted" style={{ opacity: 0.6 }}>· synced hourly</span>
+            {refreshInfloww && (
+              <button onClick={refreshInfloww} disabled={inflowwSyncing}
+                title="Pull the latest numbers from Infloww now"
+                className="ml-2 inline-flex items-center gap-1 fs-9 font-mono normal-case c-muted hover-accent-text transition-colors disabled:opacity-60"
+                style={{ verticalAlign: "middle" }}>
+                <Repeat size={10} className={inflowwSyncing ? "animate-spin" : ""} />
+                {inflowwSyncing ? "syncing…" : "refresh"}
+              </button>
+            )}
           </span>
           <div className="flex items-center gap-2">
             {hasInflowwData && <DeltaTag current={rangeTotal} previous={prevTotal} />}
@@ -8409,26 +8418,48 @@ function WhatsNewPage() {
 function useSupaInflowwDailyStats() {
   const [value, setValue] = useState([]);
   const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabaseClient.from("infloww_daily_stats").select("*");
-        if (error) throw error;
-        setValue((data || []).map((r) => ({
-          id: r.id, model: r.model, accountType: r.account_type || "paid", statDate: r.stat_date,
-          earningsNet: Number(r.earnings_net) || 0, earningsGross: Number(r.earnings_gross) || 0,
-          transactionCount: r.transaction_count || 0, messagesCount: r.messages_count || 0,
-          tipsCount: r.tips_count || 0, subsCount: r.subs_count || 0, syncedAt: r.synced_at,
-        })));
-      } catch (e) {
-        console.error("load failed for infloww_daily_stats", e);
-        setValue([]);
-      }
-      setLoading(false);
-    })();
+  const [syncing, setSyncing] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const { data, error } = await supabaseClient.from("infloww_daily_stats").select("*");
+      if (error) throw error;
+      setValue((data || []).map((r) => ({
+        id: r.id, model: r.model, accountType: r.account_type || "paid", statDate: r.stat_date,
+        earningsNet: Number(r.earnings_net) || 0, earningsGross: Number(r.earnings_gross) || 0,
+        transactionCount: r.transaction_count || 0, messagesCount: r.messages_count || 0,
+        tipsCount: r.tips_count || 0, subsCount: r.subs_count || 0, syncedAt: r.synced_at,
+      })));
+    } catch (e) {
+      console.error("load failed for infloww_daily_stats", e);
+      setValue([]);
+    }
   }, []);
-  return { value, loading };
+
+  useEffect(() => {
+    (async () => { setLoading(true); await load(); setLoading(false); })();
+  }, [load]);
+
+  // Manual refresh: pokes the infloww-sync Edge Function (the same job that runs on its
+  // own schedule) so today's numbers pull fresh from Infloww right now, then re-reads
+  // the table once that finishes instead of waiting for the next scheduled sync.
+  const refresh = useCallback(async () => {
+    setSyncing(true);
+    try {
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/infloww-sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
+        body: "{}",
+      });
+      if (!r.ok) throw new Error(`infloww-sync: HTTP ${r.status}`);
+    } catch (e) {
+      console.error("infloww-sync failed", e);
+    }
+    await load();
+    setSyncing(false);
+  }, [load]);
+
+  return { value, loading, syncing, refresh };
 }
 
 function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDailyStats, ofDailyStats, inflowwDailyStats }) {
@@ -9804,7 +9835,7 @@ function App() {
   const { value: trends, loading: trendsLoading, persist: persistTrends } = useSupaTable("trends", "id", [], trendsToJS, trendsToDB);
   const { value: bufferDailyStats, loading: bufferDailyStatsLoading } = useSupaBufferStats();
   const { value: ofDailyStats, loading: ofDailyStatsLoading } = useSupaOfDailyStats();
-  const { value: inflowwDailyStats, loading: inflowwDailyStatsLoading } = useSupaInflowwDailyStats();
+  const { value: inflowwDailyStats, loading: inflowwDailyStatsLoading, syncing: inflowwSyncing, refresh: refreshInfloww } = useSupaInflowwDailyStats();
   const { value: settings, loading: settingsLoading, persist: persistSettings } = useSupaSettings({ adminPinCZ: "2748", adminPinUS: "1234", inflowwApiKey: "", monthlyRevenueGoal: 20000 });
   const { value: integrations, loading: integrationsLoading, persist: persistIntegrations } = useSupaTable("integrations", "id", DEFAULT_INTEGRATIONS, integrationsToJS, integrationsToDB);
   const { value: weeklyTrendReels, loading: weeklyTrendReelsLoading, reload: reloadWeeklyTrendReels } = useSupaTable("weekly_trend_reels", "id", [], weeklyTrendReelsToJS, weeklyTrendReelsToDB);
@@ -10076,7 +10107,7 @@ function App() {
             )}
 
             {currentView === "dashboard" && (session.role === "admin"
-              ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} inflowwDailyStats={inflowwDailyStats} />
+              ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} inflowwDailyStats={inflowwDailyStats} inflowwSyncing={inflowwSyncing} refreshInfloww={refreshInfloww} />
               : <CreatorDashboard stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} ofDailyStats={ofDailyStats} inflowwDailyStats={inflowwDailyStats} />)}
             {currentView === "content" && <ContentDirector cards={isAdmin ? scopedCards : cards} persistCards={isAdmin ? scopedPersistCards : persistCards} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} forcedNetwork={contentPlatform} reels={isAdmin ? scopedReels : reels} persistReels={isAdmin ? scopedPersistReels : persistReels} />}
             {currentView === "calendar" && <CalendarView cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks} onNavigate={setView} restrictModel={restrictModel} />}
