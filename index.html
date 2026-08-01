@@ -743,6 +743,14 @@ canvas { display: block; }
 @keyframes revModelBarGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .rev-model-bar { transform-origin: left center; animation: revModelBarGrow 0.6s cubic-bezier(0.2,0.8,0.2,1) backwards; }
 .rev-model-row { animation: fadeInUp 0.35s ease-out backwards; }
+@keyframes revDeltaPop {
+  0%   { opacity: 0; transform: translateY(6px) scale(0.85); }
+  15%  { opacity: 1; transform: translateY(-3px) scale(1.08); }
+  25%  { transform: translateY(-5px) scale(1); }
+  78%  { opacity: 1; transform: translateY(-9px) scale(1); }
+  100% { opacity: 0; transform: translateY(-16px) scale(1); }
+}
+.rev-delta-flash { animation: revDeltaPop 2.4s ease-out forwards; display: inline-block; }
 `;
 
 // ---------- storage hooks ----------
@@ -3493,6 +3501,11 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
   const pendingIdeas = cards.filter((c) => c.stage === "idea" && c.source === "creator").length;
   const recent = [...cards].sort((a, b) => b.createdAt - a.createdAt).slice(0, 6);
   const [revRange, setRevRange] = useState(7); // 7 or 30
+  // "+$X" flash shown briefly next to the big number after a manual refresh actually
+  // changes the total — not on every render, only when refresh caused the delta.
+  const [deltaFlash, setDeltaFlash] = useState(null);
+  const prevTotalRef = useRef(null);
+  const refreshPendingRef = useRef(false);
 
   // Best reel from the most recent week that has any reels logged
   const latestReelWeek = reels.length ? [...reels].map((r) => r.weekOf).sort().slice(-1)[0] : null;
@@ -3531,14 +3544,37 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
   const chartData = days.map((day) => ({ date: day, value: sumForDay(day) }));
   const rangeTotal = chartData.reduce((t, d) => t + d.value, 0);
 
-  // Previous period for the delta badge: the calendar week/month right before this one,
-  // same length as the current (partial) one so a mid-month comparison stays fair.
+  useEffect(() => {
+    if (refreshPendingRef.current) {
+      refreshPendingRef.current = false;
+      const delta = rangeTotal - (prevTotalRef.current || 0);
+      if (Math.round(delta) !== 0) {
+        setDeltaFlash({ amount: delta, key: Date.now() });
+        setTimeout(() => setDeltaFlash(null), 2400);
+      }
+    }
+  }, [rangeTotal]);
+
+  const handleRefreshClick = async () => {
+    refreshPendingRef.current = true;
+    prevTotalRef.current = rangeTotal;
+    await refreshInfloww();
+  };
+
+  // Previous period for the delta badge. Week: the full prior calendar week (this week is
+  // always all 7 days too, future ones just $0 so far, so it's a fair whole-vs-whole compare).
+  // Month: the ENTIRE prior calendar month, not just the same handful of days-so-far — matching
+  // day-count against a month that just started made the % swing wildly (e.g. +14000% comparing
+  // day 1 vs day 1). Comparing to last month's full total reads sane the whole month through.
   const prevDays = revRange === 7
     ? days.map((day) => { const d = new Date(day + "T00:00:00"); d.setDate(d.getDate() - 7); return toISO(d); })
     : (() => {
         const now = new Date();
         const prevFirst = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        return days.map((_, i) => { const d = new Date(prevFirst); d.setDate(prevFirst.getDate() + i); return toISO(d); });
+        const prevLast = new Date(now.getFullYear(), now.getMonth(), 0);
+        const out = [];
+        for (const d = new Date(prevFirst); d <= prevLast; d.setDate(d.getDate() + 1)) out.push(toISO(d));
+        return out;
       })();
   const prevTotal = prevDays.reduce((t, day) => t + sumForDay(day), 0);
 
@@ -3573,7 +3609,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
             Agency Revenue
             <span className="fs-9 ml-2 normal-case c-muted" style={{ opacity: 0.6 }}>· synced hourly</span>
             {refreshInfloww && (
-              <button onClick={refreshInfloww} disabled={inflowwSyncing}
+              <button onClick={handleRefreshClick} disabled={inflowwSyncing}
                 title="Pull the latest numbers from Infloww now"
                 className="ml-2 inline-flex items-center gap-1 fs-9 font-mono normal-case c-muted hover-accent-text transition-colors disabled:opacity-60"
                 style={{ verticalAlign: "middle" }}>
@@ -3598,7 +3634,15 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
           <div className="fs-12 c-faint font-mono italic py-4">No Infloww data yet — add Creator IDs in Model Manager.</div>
         ) : (
           <>
-            <div className="text-4xl md:text-5xl font-extrabold c-accent mb-1">$<CountUp value={rangeTotal} /></div>
+            <div className="text-4xl md:text-5xl font-extrabold c-accent mb-1 flex items-start">
+              $<CountUp value={rangeTotal} />
+              {deltaFlash && (
+                <span key={deltaFlash.key} className="rev-delta-flash font-mono ml-3 mt-1"
+                  style={{ fontSize: 16, color: deltaFlash.amount >= 0 ? "#39e673" : "#E2725B", textShadow: "0 0 10px currentColor" }}>
+                  {deltaFlash.amount >= 0 ? "+" : "−"}${Math.abs(Math.round(deltaFlash.amount)).toLocaleString()}
+                </span>
+              )}
+            </div>
             <div className="fs-11 c-faint font-mono mb-2">across {models.length} model{models.length === 1 ? "" : "s"}, {revRange === 7 ? "this week" : "this month"}</div>
             <RevenueChart data={chartData} />
 
@@ -8531,7 +8575,7 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
           </div>
         </div>
         <div className="text-2xl font-extrabold c-accent mb-1">$<CountUp value={rangeTotal} /></div>
-        <div className="mb-2"><RevenueChart data={chartData} height={120} /></div>
+        <div className="mb-2"><RevenueChart data={chartData} height={200} /></div>
         <div className="flex gap-4 fs-10 font-mono c-faint uppercase">
           <span><CountUp value={sumInfloww(rangeRows, "messagesCount")} /> messages</span>
           <span><CountUp value={sumInfloww(rangeRows, "tipsCount")} /> tips</span>
@@ -8545,8 +8589,8 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
   const hasPaidInfloww = myInflowwRows.some((r) => r.accountType === "paid");
   const inflowwSection = (hasFreeInfloww || hasPaidInfloww) && (
     <div className="mb-6">
-      {hasPaidInfloww && <InflowwRevenueCard accountType="paid" title="Infloww · Paid OF" />}
-      {hasFreeInfloww && <InflowwRevenueCard accountType="free" title="Infloww · Free OF" />}
+      {hasPaidInfloww && <InflowwRevenueCard accountType="paid" title="OnlyFans · Paid" />}
+      {hasFreeInfloww && <InflowwRevenueCard accountType="free" title="OnlyFans · Free" />}
     </div>
   );
   const myBufferRows = (bufferDailyStats || []).filter((r) => r.model === restrictModel && r.statDate >= sevenDaysAgoStr);
