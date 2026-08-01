@@ -7428,6 +7428,14 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
   const monthPct = Math.min(100, Math.round((monthRevenue / monthGoal) * 100));
   const dayOfMonth = now.getDate();
 
+  // Creator-facing replacements for the two agency-wide tiles (active model count,
+  // trends shared) that a model should never see about the rest of the roster —
+  // her own Infloww numbers instead, from data already synced for her account(s).
+  const last7Str = (() => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); })();
+  const heroInflowwRows7d = (inflowwDailyStats || []).filter((r) => agencyModelNames.has(r.model) && r.statDate >= last7Str);
+  const messages7d = heroInflowwRows7d.reduce((s, r) => s + (r.messagesCount || 0), 0);
+  const tips7d = heroInflowwRows7d.reduce((s, r) => s + (r.tipsCount || 0), 0);
+
   // last-7-days revenue series, for a small sparkline in the HUD panel
   const last7Series = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i));
@@ -7588,12 +7596,12 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
           in the HUD panels flanking the orb above instead */}
       <div className="grid grid-cols-2 sm:hidden gap-5 mt-10 neo-fade-in" style={{ animationDelay: "0.7s" }}>
         <div className="text-center sm:text-left">
-          <div className="fs-9 tracking-widest" style={{ color: textDim, letterSpacing: "1.5px" }}>ACTIVE MODELS</div>
-          <div className="text-2xl font-bold" style={{ color: neoGreen, textShadow: `0 0 8px ${neoGreen}88` }}>{models.length}</div>
+          <div className="fs-9 tracking-widest" style={{ color: textDim, letterSpacing: "1.5px" }}>{session.role === "admin" ? "ACTIVE MODELS" : "MESSAGES (7D)"}</div>
+          <div className="text-2xl font-bold" style={{ color: neoGreen, textShadow: `0 0 8px ${neoGreen}88` }}>{session.role === "admin" ? models.length : messages7d.toLocaleString()}</div>
         </div>
         <div className="text-center sm:text-left">
-          <div className="fs-9 tracking-widest" style={{ color: textDim, letterSpacing: "1.5px" }}>TRENDS SHARED</div>
-          <div className="text-2xl font-bold" style={{ color: neoGreen, textShadow: `0 0 8px ${neoGreen}88` }}>{relevantTrends.length}</div>
+          <div className="fs-9 tracking-widest" style={{ color: textDim, letterSpacing: "1.5px" }}>{session.role === "admin" ? "TRENDS SHARED" : "TIPS (7D)"}</div>
+          <div className="text-2xl font-bold" style={{ color: neoGreen, textShadow: `0 0 8px ${neoGreen}88` }}>{session.role === "admin" ? relevantTrends.length : tips7d.toLocaleString()}</div>
         </div>
         <div className="text-center sm:text-left">
           <div className="fs-9 tracking-widest" style={{ color: textDim, letterSpacing: "1.5px" }}>NEW SUBS (7D)</div>
