@@ -3420,6 +3420,12 @@ function RevenueChart({ data, height = 240 }) {
           <feGaussianBlur stdDeviation="2.4" result="blur" />
           <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
         </filter>
+        {/* The smooth Catmull-Rom curve can overshoot past a 0 value between two higher
+            points (a real cardinal-spline artifact, not a data bug) — this clips anything
+            that would dip below the $0 line so the line never visibly crosses under it. */}
+        <clipPath id="revNoNegativeClip">
+          <rect x={-1000} y={-1000} width={width + 2000} height={baseline + 1000} />
+        </clipPath>
       </defs>
 
       {ticksFiltered.map((v, i) => {
@@ -3443,7 +3449,7 @@ function RevenueChart({ data, height = 240 }) {
 
       {linePath && (
         <path className="rev-line" d={linePath} fill="none" stroke="#39e673" strokeWidth="2.5"
-          strokeLinejoin="round" strokeLinecap="round" filter="url(#revGlowLine)"
+          strokeLinejoin="round" strokeLinecap="round" filter="url(#revGlowLine)" clipPath="url(#revNoNegativeClip)"
           pathLength="1000" strokeDasharray="1000" />
       )}
       {points.map((p, i) => (
@@ -7232,6 +7238,23 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
                 return rows.filter((r) => r.statDate >= cutoffStr).reduce((t, r) => t + (r.earningsNet || 0), 0);
               };
               return rows.length ? { model: m.name, last7Days: Math.round(sum(7)), last30Days: Math.round(sum(30)) } : null;
+            }).filter(Boolean),
+            // Day-by-day breakdown, last 14 calendar days, per model — this is what lets Neo
+            // answer "how much did X earn yesterday" or "on Tuesday" instead of only knowing
+            // rolled-up 7/30-day totals. today/yesterday dates are spelled out explicitly so
+            // Neo doesn't have to (mis)calculate them itself from a day-of-week guess.
+            todayDate: new Date().toISOString().slice(0, 10),
+            yesterdayDate: (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10); })(),
+            dailyEarningsByModel: heroModels.map((m) => {
+              const rows = (inflowwDailyStats || []).filter((r) => r.model === m.name);
+              const byDate = new Map();
+              rows.forEach((r) => byDate.set(r.statDate, (byDate.get(r.statDate) || 0) + (r.earningsNet || 0)));
+              const days = Array.from({ length: 14 }, (_, i) => {
+                const d = new Date(); d.setDate(d.getDate() - (13 - i));
+                const dateStr = d.toISOString().slice(0, 10);
+                return { date: dateStr, earnings: Math.round(byDate.get(dateStr) || 0) };
+              });
+              return rows.length ? { model: m.name, days } : null;
             }).filter(Boolean),
           },
         },
