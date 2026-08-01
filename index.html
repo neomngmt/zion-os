@@ -720,6 +720,29 @@ canvas { display: block; }
   0%, 100% { opacity: 0.35; }
   50% { opacity: 0.9; }
 }
+/* Revenue chart boot-in: line traces itself in like a terminal drawing a
+   trace, and bars power up from the baseline in a quick wave, dots pop as
+   the line "reaches" them — reads as the system booting the readout, not
+   a generic fade. */
+@keyframes revLineDraw {
+  from { stroke-dashoffset: 1000; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes revBarGrow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+@keyframes revDotPop {
+  0% { opacity: 0; transform: scale(0); }
+  55% { opacity: 1; transform: scale(1.6); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.rev-bar { transform-box: fill-box; transform-origin: 50% 100%; animation: revBarGrow 0.5s cubic-bezier(0.2,0.8,0.2,1) backwards; }
+.rev-dot { transform-box: fill-box; transform-origin: 50% 50%; animation: revDotPop 0.4s ease-out backwards; }
+.rev-line { animation: revLineDraw 1.1s cubic-bezier(0.4,0,0.2,1) forwards; }
+@keyframes revModelBarGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.rev-model-bar { transform-origin: left center; animation: revModelBarGrow 0.6s cubic-bezier(0.2,0.8,0.2,1) backwards; }
+.rev-model-row { animation: fadeInUp 0.35s ease-out backwards; }
 `;
 
 // ---------- storage hooks ----------
@@ -2653,7 +2676,6 @@ function ModelManager({ models, persistModels, cards, reels, agency }) {
       {/* ---- header ---- */}
       <div className="flex items-start justify-between gap-3 mb-1 flex-wrap">
         <div>
-          <div className="text-2xl font-extrabold tracking-tight c-text">Model Manager</div>
           <p className="c-muted text-sm mt-1.5">{models.length} model{models.length === 1 ? "" : "s"} tracked — performance ranking & accountability.</p>
         </div>
         <div className="text-right flex-shrink-0">
@@ -3272,15 +3294,49 @@ function CreatorForm({ models, cards, persistCards, restrictModel }) {
 
 // ---------- dashboard ----------
 
-function RevenueChart({ data, height = 180 }) {
-  // data: [{ date: 'YYYY-MM-DD', value: number }], oldest first
-  const width = 700;
-  const padTop = 16, padBottom = 28, padLeft = 8, padRight = 8;
+function RevenueChart({ data, height = 240 }) {
+  // data: [{ date: 'YYYY-MM-DD', value: number, byModel?: [{model,value}] }], oldest first
+  // The viewBox width tracks the container's real measured pixel width (not a fixed
+  // constant scaled via CSS/viewBox tricks) — so 1 SVG unit is always 1 real pixel on
+  // both axes. That's what keeps height fixed regardless of screen width, with no
+  // letterboxing gaps and no non-uniform stretch/distortion of circles or blur.
+  const containerRef = useRef(null);
+  const [measuredWidth, setMeasuredWidth] = useState(700);
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const el = containerRef.current;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect?.width;
+      if (w && Math.abs(w - measuredWidth) > 1) setMeasuredWidth(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [measuredWidth]);
+  const width = measuredWidth;
+  // padTop reserves a slim strip for the hover tooltip — small enough that it
+  // doesn't waste space, but the tooltip always lives inside it, pinned to
+  // the same spot, so it can never sit on top of the line/bars.
+  const fontScale = height > 240 ? 1.2 : 1; // the 30D view gets a taller chart — scale text up to match, not just whitespace
+  const padTop = 42 * fontScale, padBottom = 28 * fontScale, padLeft = 60 * fontScale, padRight = 40 * fontScale;
   const plotH = height - padTop - padBottom;
   const plotW = width - padLeft - padRight;
-  const max = Math.max(1, ...data.map((d) => d.value));
+  const rawMax = Math.max(1, ...data.map((d) => d.value));
+  const max = rawMax * 1.15; // small headroom so the tallest point isn't flush against the top edge
   const n = data.length || 1;
   const stepX = n > 1 ? plotW / (n - 1) : 0;
+
+  // "nice" axis step (1/2/5 * 10^n) so the left-hand scale reads 1k, 2k, 2.5k — not 1.15k, 2.3k
+  const niceStep = (m) => {
+    if (m <= 0) return 1;
+    const rough = m / 4;
+    const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+    const norm = rough / mag;
+    return (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag;
+  };
+  const tickStep = niceStep(max);
+  const ticks = [];
+  for (let v = 0; v <= max; v += tickStep) ticks.push(v);
+  const fmtTick = (v) => (v >= 1000 ? `$${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : `$${Math.round(v)}`);
 
   const points = data.map((d, i) => {
     const x = padLeft + i * stepX;
@@ -3288,49 +3344,136 @@ function RevenueChart({ data, height = 180 }) {
     return { x, y, ...d };
   });
 
-  const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
-  const areaPath = points.length
-    ? `${linePath} L ${points[points.length - 1].x.toFixed(1)} ${padTop + plotH} L ${points[0].x.toFixed(1)} ${padTop + plotH} Z`
+  // Catmull-Rom -> cubic Bezier segments, so the line reads as a smooth curve instead of sharp angles
+  const segments = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] || points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] || p2;
+    const c1 = { x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6 };
+    const c2 = { x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6 };
+    segments.push({ p1, c1, c2, p2 });
+  }
+  const linePath = segments.length
+    ? `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}` + segments.map((s) =>
+        ` C ${s.c1.x.toFixed(1)} ${s.c1.y.toFixed(1)}, ${s.c2.x.toFixed(1)} ${s.c2.y.toFixed(1)}, ${s.p2.x.toFixed(1)} ${s.p2.y.toFixed(1)}`
+      ).join("")
     : "";
+  const bezierY = (s, t) => {
+    const mt = 1 - t;
+    return mt * mt * mt * s.p1.y + 3 * mt * mt * t * s.c1.y + 3 * mt * t * t * s.c2.y + t * t * t * s.p2.y;
+  };
+  const baseline = padTop + plotH;
+
+  // dense bar "forest" under the curve — sampled along the smooth line, not 1:1 with data points.
+  // Target a roughly constant total bar count regardless of how many days are plotted (7 or 30),
+  // so bars stay visibly separated instead of blurring into a solid mass on narrow/mobile screens.
+  const samplesPerSeg = Math.max(1, Math.min(6, Math.round(40 / Math.max(1, n - 1))));
+  const bars = [];
+  segments.forEach((s) => {
+    for (let k = 0; k < samplesPerSeg; k++) {
+      const t = k / samplesPerSeg;
+      bars.push({ x: s.p1.x + (s.p2.x - s.p1.x) * t, y: bezierY(s, t) });
+    }
+  });
+  bars.push({ x: points[points.length - 1].x, y: points[points.length - 1].y });
+  // capped so a handful of bars (e.g. day 1 of a new month) doesn't blow up into one giant blurred blob
+  const barWidth = Math.min(36, Math.max(2, (plotW / bars.length) * 0.62));
 
   // show at most ~7 date labels regardless of range, spaced evenly
   const labelEvery = Math.max(1, Math.ceil(n / 7));
   const [hoverIdx, setHoverIdx] = useState(null);
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} style={{ overflow: "visible" }}
+    <div ref={containerRef} style={{ width: "100%" }}>
+    <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} style={{ overflow: "visible", display: "block" }}
       onMouseLeave={() => setHoverIdx(null)}>
       <defs>
-        <linearGradient id="revChartFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#39e673" stopOpacity="0.30" />
-          <stop offset="100%" stopColor="#39e673" stopOpacity="0" />
+        <linearGradient id="revBarFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#39e673" stopOpacity="0.6" />
+          <stop offset="100%" stopColor="#39e673" stopOpacity="0.04" />
         </linearGradient>
+        <filter id="revGlowLine" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="3.2" result="blur" />
+          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+        <filter id="revGlowDot" x="-250%" y="-250%" width="600%" height="600%">
+          <feGaussianBlur stdDeviation="2.4" result="blur" />
+          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
       </defs>
-      {areaPath && <path d={areaPath} fill="url(#revChartFill)" />}
-      {linePath && <path d={linePath} fill="none" stroke="#39e673" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />}
+
+      {ticks.map((v, i) => {
+        const ty = padTop + plotH - (v / max) * plotH;
+        return (
+          <g key={`tick-${i}`}>
+            <line x1={padLeft} y1={ty} x2={width - padRight} y2={ty}
+              stroke="#ffffff" strokeOpacity={v === 0 ? 0.14 : 0.07} strokeWidth="1" strokeDasharray={v === 0 ? "0" : "2,4"} />
+            <text x={padLeft - 14} y={ty + 3} textAnchor="end" fontSize={11 * fontScale} fontFamily="'JetBrains Mono', monospace" fill="#A6B0BC" fontWeight="600">
+              {fmtTick(v)}
+            </text>
+          </g>
+        );
+      })}
+
+      {bars.map((p, i) => (
+        <rect key={`bar-${i}`} className="rev-bar" x={p.x - barWidth / 2} y={p.y} width={barWidth}
+          height={Math.max(baseline - p.y, 0)} rx={barWidth / 2} fill="url(#revBarFill)"
+          style={{ animationDelay: `${(i / bars.length) * 0.4}s` }} />
+      ))}
+
+      {linePath && (
+        <path className="rev-line" d={linePath} fill="none" stroke="#39e673" strokeWidth="2.5"
+          strokeLinejoin="round" strokeLinecap="round" filter="url(#revGlowLine)"
+          pathLength="1000" strokeDasharray="1000" />
+      )}
       {points.map((p, i) => (
         <g key={i}
           onMouseEnter={() => setHoverIdx(i)}
           style={{ cursor: "pointer" }}>
           <rect x={p.x - stepX / 2} y={padTop} width={Math.max(stepX, 6)} height={plotH} fill="transparent" />
-          <circle cx={p.x} cy={p.y} r={hoverIdx === i ? 4.5 : 3} fill="#39e673" stroke="#07090a" strokeWidth="1.5" />
+          <circle className="rev-dot" cx={p.x} cy={p.y} r={hoverIdx === i ? 5 : 3.5} fill="#39e673" stroke="#07090a" strokeWidth="1.5" filter="url(#revGlowDot)"
+            style={{ animationDelay: `${0.15 + (i / Math.max(n - 1, 1)) * 1.0}s` }} />
           {i % labelEvery === 0 && (
-            <text x={p.x} y={height - 8} textAnchor="middle" fontSize="10" fontFamily="'JetBrains Mono', monospace" fill="#5c6e65">
+            <text x={p.x} y={height - 8} textAnchor="middle" fontSize={10 * fontScale} fontFamily="'JetBrains Mono', monospace" fill="#5c6e65">
               {new Date(p.date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}
             </text>
           )}
         </g>
       ))}
-      {hoverIdx !== null && (
-        <g>
-          <line x1={points[hoverIdx].x} y1={padTop} x2={points[hoverIdx].x} y2={padTop + plotH} stroke="#39e673" strokeWidth="1" strokeDasharray="3,3" opacity="0.4" />
-          <rect x={Math.min(Math.max(points[hoverIdx].x - 38, 0), width - 76)} y={padTop - 4} width="76" height="22" rx="5" fill="#0e1310" stroke="#173425" />
-          <text x={Math.min(Math.max(points[hoverIdx].x, 38), width - 38)} y={padTop + 11} textAnchor="middle" fontSize="11" fontFamily="'JetBrains Mono', monospace" fill="#39e673" fontWeight="700">
-            ${points[hoverIdx].value.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-          </text>
-        </g>
-      )}
+      {hoverIdx !== null && (() => {
+        const hp = points[hoverIdx];
+        // % vs the average of every prior day in this view, not a single previous day —
+        // a lone near-zero prior day would otherwise spike this to +800% and mean nothing.
+        const priorValues = data.slice(0, hoverIdx).map((d) => d.value).filter((v) => v > 0);
+        const priorAvg = priorValues.length ? priorValues.reduce((a, b) => a + b, 0) / priorValues.length : null;
+        const growth = priorAvg ? ((hp.value - priorAvg) / priorAvg) * 100 : null;
+        const dateLabel = new Date(hp.date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+        const valueLabel = `$${hp.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+        const growthLabel = growth !== null ? `${growth >= 0 ? "+" : ""}${growth.toFixed(1)}%` : "";
+        // rough monospace width estimate, so the pill hugs its text instead of a fixed guess
+        const charW = 7.6 * fontScale;
+        const boxW = Math.max(110 * fontScale, (dateLabel.length + valueLabel.length + growthLabel.length) * charW + 40);
+        const boxH = 28 * fontScale;
+        const boxX = Math.min(Math.max(hp.x - boxW / 2, padLeft), width - boxW - 2);
+        const boxY = 4; // pinned to the same slim strip every time — never tracks point.y, so it never overlaps the curve
+        return (
+          <g style={{ pointerEvents: "none" }}>
+            <line x1={hp.x} y1={padTop} x2={hp.x} y2={padTop + plotH} stroke="#39e673" strokeWidth="1" strokeDasharray="3,3" opacity="0.3" />
+            <rect x={boxX} y={boxY} width={boxW} height={boxH} rx={13} fill="#0b0f0d" stroke="#173425" strokeWidth="1" />
+            <text x={boxX + 12} y={boxY + 19} fontSize={12 * fontScale} fontFamily="'JetBrains Mono', monospace" fill="#8B93A1">
+              {dateLabel}
+            </text>
+            <text x={boxX + boxW - 12} y={boxY + 19} textAnchor="end" fontSize={13 * fontScale} fontFamily="'JetBrains Mono', monospace" fill="#39e673" fontWeight="700">
+              {valueLabel}
+              {growthLabel && <tspan fill={growth >= 0 ? "#39e673" : "#E2725B"} dx="8">{growthLabel}</tspan>}
+            </text>
+          </g>
+        );
+      })()}
     </svg>
+    </div>
   );
 }
 
@@ -3353,16 +3496,64 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats 
   const myInflowwRows = (inflowwDailyStats || []).filter((r) => agencyModelNames.has(r.model));
   const hasInflowwData = myInflowwRows.length > 0;
 
-  const dayList = (n) => Array.from({ length: n }, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() - (n - 1 - i)); return d.toISOString().slice(0, 10);
-  });
-  const days = dayList(revRange);
+  // "Week" is always the current calendar week, Monday through Sunday — not a rolling
+  // 7-day window. "Month" is always the 1st of the current month through today, and
+  // both reset naturally at the calendar boundary rather than sliding day by day.
+  const toISO = (d) => d.toISOString().slice(0, 10);
+  const getWeekDays = () => {
+    const now = new Date();
+    const dow = now.getDay(); // 0=Sun..6=Sat
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + (dow === 0 ? -6 : 1 - dow));
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday); d.setDate(monday.getDate() + i); return toISO(d);
+    });
+  };
+  const getMonthDaysToDate = () => {
+    const now = new Date();
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    const out = [];
+    for (const d = new Date(first); d <= now; d.setDate(d.getDate() + 1)) out.push(toISO(d));
+    return out;
+  };
+  const days = revRange === 7 ? getWeekDays() : getMonthDaysToDate();
   const sumForDay = (day) => myInflowwRows.filter((r) => r.statDate === day).reduce((t, r) => t + (r.earningsNet || 0), 0);
   const chartData = days.map((day) => ({ date: day, value: sumForDay(day) }));
   const rangeTotal = chartData.reduce((t, d) => t + d.value, 0);
 
-  const prevDays = dayList(revRange * 2).slice(0, revRange);
+  // Previous period for the delta badge: the calendar week/month right before this one,
+  // same length as the current (partial) one so a mid-month comparison stays fair.
+  const prevDays = revRange === 7
+    ? days.map((day) => { const d = new Date(day + "T00:00:00"); d.setDate(d.getDate() - 7); return toISO(d); })
+    : (() => {
+        const now = new Date();
+        const prevFirst = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        return days.map((_, i) => { const d = new Date(prevFirst); d.setDate(prevFirst.getDate() + i); return toISO(d); });
+      })();
   const prevTotal = prevDays.reduce((t, day) => t + sumForDay(day), 0);
+
+  // Per-model split for the "Earnings by model" list below the chart — always the
+  // same rolling window as the chart above it (7 or 30 days), so the number here
+  // never disagrees with what's plotted. Goal: her latest weekly earningsGoal in
+  // 7D mode, her monthlyGoal in 30D mode — never the agency-wide default, an unset
+  // personal goal means no goal shown for her, not a borrowed agency number.
+  const daySet = new Set(days);
+  const modelEarnings = models
+    .map((m) => {
+      const value = myInflowwRows.filter((r) => r.model === m.name && daySet.has(r.statDate)).reduce((t, r) => t + (r.earningsNet || 0), 0);
+      let goal = null;
+      if (revRange === 7) {
+        const latestStat = [...stats].filter((s) => s.model === m.name && s.earningsGoal)
+          .sort((a, b) => (b.weekOf || "").localeCompare(a.weekOf || ""))[0];
+        goal = latestStat ? latestStat.earningsGoal : null;
+      } else {
+        goal = (m.monthlyGoal != null && m.monthlyGoal !== "") ? Number(m.monthlyGoal) : null;
+      }
+      return { name: m.name, value, goal };
+    })
+    .sort((a, b) => b.value - a.value);
+  const modelEarningsMax = Math.max(1, ...modelEarnings.map((m) => m.value));
+  const goalPeriodLabel = revRange === 7 ? "weekly" : "monthly";
 
   return (
     <div>
@@ -3375,10 +3566,10 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats 
           <div className="flex items-center gap-2">
             {hasInflowwData && <DeltaTag current={rangeTotal} previous={prevTotal} />}
             <div className="flex rounded-lg border c-border overflow-hidden">
-              {[7, 30].map((n) => (
+              {[{ n: 7, label: "Week" }, { n: 30, label: "Month" }].map(({ n, label }) => (
                 <button key={n} onClick={() => setRevRange(n)}
                   className={`tap px-2.5 py-1 fs-10 font-mono uppercase transition-colors ${revRange === n ? "c-bg-accent c-onaccent" : "c-muted hover-bg-surface"}`}>
-                  {n}D
+                  {label}
                 </button>
               ))}
             </div>
@@ -3389,8 +3580,43 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats 
         ) : (
           <>
             <div className="text-4xl md:text-5xl font-extrabold c-accent mb-1">$<CountUp value={rangeTotal} /></div>
-            <div className="fs-11 c-faint font-mono mb-2">across {models.length} model{models.length === 1 ? "" : "s"}, last {revRange} days</div>
+            <div className="fs-11 c-faint font-mono mb-2">across {models.length} model{models.length === 1 ? "" : "s"}, {revRange === 7 ? "this week" : "this month"}</div>
             <RevenueChart data={chartData} />
+
+            {modelEarnings.length > 0 && (
+              <div key={revRange} className="mt-6 pt-5" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                <div className="fs-11 uppercase tracking-widest c-muted font-mono mb-3">
+                  Earnings by model
+                  <span className="fs-9 ml-2 normal-case c-muted" style={{ opacity: 0.6 }}>· {revRange === 7 ? "this week" : "this month"}</span>
+                </div>
+                <div className="flex flex-col gap-3">
+                  {modelEarnings.map((m, i) => {
+                    const pct = m.goal ? Math.min(100, (m.value / m.goal) * 100) : (m.value / modelEarningsMax) * 100;
+                    const hit = m.goal && m.value >= m.goal;
+                    return (
+                      <div key={m.name} className="rev-model-row" style={{ animationDelay: `${i * 0.08}s` }}>
+                        <div className="flex items-center gap-3">
+                          <div className="fs-12 font-mono c-text minw-64 truncate">{m.name}</div>
+                          <div className="flex-1 rounded-full overflow-hidden" style={{ height: 6, background: "rgba(255,255,255,0.06)" }}>
+                            <div className="rev-model-bar h-full rounded-full"
+                              style={{ width: `${pct}%`, background: "#39e673", boxShadow: "0 0 8px rgba(57,230,115,0.5)", animationDelay: `${0.1 + i * 0.08}s` }} />
+                          </div>
+                          <div className="fs-12 font-mono c-accent minw-64 text-right">
+                            $<CountUp value={m.value} />
+                            {m.goal ? <span className="c-faint"> / ${m.goal.toLocaleString()}</span> : null}
+                          </div>
+                        </div>
+                        {m.goal ? (
+                          <div className="fs-9 font-mono c-faint mt-1" style={{ marginLeft: "calc(64px + 12px)" }}>
+                            {hit ? "🔥 goal hit" : `${Math.round(pct)}% of ${goalPeriodLabel} goal`}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -7298,13 +7524,6 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
         <div className="text-center sm:text-left">
           <div className="fs-9 tracking-widest" style={{ color: textDim, letterSpacing: "1.5px" }}>ACTIVE SUBS</div>
           <div className="text-2xl font-bold" style={{ color: neoGreen, textShadow: `0 0 8px ${neoGreen}88` }}>{activeSubs.toLocaleString()}</div>
-        </div>
-        <div className="col-span-2 sm:col-span-2">
-          <div className="fs-9 tracking-widest mb-1" style={{ color: textDim, letterSpacing: "1.5px" }}>MONTHLY GOAL — {monthPct}%</div>
-          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "#0a5c2c" }}>
-            <div className="h-full transition-all" style={{ width: `${monthPct}%`, background: `linear-gradient(90deg, #12b34c, ${neoGreen})`, boxShadow: `0 0 8px ${neoGreen}88` }} />
-          </div>
-          <div className="fs-9 mt-1" style={{ color: textDim }}>${Math.round(monthGoal).toLocaleString()} goal</div>
         </div>
       </div>
 
