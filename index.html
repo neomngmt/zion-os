@@ -3523,7 +3523,14 @@ function XStatsSection({ models, bufferDailyStats }) {
     comments: rows.reduce((s, r) => s + (r.comments || 0), 0),
     reactions: rows.reduce((s, r) => s + (r.reactions || 0), 0),
     postCount: rows.reduce((s, r) => s + (r.postCount || 0), 0),
+    clicks: rows.reduce((s, r) => s + (r.clicks || 0), 0),
   };
+  // engagementRate comes from Buffer per-day already as a percentage (e.g. 3.4, not 0.034) —
+  // averaged across the days that actually have data, not divided by all 7 regardless.
+  const engagementDays = rows.filter((r) => r.engagementRate != null);
+  const avgEngagement = engagementDays.length
+    ? engagementDays.reduce((s, r) => s + r.engagementRate, 0) / engagementDays.length
+    : null;
   const impressionsSeries = byDay("impressions");
   const maxImpr = Math.max(1, ...impressionsSeries);
 
@@ -3542,6 +3549,11 @@ function XStatsSection({ models, bufferDailyStats }) {
         <div><div className="text-2xl font-bold c-text"><CountUp value={totals.comments} /></div><div className="fs-9 c-faint font-mono uppercase">replies</div></div>
         <div><div className="text-2xl font-bold c-text"><CountUp value={totals.reactions} /></div><div className="fs-9 c-faint font-mono uppercase">reactions</div></div>
         <div><div className="text-2xl font-bold c-text"><CountUp value={totals.postCount} /></div><div className="fs-9 c-faint font-mono uppercase">posts</div></div>
+        <div><div className="text-2xl font-bold c-text"><CountUp value={totals.clicks} /></div><div className="fs-9 c-faint font-mono uppercase">clicks</div></div>
+        <div>
+          <div className="text-2xl font-bold c-text">{avgEngagement != null ? `${avgEngagement.toFixed(1)}%` : "—"}</div>
+          <div className="fs-9 c-faint font-mono uppercase">engagement</div>
+        </div>
       </div>
 
       <div className="flex items-end gap-2" style={{ height: 70 }}>
