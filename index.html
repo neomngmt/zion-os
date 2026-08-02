@@ -3534,7 +3534,8 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
     const dow = now.getDay(); // 0=Sun..6=Sat
     const monday = new Date(now);
     monday.setDate(now.getDate() + (dow === 0 ? -6 : 1 - dow));
-    return Array.from({ length: 7 }, (_, i) => {
+    const daysSoFar = dow === 0 ? 7 : dow; // Monday..today, never into future days
+    return Array.from({ length: daysSoFar }, (_, i) => {
       const d = new Date(monday); d.setDate(monday.getDate() + i); return toISO(d);
     });
   };
@@ -8784,8 +8785,6 @@ function OnboardingScreen({ name, url, onContinue, onQuestionnaireReceived }) {
 
 // ---------- trend scraper ----------
 
-const APIFY_API_KEY = "apify_api_v1zS38dcGJFb4it5afeC7oH9kqVNzj0BnIY4";
-
 function TrendScraper({ models, persistModels, restrictModel }) {
   const scopedModels = restrictModel ? models.filter(m => m.name === restrictModel) : models;
   const [selectedModel, setSelectedModel] = React.useState(restrictModel || models[0]?.name || "");
@@ -8820,10 +8819,11 @@ function TrendScraper({ models, persistModels, restrictModel }) {
     try {
       const directUrls = inspoProfiles.map(p => `https://www.instagram.com/${p.igHandle}/reels/`);
       const resp = await fetch(
-        `https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=${APIFY_API_KEY}&timeout=180&memory=512`,
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ directUrls, resultsType: "posts", resultsLimit: 30 }) }
+        `${SUPABASE_URL}/functions/v1/instagram-scan`,
+        { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
+          body: JSON.stringify({ directUrls, resultsType: "posts", resultsLimit: 30 }) }
       );
-      if (!resp.ok) { const txt = await resp.text(); throw new Error(`Apify ${resp.status}: ${txt.slice(0, 300)}`); }
+      if (!resp.ok) { const txt = await resp.text(); throw new Error(`instagram-scan ${resp.status}: ${txt.slice(0, 300)}`); }
       const data = await resp.json();
       if (!Array.isArray(data)) throw new Error("Unexpected response from Apify.");
       const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
