@@ -3518,7 +3518,10 @@ function RevenueChart({ data, height = 240 }) {
           style={{ animationDelay: `${(i / bars.length) * 0.4}s` }} />
       ))}
 
-      {linePath && (
+      {/* A trend line across only 1-2 points (early days of a new month) implies a
+          trend that isn't real yet — bars/dots alone are honest until there's
+          enough of the month behind them to actually connect. */}
+      {linePath && n > 7 && (
         <path className="rev-line" d={linePath} fill="none" stroke="#39e673" strokeWidth="2.5"
           strokeLinejoin="round" strokeLinecap="round" filter="url(#revGlowLine)" clipPath="url(#revNoNegativeClip)"
           pathLength="1000" strokeDasharray="1000" />
