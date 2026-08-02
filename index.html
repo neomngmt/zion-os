@@ -3379,6 +3379,18 @@ function RevenueChart({ data, height = 240 }) {
     ro.observe(el);
     return () => ro.disconnect();
   }, [measuredWidth]);
+  // Replays the bar/dot/line entrance animation whenever the data actually changes
+  // (Week/Month toggle, a fresh sync, ...) — without a `key` remount, which in this
+  // page's React setup was leaving the previous chart's DOM behind as an orphaned
+  // sibling instead of replacing it. Toggling `animation: none` then forcing a reflow
+  // before clearing it back to '' is the standard vanilla-JS CSS-restart trick.
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const animated = containerRef.current.querySelectorAll(".rev-bar, .rev-dot, .rev-line");
+    animated.forEach((el) => { el.style.animation = "none"; });
+    void containerRef.current.offsetWidth;
+    animated.forEach((el) => { el.style.animation = ""; });
+  }, [data]);
   const width = measuredWidth;
   // padTop reserves a slim strip for the hover tooltip — small enough that it
   // doesn't waste space, but the tooltip always lives inside it, pinned to
@@ -3898,7 +3910,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
               )}
             </div>
             <div className="fs-11 c-faint font-mono mb-2">across {models.length} model{models.length === 1 ? "" : "s"}, {revRange === 7 ? "this week" : "this month"}</div>
-            <RevenueChart key={revRange} data={chartData} />
+            <RevenueChart data={chartData} />
 
             {modelEarnings.length > 0 && (
               <div key={revRange} className="mt-6 pt-5" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
@@ -8825,7 +8837,7 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
           </div>
         </div>
         <div className="text-2xl font-extrabold c-accent mb-1">$<CountUp value={rangeTotal} /></div>
-        <div className="mb-2"><RevenueChart key={range} data={chartData} height={200} /></div>
+        <div className="mb-2"><RevenueChart data={chartData} height={200} /></div>
         <div className="flex gap-4 fs-10 font-mono c-faint uppercase">
           <span><CountUp value={sumInfloww(rangeRows, "messagesCount")} /> messages</span>
           <span><CountUp value={sumInfloww(rangeRows, "tipsCount")} /> tips</span>
