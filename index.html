@@ -3525,18 +3525,14 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
   const myInflowwRows = (inflowwDailyStats || []).filter((r) => agencyModelNames.has(r.model));
   const hasInflowwData = myInflowwRows.length > 0;
 
-  // "Week" is always the current calendar week, Monday through Sunday — not a rolling
-  // 7-day window. "Month" is always the 1st of the current month through today, and
-  // both reset naturally at the calendar boundary rather than sliding day by day.
+  // "Week" is a rolling 7-day window ending today (today + 6 days back) — it slides one
+  // day at a time, never a hard reset at a calendar boundary. "Month" is the 1st of the
+  // current month through today, and DOES reset at the calendar boundary (see below).
   const toISO = (d) => d.toISOString().slice(0, 10);
   const getWeekDays = () => {
     const now = new Date();
-    const dow = now.getDay(); // 0=Sun..6=Sat
-    const monday = new Date(now);
-    monday.setDate(now.getDate() + (dow === 0 ? -6 : 1 - dow));
-    const daysSoFar = dow === 0 ? 7 : dow; // Monday..today, never into future days
-    return Array.from({ length: daysSoFar }, (_, i) => {
-      const d = new Date(monday); d.setDate(monday.getDate() + i); return toISO(d);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(now); d.setDate(now.getDate() - (6 - i)); return toISO(d);
     });
   };
   const getMonthDaysToDate = () => {
@@ -3568,8 +3564,8 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
     await refreshInfloww();
   };
 
-  // Previous period for the delta badge. Week: the full prior calendar week (this week is
-  // always all 7 days too, future ones just $0 so far, so it's a fair whole-vs-whole compare).
+  // Previous period for the delta badge. Week: the prior rolling 7-day window (one clean
+  // shift back, same as the window above is a rolling shift forward).
   // Month: the ENTIRE prior calendar month, not just the same handful of days-so-far — matching
   // day-count against a month that just started made the % swing wildly (e.g. +14000% comparing
   // day 1 vs day 1). Comparing to last month's full total reads sane the whole month through.
