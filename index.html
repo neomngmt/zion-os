@@ -601,6 +601,21 @@ const fontImport = `
 @keyframes shakeX { 10%, 90% { transform: translateX(-1px); } 20%, 80% { transform: translateX(2px); } 30%, 50%, 70% { transform: translateX(-4px); } 40%, 60% { transform: translateX(4px); } }
 @keyframes barGrow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 @keyframes topPostZoomIn { from { transform: scale(1.08); opacity: 0.6; } to { transform: scale(1); opacity: 1; } }
+/* Slow drifting aurora glow — two soft colored shadows sweeping opposite corners,
+   cycling green -> teal -> mint. Long duration so it reads as ambient light, not a blink. */
+@keyframes auroraGlow {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(57,230,115,0.06), -50px -25px 110px -45px rgba(57,230,115,0.4), 50px 35px 110px -45px rgba(45,212,191,0.3); }
+  33% { box-shadow: 0 0 0 1px rgba(45,212,191,0.09), 55px -35px 120px -40px rgba(45,212,191,0.45), -45px 35px 110px -45px rgba(57,230,115,0.3); }
+  66% { box-shadow: 0 0 0 1px rgba(93,230,180,0.08), -30px 35px 110px -40px rgba(93,230,180,0.4), 40px -25px 120px -45px rgba(57,230,115,0.35); }
+}
+@keyframes auroraTextGlow {
+  0%, 100% { text-shadow: 0 0 24px rgba(57,230,115,0.35); }
+  50% { text-shadow: 0 0 40px rgba(57,230,115,0.6); }
+}
+@keyframes auroraBgDrift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
 
 .anim-view { animation: fadeInUp 0.28s ease-out; }
 .anim-pulse-dot { animation: softPulse 2s ease-in-out infinite; }
@@ -3607,8 +3622,7 @@ function XStatsSection({ models, bufferDailyStats, bufferTopPosts, restrictModel
   return (
     <div className="c-bg-surface border rounded-xl overflow-hidden mb-6" style={{
       borderColor: "rgba(57,230,115,0.25)",
-      boxShadow: "0 0 0 1px rgba(57,230,115,0.05), 0 20px 60px -20px rgba(57,230,115,0.25)",
-      animation: "cardIn 0.4s ease-out",
+      animation: "cardIn 0.4s ease-out, auroraGlow 9s ease-in-out 0.4s infinite",
     }}>
       <div className="flex items-center justify-between px-5 py-4 flex-wrap gap-2 border-b c-border">
         <div className="flex items-center gap-2">
@@ -3835,7 +3849,10 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
 
   return (
     <div>
-      <div className="c-bg-surface border c-border rounded-xl p-5 mb-6">
+      <div className="c-bg-surface border rounded-xl p-5 mb-6" style={{
+        borderColor: "rgba(57,230,115,0.22)",
+        animation: "cardIn 0.4s ease-out, auroraGlow 11s ease-in-out 0.4s infinite",
+      }}>
         <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
           <span className="fs-11 uppercase tracking-widest c-muted font-mono">
             Agency Revenue
@@ -3866,7 +3883,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
           <div className="fs-12 c-faint font-mono italic py-4">No Infloww data yet — add Creator IDs in Model Manager.</div>
         ) : (
           <>
-            <div className="text-4xl md:text-5xl font-extrabold c-accent mb-1 flex items-start">
+            <div className="text-4xl md:text-5xl font-extrabold c-accent mb-1 flex items-start" style={{ animation: "auroraTextGlow 4s ease-in-out infinite" }}>
               $<CountUp value={rangeTotal} />
               {deltaFlash && (
                 <span key={deltaFlash.key} className="rev-delta-flash font-mono ml-3 mt-1"
