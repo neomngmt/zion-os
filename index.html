@@ -3361,7 +3361,13 @@ function CreatorForm({ models, cards, persistCards, restrictModel }) {
 
 // ---------- dashboard ----------
 
-function RevenueChart({ data, height = 240 }) {
+// sparseUntil: for a window that GROWS from 1 day up to its full length (calendar
+// month-to-date), pass the real-days threshold below which the chart shows plain
+// one-bar-per-day candles with no connecting line/curve — a trend line or a smoothed
+// bar "forest" across 1-2 real days implies a shape that isn't there yet. Leave unset
+// (0) for fixed-length windows (Week's rolling 7, Creator's rolling 7/30) where every
+// slot always has a real day and the full curve treatment is correct from the start.
+function RevenueChart({ data, height = 240, sparseUntil = 0 }) {
   // data: [{ date: 'YYYY-MM-DD', value: number, byModel?: [{model,value}] }], oldest first
   // The viewBox width tracks the container's real measured pixel width (not a fixed
   // constant scaled via CSS/viewBox tricks) — so 1 SVG unit is always 1 real pixel on
@@ -3454,18 +3460,25 @@ function RevenueChart({ data, height = 240 }) {
   };
   const baseline = padTop + plotH;
 
+  const isSparse = sparseUntil > 0 && n <= sparseUntil;
   // dense bar "forest" under the curve — sampled along the smooth line, not 1:1 with data points.
   // Target a roughly constant total bar count regardless of how many days are plotted (7 or 30),
   // so bars stay visibly separated instead of blurring into a solid mass on narrow/mobile screens.
+  // Skipped while sparse: one real day should be exactly one candle, not several interpolated ones.
   const samplesPerSeg = Math.max(1, Math.min(6, Math.round(40 / Math.max(1, n - 1))));
-  const bars = [];
-  segments.forEach((s) => {
-    for (let k = 0; k < samplesPerSeg; k++) {
-      const t = k / samplesPerSeg;
-      bars.push({ x: s.p1.x + (s.p2.x - s.p1.x) * t, y: bezierY(s, t) });
-    }
-  });
-  bars.push({ x: points[points.length - 1].x, y: points[points.length - 1].y });
+  const bars = isSparse
+    ? points.map((p) => ({ x: p.x, y: p.y }))
+    : (() => {
+        const out = [];
+        segments.forEach((s) => {
+          for (let k = 0; k < samplesPerSeg; k++) {
+            const t = k / samplesPerSeg;
+            out.push({ x: s.p1.x + (s.p2.x - s.p1.x) * t, y: bezierY(s, t) });
+          }
+        });
+        out.push({ x: points[points.length - 1].x, y: points[points.length - 1].y });
+        return out;
+      })();
   // capped at the same width bars normally are (roughly what Week shows) so day 1 of a new
   // month reads as one normal bar, not one giant blown-up blob filling the whole chart
   const barWidth = Math.min(14, Math.max(2, (plotW / bars.length) * 0.62));
@@ -3520,8 +3533,9 @@ function RevenueChart({ data, height = 240 }) {
 
       {/* A trend line across only 1-2 points (early days of a new month) implies a
           trend that isn't real yet — bars/dots alone are honest until there's
-          enough of the month behind them to actually connect. */}
-      {linePath && n > 7 && (
+          enough of the month behind them to actually connect. Only gated for
+          sparseUntil-enabled charts (Month); Week's fixed 7-point line is untouched. */}
+      {linePath && !isSparse && (
         <path className="rev-line" d={linePath} fill="none" stroke="#39e673" strokeWidth="2.5"
           strokeLinejoin="round" strokeLinecap="round" filter="url(#revGlowLine)" clipPath="url(#revNoNegativeClip)"
           pathLength="1000" strokeDasharray="1000" />
@@ -3913,7 +3927,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
               )}
             </div>
             <div className="fs-11 c-faint font-mono mb-2">across {models.length} model{models.length === 1 ? "" : "s"}, {revRange === 7 ? "this week" : "this month"}</div>
-            <RevenueChart data={chartData} />
+            <RevenueChart data={chartData} sparseUntil={revRange === 30 ? 7 : 0} />
 
             {modelEarnings.length > 0 && (
               <div key={revRange} className="mt-6 pt-5" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
