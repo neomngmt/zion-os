@@ -3408,17 +3408,23 @@ function RevenueChart({ data, height = 240, sparseUntil = 0 }) {
   const rawMax = Math.max(1, ...data.map((d) => d.value));
   const max = rawMax * 1.15; // small headroom so the tallest point isn't flush against the top edge
   const n = data.length || 1;
-  const stepX = n > 1 ? plotW / (n - 1) : 0;
+  const isSparse = sparseUntil > 0 && n <= sparseUntil;
+  // Candles pack together at a fixed, readable width instead of stretching edge-to-edge
+  // across the whole plot — 2 real days shouldn't look like they're straining to fill a
+  // 30-day-wide chart. Left-anchored, same width the dense "forest" bars settle around.
+  const stepX = n > 1 ? (isSparse ? Math.min(plotW / (n - 1), 64) : plotW / (n - 1)) : 0;
 
   // Round, human step (25/50/100/250/500/1000/2500/5000...) picked so the axis always
   // shows ~4 gridlines — a $157 month gets 0/50/100/150, a $16k month gets 0/5k/10k/15k.
-  // Never a raw fraction, never an empty axis with nothing but "$0" on it.
+  // Never a raw fraction, never an empty axis with nothing but "$0" on it. Based on the
+  // REAL max (not the padded one) — padding it first was nudging borderline values like
+  // $357 into the next step size up (e.g. 250 instead of 100) for no real reason.
   const niceStep = (m) => {
     const STEPS = [25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000];
     const rough = m / 4;
     return STEPS.find((s) => s >= rough) || Math.ceil(rough / 100000) * 100000;
   };
-  const tickStep = niceStep(max);
+  const tickStep = niceStep(rawMax);
   const ticks = [];
   for (let v = 0; v <= max; v += tickStep) ticks.push(v);
   // A tick whose gridline lands close to the highest point's actual pixel row makes its
@@ -3460,7 +3466,6 @@ function RevenueChart({ data, height = 240, sparseUntil = 0 }) {
   };
   const baseline = padTop + plotH;
 
-  const isSparse = sparseUntil > 0 && n <= sparseUntil;
   // dense bar "forest" under the curve — sampled along the smooth line, not 1:1 with data points.
   // Target a roughly constant total bar count regardless of how many days are plotted (7 or 30),
   // so bars stay visibly separated instead of blurring into a solid mass on narrow/mobile screens.
