@@ -3722,7 +3722,11 @@ function XStatsSection({ models, bufferDailyStats, bufferTopPosts, restrictModel
                 )}
                 <div className="rounded-t w-full transition-opacity group-hover:opacity-80" style={{
                   maxWidth: 28,
-                  height: `${Math.max(3, (v / maxImpr) * (i === peakIdx && v > 0 ? 82 : 88))}%`,
+                  // Fixed pixel height, not a percentage — on a stacked mobile layout (no
+                  // sibling to stretch this column's flex parent against) the parent only
+                  // has a min-height, which isn't a valid basis for percentage heights, so
+                  // every bar was silently resolving to 0px. Pixels sidestep that entirely.
+                  height: `${Math.max(3, (v / maxImpr) * (i === peakIdx && v > 0 ? 108 : 116))}px`,
                   background: v ? "linear-gradient(180deg, #5cf797, #39e673, #1f9950)" : "rgba(139,147,161,0.15)",
                   boxShadow: v ? "0 0 14px rgba(57,230,115,0.45)" : "none",
                   transformOrigin: "bottom",
