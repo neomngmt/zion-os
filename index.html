@@ -3642,6 +3642,9 @@ function XStatsSection({ models, bufferDailyStats, bufferTopPosts, restrictModel
   const peakIdx = impressionsSeries.reduce((best, v, i) => (v > impressionsSeries[best] ? i : best), 0);
   // Same "round, human step" idea as the Agency Revenue chart, in a smaller K-scale range
   // suited to impression counts (a few hundred to a few thousand) rather than dollars.
+  // Bars and gridlines MUST share this exact same scale — they used to use two different
+  // ones (bars scaled to the raw max, ticks stopped at/below it), so a 3.8K peak bar stood
+  // taller than the "3.0K" line above it instead of sitting under a "4.0K" one.
   const BAR_BUDGET_PX = 116; // matches the pixel budget the bars themselves scale against
   const imprNiceStep = (m) => {
     const STEPS = [50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000];
@@ -3649,8 +3652,11 @@ function XStatsSection({ models, bufferDailyStats, bufferTopPosts, restrictModel
     return STEPS.find((s) => s >= rough) || Math.ceil(rough / 50000) * 50000;
   };
   const imprTickStep = imprNiceStep(maxImpr);
+  // Always at least one step ABOVE the real max — Math.floor+1 (not ceil) so an exact
+  // multiple (maxImpr === 3000) still gets a step of headroom instead of landing flush.
+  const imprAxisMax = (Math.floor(maxImpr / imprTickStep) + 1) * imprTickStep;
   const imprTicks = [];
-  for (let v = 0; v <= maxImpr; v += imprTickStep) imprTicks.push(v);
+  for (let v = 0; v <= imprAxisMax; v += imprTickStep) imprTicks.push(v);
   if (imprTicks.length < 2) imprTicks.push(imprTickStep);
   const statTiles = [
     { label: "impressions", value: totals.impressions },
@@ -3711,7 +3717,7 @@ function XStatsSection({ models, bufferDailyStats, bufferTopPosts, restrictModel
                   anchor a % against once this column stacks under the photo on mobile. */}
               {imprTicks.map((t) => (
                 <div key={`grid-${t}`} className="absolute left-0 right-0 border-t border-dashed"
-                  style={{ bottom: 20 + (t / maxImpr) * BAR_BUDGET_PX, borderColor: "rgba(255,255,255,0.07)" }} />
+                  style={{ bottom: 20 + (t / imprAxisMax) * BAR_BUDGET_PX, borderColor: "rgba(255,255,255,0.07)" }} />
               ))}
               {impressionsSeries.map((v, i) => (
               <div key={i} className="group relative flex-1 flex flex-col items-center justify-end gap-1.5" style={{ height: "100%" }}>
@@ -3749,7 +3755,10 @@ function XStatsSection({ models, bufferDailyStats, bufferTopPosts, restrictModel
                   // sibling to stretch this column's flex parent against) the parent only
                   // has a min-height, which isn't a valid basis for percentage heights, so
                   // every bar was silently resolving to 0px. Pixels sidestep that entirely.
-                  height: `${Math.max(3, (v / maxImpr) * (i === peakIdx && v > 0 ? 108 : 116))}px`,
+                  // Scaled against imprAxisMax (with headroom above the real max), the exact
+                  // same reference the gridlines use — so a bar's top always lines up with
+                  // whichever tick actually matches its value, never floating past the top one.
+                  height: `${Math.max(3, (v / imprAxisMax) * BAR_BUDGET_PX)}px`,
                   background: v ? "linear-gradient(180deg, #5cf797, #39e673, #1f9950)" : "rgba(139,147,161,0.15)",
                   boxShadow: v ? "0 0 14px rgba(57,230,115,0.45)" : "none",
                   transformOrigin: "bottom",
