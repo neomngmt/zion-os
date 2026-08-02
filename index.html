@@ -768,10 +768,9 @@ canvas { display: block; }
   55% { opacity: 1; transform: scale(1.6); }
   100% { opacity: 1; transform: scale(1); }
 }
-/* Bars/dots/line no longer animate individually — the .rev-wipe cover below reveals
-   all of them together in one left-to-right sweep instead. */
-.rev-wipe { transform-box: fill-box; transform-origin: 100% 50%; animation: revWipeAway 1.1s cubic-bezier(0.65,0,0.35,1) forwards; }
-@keyframes revWipeAway { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+.rev-bar { transform-box: fill-box; transform-origin: 50% 100%; animation: revBarGrow 0.5s cubic-bezier(0.2,0.8,0.2,1) backwards; }
+.rev-dot { transform-box: fill-box; transform-origin: 50% 50%; animation: revDotPop 0.4s ease-out backwards; }
+.rev-line { animation: revLineDraw 1.1s cubic-bezier(0.4,0,0.2,1) forwards; }
 @keyframes revModelBarGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .rev-model-bar { transform-origin: left center; animation: revModelBarGrow 0.6s cubic-bezier(0.2,0.8,0.2,1) backwards; }
 .rev-model-row { animation: fadeInUp 0.35s ease-out backwards; }
@@ -3526,11 +3525,6 @@ function RevenueChart({ data, height = 240 }) {
           )}
         </g>
       ))}
-      {/* Single coordinated reveal: an opaque cover shrinks away left-to-right, so
-          gridlines, bars, the line and dots all "arrive" together as one sweep
-          instead of three separately-timed animations that never quite agreed. */}
-      <rect className="rev-wipe" x={padLeft - 4} y={0} width={Math.max(0, width - padLeft + 4)} height={height}
-        fill="var(--bg-surface)" pointerEvents="none" />
       {hoverIdx !== null && (() => {
         const hp = points[hoverIdx];
         // % vs the average of every prior day in this view, not a single previous day —
@@ -3904,7 +3898,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
               )}
             </div>
             <div className="fs-11 c-faint font-mono mb-2">across {models.length} model{models.length === 1 ? "" : "s"}, {revRange === 7 ? "this week" : "this month"}</div>
-            <RevenueChart data={chartData} />
+            <RevenueChart key={revRange} data={chartData} />
 
             {modelEarnings.length > 0 && (
               <div key={revRange} className="mt-6 pt-5" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
@@ -8831,7 +8825,7 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
           </div>
         </div>
         <div className="text-2xl font-extrabold c-accent mb-1">$<CountUp value={rangeTotal} /></div>
-        <div className="mb-2"><RevenueChart data={chartData} height={200} /></div>
+        <div className="mb-2"><RevenueChart key={range} data={chartData} height={200} /></div>
         <div className="flex gap-4 fs-10 font-mono c-faint uppercase">
           <span><CountUp value={sumInfloww(rangeRows, "messagesCount")} /> messages</span>
           <span><CountUp value={sumInfloww(rangeRows, "tipsCount")} /> tips</span>
