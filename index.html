@@ -423,6 +423,20 @@ const TABLES = {
       syncedAt: row.synced_at ? new Date(row.synced_at).getTime() : Date.now(),
     }),
   },
+  "pipeline:bufferTopPosts": {
+    // Written server-side by sync-buffer-stats — one row per model+platform, always
+    // reflecting the best-performing (by impressions) post from the last 7 days.
+    table: "buffer_top_posts", mode: "list", idKey: "id",
+    toDb: (r) => r,
+    fromDb: (row) => ({
+      id: row.id, model: row.model, platform: row.platform,
+      text: row.text || "", thumbnailUrl: row.thumbnail_url || "", sourceUrl: row.source_url || "",
+      externalLink: row.external_link || "", impressions: row.impressions || 0, reactions: row.reactions || 0,
+      comments: row.comments || 0, reposts: row.reposts || 0,
+      sentAt: row.sent_at ? new Date(row.sent_at).getTime() : null,
+      syncedAt: row.synced_at ? new Date(row.synced_at).getTime() : Date.now(),
+    }),
+  },
   "pipeline:integrations": {
     table: "integrations", mode: "list", idKey: "id",
     toDb: (i) => ({ id: i.id, name: i.name || "", status: i.status || "planned", note: i.note || "", help: i.help || "", agency: i.agency || "CZ" }),
@@ -585,6 +599,8 @@ const fontImport = `
 @keyframes softPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 @keyframes cardIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
 @keyframes shakeX { 10%, 90% { transform: translateX(-1px); } 20%, 80% { transform: translateX(2px); } 30%, 50%, 70% { transform: translateX(-4px); } 40%, 60% { transform: translateX(4px); } }
+@keyframes barGrow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes topPostZoomIn { from { transform: scale(1.08); opacity: 0.6; } to { transform: scale(1); opacity: 1; } }
 
 .anim-view { animation: fadeInUp 0.28s ease-out; }
 .anim-pulse-dot { animation: softPulse 2s ease-in-out infinite; }
@@ -888,6 +904,34 @@ function useSupaBufferStats() {
         })));
       } catch (e) {
         console.error("load failed for buffer_daily_stats", e);
+        setValue([]);
+      }
+      setLoading(false);
+    })();
+  }, []);
+  return { value, loading };
+}
+
+// buffer_top_posts is populated by the same Edge Function — one row per model+platform,
+// always the best-performing post (by impressions) from the last 7 days.
+function useSupaBufferTopPosts() {
+  const [value, setValue] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabaseClient.from("buffer_top_posts").select("*");
+        if (error) throw error;
+        setValue((data || []).map((r) => ({
+          id: r.id, model: r.model, platform: r.platform,
+          text: r.text || "", thumbnailUrl: r.thumbnail_url || "", sourceUrl: r.source_url || "",
+          externalLink: r.external_link || "", impressions: r.impressions || 0, reactions: r.reactions || 0,
+          comments: r.comments || 0, reposts: r.reposts || 0,
+          sentAt: r.sent_at ? new Date(r.sent_at).getTime() : null,
+        })));
+      } catch (e) {
+        console.error("load failed for buffer_top_posts", e);
         setValue([]);
       }
       setLoading(false);
@@ -3503,28 +3547,41 @@ function RevenueChart({ data, height = 240 }) {
 
 // Per-model X (Twitter) stats, last 7 days — picker so you view one model at a
 // time instead of a wall of numbers for the whole roster at once.
-function XStatsSection({ models, bufferDailyStats }) {
-  const xModels = models.filter((m) => (bufferDailyStats || []).some((r) => r.model === m.name && r.platform === "x"));
+const fmtK = (n) => (n >= 1000000 ? (n / 1000000).toFixed(1) + "M" : n >= 1000 ? (n / 1000).toFixed(1) + "K" : n ? String(n) : "—");
+
+function XStatsSection({ models, bufferDailyStats, bufferTopPosts, restrictModel }) {
+  const xModels = restrictModel
+    ? models.filter((m) => m.name === restrictModel)
+    : models.filter((m) => (bufferDailyStats || []).some((r) => r.model === m.name && r.platform === "x"));
   const [selected, setSelected] = useState("");
   useEffect(() => {
-    if (!selected && xModels.length) setSelected(xModels[0].name);
+    if (!selected && xModels.length) setSelected((restrictModel || xModels[0].name));
   }, [xModels.length]);
 
   if (!xModels.length) return null;
+  if (restrictModel && !(bufferDailyStats || []).some((r) => r.model === restrictModel && r.platform === "x")) return null;
 
   const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 6);
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(weekAgo); d.setDate(weekAgo.getDate() + i); return d.toISOString().slice(0, 10);
   });
+  const prevWeekAgo = new Date(weekAgo); prevWeekAgo.setDate(weekAgo.getDate() - 7);
+  const prevDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(prevWeekAgo); d.setDate(prevWeekAgo.getDate() + i); return d.toISOString().slice(0, 10);
+  });
   const rows = (bufferDailyStats || []).filter((r) => r.model === selected && r.platform === "x" && days.includes(r.statDate));
+  const prevRows = (bufferDailyStats || []).filter((r) => r.model === selected && r.platform === "x" && prevDays.includes(r.statDate));
   const byDay = (field) => days.map((day) => rows.filter((r) => r.statDate === day).reduce((s, r) => s + (r[field] || 0), 0));
   const totals = {
     impressions: rows.reduce((s, r) => s + (r.impressions || 0), 0),
     comments: rows.reduce((s, r) => s + (r.comments || 0), 0),
     reactions: rows.reduce((s, r) => s + (r.reactions || 0), 0),
     postCount: rows.reduce((s, r) => s + (r.postCount || 0), 0),
-    clicks: rows.reduce((s, r) => s + (r.clicks || 0), 0),
   };
+  const prevImpressions = prevRows.reduce((s, r) => s + (r.impressions || 0), 0);
+  // Only show a delta once there's a real prior week to compare against — a
+  // zero-vs-zero or zero-vs-something comparison is noise, not a signal.
+  const impressionsDelta = prevImpressions > 0 ? Math.round(((totals.impressions - prevImpressions) / prevImpressions) * 100) : null;
   // engagementRate comes from Buffer per-day already as a percentage (e.g. 3.4, not 0.034) —
   // averaged across the days that actually have data, not divided by all 7 regardless.
   const engagementDays = rows.filter((r) => r.engagementRate != null);
@@ -3533,42 +3590,122 @@ function XStatsSection({ models, bufferDailyStats }) {
     : null;
   const impressionsSeries = byDay("impressions");
   const maxImpr = Math.max(1, ...impressionsSeries);
+  const topPost = (bufferTopPosts || []).find((p) => p.model === selected && p.platform === "x");
+
+  const peakIdx = impressionsSeries.reduce((best, v, i) => (v > impressionsSeries[best] ? i : best), 0);
+  const statTiles = [
+    { label: "impressions", value: totals.impressions },
+    { label: "replies", value: totals.comments },
+    { label: "reactions", value: totals.reactions },
+    { label: "posts", value: totals.postCount },
+    { label: "engagement", value: avgEngagement != null ? `${avgEngagement.toFixed(1)}%` : "—", raw: true },
+  ];
 
   return (
-    <div className="c-bg-surface border c-border rounded-xl p-4 mb-6">
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <span className="fs-11 uppercase tracking-widest c-muted font-mono">X · last 7 days</span>
-        <select value={selected} onChange={(e) => setSelected(e.target.value)}
-          className="fs-11 font-mono c-bg-app border c-border rounded-lg px-2.5 py-1.5 c-text">
-          {xModels.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
-        </select>
-      </div>
-
-      <div className="flex gap-6 flex-wrap mb-5">
-        <div><div className="text-2xl font-bold c-text"><CountUp value={totals.impressions} /></div><div className="fs-9 c-faint font-mono uppercase">impressions</div></div>
-        <div><div className="text-2xl font-bold c-text"><CountUp value={totals.comments} /></div><div className="fs-9 c-faint font-mono uppercase">replies</div></div>
-        <div><div className="text-2xl font-bold c-text"><CountUp value={totals.reactions} /></div><div className="fs-9 c-faint font-mono uppercase">reactions</div></div>
-        <div><div className="text-2xl font-bold c-text"><CountUp value={totals.postCount} /></div><div className="fs-9 c-faint font-mono uppercase">posts</div></div>
-        <div><div className="text-2xl font-bold c-text"><CountUp value={totals.clicks} /></div><div className="fs-9 c-faint font-mono uppercase">clicks</div></div>
-        <div>
-          <div className="text-2xl font-bold c-text">{avgEngagement != null ? `${avgEngagement.toFixed(1)}%` : "—"}</div>
-          <div className="fs-9 c-faint font-mono uppercase">engagement</div>
+    <div className="c-bg-surface border rounded-xl overflow-hidden mb-6" style={{
+      borderColor: "rgba(57,230,115,0.25)",
+      boxShadow: "0 0 0 1px rgba(57,230,115,0.05), 0 20px 60px -20px rgba(57,230,115,0.25)",
+      animation: "cardIn 0.4s ease-out",
+    }}>
+      <div className="flex items-center justify-between px-5 py-4 flex-wrap gap-2 border-b c-border">
+        <div className="flex items-center gap-2">
+          <span style={{ width: 7, height: 7, borderRadius: 999, background: "#39e673", boxShadow: "0 0 10px #39e673", animation: "softPulse 1.8s ease-in-out infinite" }} />
+          <span className="fs-11 uppercase tracking-widest c-muted font-mono">X · last 7 days</span>
+          <span className="fs-9 uppercase tracking-widest font-mono px-1.5 py-0.5 rounded"
+            style={{ color: "#8B93A1", background: "rgba(139,147,161,0.12)" }}>posts only</span>
+          {impressionsDelta != null && (
+            <span className="fs-9 font-mono px-1.5 py-0.5 rounded flex items-center gap-1" style={{
+              color: impressionsDelta >= 0 ? "#39e673" : "#ff6b6b",
+              background: impressionsDelta >= 0 ? "rgba(57,230,115,0.12)" : "rgba(255,107,107,0.12)",
+            }}>
+              {impressionsDelta >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+              {impressionsDelta >= 0 ? "+" : ""}{impressionsDelta}% vs last week
+            </span>
+          )}
         </div>
+        {!restrictModel && (
+          <select value={selected} onChange={(e) => setSelected(e.target.value)}
+            className="fs-11 font-mono c-bg-app border c-border rounded-lg px-2.5 py-1.5 c-text">
+            {xModels.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
+          </select>
+        )}
       </div>
 
-      <div className="flex items-end gap-2" style={{ height: 70 }}>
-        {impressionsSeries.map((v, i) => (
-          <div key={i} className="flex-1 flex flex-col items-center gap-1">
-            <div className="w-full rounded-t" style={{ height: `${Math.max(4, (v / maxImpr) * 60)}px`, background: "#39e673", opacity: v ? 0.85 : 0.15 }} />
-            <span className="font-mono c-faint" style={{ fontSize: 9 }}>{days[i].slice(8, 10)}</span>
+      <div className="flex flex-col lg:flex-row lg:items-stretch">
+        <div className="flex-1 min-w-0 p-5 flex flex-col">
+          <div className="grid grid-cols-5 border c-border rounded-lg overflow-hidden mb-5">
+            {statTiles.map((t, i) => (
+              <div key={t.label} className={`px-3 py-2.5 ${i > 0 ? "border-l c-border" : ""}`}
+                style={{ animation: `neoFadeInUp 0.35s ease-out ${i * 0.05}s both` }}>
+                <div className="text-xl font-bold c-text leading-tight">{t.raw ? t.value : <CountUp value={t.value} />}</div>
+                <div className="fs-9 c-faint font-mono uppercase truncate">{t.label}</div>
+              </div>
+            ))}
           </div>
-        ))}
+
+          <div className="flex items-end gap-px flex-1" style={{ minHeight: 160 }}>
+            {impressionsSeries.map((v, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center justify-end gap-1.5" style={{ height: "100%" }}>
+                {i === peakIdx && v > 0 && (
+                  <span className="font-mono" style={{ fontSize: 9, color: "#39e673", animation: "softPulse 1.8s ease-in-out infinite" }}>{fmtK(v)}</span>
+                )}
+                <div className="rounded-t w-full" style={{
+                  maxWidth: 28,
+                  height: `${Math.max(3, (v / maxImpr) * (i === peakIdx && v > 0 ? 82 : 88))}%`,
+                  background: v ? "linear-gradient(180deg, #5cf797, #39e673, #1f9950)" : "rgba(139,147,161,0.15)",
+                  boxShadow: v ? "0 0 14px rgba(57,230,115,0.45)" : "none",
+                  transformOrigin: "bottom",
+                  animation: `barGrow 0.5s cubic-bezier(0.34,1.56,0.64,1) ${0.15 + i * 0.06}s both`,
+                }} />
+                <span className="font-mono c-faint" style={{ fontSize: 9 }}>{days[i].slice(8, 10)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {topPost && (topPost.sourceUrl || topPost.thumbnailUrl) && (
+          <div className="w-full lg:w-72 flex-shrink-0 lg:border-l relative flex flex-col group" style={{
+            background: "rgba(255,255,255,0.02)", borderColor: "rgba(57,230,115,0.2)", minHeight: 260,
+          }}>
+            <div style={{ height: "100%", minHeight: 260, overflow: "hidden", background: "#000", position: "relative" }}>
+              {/* sourceUrl is Buffer's full-resolution original asset; thumbnailUrl is a
+                  small pre-cropped preview — only fall back to it if source is missing. */}
+              <img src={topPost.sourceUrl || topPost.thumbnailUrl} alt="" className="w-full h-full transition-transform duration-700 group-hover:scale-105"
+                style={{ objectFit: "cover", animation: "topPostZoomIn 0.6s ease-out both" }}
+                onError={(e) => { if (e.target.src !== topPost.thumbnailUrl && topPost.thumbnailUrl) e.target.src = topPost.thumbnailUrl; }} />
+              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 22%, transparent 58%, rgba(0,0,0,0.9) 100%)" }} />
+              <span className="fs-9 uppercase tracking-widest font-mono absolute top-3 left-3 px-1.5 py-0.5 rounded flex items-center gap-1" style={{
+                color: "#0c0f0d", background: "#39e673",
+                boxShadow: "0 0 16px rgba(57,230,115,0.6)",
+                animation: "cardIn 0.4s ease-out 0.2s both",
+              }}>
+                <Flame size={10} /> Post of the week
+              </span>
+              <div className="absolute left-3 right-3 bottom-3 flex flex-col gap-1.5" style={{ animation: "neoFadeInUp 0.4s ease-out 0.3s both" }}>
+                {topPost.text && (
+                  <p className="fs-11 leading-snug" style={{
+                    color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.6)",
+                    display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+                  }}>{topPost.text}</p>
+                )}
+                <div className="flex items-center gap-3 pt-0.5">
+                  <span className="fs-9 font-mono" style={{ color: "rgba(255,255,255,0.85)" }}>{fmtK(topPost.impressions)} impr</span>
+                  <span className="fs-9 font-mono" style={{ color: "rgba(255,255,255,0.85)" }}>{fmtK(topPost.reactions)} likes</span>
+                  {topPost.externalLink && (
+                    <a href={topPost.externalLink} target="_blank" rel="noreferrer" className="fs-9 font-mono ml-auto"
+                      style={{ color: "#39e673" }}>view →</a>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats, inflowwSyncing, refreshInfloww, bufferDailyStats }) {
+function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats, inflowwSyncing, refreshInfloww, bufferDailyStats, bufferTopPosts }) {
   const recent = [...cards].sort((a, b) => b.createdAt - a.createdAt).slice(0, 6);
   const [revRange, setRevRange] = useState(7); // 7 or 30
   // "+$X" flash shown briefly next to the big number after a manual refresh actually
@@ -3799,7 +3936,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
         )}
       </div>
 
-      <XStatsSection models={models} bufferDailyStats={bufferDailyStats} />
+      <XStatsSection models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} />
     </div>
   );
 }
@@ -8576,7 +8713,7 @@ function useSupaInflowwDailyStats() {
   return { value, loading, syncing, refresh };
 }
 
-function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDailyStats, ofDailyStats, inflowwDailyStats }) {
+function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDailyStats, bufferTopPosts, ofDailyStats, inflowwDailyStats }) {
   const mine = stats.filter((s) => s.model === restrictModel).sort((a, b) => b.weekOf.localeCompare(a.weekOf));
   const latest = mine[0];
   const prev = mine[1];
@@ -8664,9 +8801,11 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
     platformTotals[r.platform] = p;
   });
   const platformLabel = { ig: "Instagram", x: "X", tiktok: "TikTok", fb: "Facebook" };
-  const bufferSection = Object.values(platformTotals).length > 0 && (
+  // X gets the rich panel (chart + post of the week) below instead of a plain tile here.
+  const otherPlatformTotals = Object.values(platformTotals).filter((p) => p.platform !== "x");
+  const bufferSection = otherPlatformTotals.length > 0 && (
     <div className="flex gap-3 flex-wrap mb-6">
-      {Object.values(platformTotals).map((p) => (
+      {otherPlatformTotals.map((p) => (
         <div key={p.platform} className="c-bg-surface border c-border rounded-xl px-4 py-3.5 flex-1 minw-180 hover-lift">
           <div className="fs-10 uppercase tracking-widest c-muted font-mono mb-2">This week on {platformLabel[p.platform] || p.platform}</div>
           <div className="flex gap-4">
@@ -8697,6 +8836,7 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
       <div>
         <ThisWeeksAsks tasks={tasks} restrictModel={restrictModel} onNavigate={onNavigate} />
         {inflowwSection}
+        <XStatsSection models={[{ name: restrictModel }]} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} restrictModel={restrictModel} />
         {bufferSection}
         <div className="fs-12 c-faint font-mono italic py-16 text-center border border-dashed c-border rounded-xl">
           No stats yet. Ask your manager to add this week's numbers.
@@ -8710,6 +8850,7 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
       <GoalCard latest={latest} />
       <ThisWeeksAsks tasks={tasks} restrictModel={restrictModel} onNavigate={onNavigate} />
       {inflowwSection}
+      <XStatsSection models={[{ name: restrictModel }]} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} restrictModel={restrictModel} />
       {bufferSection}
 
       <div className="flex gap-3 flex-wrap mb-6">
@@ -9947,6 +10088,7 @@ function App() {
   const { value: reels, loading: reelsLoading, persist: persistReels } = useSupaTable("reels", "id", [], reelsToJS, reelsToDB);
   const { value: trends, loading: trendsLoading, persist: persistTrends } = useSupaTable("trends", "id", [], trendsToJS, trendsToDB);
   const { value: bufferDailyStats, loading: bufferDailyStatsLoading } = useSupaBufferStats();
+  const { value: bufferTopPosts, loading: bufferTopPostsLoading } = useSupaBufferTopPosts();
   const { value: ofDailyStats, loading: ofDailyStatsLoading } = useSupaOfDailyStats();
   const { value: inflowwDailyStats, loading: inflowwDailyStatsLoading, syncing: inflowwSyncing, refresh: refreshInfloww } = useSupaInflowwDailyStats();
   const { value: settings, loading: settingsLoading, persist: persistSettings } = useSupaSettings({ adminPinCZ: "2748", adminPinUS: "1234", inflowwApiKey: "", monthlyRevenueGoal: 20000 });
@@ -10220,8 +10362,8 @@ function App() {
             )}
 
             {currentView === "dashboard" && (session.role === "admin"
-              ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} inflowwDailyStats={inflowwDailyStats} inflowwSyncing={inflowwSyncing} refreshInfloww={refreshInfloww} bufferDailyStats={bufferDailyStats} />
-              : <CreatorDashboard stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} ofDailyStats={ofDailyStats} inflowwDailyStats={inflowwDailyStats} />)}
+              ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} inflowwDailyStats={inflowwDailyStats} inflowwSyncing={inflowwSyncing} refreshInfloww={refreshInfloww} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} />
+              : <CreatorDashboard stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} ofDailyStats={ofDailyStats} inflowwDailyStats={inflowwDailyStats} />)}
             {currentView === "content" && <ContentDirector cards={isAdmin ? scopedCards : cards} persistCards={isAdmin ? scopedPersistCards : persistCards} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} forcedNetwork={contentPlatform} reels={isAdmin ? scopedReels : reels} persistReels={isAdmin ? scopedPersistReels : persistReels} />}
             {currentView === "calendar" && <CalendarView cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks} onNavigate={setView} restrictModel={restrictModel} />}
             {currentView === "tasks" && <TaskManager tasks={isAdmin ? scopedTasks : tasks} persistTasks={isAdmin ? scopedPersistTasks : persistTasks} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} />}
