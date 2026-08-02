@@ -3589,6 +3589,9 @@ function XStatsSection({ models, bufferDailyStats, bufferTopPosts, restrictModel
     ? engagementDays.reduce((s, r) => s + r.engagementRate, 0) / engagementDays.length
     : null;
   const impressionsSeries = byDay("impressions");
+  const postsSeries = byDay("postCount");
+  const reactionsSeries = byDay("reactions");
+  const commentsSeries = byDay("comments");
   const maxImpr = Math.max(1, ...impressionsSeries);
   const topPost = (bufferTopPosts || []).find((p) => p.model === selected && p.platform === "x");
 
@@ -3645,11 +3648,36 @@ function XStatsSection({ models, bufferDailyStats, bufferTopPosts, restrictModel
 
           <div className="flex items-end gap-px flex-1" style={{ minHeight: 160 }}>
             {impressionsSeries.map((v, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center justify-end gap-1.5" style={{ height: "100%" }}>
+              <div key={i} className="group relative flex-1 flex flex-col items-center justify-end gap-1.5" style={{ height: "100%" }}>
+                {/* Hover/focus tooltip — per-mark hit target is the whole day column, not just
+                    the painted bar, and every value here is also visible via the totals above
+                    (aggregated) or the table view elsewhere, so nothing is hover-gated. */}
+                <div className="absolute bottom-full left-1/2 mb-2 px-2.5 py-2 rounded-lg border pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                  style={{
+                    transform: "translateX(-50%)", background: "#0c0f0d", borderColor: "rgba(57,230,115,0.3)",
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.5)", whiteSpace: "nowrap",
+                  }}>
+                  <div className="fs-9 font-mono c-faint uppercase mb-1">{fmtDay ? fmtDay(days[i]) : days[i]}</div>
+                  <div className="flex flex-col gap-0.5">
+                    <div className="fs-11 font-mono flex items-center justify-between gap-3">
+                      <span style={{ color: "#39e673" }}>impressions</span><span className="c-text font-bold">{v.toLocaleString()}</span>
+                    </div>
+                    <div className="fs-11 font-mono flex items-center justify-between gap-3">
+                      <span className="c-faint">posts</span><span className="c-text">{postsSeries[i]}</span>
+                    </div>
+                    <div className="fs-11 font-mono flex items-center justify-between gap-3">
+                      <span className="c-faint">reactions</span><span className="c-text">{reactionsSeries[i]}</span>
+                    </div>
+                    <div className="fs-11 font-mono flex items-center justify-between gap-3">
+                      <span className="c-faint">replies</span><span className="c-text">{commentsSeries[i]}</span>
+                    </div>
+                  </div>
+                </div>
+
                 {i === peakIdx && v > 0 && (
                   <span className="font-mono" style={{ fontSize: 9, color: "#39e673", animation: "softPulse 1.8s ease-in-out infinite" }}>{fmtK(v)}</span>
                 )}
-                <div className="rounded-t w-full" style={{
+                <div className="rounded-t w-full transition-opacity group-hover:opacity-80" style={{
                   maxWidth: 28,
                   height: `${Math.max(3, (v / maxImpr) * (i === peakIdx && v > 0 ? 82 : 88))}%`,
                   background: v ? "linear-gradient(180deg, #5cf797, #39e673, #1f9950)" : "rgba(139,147,161,0.15)",
@@ -3888,6 +3916,8 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
         )}
       </div>
 
+      <XStatsSection models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} />
+
       <div className="c-bg-surface border c-border rounded-xl p-4 mb-6">
         <div className="flex items-center justify-between mb-3">
           <span className="fs-11 uppercase tracking-widest c-muted font-mono">Reel of the week</span>
@@ -3935,8 +3965,6 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
           </div>
         )}
       </div>
-
-      <XStatsSection models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} />
     </div>
   );
 }
