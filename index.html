@@ -3501,10 +3501,62 @@ function RevenueChart({ data, height = 240 }) {
   );
 }
 
-function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats, inflowwSyncing, refreshInfloww }) {
-  const activeCount = cards.filter((c) => c.stage !== "posted").length;
-  const filmingToday = cards.filter((c) => c.stage === "filming").length;
-  const pendingIdeas = cards.filter((c) => c.stage === "idea" && c.source === "creator").length;
+// Per-model X (Twitter) stats, last 7 days — picker so you view one model at a
+// time instead of a wall of numbers for the whole roster at once.
+function XStatsSection({ models, bufferDailyStats }) {
+  const xModels = models.filter((m) => (bufferDailyStats || []).some((r) => r.model === m.name && r.platform === "x"));
+  const [selected, setSelected] = useState("");
+  useEffect(() => {
+    if (!selected && xModels.length) setSelected(xModels[0].name);
+  }, [xModels.length]);
+
+  if (!xModels.length) return null;
+
+  const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 6);
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekAgo); d.setDate(weekAgo.getDate() + i); return d.toISOString().slice(0, 10);
+  });
+  const rows = (bufferDailyStats || []).filter((r) => r.model === selected && r.platform === "x" && days.includes(r.statDate));
+  const byDay = (field) => days.map((day) => rows.filter((r) => r.statDate === day).reduce((s, r) => s + (r[field] || 0), 0));
+  const totals = {
+    impressions: rows.reduce((s, r) => s + (r.impressions || 0), 0),
+    comments: rows.reduce((s, r) => s + (r.comments || 0), 0),
+    reactions: rows.reduce((s, r) => s + (r.reactions || 0), 0),
+    postCount: rows.reduce((s, r) => s + (r.postCount || 0), 0),
+  };
+  const impressionsSeries = byDay("impressions");
+  const maxImpr = Math.max(1, ...impressionsSeries);
+
+  return (
+    <div className="c-bg-surface border c-border rounded-xl p-4 mb-6">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <span className="fs-11 uppercase tracking-widest c-muted font-mono">X · last 7 days</span>
+        <select value={selected} onChange={(e) => setSelected(e.target.value)}
+          className="fs-11 font-mono c-bg-app border c-border rounded-lg px-2.5 py-1.5 c-text">
+          {xModels.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
+        </select>
+      </div>
+
+      <div className="flex gap-6 flex-wrap mb-5">
+        <div><div className="text-2xl font-bold c-text"><CountUp value={totals.impressions} /></div><div className="fs-9 c-faint font-mono uppercase">impressions</div></div>
+        <div><div className="text-2xl font-bold c-text"><CountUp value={totals.comments} /></div><div className="fs-9 c-faint font-mono uppercase">replies</div></div>
+        <div><div className="text-2xl font-bold c-text"><CountUp value={totals.reactions} /></div><div className="fs-9 c-faint font-mono uppercase">reactions</div></div>
+        <div><div className="text-2xl font-bold c-text"><CountUp value={totals.postCount} /></div><div className="fs-9 c-faint font-mono uppercase">posts</div></div>
+      </div>
+
+      <div className="flex items-end gap-2" style={{ height: 70 }}>
+        {impressionsSeries.map((v, i) => (
+          <div key={i} className="flex-1 flex flex-col items-center gap-1">
+            <div className="w-full rounded-t" style={{ height: `${Math.max(4, (v / maxImpr) * 60)}px`, background: "#39e673", opacity: v ? 0.85 : 0.15 }} />
+            <span className="font-mono c-faint" style={{ fontSize: 9 }}>{days[i].slice(8, 10)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats, inflowwSyncing, refreshInfloww, bufferDailyStats }) {
   const recent = [...cards].sort((a, b) => b.createdAt - a.createdAt).slice(0, 6);
   const [revRange, setRevRange] = useState(7); // 7 or 30
   // "+$X" flash shown briefly next to the big number after a manual refresh actually
@@ -3687,13 +3739,6 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
         )}
       </div>
 
-      <div className="flex gap-3 flex-wrap mb-6">
-        <StatCard label="Active scenes" value={activeCount} color="#12b34c" />
-        <StatCard label="In filming" value={filmingToday} color="#E2725B" />
-        <StatCard label="Ideas to review" value={pendingIdeas} color="#8B93A1" />
-        <StatCard label="Models" value={models.length} color="#f2f5f0" />
-      </div>
-
       <div className="c-bg-surface border c-border rounded-xl p-4 mb-6">
         <div className="flex items-center justify-between mb-3">
           <span className="fs-11 uppercase tracking-widest c-muted font-mono">Reel of the week</span>
@@ -3720,51 +3765,29 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        <div className="lg:col-span-3 c-bg-surface border c-border rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="fs-11 uppercase tracking-widest c-muted font-mono">Pipeline snapshot</span>
-            <button onClick={() => onNavigate("content")} className="fs-11 font-mono uppercase c-accent hover:underline">Open board →</button>
-          </div>
-          <div className="space-y-2.5">
-            {STAGES.map((s) => {
-              const n = cards.filter((c) => c.stage === s.id).length;
-              const max = Math.max(1, cards.length);
+      <div className="c-bg-surface border c-border rounded-xl p-4 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <span className="fs-11 uppercase tracking-widest c-muted font-mono">Recent activity</span>
+        </div>
+        {recent.length === 0 ? (
+          <div className="fs-11 c-faint font-mono italic py-6 text-center">nothing yet</div>
+        ) : (
+          <div className="space-y-2">
+            {recent.map((c) => {
+              const stage = STAGES.find((s) => s.id === c.stage);
               return (
-                <div key={s.id} className="flex items-center gap-3">
-                  <span className="fs-10 font-mono w-16" style={{ color: s.color }}>{s.label}</span>
-                  <div className="flex-1 h-2 c-bg-app rounded-full overflow-hidden">
-                    <div className="h-full rounded-full" style={{ width: `${(n / max) * 100}%`, backgroundColor: s.color }} />
-                  </div>
-                  <span className="fs-11 font-mono c-muted w-5 text-right">{n}</span>
+                <div key={c.id} className="flex items-center gap-2 text-xs">
+                  <Circle size={6} fill={stage.color} color={stage.color} />
+                  <span className="c-text truncate flex-1">{c.title || "Untitled"}</span>
+                  <span className="c-muted font-mono fs-10">{c.model || "—"}</span>
                 </div>
               );
             })}
           </div>
-        </div>
-
-        <div className="lg:col-span-2 c-bg-surface border c-border rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="fs-11 uppercase tracking-widest c-muted font-mono">Recent activity</span>
-          </div>
-          {recent.length === 0 ? (
-            <div className="fs-11 c-faint font-mono italic py-6 text-center">nothing yet</div>
-          ) : (
-            <div className="space-y-2">
-              {recent.map((c) => {
-                const stage = STAGES.find((s) => s.id === c.stage);
-                return (
-                  <div key={c.id} className="flex items-center gap-2 text-xs">
-                    <Circle size={6} fill={stage.color} color={stage.color} />
-                    <span className="c-text truncate flex-1">{c.title || "Untitled"}</span>
-                    <span className="c-muted font-mono fs-10">{c.model || "—"}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        )}
       </div>
+
+      <XStatsSection models={models} bufferDailyStats={bufferDailyStats} />
     </div>
   );
 }
@@ -10185,7 +10208,7 @@ function App() {
             )}
 
             {currentView === "dashboard" && (session.role === "admin"
-              ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} inflowwDailyStats={inflowwDailyStats} inflowwSyncing={inflowwSyncing} refreshInfloww={refreshInfloww} />
+              ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} inflowwDailyStats={inflowwDailyStats} inflowwSyncing={inflowwSyncing} refreshInfloww={refreshInfloww} bufferDailyStats={bufferDailyStats} />
               : <CreatorDashboard stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} ofDailyStats={ofDailyStats} inflowwDailyStats={inflowwDailyStats} />)}
             {currentView === "content" && <ContentDirector cards={isAdmin ? scopedCards : cards} persistCards={isAdmin ? scopedPersistCards : persistCards} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} forcedNetwork={contentPlatform} reels={isAdmin ? scopedReels : reels} persistReels={isAdmin ? scopedPersistReels : persistReels} />}
             {currentView === "calendar" && <CalendarView cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks} onNavigate={setView} restrictModel={restrictModel} />}
