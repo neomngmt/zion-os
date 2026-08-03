@@ -3823,6 +3823,72 @@ function XStatsSection({ models, bufferDailyStats, bufferTopPosts, restrictModel
   );
 }
 
+// New Infloww fields beyond earnings — refunds, automated messages, priority mass
+// messages, tracking links. Automated messages / PMM / tracking links are all
+// current-state snapshots (same value repeated on every synced day), not daily
+// events, so we read the latest row per model rather than summing across days —
+// summing would multiply a lifetime total by however many days got synced.
+function OfExtrasSection({ models, inflowwDailyStats }) {
+  const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+  const sevenDaysAgoStr = sevenDaysAgo.toISOString().slice(0, 10);
+
+  const rows = models.map((m) => {
+    const modelRows = (inflowwDailyStats || []).filter((r) => r.model === m.name);
+    if (!modelRows.length) return null;
+    const refunds7d = modelRows.filter((r) => r.statDate >= sevenDaysAgoStr).reduce((s, r) => s + (r.refundsNet || 0), 0);
+    const latest = [...modelRows].sort((a, b) => (b.syncedAt || "").localeCompare(a.syncedAt || ""))[0];
+    return {
+      name: m.name,
+      refunds7d,
+      automatedRevenue: latest.automatedMessagesNet || 0,
+      automatedCount: latest.automatedMessagesCount || 0,
+      pmmRevenue: latest.priorityMassMessagesNet || 0,
+      pmmCount: latest.priorityMassMessagesCount || 0,
+      trackingLinks: latest.trackingLinksCount || 0,
+    };
+  }).filter(Boolean);
+
+  if (!rows.length) return null;
+  const hasAnyActivity = rows.some((r) => r.refunds7d || r.automatedCount || r.pmmCount || r.trackingLinks);
+  if (!hasAnyActivity) return null;
+
+  return (
+    <div className="c-bg-surface border c-border rounded-xl p-4 mb-6">
+      <div className="flex items-center justify-between mb-3">
+        <span className="fs-11 uppercase tracking-widest c-muted font-mono">OF extras</span>
+        <span className="fs-9 uppercase tracking-widest font-mono px-1.5 py-0.5 rounded"
+          style={{ color: "#8B93A1", background: "rgba(139,147,161,0.12)" }}>refunds · 7d — rest · latest snapshot</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="c-muted font-mono uppercase fs-10 border-b c-border">
+              <th className="text-left py-2 pr-3">Model</th>
+              <th className="text-right py-2 px-3">Refunds (7d)</th>
+              <th className="text-right py-2 px-3">Automated msg revenue</th>
+              <th className="text-right py-2 px-3">PMM revenue</th>
+              <th className="text-right py-2 pl-3">Tracking links</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.name} className="border-b c-border c-text">
+                <td className="py-2 pr-3 font-mono">{r.name}</td>
+                <td className="py-2 px-3 text-right font-mono" style={{ color: r.refunds7d > 0 ? "#E2725B" : undefined }}>
+                  {r.refunds7d > 0 ? `-$${r.refunds7d.toFixed(2)}` : "$0"}
+                </td>
+                <td className="py-2 px-3 text-right font-mono">${r.automatedRevenue.toFixed(2)} <span className="c-faint">({r.automatedCount})</span></td>
+                <td className="py-2 px-3 text-right font-mono">${r.pmmRevenue.toFixed(2)} <span className="c-faint">({r.pmmCount})</span></td>
+                <td className="py-2 pl-3 text-right font-mono">{r.trackingLinks}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats, inflowwSyncing, refreshInfloww, bufferDailyStats, bufferTopPosts }) {
   const recent = [...cards].sort((a, b) => b.createdAt - a.createdAt).slice(0, 6);
   const [revRange, setRevRange] = useState(7); // 7 or 30
@@ -4012,6 +4078,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
       </div>
 
       <XStatsSection models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} />
+      <OfExtrasSection models={models} inflowwDailyStats={inflowwDailyStats} />
 
       <div className="c-bg-surface border c-border rounded-xl p-4 mb-6">
         <div className="flex items-center justify-between mb-3">
@@ -8803,6 +8870,10 @@ function useSupaInflowwDailyStats() {
         earningsNet: Number(r.earnings_net) || 0, earningsGross: Number(r.earnings_gross) || 0,
         transactionCount: r.transaction_count || 0, messagesCount: r.messages_count || 0,
         tipsCount: r.tips_count || 0, subsCount: r.subs_count || 0, syncedAt: r.synced_at,
+        refundsNet: Number(r.refunds_net) || 0,
+        automatedMessagesCount: r.automated_messages_count || 0, automatedMessagesNet: Number(r.automated_messages_net) || 0,
+        priorityMassMessagesCount: r.priority_mass_messages_count || 0, priorityMassMessagesNet: Number(r.priority_mass_messages_net) || 0,
+        trackingLinksCount: r.tracking_links_count || 0,
       })));
     } catch (e) {
       console.error("load failed for infloww_daily_stats", e);
