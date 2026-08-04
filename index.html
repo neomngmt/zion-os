@@ -9188,7 +9188,6 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
         <CreatorInsightsSection models={[{ name: restrictModel }]} inflowwDailyStats={inflowwDailyStats} days={30} periodLabel="30d" />
         <XStatsSection models={[{ name: restrictModel }]} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} restrictModel={restrictModel} />
         {bufferSection}
-        <OfExtrasSection models={[{ name: restrictModel }]} inflowwDailyStats={inflowwDailyStats} days={7} periodLabel="this week" />
         <div className="fs-12 c-faint font-mono italic py-16 text-center border border-dashed c-border rounded-xl">
           No stats yet. Ask your manager to add this week's numbers.
         </div>
@@ -9204,7 +9203,6 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
       <CreatorInsightsSection models={[{ name: restrictModel }]} inflowwDailyStats={inflowwDailyStats} days={30} periodLabel="30d" />
       <XStatsSection models={[{ name: restrictModel }]} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} restrictModel={restrictModel} />
       {bufferSection}
-      <OfExtrasSection models={[{ name: restrictModel }]} inflowwDailyStats={inflowwDailyStats} days={7} periodLabel="this week" />
 
       <div className="flex gap-3 flex-wrap mb-6">
         <StatCardBig icon={DollarSign} label="OF earnings this week" value={`$${latest.ofEarnings.toLocaleString()}`}
