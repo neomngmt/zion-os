@@ -4254,49 +4254,14 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
             </div>
             <div className="fs-11 c-faint font-mono mb-2">across {models.length} model{models.length === 1 ? "" : "s"}, {revRange === 7 ? "this week" : "this month"}</div>
             <RevenueChart data={chartData} sparseUntil={revRange === 30 ? 7 : 0} />
-
-            {modelEarnings.length > 0 && (
-              <div key={revRange} className="mt-6 pt-5" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-                <div className="fs-11 uppercase tracking-widest c-muted font-mono mb-3">
-                  Earnings by model
-                  <span className="fs-9 ml-2 normal-case c-muted" style={{ opacity: 0.6 }}>· {revRange === 7 ? "this week" : "this month"}</span>
-                </div>
-                <div className="flex flex-col gap-3">
-                  {modelEarnings.map((m, i) => {
-                    const pct = m.goal ? Math.min(100, (m.value / m.goal) * 100) : (m.value / modelEarningsMax) * 100;
-                    const hit = m.goal && m.value >= m.goal;
-                    return (
-                      <div key={m.name} className="rev-model-row" style={{ animationDelay: `${i * 0.08}s` }}>
-                        <div className="flex items-center gap-3">
-                          <div className="fs-12 font-mono c-text minw-64 truncate">{m.name}</div>
-                          <div className="flex-1 rounded-full overflow-hidden" style={{ height: 6, background: "rgba(255,255,255,0.06)" }}>
-                            <div className="rev-model-bar h-full rounded-full"
-                              style={{ width: `${pct}%`, background: "#39e673", boxShadow: "0 0 8px rgba(57,230,115,0.5)", animationDelay: `${0.1 + i * 0.08}s` }} />
-                          </div>
-                          <div className="fs-12 font-mono c-accent minw-64 text-right">
-                            $<CountUp value={m.value} />
-                            {m.goal ? <span className="c-faint"> / ${m.goal.toLocaleString()}</span> : null}
-                          </div>
-                        </div>
-                        {m.goal ? (
-                          <div className="fs-9 font-mono c-faint mt-1" style={{ marginLeft: "calc(64px + 12px)" }}>
-                            {hit ? "🔥 goal hit" : `${Math.round(pct)}% of ${goalPeriodLabel} goal`}
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </>
         )}
       </div>
 
+      <CreatorInsightsSection models={models} inflowwDailyStats={inflowwDailyStats} />
       <XStatsSection models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} />
       <OfExtrasSection models={models} inflowwDailyStats={inflowwDailyStats} />
       <CreatorReportSection models={models} inflowwDailyStats={inflowwDailyStats} />
-      <CreatorInsightsSection models={models} inflowwDailyStats={inflowwDailyStats} />
 
       <div className="c-bg-surface border c-border rounded-xl p-4 mb-6">
         <div className="flex items-center justify-between mb-3">
