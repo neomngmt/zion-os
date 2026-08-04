@@ -3894,88 +3894,6 @@ function OfExtrasSection({ models, inflowwDailyStats }) {
   );
 }
 
-const fmtMs = (ms) => {
-  if (!ms) return "—";
-  const totalSec = Math.round(ms / 1000);
-  const m = Math.floor(totalSec / 60), s = totalSec % 60;
-  return m > 0 ? `${m}m ${s}s` : `${s}s`;
-};
-
-// Creator Report metrics (Infloww's official /v1/creator-report/* endpoints — active
-// fans, reply time, profile visitors, ranking, etc.). Different fields land on
-// different days (chat-summary is a whole-range snapshot that only shows up on the
-// most recent sync day; the rest are daily), so each field independently picks the
-// most recent row that actually has a value for IT, rather than one "latest row"
-// that would leave most columns blank.
-function CreatorReportSection({ models, inflowwDailyStats }) {
-  // Prefers the most recent day with a genuinely non-zero value — the very latest
-  // synced day is frequently a real 0 because Infloww hasn't finished computing that
-  // day's numbers yet (same processing lag seen elsewhere), which reads as "this
-  // model suddenly has 0 profile visitors" rather than what it actually is: today
-  // isn't done yet. Falls back to the latest non-null value (even if 0) if every
-  // day on record is genuinely zero.
-  const latestNonNull = (rows, field) => {
-    const withValue = rows.filter((r) => r[field] != null).sort((a, b) => b.statDate.localeCompare(a.statDate));
-    if (!withValue.length) return null;
-    const nonZero = withValue.find((r) => r[field] !== 0);
-    return (nonZero || withValue[0])[field];
-  };
-
-  const rows = models.map((m) => {
-    const modelRows = (inflowwDailyStats || []).filter((r) => r.model === m.name);
-    if (!modelRows.length) return null;
-    const data = {
-      activeFans: latestNonNull(modelRows, "activeFans"),
-      profileVisitors: latestNonNull(modelRows, "profileVisitors"),
-      performanceRank: latestNonNull(modelRows, "performanceRank"),
-      replyTimeMs: latestNonNull(modelRows, "replyTimeMs"),
-      avgSubscriptionLengthDays: latestNonNull(modelRows, "avgSubscriptionLengthDays"),
-      fansWithRenewOn: latestNonNull(modelRows, "fansWithRenewOn"),
-    };
-    const hasAny = Object.values(data).some((v) => v != null);
-    return hasAny ? { name: m.name, ...data } : null;
-  }).filter(Boolean);
-
-  if (!rows.length) return null;
-
-  return (
-    <div className="c-bg-surface border c-border rounded-xl p-4 mb-6">
-      <div className="flex items-center justify-between mb-3">
-        <span className="fs-11 uppercase tracking-widest c-muted font-mono">Creator report</span>
-        <span className="fs-9 uppercase tracking-widest font-mono px-1.5 py-0.5 rounded"
-          style={{ color: "#8B93A1", background: "rgba(139,147,161,0.12)" }}>latest available per field</span>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="c-muted font-mono uppercase fs-10 border-b c-border">
-              <th className="text-left py-2 pr-3">Model</th>
-              <th className="text-right py-2 px-3">Active fans</th>
-              <th className="text-right py-2 px-3">Renew on</th>
-              <th className="text-right py-2 px-3">Avg sub length</th>
-              <th className="text-right py-2 px-3">Profile visitors</th>
-              <th className="text-right py-2 px-3">Reply time</th>
-              <th className="text-right py-2 pl-3">OF rank</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.name} className="border-b c-border c-text">
-                <td className="py-2 pr-3 font-mono">{r.name}</td>
-                <td className="py-2 px-3 text-right font-mono">{r.activeFans ?? "—"}</td>
-                <td className="py-2 px-3 text-right font-mono">{r.fansWithRenewOn ?? "—"}</td>
-                <td className="py-2 px-3 text-right font-mono">{r.avgSubscriptionLengthDays != null ? `${r.avgSubscriptionLengthDays}d` : "—"}</td>
-                <td className="py-2 px-3 text-right font-mono">{r.profileVisitors ?? "—"}</td>
-                <td className="py-2 px-3 text-right font-mono">{fmtMs(r.replyTimeMs)}</td>
-                <td className="py-2 pl-3 text-right font-mono">{r.performanceRank != null ? `#${r.performanceRank}` : "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
 
 // Auto-generated read on an account's health, combining reply time + renew rate +
 // the "big fan pool but nobody pays" pattern — same idea as the Creator Report
@@ -4008,7 +3926,7 @@ const TONE_COLOR = { good: "#39e673", bad: "#E2725B", neutral: "#8B93A1" };
 // window regardless of the Agency Revenue toggle above, since these fields
 // (reply time, renew rate) are themselves already rolling/latest-snapshot values,
 // not day-specific — a shorter window would just be noisier for no real benefit.
-function CreatorInsightsSection({ models, inflowwDailyStats }) {
+function CreatorInsightsSection({ models, inflowwDailyStats, embedded }) {
   const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
   const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().slice(0, 10);
 
@@ -4031,9 +3949,11 @@ function CreatorInsightsSection({ models, inflowwDailyStats }) {
       const fansWithRenewOn = latestNonZero(rows, "fansWithRenewOn");
       const replyTimeMs = latestNonZero(rows, "replyTimeMs");
       const performanceRank = latestNonZero(rows, "performanceRank");
+      const profileVisitors = latestNonZero(rows, "profileVisitors");
+      const avgSubscriptionLengthDays = latestNonZero(rows, "avgSubscriptionLengthDays");
       accounts.push({
         model: m.name, accountType, earnings30d,
-        activeFans, fansWithRenewOn, performanceRank,
+        activeFans, fansWithRenewOn, performanceRank, profileVisitors, avgSubscriptionLengthDays,
         replyMin: replyTimeMs ? Math.round(replyTimeMs / 60000) : null,
         renewPct: (activeFans && fansWithRenewOn != null) ? Math.round((fansWithRenewOn / activeFans) * 1000) / 10 : null,
         avgSpend: activeFans ? earnings30d / activeFans : null,
@@ -4045,8 +3965,8 @@ function CreatorInsightsSection({ models, inflowwDailyStats }) {
   accounts.sort((a, b) => b.earnings30d - a.earnings30d);
   const maxEarnings = Math.max(1, ...accounts.map((a) => a.earnings30d));
 
-  return (
-    <div className="c-bg-surface border c-border rounded-xl p-4 mb-6">
+  const content = (
+    <>
       <div className="flex items-center justify-between mb-4">
         <span className="fs-11 uppercase tracking-widest c-muted font-mono">Creator performance · 30d</span>
         <span className="fs-9 uppercase tracking-widest font-mono px-1.5 py-0.5 rounded"
@@ -4095,12 +4015,25 @@ function CreatorInsightsSection({ models, inflowwDailyStats }) {
                 <div className="flex justify-between fs-10 font-mono c-faint">
                   <span>Active fans</span><span className="c-muted">{a.activeFans != null ? a.activeFans.toLocaleString() : "—"}</span>
                 </div>
+                <div className="flex justify-between fs-10 font-mono c-faint">
+                  <span>Profile visitors</span><span className="c-muted">{a.profileVisitors != null ? a.profileVisitors.toLocaleString() : "—"}</span>
+                </div>
+                <div className="flex justify-between fs-10 font-mono c-faint">
+                  <span>Avg sub length</span><span className="c-muted">{a.avgSubscriptionLengthDays != null ? `${a.avgSubscriptionLengthDays}d` : "—"}</span>
+                </div>
               </div>
               <p className="fs-10 font-mono" style={{ color, lineHeight: 1.5, opacity: 0.9 }}>{insight.text}</p>
             </div>
           );
         })}
       </div>
+    </>
+  );
+
+  if (embedded) return content;
+  return (
+    <div className="c-bg-surface border c-border rounded-xl p-4 mb-6">
+      {content}
     </div>
   );
 }
@@ -4254,14 +4187,18 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
             </div>
             <div className="fs-11 c-faint font-mono mb-2">across {models.length} model{models.length === 1 ? "" : "s"}, {revRange === 7 ? "this week" : "this month"}</div>
             <RevenueChart data={chartData} sparseUntil={revRange === 30 ? 7 : 0} />
+
+            {hasInflowwData && (
+              <div className="mt-6 pt-5" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                <CreatorInsightsSection models={models} inflowwDailyStats={inflowwDailyStats} embedded />
+              </div>
+            )}
           </>
         )}
       </div>
 
-      <CreatorInsightsSection models={models} inflowwDailyStats={inflowwDailyStats} />
       <XStatsSection models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} />
       <OfExtrasSection models={models} inflowwDailyStats={inflowwDailyStats} />
-      <CreatorReportSection models={models} inflowwDailyStats={inflowwDailyStats} />
 
       <div className="c-bg-surface border c-border rounded-xl p-4 mb-6">
         <div className="flex items-center justify-between mb-3">
