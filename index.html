@@ -4279,6 +4279,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
     </div>
   );
 }
+Dashboard = React.memo(Dashboard);
 
 // ---------- date helpers ----------
 
@@ -9246,6 +9247,7 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
     </div>
   );
 }
+CreatorDashboard = React.memo(CreatorDashboard);
 
 // ---------- creator onboarding (first login) ----------
 
@@ -10460,6 +10462,30 @@ function App() {
   }, [view]);
   const loading = cardsLoading || modelsLoading || tasksLoading || settingsLoading || statsLoading || reelsLoading || trendsLoading || integrationsLoading;
 
+  const isAdmin = !!session && session.role === "admin";
+  const agencyModels = useMemo(
+    () => (isAdmin ? models.filter((m) => (m.agency || "CZ") === session.agency) : models),
+    [isAdmin, models, session && session.agency]
+  );
+  const agencyModelNameSet = useMemo(() => new Set(agencyModels.map((m) => m.name)), [agencyModels]);
+
+  const scopedCards = useMemo(
+    () => (isAdmin ? cards.filter((c) => agencyModelNameSet.has(c.model)) : cards),
+    [isAdmin, cards, agencyModelNameSet]
+  );
+  const scopedTasks = useMemo(
+    () => (isAdmin ? tasks.filter((t) => agencyModelNameSet.has(t.model)) : tasks),
+    [isAdmin, tasks, agencyModelNameSet]
+  );
+  const scopedStats = useMemo(
+    () => (isAdmin ? stats.filter((s) => agencyModelNameSet.has(s.model)) : stats),
+    [isAdmin, stats, agencyModelNameSet]
+  );
+  const scopedReels = useMemo(
+    () => (isAdmin ? reels.filter((r) => agencyModelNameSet.has(r.model)) : reels),
+    [isAdmin, reels, agencyModelNameSet]
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen c-bg-app flex items-center justify-center">
@@ -10506,15 +10532,6 @@ function App() {
   const NAV = session.role === "admin" ? NAV_ADMIN : NAV_CREATOR;
   const restrictModel = session.role === "creator" ? session.name : undefined;
   const currentView = view || "dashboard";
-
-  const isAdmin = session.role === "admin";
-  const agencyModels = isAdmin ? models.filter((m) => (m.agency || "CZ") === session.agency) : models;
-  const agencyModelNameSet = new Set(agencyModels.map((m) => m.name));
-
-  const scopedCards = isAdmin ? cards.filter((c) => agencyModelNameSet.has(c.model)) : cards;
-  const scopedTasks = isAdmin ? tasks.filter((t) => agencyModelNameSet.has(t.model)) : tasks;
-  const scopedStats = isAdmin ? stats.filter((s) => agencyModelNameSet.has(s.model)) : stats;
-  const scopedReels = isAdmin ? reels.filter((r) => agencyModelNameSet.has(r.model)) : reels;
   // trends are shared/global — Team manages the same list from either login, choosing per-trend who sees it
 
   const scopedPersistCards = isAdmin
