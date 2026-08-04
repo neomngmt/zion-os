@@ -3977,6 +3977,134 @@ function CreatorReportSection({ models, inflowwDailyStats }) {
   );
 }
 
+// Auto-generated read on an account's health, combining reply time + renew rate +
+// the "big fan pool but nobody pays" pattern — same idea as the Creator Report
+// table above, just turned into a plain-language verdict instead of raw numbers.
+function creatorInsight(a) {
+  const notes = [];
+  if (a.replyMin != null) {
+    if (a.replyMin > 60) notes.push("reply time přes hodinu — ztracený příjem");
+    else if (a.replyMin <= 30) notes.push("reply time v pohodě");
+  }
+  if (a.renewPct != null) {
+    if (a.renewPct >= 55) notes.push("silný renew");
+    else if (a.renewPct < 45) notes.push("slabý renew");
+  } else if (a.accountType === "free") {
+    notes.push("free účet — velký fanoušek pool na konverzi");
+  }
+  if (a.activeFans > 1000 && a.avgSpend < 1) {
+    notes.push("hodně fanoušků, skoro nic neplatí — obsah/cena nekonvertuje");
+  }
+  if (!notes.length) return { text: "Bez výrazných výkyvů.", tone: "neutral" };
+  const tone = a.replyMin > 60 || (a.renewPct != null && a.renewPct < 45) || (a.activeFans > 1000 && a.avgSpend < 1)
+    ? "bad" : (a.replyMin <= 30 && a.renewPct >= 55) ? "good" : "neutral";
+  return { text: notes.join(" · ") + ".", tone };
+}
+
+const TONE_COLOR = { good: "#39e673", bad: "#E2725B", neutral: "#8B93A1" };
+
+// Revenue-by-creator bar chart + one insight card per account — the visual,
+// at-a-glance companion to the raw CreatorReportSection table above it. 30-day
+// window regardless of the Agency Revenue toggle above, since these fields
+// (reply time, renew rate) are themselves already rolling/latest-snapshot values,
+// not day-specific — a shorter window would just be noisier for no real benefit.
+function CreatorInsightsSection({ models, inflowwDailyStats }) {
+  const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
+  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().slice(0, 10);
+
+  const latestNonZero = (rows, field) => {
+    const withValue = rows.filter((r) => r[field] != null).sort((a, b) => b.statDate.localeCompare(a.statDate));
+    if (!withValue.length) return null;
+    const nonZero = withValue.find((r) => r[field] !== 0);
+    return (nonZero || withValue[0])[field];
+  };
+
+  const accounts = [];
+  models.forEach((m) => {
+    const modelRows = (inflowwDailyStats || []).filter((r) => r.model === m.name);
+    if (!modelRows.length) return;
+    const byAccountType = {};
+    modelRows.forEach((r) => { (byAccountType[r.accountType] || (byAccountType[r.accountType] = [])).push(r); });
+    Object.entries(byAccountType).forEach(([accountType, rows]) => {
+      const earnings30d = rows.filter((r) => r.statDate >= thirtyDaysAgoStr).reduce((s, r) => s + (r.earningsNet || 0), 0);
+      const activeFans = latestNonZero(rows, "activeFans");
+      const fansWithRenewOn = latestNonZero(rows, "fansWithRenewOn");
+      const replyTimeMs = latestNonZero(rows, "replyTimeMs");
+      const performanceRank = latestNonZero(rows, "performanceRank");
+      accounts.push({
+        model: m.name, accountType, earnings30d,
+        activeFans, fansWithRenewOn, performanceRank,
+        replyMin: replyTimeMs ? Math.round(replyTimeMs / 60000) : null,
+        renewPct: (activeFans && fansWithRenewOn != null) ? Math.round((fansWithRenewOn / activeFans) * 1000) / 10 : null,
+        avgSpend: activeFans ? earnings30d / activeFans : null,
+      });
+    });
+  });
+
+  if (!accounts.length) return null;
+  accounts.sort((a, b) => b.earnings30d - a.earnings30d);
+  const maxEarnings = Math.max(1, ...accounts.map((a) => a.earnings30d));
+
+  return (
+    <div className="c-bg-surface border c-border rounded-xl p-4 mb-6">
+      <div className="flex items-center justify-between mb-4">
+        <span className="fs-11 uppercase tracking-widest c-muted font-mono">Creator performance · 30d</span>
+        <span className="fs-9 uppercase tracking-widest font-mono px-1.5 py-0.5 rounded"
+          style={{ color: "#8B93A1", background: "rgba(139,147,161,0.12)" }}>auto-generated read</span>
+      </div>
+
+      <div className="flex flex-col gap-2.5 mb-5">
+        {accounts.map((a) => {
+          const pct = (a.earnings30d / maxEarnings) * 100;
+          return (
+            <div key={`${a.model}-${a.accountType}`} className="flex items-center gap-3">
+              <div className="fs-11 font-mono c-text truncate" style={{ width: 96, flexShrink: 0 }}>
+                {a.model}{a.accountType === "free" ? " (free)" : ""}
+              </div>
+              <div className="flex-1 rounded-full overflow-hidden" style={{ height: 6, background: "rgba(255,255,255,0.06)" }}>
+                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "#39e673", boxShadow: "0 0 8px rgba(57,230,115,0.5)" }} />
+              </div>
+              <div className="fs-11 font-mono c-accent text-right" style={{ width: 70, flexShrink: 0 }}>${Math.round(a.earnings30d).toLocaleString()}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+        {accounts.map((a) => {
+          const insight = creatorInsight(a);
+          const color = TONE_COLOR[insight.tone];
+          return (
+            <div key={`${a.model}-${a.accountType}-card`} className="rounded-lg p-3" style={{
+              background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderLeft: `3px solid ${color}`,
+            }}>
+              <div className="flex items-baseline justify-between mb-2">
+                <span className="fs-12 font-mono font-bold c-text">{a.model}{a.accountType === "free" ? " · free" : ""}</span>
+                <span className="fs-12 font-mono c-accent">${Math.round(a.earnings30d).toLocaleString()}</span>
+              </div>
+              <div className="flex flex-col gap-1 mb-2">
+                <div className="flex justify-between fs-10 font-mono c-faint">
+                  <span>OF rank</span><span className="c-muted">{a.performanceRank != null ? `#${a.performanceRank}` : "—"}</span>
+                </div>
+                <div className="flex justify-between fs-10 font-mono c-faint">
+                  <span>Reply time</span><span className="c-muted">{a.replyMin != null ? `${a.replyMin} min` : "—"}</span>
+                </div>
+                <div className="flex justify-between fs-10 font-mono c-faint">
+                  <span>Renew on</span><span className="c-muted">{a.renewPct != null ? `${a.renewPct}%` : "—"}</span>
+                </div>
+                <div className="flex justify-between fs-10 font-mono c-faint">
+                  <span>Active fans</span><span className="c-muted">{a.activeFans != null ? a.activeFans.toLocaleString() : "—"}</span>
+                </div>
+              </div>
+              <p className="fs-10 font-mono" style={{ color, lineHeight: 1.5, opacity: 0.9 }}>{insight.text}</p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats, inflowwSyncing, refreshInfloww, bufferDailyStats, bufferTopPosts }) {
   const recent = [...cards].sort((a, b) => b.createdAt - a.createdAt).slice(0, 6);
   const [revRange, setRevRange] = useState(7); // 7 or 30
@@ -4168,6 +4296,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
       <XStatsSection models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} />
       <OfExtrasSection models={models} inflowwDailyStats={inflowwDailyStats} />
       <CreatorReportSection models={models} inflowwDailyStats={inflowwDailyStats} />
+      <CreatorInsightsSection models={models} inflowwDailyStats={inflowwDailyStats} />
 
       <div className="c-bg-surface border c-border rounded-xl p-4 mb-6">
         <div className="flex items-center justify-between mb-3">
