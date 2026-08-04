@@ -625,6 +625,15 @@ const fontImport = `
 .tap:active { transform: scale(0.96); }
 .hover-lift { transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease; }
 .hover-lift:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
+
+/* creator (model login) dashboard: soft green glow behind every panel */
+.creator-glow-scope .c-bg-surface {
+  box-shadow: 0 0 1px 1px rgba(57,230,115,0.18), 0 0 28px 2px rgba(18,179,76,0.20);
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+.creator-glow-scope .c-bg-surface.hover-lift:hover {
+  box-shadow: 0 0 1px 1px rgba(57,230,115,0.35), 0 0 40px 6px rgba(57,230,115,0.32);
+}
 .transition-smooth { transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease; }
 
 /* ---------- soft, rounded design pass (no sharp/blocky corners) ---------- */
@@ -9173,7 +9182,7 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
 
   if (!latest) {
     return (
-      <div>
+      <div className="creator-glow-scope">
         <ThisWeeksAsks tasks={tasks} restrictModel={restrictModel} onNavigate={onNavigate} />
         {inflowwSection}
         <CreatorInsightsSection models={[{ name: restrictModel }]} inflowwDailyStats={inflowwDailyStats} days={30} periodLabel="30d" />
@@ -9188,7 +9197,7 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
   }
 
   return (
-    <div>
+    <div className="creator-glow-scope">
       <GoalCard latest={latest} />
       <ThisWeeksAsks tasks={tasks} restrictModel={restrictModel} onNavigate={onNavigate} />
       {inflowwSection}
