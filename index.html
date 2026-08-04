@@ -3779,8 +3779,13 @@ function XStatsSection({ models, bufferDailyStats, bufferTopPosts, restrictModel
         </div>
 
         {topPost && (topPost.sourceUrl || topPost.thumbnailUrl) && (
+          // Fixed pixel height (not "100%") — a portrait vs landscape photo has a wildly
+          // different natural aspect ratio, and "100%" against this column's otherwise
+          // auto/content-driven height fell back to sizing off that ratio, so the whole
+          // panel visibly grew or shrank depending purely on which model was selected.
+          // A constant height keeps the panel the same size no matter whose photo it is.
           <div className="w-full lg:w-72 flex-shrink-0 lg:border-l relative flex flex-col items-center justify-center group p-4" style={{
-            background: "rgba(255,255,255,0.02)", borderColor: "rgba(57,230,115,0.2)", minHeight: 260,
+            background: "rgba(255,255,255,0.02)", borderColor: "rgba(57,230,115,0.2)", height: 320, minHeight: 320, maxHeight: 320,
           }}>
             <div className="rounded-xl border" style={{
               width: "100%", height: "100%", overflow: "hidden", background: "#000", position: "relative",
