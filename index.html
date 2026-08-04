@@ -3842,21 +3842,30 @@ function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "t
   const windowAgo = new Date(); windowAgo.setDate(windowAgo.getDate() - (days - 1));
   const windowAgoStr = windowAgo.toISOString().slice(0, 10);
 
-  const rows = models.map((m) => {
+  // Free and paid are separate Infloww accounts with their own sync rows — merging
+  // them into one "latest" row (the old approach) meant whichever account type
+  // happened to sort last silently ate the other's numbers. One row per account
+  // type instead, same as CreatorInsightsSection already does it correctly.
+  const rows = [];
+  models.forEach((m) => {
     const modelRows = (inflowwDailyStats || []).filter((r) => r.model === m.name);
-    if (!modelRows.length) return null;
-    const refundsWindow = modelRows.filter((r) => r.statDate >= windowAgoStr).reduce((s, r) => s + (r.refundsNet || 0), 0);
-    const latest = [...modelRows].sort((a, b) => (b.syncedAt || "").localeCompare(a.syncedAt || ""))[0];
-    return {
-      name: m.name,
-      refundsWindow,
-      automatedRevenue: latest.automatedMessagesNet || 0,
-      automatedCount: latest.automatedMessagesCount || 0,
-      pmmRevenue: latest.priorityMassMessagesNet || 0,
-      pmmCount: latest.priorityMassMessagesCount || 0,
-      trackingLinks: latest.trackingLinksCount || 0,
-    };
-  }).filter(Boolean);
+    if (!modelRows.length) return;
+    const byAccountType = {};
+    modelRows.forEach((r) => { (byAccountType[r.accountType] || (byAccountType[r.accountType] = [])).push(r); });
+    Object.entries(byAccountType).forEach(([accountType, acctRows]) => {
+      const refundsWindow = acctRows.filter((r) => r.statDate >= windowAgoStr).reduce((s, r) => s + (r.refundsNet || 0), 0);
+      const latest = [...acctRows].sort((a, b) => (b.syncedAt || "").localeCompare(a.syncedAt || ""))[0];
+      rows.push({
+        name: m.name, accountType,
+        refundsWindow,
+        automatedRevenue: latest.automatedMessagesNet || 0,
+        automatedCount: latest.automatedMessagesCount || 0,
+        pmmRevenue: latest.priorityMassMessagesNet || 0,
+        pmmCount: latest.priorityMassMessagesCount || 0,
+        trackingLinks: latest.trackingLinksCount || 0,
+      });
+    });
+  });
 
   if (!rows.length) return null;
   const hasAnyActivity = rows.some((r) => r.refundsWindow || r.automatedCount || r.pmmCount || r.trackingLinks);
@@ -3882,8 +3891,8 @@ function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "t
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.name} className="border-b c-border c-text">
-                <td className="py-2 pr-3 font-mono">{r.name}</td>
+              <tr key={`${r.name}-${r.accountType}`} className="border-b c-border c-text">
+                <td className="py-2 pr-3 font-mono">{r.name}{r.accountType === "free" ? " (free)" : ""}</td>
                 <td className="py-2 px-3 text-right font-mono" style={{ color: r.refundsWindow > 0 ? "#E2725B" : undefined }}>
                   {r.refundsWindow > 0 ? `-$${r.refundsWindow.toFixed(2)}` : "$0"}
                 </td>
@@ -9167,8 +9176,10 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
       <div>
         <ThisWeeksAsks tasks={tasks} restrictModel={restrictModel} onNavigate={onNavigate} />
         {inflowwSection}
+        <CreatorInsightsSection models={[{ name: restrictModel }]} inflowwDailyStats={inflowwDailyStats} days={30} periodLabel="30d" />
         <XStatsSection models={[{ name: restrictModel }]} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} restrictModel={restrictModel} />
         {bufferSection}
+        <OfExtrasSection models={[{ name: restrictModel }]} inflowwDailyStats={inflowwDailyStats} days={7} periodLabel="this week" />
         <div className="fs-12 c-faint font-mono italic py-16 text-center border border-dashed c-border rounded-xl">
           No stats yet. Ask your manager to add this week's numbers.
         </div>
@@ -9181,8 +9192,10 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
       <GoalCard latest={latest} />
       <ThisWeeksAsks tasks={tasks} restrictModel={restrictModel} onNavigate={onNavigate} />
       {inflowwSection}
+      <CreatorInsightsSection models={[{ name: restrictModel }]} inflowwDailyStats={inflowwDailyStats} days={30} periodLabel="30d" />
       <XStatsSection models={[{ name: restrictModel }]} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} restrictModel={restrictModel} />
       {bufferSection}
+      <OfExtrasSection models={[{ name: restrictModel }]} inflowwDailyStats={inflowwDailyStats} days={7} periodLabel="this week" />
 
       <div className="flex gap-3 flex-wrap mb-6">
         <StatCardBig icon={DollarSign} label="OF earnings this week" value={`$${latest.ofEarnings.toLocaleString()}`}
