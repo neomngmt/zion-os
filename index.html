@@ -4091,7 +4091,10 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
   // cards use rolling 30/7 day windows instead; different intent, don't unify them).
   // Early in a new month this legitimately has few days of data — that's expected,
   // not a bug, same as any month-to-date figure anywhere else.
-  const toISO = (d) => d.toISOString().slice(0, 10);
+  // Local calendar date, not UTC — d.toISOString() converts through UTC first, which
+  // silently shifts every date back a day for any timezone ahead of UTC (e.g. CEST),
+  // dropping "today" from month-to-date and mislabeling every other day in the range.
+  const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const getWeekDays = () => {
     const now = new Date();
     return Array.from({ length: 7 }, (_, i) => {
