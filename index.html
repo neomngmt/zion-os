@@ -3847,9 +3847,10 @@ function XStatsSection({ models, bufferDailyStats, bufferTopPosts, restrictModel
 // messages / PMM / tracking links stay "latest snapshot" regardless of the toggle
 // since those are lifetime/current-state values, not day-bucketed (see their sync
 // logic), so there's nothing period-specific to sum for them.
-function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "this week" }) {
+function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "this week", sinceISO }) {
+  const toLocalISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const windowAgo = new Date(); windowAgo.setDate(windowAgo.getDate() - (days - 1));
-  const windowAgoStr = windowAgo.toISOString().slice(0, 10);
+  const windowAgoStr = sinceISO || toLocalISO(windowAgo);
 
   // Free and paid are separate Infloww accounts with their own sync rows — merging
   // them into one "latest" row (the old approach) meant whichever account type
@@ -3949,13 +3950,17 @@ const TONE_COLOR = { good: "#39e673", bad: "#E2725B", neutral: "#8B93A1" };
 // window regardless of the Agency Revenue toggle above, since these fields
 // (reply time, renew rate) are themselves already rolling/latest-snapshot values,
 // not day-specific — a shorter window would just be noisier for no real benefit.
-function CreatorInsightsSection({ models, inflowwDailyStats, embedded, days = 30, periodLabel = "30d" }) {
+function CreatorInsightsSection({ models, inflowwDailyStats, embedded, days = 30, periodLabel = "30d", sinceISO }) {
   // Mirrors the Agency Revenue Week/Month toggle above it — earnings and avgSpend
   // (both derived from earnings) actually change with the window; the snapshot
   // fields (reply time, renew %, rank, ...) don't, since they're latest-available
   // values with no meaningful "this week vs this month" sum.
+  // `sinceISO`, when passed, pins the window to the same calendar range as the Agency
+  // Revenue chart above it (e.g. "1st of this month" instead of a rolling N-day lookback,
+  // which would otherwise pull in most of last month a few days into a new one).
+  const toLocalISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const windowAgo = new Date(); windowAgo.setDate(windowAgo.getDate() - (days - 1));
-  const windowAgoStr = windowAgo.toISOString().slice(0, 10);
+  const windowAgoStr = sinceISO || toLocalISO(windowAgo);
 
   const latestNonZero = (rows, field) => {
     const withValue = rows.filter((r) => r[field] != null).sort((a, b) => b.statDate.localeCompare(a.statDate));
@@ -4221,7 +4226,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
             {hasInflowwData && (
               <div className="mt-6 pt-5" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
                 <CreatorInsightsSection models={models} inflowwDailyStats={inflowwDailyStats} embedded
-                  days={revRange} periodLabel={revRange === 7 ? "this week" : "this month"} />
+                  days={revRange} periodLabel={revRange === 7 ? "this week" : "this month"} sinceISO={days[0]} />
               </div>
             )}
           </>
@@ -4230,7 +4235,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
 
       <XStatsSection models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} />
       <OfExtrasSection models={models} inflowwDailyStats={inflowwDailyStats}
-        days={revRange} periodLabel={revRange === 7 ? "this week" : "this month"} />
+        days={revRange} periodLabel={revRange === 7 ? "this week" : "this month"} sinceISO={days[0]} />
 
       <div className="c-bg-surface border c-border rounded-xl p-4 mb-6">
         <div className="flex items-center justify-between mb-3">
