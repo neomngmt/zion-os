@@ -9269,212 +9269,6 @@ function OnboardingScreen({ name, url, onContinue, onQuestionnaireReceived }) {
   );
 }
 
-// ---------- trend scraper ----------
-
-function TrendScraper({ models, persistModels, restrictModel }) {
-  const scopedModels = restrictModel ? models.filter(m => m.name === restrictModel) : models;
-  const [selectedModel, setSelectedModel] = React.useState(restrictModel || models[0]?.name || "");
-  const [scraping, setScraping] = React.useState(false);
-  const [results, setResults] = React.useState([]);
-  const [profileCount, setProfileCount] = React.useState(0);
-  const [error, setError] = React.useState("");
-  const [threshold, setThreshold] = React.useState(3);
-  const [topN, setTopN] = React.useState(15);
-  const [addingHandle, setAddingHandle] = React.useState("");
-
-  const model = scopedModels.find(m => m.name === selectedModel);
-  const inspoProfiles = model?.inspoProfiles || [];
-
-  const addProfile = async () => {
-    if (!addingHandle.trim() || !model) return;
-    const handle = addingHandle.trim().replace(/https?:\/\/(www\.)?instagram\.com\//i, "").replace(/\//g, "").replace(/^@/, "");
-    if (!handle) return;
-    const updated = { ...model, inspoProfiles: [...inspoProfiles, { id: Math.random().toString(36).slice(2), igHandle: handle }] };
-    await persistModels(models.map(m => m.name === selectedModel ? updated : m));
-    setAddingHandle("");
-  };
-
-  const removeProfile = async (id) => {
-    if (!model) return;
-    await persistModels(models.map(m => m.name === selectedModel ? { ...m, inspoProfiles: (m.inspoProfiles || []).filter(p => p.id !== id) } : m));
-  };
-
-  const scrape = async () => {
-    if (!inspoProfiles.length) return;
-    setScraping(true); setError(""); setResults([]); setProfileCount(0);
-    try {
-      const directUrls = inspoProfiles.map(p => `https://www.instagram.com/${p.igHandle}/reels/`);
-      const resp = await fetch(
-        `${SUPABASE_URL}/functions/v1/instagram-scan`,
-        { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
-          body: JSON.stringify({ directUrls, resultsType: "posts", resultsLimit: 30 }) }
-      );
-      if (!resp.ok) { const txt = await resp.text(); throw new Error(`instagram-scan ${resp.status}: ${txt.slice(0, 300)}`); }
-      const data = await resp.json();
-      if (!Array.isArray(data)) throw new Error("Unexpected response from Apify.");
-      const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-      const recentData = data.filter(post => {
-        const ts = post.timestamp || post.takenAtTimestamp;
-        if (!ts) return false;
-        const t = new Date(ts).getTime();
-        return !isNaN(t) && t >= cutoff;
-      });
-      const grouped = {};
-      recentData.forEach(post => { const u = (post.ownerUsername || post.username || "?").toLowerCase(); if (!grouped[u]) grouped[u] = []; grouped[u].push(post); });
-      setProfileCount(Object.keys(grouped).length);
-      const viral = [];
-      Object.entries(grouped).forEach(([username, posts]) => {
-        const avgL = posts.reduce((s, p) => s + (p.likesCount || 0), 0) / (posts.length || 1);
-        const avgV = posts.reduce((s, p) => s + (p.videoViewCount || 0), 0) / (posts.length || 1);
-        posts.forEach(post => {
-          const ratio = Math.max(avgL > 0 ? (post.likesCount || 0) / avgL : 0, avgV > 0 ? (post.videoViewCount || 0) / avgV : 0);
-          if (ratio >= threshold) viral.push({ ...post, _username: username, _ratio: ratio });
-        });
-      });
-      viral.sort((a, b) => b._ratio - a._ratio);
-      setResults(viral.slice(0, topN));
-    } catch (e) { setError(e.message); }
-    setScraping(false);
-  };
-
-  const fmt = n => !n ? "0" : n >= 1000000 ? `${(n/1000000).toFixed(1)}M` : n >= 1000 ? `${(n/1000).toFixed(1)}K` : String(n);
-  const emptyMsg = !selectedModel ? "Select a model on the left" : !inspoProfiles.length ? "Add reference profiles" : "Click Scan";
-
-  return (
-    <div>
-      <div className="c-bg-surface border c-border rounded-xl p-4 mb-5 flex flex-wrap gap-3 items-center justify-end">
-        <div className="w-full">
-          <div className="fs-10 c-muted font-mono uppercase mb-2">Viral threshold — post is viral if it beats the profile average by</div>
-          <div className="flex flex-wrap gap-2 mb-4">
-            {[2, 3, 5, 10, 15].map(t => (
-              <button key={t} onClick={() => setThreshold(t)}
-                className={`px-3 py-1.5 rounded-full border fs-11 font-mono font-semibold transition-colors ${threshold === t ? "c-border-accent c-accent c-bg-accent-a2" : "c-border c-muted hover-bg-surface"}`}>
-                {t}x
-              </button>
-            ))}
-          </div>
-          <div className="fs-10 c-muted font-mono uppercase mb-2">How many reels</div>
-          <div className="flex flex-wrap gap-2">
-            {[10, 15, 20, 30].map(n => (
-              <button key={n} onClick={() => setTopN(n)}
-                className={`px-3 py-1.5 rounded-full border fs-11 font-mono font-semibold transition-colors ${topN === n ? "c-border-accent c-accent c-bg-accent-a2" : "c-border c-muted hover-bg-surface"}`}>
-                Top {n}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-      <div className="flex flex-col lg:flex-row gap-5">
-        <div className="w-full lg:w-64 flex-shrink-0">
-          {!restrictModel && (
-            <>
-              <div className="fs-10 uppercase tracking-widest c-muted font-mono mb-2">Model</div>
-              <div className="flex flex-col gap-1 mb-4">
-                {scopedModels.map(m => (
-                  <button key={m.name} onClick={() => { setSelectedModel(m.name); setResults([]); setError(""); }}
-                    className={`w-full text-left px-3 py-2 rounded-lg fs-12 font-mono transition-colors ${selectedModel === m.name ? "c-bg-accent-a2 c-accent font-semibold" : "c-muted hover-bg-surface"}`}>
-                    {m.name}{m.inspoProfiles?.length > 0 && <span className="ml-2 fs-10 c-faint">({m.inspoProfiles.length})</span>}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-          {selectedModel && (
-            <div className="c-bg-surface border c-border rounded-xl p-3">
-              <div className="fs-10 uppercase tracking-widest c-muted font-mono mb-2">Reference profiles</div>
-              {inspoProfiles.length === 0 && <p className="fs-11 c-faint font-mono italic mb-2">None yet</p>}
-              <div className="space-y-1 mb-1">
-                {inspoProfiles.map(p => (
-                  <div key={p.id} className="flex items-center gap-1.5 py-1 border-b c-border last:border-0">
-                    <Instagram size={11} className="c-muted" /><span className="fs-12 c-text">@{p.igHandle}</span>
-                  </div>
-                ))}
-              </div>
-              <p className="fs-10 c-faint font-mono mt-2">Managed in Model Manager →</p>
-            </div>
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 mb-4">
-            <button onClick={scrape} disabled={scraping || !selectedModel || !inspoProfiles.length}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-lg c-bg-accent c-onaccent fs-12 font-mono uppercase tracking-wide font-semibold hover-bg-accent2 disabled:opacity-40 tap">
-              {scraping ? <><Loader2 size={14} className="animate-spin" /> Scraping...</> : <><Zap size={14} /> Scan viral reels</>}
-            </button>
-          </div>
-          {error && <div className="c-bg-surface border c-border-warn-a rounded-xl p-3 mb-4 fs-12 c-warn font-mono break-all">{error}</div>}
-          {!scraping && results.length === 0 && !error && <div className="fs-12 c-faint font-mono italic py-12 text-center border border-dashed c-border rounded-xl">{emptyMsg}</div>}
-          {scraping && <div className="fs-12 c-muted font-mono py-12 text-center border border-dashed c-border rounded-xl">Scraping {inspoProfiles.length} profiles via Apify... 1-2 min</div>}
-          {results.length > 0 && (
-            <>
-              <div className="fs-11 c-muted font-mono mb-3"><span className="c-accent font-semibold">{results.length}</span> viral reels from {profileCount} profiles</div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
-                {results.map((post, i) => (
-                  <div key={post.url || i}
-                    className="c-bg-surface border c-border rounded-xl overflow-hidden hover-border-accent hover-lift transition-all">
-                    {(post.videoUrl || post.displayUrl) && (
-                      <div className="relative w-full bg-black" style={{ paddingTop: "177.78%" }}>
-                        {post.videoUrl ? (
-                          <video src={post.videoUrl} poster={post.displayUrl} controls playsInline preload="none"
-                            className="absolute inset-0 w-full h-full object-cover" />
-                        ) : (
-                          <img src={post.displayUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                        )}
-                        <div className="absolute top-2 right-2 c-bg-accent c-onaccent fs-9 font-mono font-bold px-1.5 py-0.5 rounded-lg" style={{ pointerEvents: "none" }}>{post._ratio.toFixed(1)}x avg</div>
-                        <div className="absolute top-2 left-2 fs-10 font-mono px-1.5 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.6)", color: "#fff", pointerEvents: "none" }}>@{post._username}</div>
-                      </div>
-                    )}
-                    <div className="p-3">
-                      <div className="flex gap-3 fs-12 font-mono mb-1">
-                        <span className="flex items-center gap-1 c-text"><Eye size={12} />{fmt(post.videoViewCount)}</span>
-                        <span style={{ color: "#E1306C" }}>&#9829; {fmt(post.likesCount)}</span>
-                      </div>
-                      {post.caption && <div className="fs-11 c-muted leading-snug mb-1.5" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{post.caption}</div>}
-                      <div className="flex items-center justify-between">
-                        {post.timestamp && <div className="fs-10 c-faint font-mono">{new Date(post.timestamp).toLocaleDateString("en-US")}</div>}
-                        <a href={post.url} target="_blank" rel="noopener noreferrer" className="fs-10 c-accent hover-accent-text font-mono">Open on Instagram →</a>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------- trends hub (merges the agency-wide weekly scan with each model's own
-// inspo-profile scan into one section — they used to be two separate, confusingly
-// named nav items even though both are just "scrape IG for viral ideas") ----------
-
-function TrendsHub({ isAdmin, models, persistModels, restrictModel, weeklyTrendReels, onReloadWeeklyTrendReels }) {
-  const [tab, setTab] = useState("weekly");
-  if (!isAdmin) {
-    // Creators only ever had the per-model inspo scan — the agency-wide weekly scan's
-    // "Generate Now" triggers paid Apify calls, so it stays admin-only, same as before.
-    return <TrendScraper models={models} persistModels={persistModels} restrictModel={restrictModel} />;
-  }
-  return (
-    <div>
-      <div className="flex rounded-lg border c-border overflow-hidden mb-5 w-fit">
-        <button onClick={() => setTab("weekly")}
-          className={`tap px-3.5 py-1.5 fs-11 font-mono uppercase transition-colors ${tab === "weekly" ? "c-bg-accent c-onaccent" : "c-muted hover-bg-surface"}`}>
-          Weekly Scan
-        </button>
-        <button onClick={() => setTab("inspo")}
-          className={`tap px-3.5 py-1.5 fs-11 font-mono uppercase transition-colors ${tab === "inspo" ? "c-bg-accent c-onaccent" : "c-muted hover-bg-surface"}`}>
-          Per-model Inspo Scan
-        </button>
-      </div>
-      {tab === "weekly"
-        ? <TrendsPage weeklyTrendReels={weeklyTrendReels} onReload={onReloadWeeklyTrendReels} />
-        : <TrendScraper models={models} persistModels={persistModels} restrictModel={restrictModel} />}
-    </div>
-  );
-}
-
 // ---------- reel sorter (ported inline, no separate file / iframe) ----------
 
 const REEL_SORTER_CSS = `
@@ -10363,7 +10157,7 @@ const NAV_ADMIN = [
   { id: "calendar", label: "Calendar", icon: Calendar },
   { id: "tasks", label: "Tasks", icon: CheckSquare },
   { id: "stats", label: "Stats", icon: TrendingUp },
-  { id: "trends", label: "Trends", icon: Flame },
+  { id: "weeklytrends", label: "Trends", icon: Flame },
   { id: "reelsorter", label: "Reels Sorter", icon: Repeat },
   { id: "titlegen", label: "Title Generator", icon: Mic },
   { id: "neo", label: "Neo", icon: Sparkles },
@@ -10377,7 +10171,6 @@ const NAV_CREATOR = [
   { id: "content", label: "My Scenes", icon: Film },
   { id: "calendar", label: "My Calendar", icon: Calendar },
   { id: "tasks", label: "My Tasks", icon: CheckSquare },
-  { id: "trends", label: "Trends", icon: Flame },
   { id: "neo", label: "Neo", icon: Sparkles },
   { id: "whatsnew", label: "OF News", icon: Megaphone },
   { id: "settings", label: "Settings", icon: Settings },
@@ -10591,7 +10384,7 @@ function App() {
         <div className="flex items-center gap-1.5 px-4 py-3 flex-1 justify-end min-w-0">
           <GlobalSearch cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks}
             models={isAdmin ? agencyModels : models} trends={weeklyTrendReels} onNavigate={setView}
-            trendsNavId="trends" showModels={isAdmin} showTrends={isAdmin} navItems={NAV} />
+            trendsNavId="weeklytrends" showModels={isAdmin} showTrends={isAdmin} navItems={NAV} />
           {session.role === "admin" && (
             <AdminNotificationBell cards={scopedCards} tasks={scopedTasks} onNavigate={setView} />
           )}
@@ -10726,11 +10519,9 @@ function App() {
             {currentView === "calendar" && <CalendarView cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks} onNavigate={setView} restrictModel={restrictModel} />}
             {currentView === "tasks" && <TaskManager tasks={isAdmin ? scopedTasks : tasks} persistTasks={isAdmin ? scopedPersistTasks : persistTasks} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} />}
             {currentView === "stats" && <StatsManager stats={scopedStats} persistStats={scopedPersistStats} models={agencyModels} reels={scopedReels} persistReels={scopedPersistReels} />}
-            {currentView === "trends" && (isAdmin
-              ? <TrendsHub isAdmin models={agencyModels} persistModels={scopedPersistModels} weeklyTrendReels={weeklyTrendReels} onReloadWeeklyTrendReels={reloadWeeklyTrendReels} />
-              : <TrendsHub isAdmin={false} models={models} persistModels={persistModels} restrictModel={restrictModel} />)}
             {currentView === "reelsorter" && isAdmin && <ReelSorterPage />}
             {currentView === "titlegen" && isAdmin && <TitleGeneratorPage />}
+            {currentView === "weeklytrends" && isAdmin && <TrendsPage weeklyTrendReels={weeklyTrendReels} onReload={reloadWeeklyTrendReels} />}
             {currentView === "trending" && <CreatorTrending trends={trends} agency={session.agency} />}
             {currentView === "models" && <ModelManager models={agencyModels} persistModels={scopedPersistModels} cards={scopedCards} reels={scopedReels} agency={session.agency} />}
             {currentView === "whatsnew" && <WhatsNewPage />}
