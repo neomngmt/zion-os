@@ -3499,8 +3499,12 @@ function RevenueChart({ data, height = 240, sparseUntil = 0 }) {
   // month reads as one normal bar, not one giant blown-up blob filling the whole chart
   const barWidth = Math.min(14, Math.max(2, (plotW / bars.length) * 0.62));
 
-  // show at most ~7 date labels regardless of range, spaced evenly
-  const labelEvery = Math.max(1, Math.ceil(n / 7));
+  // Show as many date labels as actually fit the measured width, spaced evenly — a fixed
+  // "~7 labels" was fine on desktop but on a narrow phone screen 7 labels like "13. 8."
+  // don't have room to breathe and end up overlapping into an unreadable smear.
+  const minLabelSpacingPx = 44 * fontScale;
+  const maxLabelsThatFit = Math.max(2, Math.floor(plotW / minLabelSpacingPx));
+  const labelEvery = Math.max(1, Math.ceil(n / Math.min(n, maxLabelsThatFit, 7)));
   const [hoverIdx, setHoverIdx] = useState(null);
 
   return (
@@ -3563,7 +3567,7 @@ function RevenueChart({ data, height = 240, sparseUntil = 0 }) {
           <rect x={p.x - stepX / 2} y={padTop} width={Math.max(stepX, 6)} height={plotH} fill="transparent" />
           <circle className="rev-dot" cx={p.x} cy={p.y} r={hoverIdx === i ? 5 : 3.5} fill="#39e673" stroke="#07090a" strokeWidth="1.5" filter="url(#revGlowDot)"
             style={{ animationDelay: `${0.15 + (i / Math.max(n - 1, 1)) * 1.0}s` }} />
-          {i % labelEvery === 0 && (
+          {(n - 1 - i) % labelEvery === 0 && (
             <text x={p.x} y={height - 8} textAnchor="middle" fontSize={10 * fontScale} fontFamily="'JetBrains Mono', monospace" fill="#5c6e65">
               {new Date(p.date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}
             </text>
