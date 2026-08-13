@@ -9445,6 +9445,36 @@ function TrendScraper({ models, persistModels, restrictModel }) {
   );
 }
 
+// ---------- trends hub (merges the agency-wide weekly scan with each model's own
+// inspo-profile scan into one section — they used to be two separate, confusingly
+// named nav items even though both are just "scrape IG for viral ideas") ----------
+
+function TrendsHub({ isAdmin, models, persistModels, restrictModel, weeklyTrendReels, onReloadWeeklyTrendReels }) {
+  const [tab, setTab] = useState("weekly");
+  if (!isAdmin) {
+    // Creators only ever had the per-model inspo scan — the agency-wide weekly scan's
+    // "Generate Now" triggers paid Apify calls, so it stays admin-only, same as before.
+    return <TrendScraper models={models} persistModels={persistModels} restrictModel={restrictModel} />;
+  }
+  return (
+    <div>
+      <div className="flex rounded-lg border c-border overflow-hidden mb-5 w-fit">
+        <button onClick={() => setTab("weekly")}
+          className={`tap px-3.5 py-1.5 fs-11 font-mono uppercase transition-colors ${tab === "weekly" ? "c-bg-accent c-onaccent" : "c-muted hover-bg-surface"}`}>
+          Weekly Scan
+        </button>
+        <button onClick={() => setTab("inspo")}
+          className={`tap px-3.5 py-1.5 fs-11 font-mono uppercase transition-colors ${tab === "inspo" ? "c-bg-accent c-onaccent" : "c-muted hover-bg-surface"}`}>
+          Per-model Inspo Scan
+        </button>
+      </div>
+      {tab === "weekly"
+        ? <TrendsPage weeklyTrendReels={weeklyTrendReels} onReload={onReloadWeeklyTrendReels} />
+        : <TrendScraper models={models} persistModels={persistModels} restrictModel={restrictModel} />}
+    </div>
+  );
+}
+
 // ---------- reel sorter (ported inline, no separate file / iframe) ----------
 
 const REEL_SORTER_CSS = `
@@ -10333,8 +10363,7 @@ const NAV_ADMIN = [
   { id: "calendar", label: "Calendar", icon: Calendar },
   { id: "tasks", label: "Tasks", icon: CheckSquare },
   { id: "stats", label: "Stats", icon: TrendingUp },
-  { id: "viral", label: "Viral Feed", icon: Zap },
-  { id: "weeklytrends", label: "Trends", icon: Flame },
+  { id: "trends", label: "Trends", icon: Flame },
   { id: "reelsorter", label: "Reels Sorter", icon: Repeat },
   { id: "titlegen", label: "Title Generator", icon: Mic },
   { id: "neo", label: "Neo", icon: Sparkles },
@@ -10348,7 +10377,7 @@ const NAV_CREATOR = [
   { id: "content", label: "My Scenes", icon: Film },
   { id: "calendar", label: "My Calendar", icon: Calendar },
   { id: "tasks", label: "My Tasks", icon: CheckSquare },
-  { id: "viral", label: "Viral Feed", icon: Zap },
+  { id: "trends", label: "Trends", icon: Flame },
   { id: "neo", label: "Neo", icon: Sparkles },
   { id: "whatsnew", label: "OF News", icon: Megaphone },
   { id: "settings", label: "Settings", icon: Settings },
@@ -10562,7 +10591,7 @@ function App() {
         <div className="flex items-center gap-1.5 px-4 py-3 flex-1 justify-end min-w-0">
           <GlobalSearch cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks}
             models={isAdmin ? agencyModels : models} trends={weeklyTrendReels} onNavigate={setView}
-            trendsNavId="weeklytrends" showModels={isAdmin} showTrends={isAdmin} navItems={NAV} />
+            trendsNavId="trends" showModels={isAdmin} showTrends={isAdmin} navItems={NAV} />
           {session.role === "admin" && (
             <AdminNotificationBell cards={scopedCards} tasks={scopedTasks} onNavigate={setView} />
           )}
@@ -10697,12 +10726,11 @@ function App() {
             {currentView === "calendar" && <CalendarView cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks} onNavigate={setView} restrictModel={restrictModel} />}
             {currentView === "tasks" && <TaskManager tasks={isAdmin ? scopedTasks : tasks} persistTasks={isAdmin ? scopedPersistTasks : persistTasks} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} />}
             {currentView === "stats" && <StatsManager stats={scopedStats} persistStats={scopedPersistStats} models={agencyModels} reels={scopedReels} persistReels={scopedPersistReels} />}
-            {currentView === "viral" && (isAdmin
-              ? <TrendScraper models={agencyModels} persistModels={scopedPersistModels} />
-              : <TrendScraper models={models} persistModels={persistModels} restrictModel={restrictModel} />)}
+            {currentView === "trends" && (isAdmin
+              ? <TrendsHub isAdmin models={agencyModels} persistModels={scopedPersistModels} weeklyTrendReels={weeklyTrendReels} onReloadWeeklyTrendReels={reloadWeeklyTrendReels} />
+              : <TrendsHub isAdmin={false} models={models} persistModels={persistModels} restrictModel={restrictModel} />)}
             {currentView === "reelsorter" && isAdmin && <ReelSorterPage />}
             {currentView === "titlegen" && isAdmin && <TitleGeneratorPage />}
-            {currentView === "weeklytrends" && isAdmin && <TrendsPage weeklyTrendReels={weeklyTrendReels} onReload={reloadWeeklyTrendReels} />}
             {currentView === "trending" && <CreatorTrending trends={trends} agency={session.agency} />}
             {currentView === "models" && <ModelManager models={agencyModels} persistModels={scopedPersistModels} cards={scopedCards} reels={scopedReels} agency={session.agency} />}
             {currentView === "whatsnew" && <WhatsNewPage />}
