@@ -8022,7 +8022,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
             </div>
             {/* tick-mark dial ring behind the orb — a bit of HUD/instrument-panel flair. Independently adjustable via the edit panel. */}
             <div style={{ position: "absolute", inset: 0, transform: isDesktopViewport ? `translate(20px, -12px) scale(1.14)` : "none" }}>
-              <svg className="neo-ring-size" viewBox="0 0 400 400" style={{ position: "absolute", inset: "-6%", pointerEvents: "none" }}>
+              <svg className="neo-ring-size" viewBox="0 0 400 400" style={{ position: "absolute", inset: "-6%", width: "112%", height: "112%", pointerEvents: "none" }}>
                 <circle cx="200" cy="200" r="196" fill="none" stroke="rgba(57,230,115,0.18)" strokeWidth="1" />
                 <circle cx="200" cy="200" r="182" fill="none" stroke="rgba(57,230,115,0.14)" strokeWidth="1" strokeDasharray="1,7" />
                 {Array.from({ length: 48 }, (_, i) => {
