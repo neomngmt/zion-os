@@ -4306,19 +4306,36 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
             <RevenueChart data={chartData} sparseUntil={revRange === 30 ? 7 : 0} />
 
             <div className="mt-5 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-3">
                 <span className="fs-10 uppercase tracking-widest c-muted font-mono">Weeks this month</span>
-                <button onClick={() => setShowAllWeeksModal(true)} className="fs-10 font-mono uppercase c-accent hover-accent-text transition-colors">
-                  See all weeks →
+                <button onClick={() => setShowAllWeeksModal(true)}
+                  className="tap fs-10 font-mono uppercase c-accent hover-accent-text transition-colors flex items-center gap-1">
+                  See all weeks <ChevronRight size={12} />
                 </button>
               </div>
-              <div className="space-y-1.5">
-                {weeksThisMonth.map((w, i) => (
-                  <div key={w.startISO} className="flex items-center justify-between fs-12">
-                    <span className="c-muted font-mono">{ORDINAL_WEEK_LABELS[i] || `Week ${i + 1}`}</span>
-                    <span className="c-text font-mono font-semibold">${Math.round(w.total).toLocaleString()}</span>
-                  </div>
-                ))}
+              <div className="flex flex-col gap-2.5">
+                {(() => {
+                  const weeksMax = Math.max(1, ...weeksThisMonth.map((w) => w.total));
+                  const todayISO0 = toISO(new Date());
+                  return weeksThisMonth.map((w, i) => {
+                    const pct = (w.total / weeksMax) * 100;
+                    const isCurrent = todayISO0 >= w.startISO && todayISO0 <= w.endISO;
+                    return (
+                      <div key={w.startISO} className="flex items-center gap-3">
+                        <div className={`fs-11 font-mono truncate flex items-center gap-1.5 ${isCurrent ? "c-accent" : "c-muted"}`} style={{ width: 110, flexShrink: 0 }}>
+                          {isCurrent && <Circle size={5} fill="#39e673" color="#39e673" className="anim-pulse-dot" />}
+                          {ORDINAL_WEEK_LABELS[i] || `Week ${i + 1}`}
+                        </div>
+                        <div className="flex-1 rounded-full overflow-hidden" style={{ height: 6, background: "rgba(255,255,255,0.06)" }}>
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isCurrent ? "#39e673" : "rgba(57,230,115,0.55)", boxShadow: isCurrent ? "0 0 8px rgba(57,230,115,0.5)" : "none" }} />
+                        </div>
+                        <div className="fs-11 font-mono text-right" style={{ width: 70, flexShrink: 0, color: isCurrent ? "#39e673" : undefined }}>
+                          ${Math.round(w.total).toLocaleString()}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
 
@@ -4390,35 +4407,59 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
         allWeeks.forEach((w) => {
           const monthKey = new Date(w.startISO + "T00:00:00").toLocaleDateString(undefined, { month: "long", year: "numeric" });
           let g = groups.find((g) => g.monthKey === monthKey);
-          if (!g) { g = { monthKey, weeks: [] }; groups.push(g); }
+          if (!g) { g = { monthKey, weeks: [], total: 0 }; groups.push(g); }
           g.weeks.push(w);
+          g.total += w.total;
         });
+        const todayISO0 = toISO(new Date());
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(2px)" }}
             onClick={() => setShowAllWeeksModal(false)}>
-            <div className="c-bg-panel border c-border rounded-xl max-w-md w-full max-h-[80vh] overflow-y-auto p-6"
+            <div className="c-bg-panel border c-border rounded-xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-6"
+              style={{ boxShadow: "0 0 60px rgba(57,230,115,0.08), 0 20px 60px rgba(0,0,0,0.5)" }}
               onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between mb-4">
-                <span className="fs-11 uppercase tracking-widest c-accent font-mono">All weeks</span>
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-2">
+                  <TrendingUp size={15} className="c-accent" />
+                  <span className="fs-11 uppercase tracking-widest c-accent font-mono">All weeks</span>
+                </div>
                 <button onClick={() => setShowAllWeeksModal(false)} className="tap c-muted hover-text-primary"><X size={18} /></button>
               </div>
               {groups.length === 0 ? (
                 <div className="fs-12 c-faint font-mono italic py-6 text-center">No revenue history yet.</div>
               ) : (
-                <div className="space-y-5">
-                  {groups.map((g) => (
-                    <div key={g.monthKey}>
-                      <div className="fs-10 uppercase tracking-widest c-muted font-mono mb-2">{g.monthKey}</div>
-                      <div className="space-y-1.5">
-                        {g.weeks.map((w) => (
-                          <div key={w.startISO} className="flex items-center justify-between fs-12">
-                            <span className="c-muted font-mono">{fmtWeekRange(w.startISO, w.endISO)}</span>
-                            <span className="c-text font-mono font-semibold">${Math.round(w.total).toLocaleString()}</span>
-                          </div>
-                        ))}
+                <div className="space-y-6">
+                  {groups.map((g, gi) => {
+                    const groupMax = Math.max(1, ...g.weeks.map((w) => w.total));
+                    return (
+                      <div key={g.monthKey} className={gi > 0 ? "pt-5" : ""} style={gi > 0 ? { borderTop: "1px solid rgba(255,255,255,0.08)" } : undefined}>
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="fs-10 uppercase tracking-widest c-text font-mono font-semibold">{g.monthKey}</span>
+                          <span className="fs-10 font-mono c-faint">${Math.round(g.total).toLocaleString()} total</span>
+                        </div>
+                        <div className="flex flex-col gap-2.5">
+                          {g.weeks.map((w) => {
+                            const pct = (w.total / groupMax) * 100;
+                            const isCurrent = todayISO0 >= w.startISO && todayISO0 <= w.endISO;
+                            return (
+                              <div key={w.startISO} className="flex items-center gap-3">
+                                <div className={`fs-11 font-mono whitespace-nowrap flex items-center gap-1.5 ${isCurrent ? "c-accent" : "c-muted"}`} style={{ width: 150, flexShrink: 0 }}>
+                                  {isCurrent && <Circle size={5} fill="#39e673" color="#39e673" className="anim-pulse-dot" />}
+                                  {fmtWeekRange(w.startISO, w.endISO)}
+                                </div>
+                                <div className="flex-1 rounded-full overflow-hidden" style={{ height: 6, background: "rgba(255,255,255,0.06)" }}>
+                                  <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isCurrent ? "#39e673" : "rgba(57,230,115,0.55)", boxShadow: isCurrent ? "0 0 8px rgba(57,230,115,0.5)" : "none" }} />
+                                </div>
+                                <div className={`fs-11 font-mono text-right ${isCurrent ? "c-accent" : "c-text"}`} style={{ width: 70, flexShrink: 0 }}>
+                                  ${Math.round(w.total).toLocaleString()}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
