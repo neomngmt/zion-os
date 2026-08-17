@@ -4130,11 +4130,17 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
   // silently shifts every date back a day for any timezone ahead of UTC (e.g. CEST),
   // dropping "today" from month-to-date and mislabeling every other day in the range.
   const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // Calendar week, Monday through today — not a rolling 7-day window. At Monday
+  // 00:00 this collapses to just today (a single fresh candle) and fills back in
+  // day by day through Sunday, same "to-date" shape as the Month view below.
   const getWeekDays = () => {
     const now = new Date();
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(now); d.setDate(now.getDate() - (6 - i)); return toISO(d);
-    });
+    const dow = now.getDay(); // 0=Sun..6=Sat
+    const daysSinceMonday = dow === 0 ? 6 : dow - 1;
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysSinceMonday);
+    const out = [];
+    for (const d = new Date(monday); d <= now; d.setDate(d.getDate() + 1)) out.push(toISO(d));
+    return out;
   };
   const getMonthDaysToDate = () => {
     const now = new Date();
@@ -4147,6 +4153,52 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
   const sumForDay = (day) => myInflowwRows.filter((r) => r.statDate === day).reduce((t, r) => t + (r.earningsNet || 0), 0);
   const chartData = days.map((day) => ({ date: day, value: sumForDay(day) }));
   const rangeTotal = chartData.reduce((t, d) => t + d.value, 0);
+
+  // Weeks-this-month tracker (below the chart) and its "see all weeks" modal —
+  // splits a run of ISO day strings into real Monday–Sunday weeks. A new bucket
+  // starts on every Monday OR on the very first day of the list, so a month/range
+  // that doesn't begin on a Monday gets a short first week instead of that first
+  // handful of days silently merging into the tail of the prior calendar week.
+  const ORDINAL_WEEK_LABELS = ["First week", "Second week", "Third week", "Fourth week", "Fifth week", "Sixth week"];
+  const bucketIntoWeeks = (dayList) => {
+    const weeks = [];
+    let current = null;
+    dayList.forEach((iso) => {
+      const d = new Date(iso + "T00:00:00");
+      if (d.getDay() === 1 || !current) {
+        current = { days: [] };
+        weeks.push(current);
+      }
+      current.days.push(iso);
+    });
+    return weeks.map((w) => ({
+      startISO: w.days[0],
+      endISO: w.days[w.days.length - 1],
+      total: w.days.reduce((t, day) => t + sumForDay(day), 0),
+    }));
+  };
+  const [showAllWeeksModal, setShowAllWeeksModal] = useState(false);
+  const weeksThisMonth = (() => {
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const lastDay = Math.min(daysInMonth, now.getDate());
+    const monthDays = Array.from({ length: lastDay }, (_, i) => toISO(new Date(now.getFullYear(), now.getMonth(), i + 1)));
+    return bucketIntoWeeks(monthDays);
+  })();
+  const getAllWeeksHistory = () => {
+    if (!myInflowwRows.length) return [];
+    const earliest = [...new Set(myInflowwRows.map((r) => r.statDate))].sort()[0];
+    const now = new Date();
+    const todayISO = toISO(now);
+    const allDays = [];
+    for (const d = new Date(earliest + "T00:00:00"); toISO(d) <= todayISO; d.setDate(d.getDate() + 1)) allDays.push(toISO(d));
+    return bucketIntoWeeks(allDays).reverse();
+  };
+  const fmtWeekRange = (startISO, endISO) => {
+    const s = new Date(startISO + "T00:00:00"), e = new Date(endISO + "T00:00:00");
+    const fmt = (d, withYear) => d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: withYear ? "numeric" : undefined });
+    return `${fmt(s, s.getFullYear() !== e.getFullYear())} – ${fmt(e, true)}`;
+  };
 
   useEffect(() => {
     if (refreshPendingRef.current) {
@@ -4253,6 +4305,23 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
             <div className="fs-11 c-faint font-mono mb-2">across {models.length} model{models.length === 1 ? "" : "s"}, {revRange === 7 ? "this week" : "this month"}</div>
             <RevenueChart data={chartData} sparseUntil={revRange === 30 ? 7 : 0} />
 
+            <div className="mt-5 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="fs-10 uppercase tracking-widest c-muted font-mono">Weeks this month</span>
+                <button onClick={() => setShowAllWeeksModal(true)} className="fs-10 font-mono uppercase c-accent hover-accent-text transition-colors">
+                  See all weeks →
+                </button>
+              </div>
+              <div className="space-y-1.5">
+                {weeksThisMonth.map((w, i) => (
+                  <div key={w.startISO} className="flex items-center justify-between fs-12">
+                    <span className="c-muted font-mono">{ORDINAL_WEEK_LABELS[i] || `Week ${i + 1}`}</span>
+                    <span className="c-text font-mono font-semibold">${Math.round(w.total).toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {hasInflowwData && (
               <div className="mt-6 pt-5" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
                 <CreatorInsightsSection models={models} inflowwDailyStats={inflowwDailyStats} embedded
@@ -4314,6 +4383,48 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
           </div>
         )}
       </div>
+
+      {showAllWeeksModal && (() => {
+        const allWeeks = getAllWeeksHistory();
+        const groups = [];
+        allWeeks.forEach((w) => {
+          const monthKey = new Date(w.startISO + "T00:00:00").toLocaleDateString(undefined, { month: "long", year: "numeric" });
+          let g = groups.find((g) => g.monthKey === monthKey);
+          if (!g) { g = { monthKey, weeks: [] }; groups.push(g); }
+          g.weeks.push(w);
+        });
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}
+            onClick={() => setShowAllWeeksModal(false)}>
+            <div className="c-bg-panel border c-border rounded-xl max-w-md w-full max-h-[80vh] overflow-y-auto p-6"
+              onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <span className="fs-11 uppercase tracking-widest c-accent font-mono">All weeks</span>
+                <button onClick={() => setShowAllWeeksModal(false)} className="tap c-muted hover-text-primary"><X size={18} /></button>
+              </div>
+              {groups.length === 0 ? (
+                <div className="fs-12 c-faint font-mono italic py-6 text-center">No revenue history yet.</div>
+              ) : (
+                <div className="space-y-5">
+                  {groups.map((g) => (
+                    <div key={g.monthKey}>
+                      <div className="fs-10 uppercase tracking-widest c-muted font-mono mb-2">{g.monthKey}</div>
+                      <div className="space-y-1.5">
+                        {g.weeks.map((w) => (
+                          <div key={w.startISO} className="flex items-center justify-between fs-12">
+                            <span className="c-muted font-mono">{fmtWeekRange(w.startISO, w.endISO)}</span>
+                            <span className="c-text font-mono font-semibold">${Math.round(w.total).toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
