@@ -4329,7 +4329,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
                         <div className="flex-1 rounded-full overflow-hidden" style={{ height: 6, background: "rgba(255,255,255,0.06)" }}>
                           <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isCurrent ? "#39e673" : "rgba(57,230,115,0.55)", boxShadow: isCurrent ? "0 0 8px rgba(57,230,115,0.5)" : "none" }} />
                         </div>
-                        <div className="fs-11 font-mono text-right" style={{ width: 70, flexShrink: 0, color: isCurrent ? "#39e673" : undefined }}>
+                        <div className={`fs-11 font-mono font-semibold text-right ${isCurrent ? "c-accent" : "c-text"}`} style={{ width: 70, flexShrink: 0 }}>
                           ${Math.round(w.total).toLocaleString()}
                         </div>
                       </div>
