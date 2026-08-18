@@ -3894,7 +3894,13 @@ function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "t
     modelRows.forEach((r) => { (byAccountType[r.accountType] || (byAccountType[r.accountType] = [])).push(r); });
     Object.entries(byAccountType).forEach(([accountType, acctRows]) => {
       const refundsWindow = acctRows.filter((r) => r.statDate >= windowAgoStr).reduce((s, r) => s + (r.refundsNet || 0), 0);
-      const latest = [...acctRows].sort((a, b) => (b.syncedAt || "").localeCompare(a.syncedAt || ""))[0];
+      // Sort by the actual calendar day (statDate), not syncedAt — a bulk sync
+      // upserts every day's row within the same request, often with identical
+      // (or near-identical) syncedAt timestamps, which made "latest by
+      // syncedAt" pick an effectively random day instead of the real latest
+      // one, silently showing 0 for snapshot fields (fans chatted, etc.) that
+      // only ever get written onto today's row.
+      const latest = [...acctRows].sort((a, b) => (b.statDate || "").localeCompare(a.statDate || ""))[0];
       rows.push({
         name: m.name, accountType,
         refundsWindow,
