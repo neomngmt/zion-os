@@ -3904,18 +3904,15 @@ function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "t
       rows.push({
         name: m.name, accountType,
         refundsWindow,
-        automatedRevenue: latest.automatedMessagesNet || 0,
-        automatedCount: latest.automatedMessagesCount || 0,
-        pmmRevenue: latest.priorityMassMessagesNet || 0,
-        pmmCount: latest.priorityMassMessagesCount || 0,
-        trackingLinks: latest.trackingLinksCount || 0,
         fansChatted: latest.fansChatted || 0,
+        replyMin: latest.replyTimeMs ? Math.round(latest.replyTimeMs / 60000) : null,
+        // chattingRatio pending — waiting on the real "1:N" formula before adding it back.
       });
     });
   });
 
   if (!rows.length) return null;
-  const hasAnyActivity = rows.some((r) => r.refundsWindow || r.automatedCount || r.pmmCount || r.trackingLinks || r.fansChatted);
+  const hasAnyActivity = rows.some((r) => r.refundsWindow || r.fansChatted);
   if (!hasAnyActivity) return null;
 
   return (
@@ -3931,10 +3928,8 @@ function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "t
             <tr className="c-muted font-mono uppercase fs-10 border-b c-border">
               <th className="text-left py-2 pr-3">Model</th>
               <th className="text-right py-2 px-3">Refunds ({periodLabel})</th>
-              <th className="text-right py-2 px-3">Automated msg revenue</th>
-              <th className="text-right py-2 px-3">PMM revenue</th>
               <th className="text-right py-2 px-3">Fans chatted</th>
-              <th className="text-right py-2 pl-3">Tracking links</th>
+              <th className="text-right py-2 pl-3">Reply time</th>
             </tr>
           </thead>
           <tbody>
@@ -3944,10 +3939,8 @@ function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "t
                 <td className="py-2 px-3 text-right font-mono" style={{ color: r.refundsWindow > 0 ? "#E2725B" : undefined }}>
                   {r.refundsWindow > 0 ? `-$${r.refundsWindow.toFixed(2)}` : "$0"}
                 </td>
-                <td className="py-2 px-3 text-right font-mono">${r.automatedRevenue.toFixed(2)} <span className="c-faint">({r.automatedCount})</span></td>
-                <td className="py-2 px-3 text-right font-mono">${r.pmmRevenue.toFixed(2)} <span className="c-faint">({r.pmmCount})</span></td>
                 <td className="py-2 px-3 text-right font-mono">{r.fansChatted.toLocaleString()}</td>
-                <td className="py-2 pl-3 text-right font-mono">{r.trackingLinks}</td>
+                <td className="py-2 pl-3 text-right font-mono">{r.replyMin != null ? `${r.replyMin} min` : "—"}</td>
               </tr>
             ))}
           </tbody>
