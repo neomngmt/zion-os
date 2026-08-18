@@ -4155,18 +4155,23 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
   const rangeTotal = chartData.reduce((t, d) => t + d.value, 0);
 
   // Weeks-this-month tracker (below the chart) and its "see all weeks" modal —
-  // splits a run of ISO day strings into fixed 7-day chunks starting at day 1
-  // of whichever month they belong to (First week = the 1st-7th, Second week =
-  // 8th-14th, ...), NOT real Monday-Sunday calendar weeks — deliberately
-  // different from the main Week/Month toggle above, so "First week" always
-  // means a full (or, for the current month, to-date) 7-day span regardless of
-  // which weekday the 1st falls on.
+  // splits a run of ISO day strings into real Monday-Sunday calendar weeks,
+  // same alignment as the Week/Month toggle above AND as OnlyFans' own payout
+  // cycle (OF pays out weekly on Mondays) — so a week boundary here always
+  // lines up with a real payout boundary. The tradeoff: the first/last week of
+  // a month can be shorter than 7 days if the month doesn't start/end on a
+  // Monday/Sunday — that's correct, not a bug, same as the main chart above.
   const ORDINAL_WEEK_LABELS = ["First week", "Second week", "Third week", "Fourth week", "Fifth week", "Sixth week"];
   const bucketIntoWeeks = (dayList) => {
     const weeks = [];
-    dayList.forEach((iso, i) => {
-      if (i % 7 === 0) weeks.push({ days: [] });
-      weeks[weeks.length - 1].days.push(iso);
+    let current = null;
+    dayList.forEach((iso) => {
+      const d = new Date(iso + "T00:00:00");
+      if (d.getDay() === 1 || !current) {
+        current = { days: [] };
+        weeks.push(current);
+      }
+      current.days.push(iso);
     });
     return weeks.map((w) => ({
       startISO: w.days[0],
@@ -4182,32 +4187,14 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
     const monthDays = Array.from({ length: lastDay }, (_, i) => toISO(new Date(now.getFullYear(), now.getMonth(), i + 1)));
     return bucketIntoWeeks(monthDays);
   })();
-  // Same day-1-anchored 7-day bucketing as weeksThisMonth, but reset fresh at
-  // the start of every calendar month (not one continuous run from the very
-  // first day of data) — so "First week" means the same thing here as it does
-  // in the tracker above, for every month, not just the current one.
   const getAllWeeksHistory = () => {
     if (!myInflowwRows.length) return [];
     const earliest = [...new Set(myInflowwRows.map((r) => r.statDate))].sort()[0];
     const now = new Date();
-    const earliestDate = new Date(earliest + "T00:00:00");
-    const out = [];
-    let cursor = new Date(earliestDate.getFullYear(), earliestDate.getMonth(), 1);
-    const lastMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    while (cursor <= lastMonthStart) {
-      const y = cursor.getFullYear(), mo = cursor.getMonth();
-      const isCurrentMonth = y === now.getFullYear() && mo === now.getMonth();
-      const daysInMonth = new Date(y, mo + 1, 0).getDate();
-      const lastDay = isCurrentMonth ? now.getDate() : daysInMonth;
-      const monthDays = [];
-      for (let d = 1; d <= lastDay; d++) {
-        const iso = toISO(new Date(y, mo, d));
-        if (iso >= earliest) monthDays.push(iso);
-      }
-      if (monthDays.length) out.push(...bucketIntoWeeks(monthDays));
-      cursor = new Date(y, mo + 1, 1);
-    }
-    return out.reverse();
+    const todayISO = toISO(now);
+    const allDays = [];
+    for (const d = new Date(earliest + "T00:00:00"); toISO(d) <= todayISO; d.setDate(d.getDate() + 1)) allDays.push(toISO(d));
+    return bucketIntoWeeks(allDays).reverse();
   };
   const fmtWeekRange = (startISO, endISO) => {
     const s = new Date(startISO + "T00:00:00"), e = new Date(endISO + "T00:00:00");
