@@ -3903,12 +3903,13 @@ function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "t
         pmmRevenue: latest.priorityMassMessagesNet || 0,
         pmmCount: latest.priorityMassMessagesCount || 0,
         trackingLinks: latest.trackingLinksCount || 0,
+        fansChatted: latest.fansChatted || 0,
       });
     });
   });
 
   if (!rows.length) return null;
-  const hasAnyActivity = rows.some((r) => r.refundsWindow || r.automatedCount || r.pmmCount || r.trackingLinks);
+  const hasAnyActivity = rows.some((r) => r.refundsWindow || r.automatedCount || r.pmmCount || r.trackingLinks || r.fansChatted);
   if (!hasAnyActivity) return null;
 
   return (
@@ -3926,6 +3927,7 @@ function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "t
               <th className="text-right py-2 px-3">Refunds ({periodLabel})</th>
               <th className="text-right py-2 px-3">Automated msg revenue</th>
               <th className="text-right py-2 px-3">PMM revenue</th>
+              <th className="text-right py-2 px-3">Fans chatted</th>
               <th className="text-right py-2 pl-3">Tracking links</th>
             </tr>
           </thead>
@@ -3938,6 +3940,7 @@ function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "t
                 </td>
                 <td className="py-2 px-3 text-right font-mono">${r.automatedRevenue.toFixed(2)} <span className="c-faint">({r.automatedCount})</span></td>
                 <td className="py-2 px-3 text-right font-mono">${r.pmmRevenue.toFixed(2)} <span className="c-faint">({r.pmmCount})</span></td>
+                <td className="py-2 px-3 text-right font-mono">{r.fansChatted.toLocaleString()}</td>
                 <td className="py-2 pl-3 text-right font-mono">{r.trackingLinks}</td>
               </tr>
             ))}
