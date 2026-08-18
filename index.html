@@ -4303,7 +4303,11 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
               )}
             </div>
             <div className="fs-11 c-faint font-mono mb-2">across {models.length} model{models.length === 1 ? "" : "s"}, {revRange === 7 ? "this week" : "this month"}</div>
-            <RevenueChart data={chartData} sparseUntil={revRange === 30 ? 7 : 0} />
+            {/* sparseUntil=7 always — Week never has more than 7 real days (and often
+                just 1-2 early in the week), so it should always render exactly one
+                candle per real day, packed close, rather than the dense interpolated
+                "bar forest" the Month view uses once it has more than 7 real days. */}
+            <RevenueChart data={chartData} sparseUntil={7} />
 
             <div className="mt-5 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
               <div className="flex items-center justify-between mb-3">
