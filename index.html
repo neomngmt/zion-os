@@ -3893,7 +3893,17 @@ function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "t
     const byAccountType = {};
     modelRows.forEach((r) => { (byAccountType[r.accountType] || (byAccountType[r.accountType] = [])).push(r); });
     Object.entries(byAccountType).forEach(([accountType, acctRows]) => {
-      const refundsWindow = acctRows.filter((r) => r.statDate >= windowAgoStr).reduce((s, r) => s + (r.refundsNet || 0), 0);
+      const windowRows = acctRows.filter((r) => r.statDate >= windowAgoStr);
+      const refundsWindow = windowRows.reduce((s, r) => s + (r.refundsNet || 0), 0);
+      // Chatting ratio (a.k.a. sub-to-message ratio) — chat/message revenue
+      // (PPVs, tips, customs — messagesNet + tipsNet) vs subscription revenue
+      // (subsNet), summed over the same window as refunds above. Worth
+      // treating as informational, not a target to optimize: it's easy to
+      // game by pushing PPVs at the expense of renewals, and a page that
+      // improves retention (more subs revenue) will show a "worse" ratio
+      // even while making more money overall.
+      const chatRevenue = windowRows.reduce((s, r) => s + (r.messagesNet || 0) + (r.tipsNet || 0), 0);
+      const subRevenue = windowRows.reduce((s, r) => s + (r.subsNet || 0), 0);
       // Sort by the actual calendar day (statDate), not syncedAt — a bulk sync
       // upserts every day's row within the same request, often with identical
       // (or near-identical) syncedAt timestamps, which made "latest by
@@ -3906,7 +3916,7 @@ function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "t
         refundsWindow,
         fansChatted: latest.fansChatted || 0,
         replyMin: latest.replyTimeMs ? Math.round(latest.replyTimeMs / 60000) : null,
-        // chattingRatio pending — waiting on the real "1:N" formula before adding it back.
+        chattingRatio: subRevenue > 0 ? chatRevenue / subRevenue : (chatRevenue > 0 ? Infinity : null),
       });
     });
   });
@@ -3929,7 +3939,10 @@ function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "t
               <th className="text-left py-2 pr-3">Model</th>
               <th className="text-right py-2 px-3">Refunds ({periodLabel})</th>
               <th className="text-right py-2 px-3">Fans chatted</th>
-              <th className="text-right py-2 pl-3">Reply time</th>
+              <th className="text-right py-2 px-3">Reply time</th>
+              <th className="text-right py-2 pl-3" title="Chat/message revenue (PPVs, tips, customs) : subscription revenue. Informational only — easy to game, and a healthier page (more renewals) can show a 'worse' ratio while earning more overall.">
+                Chatting ratio
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -3940,7 +3953,10 @@ function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "t
                   {r.refundsWindow > 0 ? `-$${r.refundsWindow.toFixed(2)}` : "$0"}
                 </td>
                 <td className="py-2 px-3 text-right font-mono">{r.fansChatted.toLocaleString()}</td>
-                <td className="py-2 pl-3 text-right font-mono">{r.replyMin != null ? `${r.replyMin} min` : "—"}</td>
+                <td className="py-2 px-3 text-right font-mono">{r.replyMin != null ? `${r.replyMin} min` : "—"}</td>
+                <td className="py-2 pl-3 text-right font-mono">
+                  {r.chattingRatio == null ? "—" : r.chattingRatio === Infinity ? "1:0" : `1:${r.chattingRatio.toFixed(1)}`}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -9142,6 +9158,7 @@ function useSupaInflowwDailyStats() {
         earningsNet: Number(r.earnings_net) || 0, earningsGross: Number(r.earnings_gross) || 0,
         transactionCount: r.transaction_count || 0, messagesCount: r.messages_count || 0,
         tipsCount: r.tips_count || 0, subsCount: r.subs_count || 0, syncedAt: r.synced_at,
+        messagesNet: Number(r.messages_net) || 0, tipsNet: Number(r.tips_net) || 0, subsNet: Number(r.subs_net) || 0,
         refundsNet: Number(r.refunds_net) || 0,
         automatedMessagesCount: r.automated_messages_count || 0, automatedMessagesNet: Number(r.automated_messages_net) || 0,
         priorityMassMessagesCount: r.priority_mass_messages_count || 0, priorityMassMessagesNet: Number(r.priority_mass_messages_net) || 0,
