@@ -3955,7 +3955,7 @@ function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "t
                 <td className="py-2 px-3 text-right font-mono">{r.fansChatted.toLocaleString()}</td>
                 <td className="py-2 px-3 text-right font-mono">{r.replyMin != null ? `${r.replyMin} min` : "—"}</td>
                 <td className="py-2 pl-3 text-right font-mono">
-                  {r.chattingRatio == null ? "—" : r.chattingRatio === Infinity ? "1:0" : `1:${r.chattingRatio.toFixed(1)}`}
+                  {r.chattingRatio == null ? "—" : r.chattingRatio === Infinity ? "1:0" : `1:${Math.round(r.chattingRatio)}`}
                 </td>
               </tr>
             ))}
