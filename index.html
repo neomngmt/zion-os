@@ -2389,18 +2389,25 @@ function IGStar({ size = 14, color = "#fff" }) {
 // lines are decorative.
 function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanPosts }) {
   const C = {
-    page: "#eeece6", card: "#ffffff", ink: "#161616", sub: "#7a7972",
-    pinkA: "#ff2e78", pinkB: "#ff7a3d", pinkSoft: "#ffe4ee", pinkIcon: "#ff2e78",
-    ringTrack: "#f1efe9",
+    page: "radial-gradient(ellipse 130% 100% at 10% 0%, rgba(255,46,120,0.14), transparent 55%), radial-gradient(ellipse 100% 80% at 100% 0%, rgba(255,122,61,0.10), transparent 55%), #0b0f0d",
+    card: "rgba(255,255,255,0.035)", cardBorder: "1px solid rgba(255,255,255,0.08)",
+    ink: "#ffffff", sub: "#9d9b95",
+    pinkA: "#ff2e78", pinkB: "#ff7a3d", pinkSoft: "rgba(255,46,120,0.14)", pinkIcon: "#ff5c9a",
+    ringTrack: "rgba(255,255,255,0.08)",
   };
-  const DONUT_COLORS = ["#ff2e78", "#2e2e2e", "#ffb020"];
+  const DONUT_COLORS = ["#ff2e78", "#38bdf8", "#ffb020"];
 
-  const rows = (bufferDailyStats || []).filter((r) => r.platform === "ig");
-  const connectedNames = new Set(rows.map((r) => r.model));
+  const [igAccount, setIgAccount] = React.useState("all");
+  const [igRange, setIgRange] = React.useState(7);
+
+  const allRows = (bufferDailyStats || []).filter((r) => r.platform === "ig");
+  const connectedNames = new Set(allRows.map((r) => r.model));
   const connectedModels = models.filter((m) => connectedNames.has(m.name));
+  const rows = igAccount === "all" ? allRows : allRows.filter((r) => r.model === igAccount);
+
   const dateNDaysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
-  const weekAgoStr = dateNDaysAgo(6);
-  const weekRows = rows.filter((r) => r.statDate >= weekAgoStr);
+  const rangeAgoStr = dateNDaysAgo(igRange - 1);
+  const weekRows = rows.filter((r) => r.statDate >= rangeAgoStr);
   const weekTotals = {
     reach: weekRows.reduce((s, r) => s + (r.impressions || 0), 0),
     posts: weekRows.reduce((s, r) => s + (r.postCount || 0), 0),
@@ -2409,10 +2416,10 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
   };
   const fmtK = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}K` : `${n}`);
 
-  const last7Days = Array.from({ length: 7 }, (_, i) => dateNDaysAgo(6 - i));
-  const dayBars = last7Days.map((date) => ({
+  const rangeDays = Array.from({ length: igRange }, (_, i) => dateNDaysAgo(igRange - 1 - i));
+  const dayBars = rangeDays.map((date) => ({
     date,
-    label: new Date(date + "T12:00:00").toLocaleDateString(undefined, { weekday: "narrow" }),
+    label: igRange <= 7 ? new Date(date + "T12:00:00").toLocaleDateString(undefined, { weekday: "narrow" }) : new Date(date + "T12:00:00").getDate(),
     reach: rows.filter((r) => r.statDate === date).reduce((s, r) => s + (r.impressions || 0), 0),
   }));
   const maxDayReach = Math.max(1, ...dayBars.map((d) => d.reach));
@@ -2433,33 +2440,65 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
   let donutOffset = 0;
 
   const topPosts = (bufferTopPosts || [])
-    .filter((p) => p.platform === "ig" && connectedNames.has(p.model))
+    .filter((p) => p.platform === "ig" && connectedNames.has(p.model) && (igAccount === "all" || p.model === igAccount))
     .sort((a, b) => (b.impressions || 0) - (a.impressions || 0));
 
   const noAccounts = connectedModels.length === 0;
 
   return (
-    <div className="mb-5 rounded-3xl overflow-hidden" style={{ background: C.page, color: C.ink, fontFamily: "system-ui, -apple-system, sans-serif" }}>
+    <div className="mb-5 rounded-3xl overflow-hidden" style={{ background: C.page, color: C.ink, fontFamily: "system-ui, -apple-system, sans-serif", border: "1px solid rgba(255,46,120,0.16)" }}>
       <div className="p-5 md:p-7">
-        <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
+        <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: `linear-gradient(135deg, ${C.pinkA}, ${C.pinkB})` }}>
+            <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: `linear-gradient(135deg, ${C.pinkA}, ${C.pinkB})`, boxShadow: `0 0 20px ${C.pinkA}55` }}>
               <Instagram size={18} color="#fff" />
             </div>
             <div>
-              <div className="text-2xl font-extrabold tracking-tight" style={{ color: C.ink }}>Instagram Dashboard</div>
+              <div className="text-2xl font-extrabold tracking-tight" style={{ color: C.ink, textShadow: `0 0 20px ${C.pinkA}59` }}>Instagram Dashboard</div>
               <p className="text-sm mt-0.5" style={{ color: C.sub }}>{connectedModels.length} account{connectedModels.length !== 1 ? "s" : ""} connected via Publer</p>
             </div>
           </div>
           <button onClick={onPlanPosts}
             className="flex items-center gap-2 px-4 py-2.5 rounded-full fs-12 font-mono uppercase tracking-wide font-semibold tap"
-            style={{ background: C.ink, color: "#fff" }}>
+            style={{ background: `linear-gradient(135deg, ${C.pinkA}, ${C.pinkB})`, color: "#fff", boxShadow: `0 0 20px ${C.pinkA}55` }}>
             <Megaphone size={14} /> Plan content
           </button>
         </div>
 
+        {!noAccounts && (
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
+            <div className="flex flex-wrap gap-1.5">
+              <button onClick={() => setIgAccount("all")}
+                className="fs-11 font-mono uppercase px-3 py-1.5 rounded-full tap"
+                style={igAccount === "all"
+                  ? { background: C.pinkSoft, color: C.pinkIcon, border: `1px solid ${C.pinkA}66` }
+                  : { background: "transparent", color: C.sub, border: "1px solid rgba(255,255,255,0.1)" }}>
+                All accounts
+              </button>
+              {connectedModels.map((m) => (
+                <button key={m.name} onClick={() => setIgAccount(m.name)}
+                  className="fs-11 font-mono uppercase px-3 py-1.5 rounded-full tap"
+                  style={igAccount === m.name
+                    ? { background: C.pinkSoft, color: C.pinkIcon, border: `1px solid ${C.pinkA}66` }
+                    : { background: "transparent", color: C.sub, border: "1px solid rgba(255,255,255,0.1)" }}>
+                  {m.name}
+                </button>
+              ))}
+            </div>
+            <div className="flex rounded-full p-0.5" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              {[7, 30].map((d) => (
+                <button key={d} onClick={() => setIgRange(d)}
+                  className="fs-11 font-mono uppercase px-3 py-1.5 rounded-full tap"
+                  style={igRange === d ? { background: C.pinkA, color: "#fff" } : { background: "transparent", color: C.sub }}>
+                  {d}D
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {noAccounts ? (
-          <div className="fs-12 italic py-10 text-center rounded-2xl" style={{ border: `1px dashed ${C.ringTrack}`, color: C.sub, background: C.card }}>
+          <div className="fs-12 italic py-10 text-center rounded-2xl" style={{ border: "1px dashed rgba(255,255,255,0.14)", color: C.sub, background: C.card }}>
             No Instagram accounts connected yet — connect one in Publer, then sync will pick it up automatically.
           </div>
         ) : (
@@ -2469,13 +2508,13 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
               <div className="lg:col-span-5 rounded-3xl p-5 relative overflow-hidden flex flex-col justify-between"
                 style={{ background: `linear-gradient(135deg, ${C.pinkA}, ${C.pinkB})`, minHeight: 220, boxShadow: `0 20px 40px ${C.pinkA}33` }}>
                 <div className="flex items-start justify-between">
-                  <div className="fs-13 font-semibold" style={{ color: "rgba(255,255,255,0.9)" }}>Total Reach · 7d</div>
+                  <div className="fs-13 font-semibold" style={{ color: "rgba(255,255,255,0.9)" }}>Total Views · {igRange}d</div>
                   <MoreDotsIG />
                 </div>
                 <div>
-                  <div className="text-4xl font-extrabold text-white leading-none mb-3">{fmtK(weekTotals.reach)}</div>
-                  <IGSquiggle values={last7Days.map((d) => rows.filter((r) => r.statDate === d).reduce((s, r) => s + (r.impressions || 0), 0))} color="#fff" opacity={0.5} />
-                  <IGSquiggle values={last7Days.map((d) => rows.filter((r) => r.statDate === d).reduce((s, r) => s + (r.reactions || 0), 0))} color="#1c1c1c" opacity={0.35} />
+                  <div className="text-4xl font-extrabold text-white leading-none mb-3" style={{ textShadow: "0 0 24px rgba(255,255,255,0.5)" }}>{fmtK(weekTotals.reach)}</div>
+                  <IGSquiggle values={rangeDays.map((d) => rows.filter((r) => r.statDate === d).reduce((s, r) => s + (r.impressions || 0), 0))} color="#fff" opacity={0.55} />
+                  <IGSquiggle values={rangeDays.map((d) => rows.filter((r) => r.statDate === d).reduce((s, r) => s + (r.reactions || 0), 0))} color="#0a0a0a" opacity={0.3} />
                 </div>
                 <div className="flex items-center gap-4 pt-3 mt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.25)" }}>
                   {accountShares.length ? accountShares.map((a) => (
@@ -2488,7 +2527,7 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
               </div>
 
               {/* Engagement mix ring, "pending messages"-style card */}
-              <div className="lg:col-span-4 rounded-3xl p-5" style={{ background: C.card, minHeight: 220 }}>
+              <div className="lg:col-span-4 rounded-3xl p-5" style={{ background: C.card, border: C.cardBorder, minHeight: 220 }}>
                 <div className="flex items-center justify-between mb-2">
                   <div className="fs-13 font-semibold">Engagement mix</div>
                   <MoreDotsIG dark />
@@ -2510,7 +2549,7 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
                       })}
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="rounded-full flex items-center justify-center" style={{ width: 44, height: 44, background: C.pinkSoft }}>
+                      <div className="rounded-full flex items-center justify-center" style={{ width: 44, height: 44, background: "rgba(255,46,120,0.16)", boxShadow: `0 0 16px ${C.pinkA}55` }}>
                         <Heart size={18} color={C.pinkIcon} />
                       </div>
                     </div>
@@ -2529,19 +2568,19 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
 
               {/* Right column: two mini stat cards */}
               <div className="lg:col-span-3 flex flex-col gap-4">
-                <div className="rounded-3xl p-4 flex items-center gap-3" style={{ background: C.pinkSoft }}>
-                  <div className="rounded-2xl flex items-center justify-center flex-shrink-0" style={{ width: 40, height: 40, background: "#fff" }}>
+                <div className="rounded-3xl p-4 flex items-center gap-3" style={{ background: C.pinkSoft, border: `1px solid ${C.pinkA}33` }}>
+                  <div className="rounded-2xl flex items-center justify-center flex-shrink-0" style={{ width: 40, height: 40, background: "rgba(0,0,0,0.25)" }}>
                     <Send size={16} color={C.pinkIcon} />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-lg font-extrabold leading-none">{fmtK(weekTotals.replies)}</div>
+                    <div className="text-lg font-extrabold leading-none" style={{ textShadow: `0 0 12px ${C.pinkA}66` }}>{fmtK(weekTotals.replies)}</div>
                     <div className="fs-10 mt-1" style={{ color: C.sub }}>Replies</div>
-                    <div className="rounded-full mt-1.5 overflow-hidden" style={{ width: "100%", height: 4, background: "rgba(255,46,120,0.15)" }}>
+                    <div className="rounded-full mt-1.5 overflow-hidden" style={{ width: "100%", height: 4, background: "rgba(255,255,255,0.1)" }}>
                       <div style={{ width: `${Math.min(100, (weekTotals.replies / Math.max(1, weekTotals.likes)) * 100)}%`, height: "100%", background: C.pinkIcon }} />
                     </div>
                   </div>
                 </div>
-                <div className="rounded-3xl p-4" style={{ background: C.card, flex: 1 }}>
+                <div className="rounded-3xl p-4" style={{ background: C.card, border: C.cardBorder, flex: 1 }}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="fs-12 font-semibold">Post Stats</div>
                     <MoreDotsIG dark />
@@ -2552,7 +2591,8 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
                         {i === bestDayIdx && <IGStar size={11} color={C.pinkA} />}
                         <div className="rounded-full w-full" style={{
                           height: `${Math.max(6, (d.reach / maxDayReach) * 70)}px`,
-                          background: i === bestDayIdx ? `linear-gradient(180deg, ${C.pinkA}, ${C.pinkB})` : "#e3e1da",
+                          background: i === bestDayIdx ? `linear-gradient(180deg, ${C.pinkA}, ${C.pinkB})` : "rgba(255,255,255,0.08)",
+                          boxShadow: i === bestDayIdx ? `0 0 10px ${C.pinkA}77` : "none",
                         }} />
                         <span className="fs-9" style={{ color: C.sub }}>{d.label}</span>
                       </div>
@@ -2568,7 +2608,7 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
 
             {/* Post activity table */}
             {topPosts.length > 0 && (
-              <div className="rounded-3xl p-5" style={{ background: C.card }}>
+              <div className="rounded-3xl p-5" style={{ background: C.card, border: C.cardBorder }}>
                 <div className="fs-13 font-semibold mb-3">Top Posts · rolling 7 days</div>
                 <div className="flex flex-col gap-1">
                   {topPosts.map((p) => {
@@ -2577,7 +2617,7 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
                       <a key={p.model} href={p.externalLink || undefined} target="_blank" rel="noreferrer"
                         className="flex items-center gap-3 rounded-2xl p-2.5 transition-colors"
                         style={{ background: "transparent" }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = "#f7f6f2"}
+                        onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
                         onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
                         {p.thumbnailUrl ? (
                           <img src={p.thumbnailUrl} alt="" className="flex-shrink-0 rounded-xl object-cover" style={{ width: 44, height: 44 }} />
@@ -5575,7 +5615,6 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
         )}
       </div>
 
-      <XStatsSection models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} />
       <OfExtrasSection models={models} inflowwDailyStats={inflowwDailyStats}
         days={revRange} periodLabel={revRange === 7 ? "this week" : "this month"} sinceISO={days[0]} />
 
