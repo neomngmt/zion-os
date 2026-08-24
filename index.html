@@ -1599,7 +1599,7 @@ function XCaptionStudio({ models, restrictModel, filterModel, onBackToModels }) 
         </div>
       )}
     </div>
-    {model && <XMassPlanner models={models} defaultSelected={[model.name]} defaultOpen={false} />}
+    {model && <XMassPlanner models={models} lockedModel={model.name} defaultOpen={false} />}
     </>
   );
 }
@@ -1644,10 +1644,14 @@ function nextMassPlannerSlots(n) {
 // Picks all connected models at once, generates + auto-schedules a week of
 // captioned posts across their X accounts, and shows a preview grid before
 // anything actually gets uploaded/scheduled to Publer.
-function XMassPlanner({ models, defaultSelected = [], defaultOpen = true }) {
+// lockedModel: when set, the planner always plans for exactly this one
+// model — no account picker. A shared photo batch split across several
+// models never made sense (a photo belongs to one creator, not a pool), so
+// multi-account planning is gone; this always runs one model at a time.
+function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
   const [open, setOpen] = React.useState(defaultOpen);
-  const [selected, setSelected] = React.useState(defaultSelected);
-  React.useEffect(() => { setSelected(defaultSelected); }, [defaultSelected.join(",")]);
+  const [selected, setSelected] = React.useState(lockedModel ? [lockedModel] : []);
+  React.useEffect(() => { if (lockedModel) setSelected([lockedModel]); }, [lockedModel]);
   const [photos, setPhotos] = React.useState([]);
   const fileInputRef = React.useRef(null);
   const [plan, setPlan] = React.useState(null);
@@ -1790,10 +1794,12 @@ function XMassPlanner({ models, defaultSelected = [], defaultOpen = true }) {
           </div>
           <div className="text-left">
             <div className="flex items-center gap-2">
-              <span className="text-base font-extrabold tracking-tight c-text">Mass Planner</span>
+              <span className="text-base font-extrabold tracking-tight c-text">Week Planner</span>
               <XLogo size={11} className="c-muted" />
             </div>
-            <p className="fs-11 c-muted mt-0.5">Plan a week across every X account at once</p>
+            <p className="fs-11 c-muted mt-0.5">
+              {lockedModel ? `Plan ${lockedModel}'s week — captions, photos, and scheduling in one go` : "Plan a week across every X account at once"}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
@@ -1808,38 +1814,44 @@ function XMassPlanner({ models, defaultSelected = [], defaultOpen = true }) {
 
       {open && (
         <div className="mt-4 pt-4 border-t" style={{ borderColor: "rgba(57,230,115,0.14)" }}>
-          <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2.5">Accounts</div>
-          <div className="flex flex-wrap gap-3 mb-5">
-            {models.map((m) => {
-              const isOn = selected.includes(m.name);
-              return (
-                <button key={m.name} onClick={() => { toggleModel(m.name); setPlan(null); }}
-                  className="flex flex-col items-center gap-1.5 tap group" style={{ width: 60 }}>
-                  <div className="relative">
-                    <div className="rounded-full flex items-center justify-center font-bold transition-all"
-                      style={{
-                        width: 44, height: 44, fontSize: 16,
-                        background: isOn ? modelColor(m.name) + "22" : "rgba(255,255,255,0.04)",
-                        border: isOn ? `2px solid ${modelColor(m.name)}` : "2px solid rgba(255,255,255,0.10)",
-                        color: isOn ? modelColor(m.name) : "var(--c-faint, #6b7280)",
-                        boxShadow: isOn ? `0 0 14px ${modelColor(m.name)}40` : "none",
-                      }}>
-                      {m.name.slice(0, 1).toUpperCase()}
-                    </div>
-                    {isOn && (
-                      <div className="absolute -bottom-0.5 -right-0.5 rounded-full flex items-center justify-center"
-                        style={{ width: 16, height: 16, background: modelColor(m.name) }}>
-                        <Sparkles size={9} style={{ color: "#04150a" }} />
+          {!lockedModel && (
+            <>
+              <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2.5">Accounts</div>
+              <div className="flex flex-wrap gap-3 mb-5">
+                {models.map((m) => {
+                  const isOn = selected.includes(m.name);
+                  return (
+                    <button key={m.name} onClick={() => { toggleModel(m.name); setPlan(null); }}
+                      className="flex flex-col items-center gap-1.5 tap group" style={{ width: 60 }}>
+                      <div className="relative">
+                        <div className="rounded-full flex items-center justify-center font-bold transition-all"
+                          style={{
+                            width: 44, height: 44, fontSize: 16,
+                            background: isOn ? modelColor(m.name) + "22" : "rgba(255,255,255,0.04)",
+                            border: isOn ? `2px solid ${modelColor(m.name)}` : "2px solid rgba(255,255,255,0.10)",
+                            color: isOn ? modelColor(m.name) : "var(--c-faint, #6b7280)",
+                            boxShadow: isOn ? `0 0 14px ${modelColor(m.name)}40` : "none",
+                          }}>
+                          {m.name.slice(0, 1).toUpperCase()}
+                        </div>
+                        {isOn && (
+                          <div className="absolute -bottom-0.5 -right-0.5 rounded-full flex items-center justify-center"
+                            style={{ width: 16, height: 16, background: modelColor(m.name) }}>
+                            <Sparkles size={9} style={{ color: "#04150a" }} />
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <span className={`fs-10 font-mono truncate w-full text-center ${isOn ? "c-text font-semibold" : "c-faint"}`}>{m.name}</span>
-                </button>
-              );
-            })}
-          </div>
+                      <span className={`fs-10 font-mono truncate w-full text-center ${isOn ? "c-text font-semibold" : "c-faint"}`}>{m.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
 
-          <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2.5">Shared photo batch</div>
+          <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2.5">
+            {lockedModel ? `${lockedModel}'s photos` : "Shared photo batch"}
+          </div>
           <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden"
             onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
           {photos.length === 0 ? (
@@ -1852,7 +1864,7 @@ function XMassPlanner({ models, defaultSelected = [], defaultOpen = true }) {
                 <Plus size={16} className="c-muted" />
               </div>
               <span className="fs-12 c-muted font-mono">Upload photos</span>
-              <span className="fs-10 c-faint font-mono">drops get split evenly across the accounts above</span>
+              <span className="fs-10 c-faint font-mono">{lockedModel ? "gets scheduled across the coming week" : "drops get split evenly across the accounts above"}</span>
             </button>
           ) : (
             <div className="mb-4">
@@ -2020,7 +2032,118 @@ function XCompetitorSettings({ competitors, persistCompetitors }) {
   );
 }
 
-function ContentDirector({ cards, persistCards, models, restrictModel, forcedNetwork, reels, persistReels, xCompetitors, persistXCompetitors }) {
+// Landing page for X — connected accounts + their stats at a glance, with
+// "Plan posts" as the doorway into the per-model workflow (caption studio +
+// mass planner). Reuses XStatsSection (already wired to buffer_daily_stats/
+// buffer_top_posts, which publer-sync populates hourly) instead of building
+// a second stats fetch path.
+const XNEON = {
+  green: { fg: "#39e673", glow: "rgba(57,230,115,0.45)", bg: "rgba(57,230,115,0.08)" },
+  blue: { fg: "#38bdf8", glow: "rgba(56,189,248,0.45)", bg: "rgba(56,189,248,0.08)" },
+  pink: { fg: "#f472b6", glow: "rgba(244,114,182,0.45)", bg: "rgba(244,114,182,0.08)" },
+  amber: { fg: "#fbbf24", glow: "rgba(251,191,36,0.45)", bg: "rgba(251,191,36,0.08)" },
+};
+
+function XNeonStatTile({ label, value, color, icon }) {
+  const c = XNEON[color];
+  return (
+    <div className="rounded-xl p-3.5 flex-1 min-w-0" style={{ background: c.bg, border: `1px solid ${c.fg}33` }}>
+      <div className="flex items-center gap-1.5 mb-1.5">
+        {icon}
+        <span className="fs-9 uppercase tracking-widest font-mono c-faint truncate">{label}</span>
+      </div>
+      <div className="text-2xl font-extrabold truncate" style={{ color: c.fg, textShadow: `0 0 16px ${c.glow}` }}>{value}</div>
+    </div>
+  );
+}
+
+function XOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, competitors, persistCompetitors, onPlanPosts }) {
+  const xRows = (bufferDailyStats || []).filter((r) => r.platform === "x");
+  const connectedNames = new Set(xRows.map((r) => r.model));
+  const connectedModels = models.filter((m) => connectedNames.has(m.name));
+
+  const weekAgoStr = (() => { const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().slice(0, 10); })();
+  const weekRows = xRows.filter((r) => r.statDate >= weekAgoStr);
+  const weekTotals = {
+    reach: weekRows.reduce((s, r) => s + (r.impressions || 0), 0),
+    posts: weekRows.reduce((s, r) => s + (r.postCount || 0), 0),
+    likes: weekRows.reduce((s, r) => s + (r.reactions || 0), 0),
+  };
+  const erDays = weekRows.filter((r) => r.engagementRate != null);
+  const avgEr = erDays.length ? erDays.reduce((s, r) => s + r.engagementRate, 0) / erDays.length : null;
+
+  const accountColor = (name) => MASS_PLANNER_COLORS[connectedModels.findIndex((m) => m.name === name) % MASS_PLANNER_COLORS.length];
+
+  return (
+    <div className="rounded-2xl p-5 md:p-7 relative overflow-hidden mb-5"
+      style={{
+        background: "radial-gradient(ellipse 130% 100% at 10% 0%, rgba(57,230,115,0.12), transparent 55%), radial-gradient(ellipse 100% 80% at 100% 0%, rgba(56,189,248,0.08), transparent 55%), #0b0f0d",
+        border: "1px solid rgba(57,230,115,0.16)",
+      }}>
+      <div className="flex items-start justify-between gap-3 mb-6 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: "rgba(57,230,115,0.12)", border: "1px solid rgba(57,230,115,0.3)" }}>
+            <XLogo size={18} className="c-accent" />
+          </div>
+          <div>
+            <div className="text-2xl font-extrabold tracking-tight c-text" style={{ textShadow: "0 0 20px rgba(57,230,115,0.35)" }}>X Dashboard</div>
+            <p className="c-muted text-sm mt-0.5">
+              {connectedModels.length} account{connectedModels.length !== 1 ? "s" : ""} connected via Publer
+            </p>
+          </div>
+        </div>
+        <button onClick={onPlanPosts}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl c-bg-accent c-onaccent fs-12 font-mono uppercase tracking-wide font-semibold hover-bg-accent2 tap"
+          style={{ boxShadow: "0 0 20px rgba(57,230,115,0.25)" }}>
+          <Megaphone size={14} /> Plan posts
+        </button>
+      </div>
+
+      {connectedModels.length === 0 ? (
+        <div className="fs-12 c-faint font-mono italic py-10 text-center rounded-xl" style={{ border: "1px dashed rgba(255,255,255,0.12)" }}>
+          No X accounts connected yet — connect one in Publer, then sync will pick it up automatically.
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-2.5 mb-4">
+            <XNeonStatTile label="Reach · 7d" value={weekTotals.reach.toLocaleString()} color="blue" icon={<Eye size={11} style={{ color: XNEON.blue.fg }} />} />
+            <XNeonStatTile label="Posts · 7d" value={weekTotals.posts} color="green" icon={<Sparkles size={11} style={{ color: XNEON.green.fg }} />} />
+            <XNeonStatTile label="Likes · 7d" value={weekTotals.likes.toLocaleString()} color="pink" icon={<Heart size={11} style={{ color: XNEON.pink.fg }} />} />
+            <XNeonStatTile label="Avg engagement" value={avgEr != null ? `${avgEr.toFixed(1)}%` : "—"} color="amber" icon={<Flame size={11} style={{ color: XNEON.amber.fg }} />} />
+          </div>
+
+          <div className="flex flex-wrap gap-2 mb-5">
+            {connectedModels.map((m) => {
+              const color = accountColor(m.name);
+              const mRows = weekRows.filter((r) => r.model === m.name);
+              const mReach = mRows.reduce((s, r) => s + (r.impressions || 0), 0);
+              return (
+                <div key={m.name} className="flex items-center gap-2.5 rounded-xl pl-2 pr-3.5 py-2"
+                  style={{ background: color + "14", border: `1px solid ${color}40` }}>
+                  <span className="w-7 h-7 rounded-full flex items-center justify-center fs-11 font-bold flex-shrink-0"
+                    style={{ background: color + "26", color, boxShadow: `0 0 10px ${color}55` }}>
+                    {m.name.slice(0, 1).toUpperCase()}
+                  </span>
+                  <div>
+                    <div className="fs-11 font-semibold c-text leading-none">{m.name}</div>
+                    <div className="fs-9 font-mono c-faint mt-0.5">{mReach.toLocaleString()} reach · 7d</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <XStatsSection models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} />
+        </>
+      )}
+
+      <XCompetitorSettings competitors={competitors} persistCompetitors={persistCompetitors} />
+    </div>
+  );
+}
+
+function ContentDirector({ cards, persistCards, models, restrictModel, forcedNetwork, reels, persistReels, xCompetitors, persistXCompetitors, bufferDailyStats, bufferTopPosts }) {
   const [detail, setDetail] = useState(null);
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -2028,6 +2151,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
   const [newPlatform, setNewPlatform] = useState("ig");
   const [filter, setFilter] = useState(restrictModel || "all");
   const [network, setNetwork] = useState(forcedNetwork || "all");
+  const [xPlanningMode, setXPlanningMode] = useState(false);
 
   // The sidebar's Content Director arrow lets you jump straight to a
   // platform (Instagram / TikTok / X) — when that changes, follow it here.
@@ -2109,12 +2233,25 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
   const xModelName = restrictModel || (filter !== "all" ? filter : null);
   const xMode = network === "x" && !restrictModel;
   if (xMode) {
-    return xModelName ? (
-      <XCaptionStudio key={xModelName} models={models} restrictModel={xModelName} filterModel={xModelName} onBackToModels={!restrictModel ? () => setFilter("all") : undefined} />
-    ) : (
+    if (xModelName) {
+      return <XCaptionStudio key={xModelName} models={models} restrictModel={xModelName} filterModel={xModelName} onBackToModels={!restrictModel ? () => setFilter("all") : undefined} />;
+    }
+    if (!xPlanningMode) {
+      return (
+        <XOverviewDashboard
+          models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts}
+          competitors={xCompetitors} persistCompetitors={persistXCompetitors}
+          onPlanPosts={() => setXPlanningMode(true)}
+        />
+      );
+    }
+    return (
       <>
+        <button onClick={() => setXPlanningMode(false)}
+          className="flex items-center gap-1 fs-10 font-mono uppercase c-faint hover-accent-text mb-3 transition-colors">
+          <ChevronLeft size={12} /> X Dashboard
+        </button>
         <IGModelPicker models={models} onPick={setFilter} subtitle="Opens her X dashboard — stats, captions, and the mass planner." handleKey="xHandle" handleLabel="X" />
-        <XCompetitorSettings competitors={xCompetitors} persistCompetitors={persistXCompetitors} />
       </>
     );
   }
@@ -11271,7 +11408,7 @@ function App() {
             {currentView === "dashboard" && (session.role === "admin"
               ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} inflowwDailyStats={inflowwDailyStats} inflowwSyncing={inflowwSyncing} refreshInfloww={refreshInfloww} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} />
               : <CreatorDashboard stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} ofDailyStats={ofDailyStats} inflowwDailyStats={inflowwDailyStats} />)}
-            {currentView === "content" && <ContentDirector cards={isAdmin ? scopedCards : cards} persistCards={isAdmin ? scopedPersistCards : persistCards} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} forcedNetwork={contentPlatform} reels={isAdmin ? scopedReels : reels} persistReels={isAdmin ? scopedPersistReels : persistReels} xCompetitors={xCompetitors} persistXCompetitors={persistXCompetitors} />}
+            {currentView === "content" && <ContentDirector cards={isAdmin ? scopedCards : cards} persistCards={isAdmin ? scopedPersistCards : persistCards} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} forcedNetwork={contentPlatform} reels={isAdmin ? scopedReels : reels} persistReels={isAdmin ? scopedPersistReels : persistReels} xCompetitors={xCompetitors} persistXCompetitors={persistXCompetitors} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} />}
             {currentView === "calendar" && <CalendarView cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks} onNavigate={setView} restrictModel={restrictModel} />}
             {currentView === "tasks" && <TaskManager tasks={isAdmin ? scopedTasks : tasks} persistTasks={isAdmin ? scopedPersistTasks : persistTasks} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} />}
             {currentView === "stats" && <StatsManager stats={scopedStats} persistStats={scopedPersistStats} models={agencyModels} reels={scopedReels} persistReels={scopedPersistReels} />}
