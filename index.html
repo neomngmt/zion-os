@@ -1297,7 +1297,7 @@ function CardDetail({ card, models, restrictModel, onClose, onSave, onDelete }) 
 
 // ---------- X bulk upload & auto-caption studio ----------
 
-function XCaptionStudio({ models, restrictModel, filterModel }) {
+function XCaptionStudio({ models, restrictModel, filterModel, onBackToModels }) {
   const scopedModels = restrictModel ? models.filter((m) => m.name === restrictModel) : models;
   const [selectedModel, setSelectedModel] = React.useState(
     restrictModel || (filterModel && filterModel !== "all" ? filterModel : scopedModels[0]?.name || "")
@@ -1436,6 +1436,12 @@ function XCaptionStudio({ models, restrictModel, filterModel }) {
   return (
     <>
     <div className="mb-5 c-bg-surface border c-border rounded-xl p-4 relative overflow-hidden">
+      {onBackToModels && (
+        <button onClick={onBackToModels}
+          className="flex items-center gap-1 fs-10 font-mono uppercase c-faint hover-accent-text mb-2 transition-colors">
+          <ChevronLeft size={12} /> All models
+        </button>
+      )}
       <div className="flex items-center gap-2 mb-1">
         <Sparkles size={15} className="c-accent" />
         <span className="fs-13 font-semibold c-text">Bulk Upload &amp; Auto-Captions</span>
@@ -1551,26 +1557,44 @@ function XCaptionStudio({ models, restrictModel, filterModel }) {
 
       {postHistory && postHistory.posts.length > 0 && (
         <div className="mt-4 pt-4 border-t c-border">
-          <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2">
-            All posts · last 30 days ({postHistory.posts.length})
+          <div className="flex items-center justify-between mb-2.5">
+            <div className="fs-10 uppercase tracking-widest c-faint font-mono">
+              All posts · last 30 days ({postHistory.posts.length})
+            </div>
+            <div className="fs-9 font-mono c-faint hidden sm:block">reach · engagement</div>
           </div>
-          <div className="flex flex-col gap-1.5 max-h-96 overflow-y-auto pr-1">
-            {postHistory.posts.map((p) => (
-              <a key={p.id} href={p.postLink || undefined} target="_blank" rel="noreferrer"
-                className="flex gap-3 c-bg-app border c-border rounded-lg p-2.5 hover-border-accent transition-colors">
-                {p.thumbnailUrl ? (
-                  <img src={p.thumbnailUrl} alt="" className="flex-shrink-0 rounded-md object-cover" style={{ width: 44, height: 44 }} />
-                ) : (
-                  <div className="flex-shrink-0 rounded-md c-bg-surface" style={{ width: 44, height: 44 }} />
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="fs-11 c-text leading-snug truncate">{p.text || <span className="c-faint italic">No text</span>}</div>
-                  <div className="fs-9 c-faint font-mono mt-1">
-                    {p.scheduledAt ? new Date(p.scheduledAt).toLocaleDateString() : "—"} · reach {p.reach.toLocaleString()} · {p.likes} likes · {p.engagementRate.toFixed(1)}% ER
+          <div className="flex flex-col gap-1 max-h-[32rem] overflow-y-auto pr-1">
+            {postHistory.posts.map((p) => {
+              const avgEr = postHistory.summary.avgEngagementRate;
+              const erColor = p.engagementRate >= avgEr * 1.15 ? "#39e673" : p.engagementRate <= avgEr * 0.7 ? "#f87171" : undefined;
+              return (
+                <a key={p.id} href={p.postLink || undefined} target="_blank" rel="noreferrer"
+                  className="flex items-center gap-3 c-bg-app border c-border rounded-xl p-2 hover-border-accent transition-colors">
+                  {p.thumbnailUrl ? (
+                    <img src={p.thumbnailUrl} alt="" className="flex-shrink-0 rounded-lg object-cover" style={{ width: 56, height: 56 }} />
+                  ) : (
+                    <div className="flex-shrink-0 rounded-lg c-bg-surface" style={{ width: 56, height: 56 }} />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="fs-11 c-text leading-snug line-clamp-2">{p.text || <span className="c-faint italic">No text</span>}</div>
+                    <div className="fs-9 c-faint font-mono mt-1">
+                      {p.scheduledAt ? new Date(p.scheduledAt).toLocaleDateString() : "—"}
+                    </div>
                   </div>
-                </div>
-              </a>
-            ))}
+                  <div className="flex-shrink-0 text-right font-mono" style={{ width: 88 }}>
+                    <div className="fs-12 c-text font-semibold">{p.reach.toLocaleString()}</div>
+                    <div className="fs-9 c-faint">reach</div>
+                  </div>
+                  <div className="flex-shrink-0 flex items-center gap-2.5 fs-10 font-mono c-muted" style={{ width: 90 }}>
+                    <span className="flex items-center gap-0.5"><Heart size={10} className="c-faint" />{p.likes}</span>
+                    <span className="flex items-center gap-0.5">💬{p.comments}</span>
+                  </div>
+                  <div className="flex-shrink-0 fs-11 font-mono font-semibold text-right" style={{ width: 48, color: erColor }}>
+                    {p.engagementRate.toFixed(1)}%
+                  </div>
+                </a>
+              );
+            })}
           </div>
         </div>
       )}
@@ -2086,7 +2110,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
   const xMode = network === "x" && !restrictModel;
   if (xMode) {
     return xModelName ? (
-      <XCaptionStudio key={xModelName} models={models} restrictModel={xModelName} filterModel={xModelName} />
+      <XCaptionStudio key={xModelName} models={models} restrictModel={xModelName} filterModel={xModelName} onBackToModels={!restrictModel ? () => setFilter("all") : undefined} />
     ) : (
       <>
         <IGModelPicker models={models} onPick={setFilter} subtitle="Opens her X dashboard — stats, captions, and the mass planner." handleKey="xHandle" handleLabel="X" />
