@@ -620,6 +620,24 @@ const fontImport = `
   0%, 100% { box-shadow: 0 0 24px -12px var(--glow-c, rgba(57,230,115,0.45)), 0 30px 60px -30px rgba(0,0,0,0.6); }
   50% { box-shadow: 0 0 48px -10px var(--glow-c, rgba(57,230,115,0.65)), 0 30px 60px -30px rgba(0,0,0,0.6); }
 }
+@keyframes bubbleFloatA {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(5px, -7px); }
+  50% { transform: translate(-4px, 2px); }
+  75% { transform: translate(3px, 6px); }
+}
+@keyframes bubbleFloatB {
+  0%, 100% { transform: translate(0, 0); }
+  30% { transform: translate(-6px, 4px); }
+  60% { transform: translate(4px, 7px); }
+  85% { transform: translate(-3px, -5px); }
+}
+@keyframes bubbleFloatC {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(4px, 5px); }
+  55% { transform: translate(-5px, -3px); }
+  80% { transform: translate(2px, -6px); }
+}
 
 .anim-view { animation: fadeInUp 0.28s ease-out; }
 .anim-pulse-dot { animation: softPulse 2s ease-in-out infinite; }
@@ -2488,6 +2506,15 @@ const DEFAULT_AGES = [
   { label: "18-24 years", pct: 0 }, { label: "25-34 years", pct: 0 },
   { label: "35-44 years", pct: 0 }, { label: "45+ years", pct: 0 },
 ];
+// Each bubble drifts on its own slow loop (different duration/delay/direction
+// per slot) so the cluster reads as gently floating rather than static —
+// small enough (a few px) that the overlap/labels stay legible throughout.
+const BUBBLE_FLOAT_ANIM = [
+  { duration: "9s", delay: "0s", name: "bubbleFloatA" },
+  { duration: "11s", delay: "-3s", name: "bubbleFloatB" },
+  { duration: "8s", delay: "-1s", name: "bubbleFloatC" },
+  { duration: "10s", delay: "-5s", name: "bubbleFloatA" },
+];
 function AgeRangeBubbles({ ages, colors }) {
   const data = (ages && ages.length ? ages : DEFAULT_AGES).slice(0, 4);
   const containerPx = 260;
@@ -2497,6 +2524,7 @@ function AgeRangeBubbles({ ages, colors }) {
         const slot = AGE_BUBBLE_SLOTS[i];
         const size = Math.round(containerPx * slot.sizePct);
         const color = colors[i % colors.length];
+        const anim = BUBBLE_FLOAT_ANIM[i % BUBBLE_FLOAT_ANIM.length];
         return (
           <div key={a.label} title={a.label}
             className="absolute rounded-full flex flex-col items-center justify-center"
@@ -2504,6 +2532,7 @@ function AgeRangeBubbles({ ages, colors }) {
               width: size, height: size, left: slot.left, top: slot.top, bottom: slot.bottom,
               background: `${color}29`, border: `1.5px solid ${color}77`,
               boxShadow: `0 0 24px ${color}40`, zIndex: 4 - i,
+              animation: `${anim.name} ${anim.duration} ease-in-out ${anim.delay} infinite`,
             }}>
             <span className="font-extrabold leading-none" style={{ color, fontSize: Math.max(12, size * 0.22) }}>{a.pct}%</span>
             {size >= 60 && <span className="fs-9 font-mono c-faint mt-1 text-center px-1" style={{ lineHeight: 1.1 }}>{a.label}</span>}
@@ -2515,7 +2544,28 @@ function AgeRangeBubbles({ ages, colors }) {
 }
 
 const DEFAULT_COUNTRIES = [{ code: "US", value: 0 }, { code: "DE", value: 0 }, { code: "GB", value: 0 }, { code: "ES", value: 0 }];
-const COUNTRY_NAMES = { US: "USA", DE: "Germany", GB: "UK", ES: "Spain", FR: "France", AU: "Australia", CA: "Canada", BR: "Brazil", IT: "Italy", MX: "Mexico" };
+const COUNTRY_NAMES = { US: "USA", DE: "Germany", GB: "UK", ES: "Spain", FR: "France", AU: "Australia", CA: "Canada", BR: "Brazil", IT: "Italy", MX: "Mexico", CZ: "Czech Republic", SK: "Slovakia" };
+
+// Manually keyed in from Instagram's own Insights app (screenshots), since
+// Publer's chart_data endpoint doesn't backfill demographics retroactively —
+// it only starts collecting from whenever the Business plan kicked in. Swap
+// this out (or delete the model's entry) once Publer actually has data;
+// publer-demographics results always win over this when they're non-empty.
+const MANUAL_IG_DEMOGRAPHICS = {
+  Vivien: {
+    ages: [
+      { label: "25-34 years", pct: 42 },
+      { label: "18-24 years", pct: 23.8 },
+      { label: "35-44 years", pct: 23.5 },
+      { label: "45-54 years", pct: 9.3 },
+    ],
+    countries: [
+      { code: "CZ", value: 75.2 }, { code: "SK", value: 19.6 },
+      { code: "DE", value: 1.8 }, { code: "GB", value: 0.4 }, { code: "AU", value: 0.4 },
+    ],
+    unit: "%",
+  },
+};
 
 // Dot-fill world silhouette — the real country outlines (flekschas/simple-world-map,
 // CC BY-SA), filled with a repeating dot pattern instead of a solid color so
@@ -2534,7 +2584,7 @@ function WorldDotMap({ color = "#a78bfa" }) {
   );
 }
 
-function TopCountriesCard({ countries, totalImpressions }) {
+function TopCountriesCard({ countries, unit = "" }) {
   const data = countries && countries.length ? countries : DEFAULT_COUNTRIES;
   return (
     <div className="flex flex-col gap-1.5">
@@ -2543,7 +2593,7 @@ function TopCountriesCard({ countries, totalImpressions }) {
           style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
           <span className="fs-15">{flagEmoji(c.code)}</span>
           <span className="fs-11 c-text font-medium flex-1 truncate">{COUNTRY_NAMES[c.code] || c.code}</span>
-          <span className="fs-11 font-mono c-text font-semibold">{c.value.toLocaleString()}</span>
+          <span className="fs-11 font-mono c-text font-semibold">{unit === "%" ? `${c.value}%` : c.value.toLocaleString()}</span>
         </div>
       ))}
     </div>
@@ -2591,7 +2641,15 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
       try {
         const { data, error } = await supabaseClient.functions.invoke("publer-demographics", { body: { modelName: demoModelName, platform: "ig" } });
         if (cancelled) return;
-        setDemographics(error ? null : data);
+        const manual = MANUAL_IG_DEMOGRAPHICS[demoModelName];
+        const live = error ? null : data;
+        // Publer's own data wins whenever it actually has any — this manual
+        // set is only a stand-in until chart_data starts returning something.
+        if (manual && (!live || !live.ages?.length)) {
+          setDemographics({ ...live, ages: manual.ages, countries: manual.countries, unit: manual.unit });
+        } else {
+          setDemographics(live);
+        }
       } catch (e) {
         if (!cancelled) setDemographics(null);
       } finally {
@@ -2919,11 +2977,15 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
               </div>
               <div className="lg:col-span-3 rounded-3xl p-5" style={{ background: C.card, border: C.cardBorder }}>
                 <div className="flex items-center justify-between mb-1">
-                  <div className="text-2xl font-extrabold c-text">{(demographics?.totalImpressions || 0).toLocaleString()}</div>
+                  {demographics?.unit === "%" ? (
+                    <div className="text-lg font-extrabold c-text">Audience</div>
+                  ) : (
+                    <div className="text-2xl font-extrabold c-text">{(demographics?.totalImpressions || 0).toLocaleString()}</div>
+                  )}
                   <MoreDotsIG dark />
                 </div>
-                <div className="fs-10 c-faint font-mono mb-3">Impressions worldwide</div>
-                <TopCountriesCard countries={demographics?.countries} totalImpressions={demographics?.totalImpressions || 0} />
+                <div className="fs-10 c-faint font-mono mb-3">{demographics?.unit === "%" ? "by country" : "Impressions worldwide"}</div>
+                <TopCountriesCard countries={demographics?.countries} unit={demographics?.unit} />
               </div>
             </div>
 
