@@ -2353,15 +2353,262 @@ function XOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, competit
   );
 }
 
-function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanPosts }) {
+// A tiny decorative sine-ish squiggle — purely ornamental (no axis, no
+// legend needed), matching the reference dashboard's wavy line-under-hero
+// motif. Derived loosely from real values so it's not pure noise, but it's
+// not meant to be read precisely — the real numbers live in the tiles.
+function IGSquiggle({ values, color, width = 260, height = 36, opacity = 0.55 }) {
+  const max = Math.max(1, ...values);
+  const n = values.length;
+  const pts = values.map((v, i) => {
+    const x = (i / (n - 1)) * width;
+    const y = height - (v / max) * height * 0.7 - height * 0.15;
+    return [x, y];
+  });
+  const d = pts.map(([x, y], i) => `${i === 0 ? "M" : "L"} ${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
   return (
-    <PlatformOverviewDashboard
-      platform="ig" label="Instagram" icon={<Instagram size={18} style={{ color: "#f472b6" }} />} glowRgb="#f472b6"
-      bgGradient="radial-gradient(ellipse 130% 100% at 10% 0%, rgba(244,114,182,0.14), transparent 55%), radial-gradient(ellipse 100% 80% at 100% 0%, rgba(251,146,60,0.10), transparent 55%), #0b0f0d"
-      models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts}
-      onPlanPosts={onPlanPosts} planLabel="Plan content"
-      noAccountsHint="No Instagram accounts connected yet — connect one in Publer, then sync will pick it up automatically."
-    />
+    <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", height }} preserveAspectRatio="none">
+      <path d={d} fill="none" stroke={color} strokeWidth="1.5" strokeOpacity={opacity} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IGStar({ size = 14, color = "#fff" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+      <path d="M12 2l2.6 6.6L22 10l-5.5 4.6L18 22l-6-3.6L6 22l1.5-7.4L2 10l7.4-1.4L12 2z" />
+    </svg>
+  );
+}
+
+// Light "widget" dashboard, deliberately styled 1:1 off a reference (cream
+// page, white cards, pink→orange hero gradient, ring + squiggle + bar chart)
+// rather than the app's own dark theme — an intentional island, same as the
+// X dashboard is a deliberate dark-neon island. Uses real Instagram numbers
+// from buffer_daily_stats/buffer_top_posts throughout; only the squiggle
+// lines are decorative.
+function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanPosts }) {
+  const C = {
+    page: "#eeece6", card: "#ffffff", ink: "#161616", sub: "#7a7972",
+    pinkA: "#ff2e78", pinkB: "#ff7a3d", pinkSoft: "#ffe4ee", pinkIcon: "#ff2e78",
+    ringTrack: "#f1efe9",
+  };
+  const DONUT_COLORS = ["#ff2e78", "#2e2e2e", "#ffb020"];
+
+  const rows = (bufferDailyStats || []).filter((r) => r.platform === "ig");
+  const connectedNames = new Set(rows.map((r) => r.model));
+  const connectedModels = models.filter((m) => connectedNames.has(m.name));
+  const dateNDaysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+  const weekAgoStr = dateNDaysAgo(6);
+  const weekRows = rows.filter((r) => r.statDate >= weekAgoStr);
+  const weekTotals = {
+    reach: weekRows.reduce((s, r) => s + (r.impressions || 0), 0),
+    posts: weekRows.reduce((s, r) => s + (r.postCount || 0), 0),
+    likes: weekRows.reduce((s, r) => s + (r.reactions || 0), 0),
+    replies: weekRows.reduce((s, r) => s + (r.comments || 0), 0),
+  };
+  const fmtK = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}K` : `${n}`);
+
+  const last7Days = Array.from({ length: 7 }, (_, i) => dateNDaysAgo(6 - i));
+  const dayBars = last7Days.map((date) => ({
+    date,
+    label: new Date(date + "T12:00:00").toLocaleDateString(undefined, { weekday: "narrow" }),
+    reach: rows.filter((r) => r.statDate === date).reduce((s, r) => s + (r.impressions || 0), 0),
+  }));
+  const maxDayReach = Math.max(1, ...dayBars.map((d) => d.reach));
+  const bestDayIdx = dayBars.reduce((best, d, i) => (d.reach > dayBars[best].reach ? i : best), 0);
+
+  const accountShares = connectedModels.map((m) => {
+    const r = weekRows.filter((row) => row.model === m.name).reduce((s, row) => s + (row.impressions || 0), 0);
+    return { name: m.name, reach: r, pct: weekTotals.reach > 0 ? Math.round((r / weekTotals.reach) * 100) : 0 };
+  }).sort((a, b) => b.reach - a.reach).slice(0, 3);
+
+  const donutSegments = [
+    { label: "Likes", value: weekTotals.likes, color: DONUT_COLORS[0] },
+    { label: "Replies", value: weekTotals.replies, color: DONUT_COLORS[1] },
+    { label: "Reposts", value: weekRows.reduce((s, r) => s + (r.reposts || 0), 0), color: DONUT_COLORS[2] },
+  ];
+  const donutTotal = donutSegments.reduce((s, seg) => s + seg.value, 0);
+  const donutR = 40, donutCirc = 2 * Math.PI * donutR;
+  let donutOffset = 0;
+
+  const topPosts = (bufferTopPosts || [])
+    .filter((p) => p.platform === "ig" && connectedNames.has(p.model))
+    .sort((a, b) => (b.impressions || 0) - (a.impressions || 0));
+
+  const noAccounts = connectedModels.length === 0;
+
+  return (
+    <div className="mb-5 rounded-3xl overflow-hidden" style={{ background: C.page, color: C.ink, fontFamily: "system-ui, -apple-system, sans-serif" }}>
+      <div className="p-5 md:p-7">
+        <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: `linear-gradient(135deg, ${C.pinkA}, ${C.pinkB})` }}>
+              <Instagram size={18} color="#fff" />
+            </div>
+            <div>
+              <div className="text-2xl font-extrabold tracking-tight" style={{ color: C.ink }}>Instagram Dashboard</div>
+              <p className="text-sm mt-0.5" style={{ color: C.sub }}>{connectedModels.length} account{connectedModels.length !== 1 ? "s" : ""} connected via Publer</p>
+            </div>
+          </div>
+          <button onClick={onPlanPosts}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-full fs-12 font-mono uppercase tracking-wide font-semibold tap"
+            style={{ background: C.ink, color: "#fff" }}>
+            <Megaphone size={14} /> Plan content
+          </button>
+        </div>
+
+        {noAccounts ? (
+          <div className="fs-12 italic py-10 text-center rounded-2xl" style={{ border: `1px dashed ${C.ringTrack}`, color: C.sub, background: C.card }}>
+            No Instagram accounts connected yet — connect one in Publer, then sync will pick it up automatically.
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
+              {/* Hero: total reach, gradient card */}
+              <div className="lg:col-span-5 rounded-3xl p-5 relative overflow-hidden flex flex-col justify-between"
+                style={{ background: `linear-gradient(135deg, ${C.pinkA}, ${C.pinkB})`, minHeight: 220, boxShadow: `0 20px 40px ${C.pinkA}33` }}>
+                <div className="flex items-start justify-between">
+                  <div className="fs-13 font-semibold" style={{ color: "rgba(255,255,255,0.9)" }}>Total Reach · 7d</div>
+                  <MoreDotsIG />
+                </div>
+                <div>
+                  <div className="text-4xl font-extrabold text-white leading-none mb-3">{fmtK(weekTotals.reach)}</div>
+                  <IGSquiggle values={last7Days.map((d) => rows.filter((r) => r.statDate === d).reduce((s, r) => s + (r.impressions || 0), 0))} color="#fff" opacity={0.5} />
+                  <IGSquiggle values={last7Days.map((d) => rows.filter((r) => r.statDate === d).reduce((s, r) => s + (r.reactions || 0), 0))} color="#1c1c1c" opacity={0.35} />
+                </div>
+                <div className="flex items-center gap-4 pt-3 mt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.25)" }}>
+                  {accountShares.length ? accountShares.map((a) => (
+                    <div key={a.name}>
+                      <div className="fs-10 font-mono" style={{ color: "rgba(255,255,255,0.75)" }}>{a.name}</div>
+                      <div className="fs-13 font-bold text-white">{a.pct}%</div>
+                    </div>
+                  )) : <div className="fs-11" style={{ color: "rgba(255,255,255,0.75)" }}>No breakdown yet</div>}
+                </div>
+              </div>
+
+              {/* Engagement mix ring, "pending messages"-style card */}
+              <div className="lg:col-span-4 rounded-3xl p-5" style={{ background: C.card, minHeight: 220 }}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="fs-13 font-semibold">Engagement mix</div>
+                  <MoreDotsIG dark />
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="relative flex-shrink-0" style={{ width: 128, height: 128 }}>
+                    <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%", transform: "rotate(-90deg)" }}>
+                      <circle cx="50" cy="50" r={donutR} fill="none" stroke={C.ringTrack} strokeWidth="13" />
+                      {donutTotal > 0 && donutSegments.map((seg, i) => {
+                        const frac = seg.value / donutTotal;
+                        const dash = frac * donutCirc;
+                        const el = (
+                          <circle key={i} cx="50" cy="50" r={donutR} fill="none" stroke={seg.color} strokeWidth="13"
+                            strokeDasharray={`${Math.max(dash - 1.5, 0)} ${donutCirc - dash + 1.5}`} strokeDashoffset={-donutOffset}
+                            strokeLinecap="round" />
+                        );
+                        donutOffset += dash;
+                        return el;
+                      })}
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="rounded-full flex items-center justify-center" style={{ width: 44, height: 44, background: C.pinkSoft }}>
+                        <Heart size={18} color={C.pinkIcon} />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2 min-w-0">
+                    {donutSegments.map((seg) => (
+                      <div key={seg.label} className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: seg.color }} />
+                        <span className="fs-11" style={{ color: C.sub }}>{seg.label}</span>
+                        <span className="fs-11 font-bold ml-auto pl-3">{donutTotal > 0 ? Math.round((seg.value / donutTotal) * 100) : 0}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right column: two mini stat cards */}
+              <div className="lg:col-span-3 flex flex-col gap-4">
+                <div className="rounded-3xl p-4 flex items-center gap-3" style={{ background: C.pinkSoft }}>
+                  <div className="rounded-2xl flex items-center justify-center flex-shrink-0" style={{ width: 40, height: 40, background: "#fff" }}>
+                    <Send size={16} color={C.pinkIcon} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-lg font-extrabold leading-none">{fmtK(weekTotals.replies)}</div>
+                    <div className="fs-10 mt-1" style={{ color: C.sub }}>Replies</div>
+                    <div className="rounded-full mt-1.5 overflow-hidden" style={{ width: "100%", height: 4, background: "rgba(255,46,120,0.15)" }}>
+                      <div style={{ width: `${Math.min(100, (weekTotals.replies / Math.max(1, weekTotals.likes)) * 100)}%`, height: "100%", background: C.pinkIcon }} />
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-3xl p-4" style={{ background: C.card, flex: 1 }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="fs-12 font-semibold">Post Stats</div>
+                    <MoreDotsIG dark />
+                  </div>
+                  <div className="flex items-end justify-between gap-1" style={{ height: 90 }}>
+                    {dayBars.map((d, i) => (
+                      <div key={d.date} className="flex-1 flex flex-col items-center justify-end gap-1" style={{ height: "100%" }}>
+                        {i === bestDayIdx && <IGStar size={11} color={C.pinkA} />}
+                        <div className="rounded-full w-full" style={{
+                          height: `${Math.max(6, (d.reach / maxDayReach) * 70)}px`,
+                          background: i === bestDayIdx ? `linear-gradient(180deg, ${C.pinkA}, ${C.pinkB})` : "#e3e1da",
+                        }} />
+                        <span className="fs-9" style={{ color: C.sub }}>{d.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between pt-2 mt-2" style={{ borderTop: `1px solid ${C.ringTrack}` }}>
+                    <span className="fs-10" style={{ color: C.sub }}>Posts · 7d</span>
+                    <span className="fs-13 font-extrabold">{weekTotals.posts}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Post activity table */}
+            {topPosts.length > 0 && (
+              <div className="rounded-3xl p-5" style={{ background: C.card }}>
+                <div className="fs-13 font-semibold mb-3">Top Posts · rolling 7 days</div>
+                <div className="flex flex-col gap-1">
+                  {topPosts.map((p) => {
+                    const account = models.find((m) => m.name === p.model);
+                    return (
+                      <a key={p.model} href={p.externalLink || undefined} target="_blank" rel="noreferrer"
+                        className="flex items-center gap-3 rounded-2xl p-2.5 transition-colors"
+                        style={{ background: "transparent" }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = "#f7f6f2"}
+                        onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                        {p.thumbnailUrl ? (
+                          <img src={p.thumbnailUrl} alt="" className="flex-shrink-0 rounded-xl object-cover" style={{ width: 44, height: 44 }} />
+                        ) : (
+                          <div className="flex-shrink-0 rounded-xl" style={{ width: 44, height: 44, background: C.ringTrack }} />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="fs-12 font-semibold truncate flex items-center gap-1.5">
+                            {p.text || "No caption"} {p.externalLink && <ExternalLink size={11} color={C.sub} />}
+                          </div>
+                        </div>
+                        <span className="fs-10 font-semibold px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: C.pinkSoft, color: C.pinkIcon }}>{p.model}</span>
+                        <div className="fs-11 font-mono flex-shrink-0" style={{ color: C.sub, width: 60, textAlign: "right" }}>{(p.impressions || 0).toLocaleString()}</div>
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+function MoreDotsIG({ dark }) {
+  const c = dark ? "#c9c8c1" : "rgba(255,255,255,0.8)";
+  return (
+    <div className="flex items-center gap-0.5">
+      {[0, 1, 2].map((i) => <span key={i} className="rounded-full" style={{ width: 3.5, height: 3.5, background: c }} />)}
+    </div>
   );
 }
 
