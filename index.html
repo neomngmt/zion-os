@@ -2601,6 +2601,29 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
     return () => { cancelled = true; };
   }, [demoModelName]);
 
+  // Live post list (not just the 5-post rolling-7-day snapshot buffer_top_posts
+  // keeps) so "Top Posts" actually grows to show more when 30D is selected —
+  // reuses publer-posts, the same endpoint XCaptionStudio's post history uses.
+  const [livePosts, setLivePosts] = React.useState(null);
+  const [livePostsLoading, setLivePostsLoading] = React.useState(false);
+  React.useEffect(() => {
+    if (!demoModelName) { setLivePosts(null); return; }
+    let cancelled = false;
+    setLivePostsLoading(true);
+    (async () => {
+      try {
+        const { data, error } = await supabaseClient.functions.invoke("publer-posts", { body: { modelName: demoModelName, platform: "ig", days: igRange } });
+        if (cancelled) return;
+        setLivePosts(!error && data?.posts ? data.posts : null);
+      } catch (e) {
+        if (!cancelled) setLivePosts(null);
+      } finally {
+        if (!cancelled) setLivePostsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [demoModelName, igRange]);
+
   const dateNDaysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
   const rangeAgoStr = dateNDaysAgo(igRange - 1);
   const weekRows = rows.filter((r) => r.statDate >= rangeAgoStr);
@@ -2621,17 +2644,6 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
   const maxDayReach = Math.max(1, ...dayBars.map((d) => d.reach));
   const bestDayIdx = dayBars.reduce((best, d, i) => (d.reach > dayBars[best].reach ? i : best), 0);
 
-  // Fixed 7-day version for the narrow "Post Stats" mini card, independent
-  // of the 7D/30D toggle above (that toggle only widens the big area chart).
-  const miniDays = Array.from({ length: 7 }, (_, i) => dateNDaysAgo(6 - i));
-  const miniDayBars = miniDays.map((date) => ({
-    date, label: new Date(date + "T12:00:00").toLocaleDateString(undefined, { weekday: "narrow" }),
-    reach: rows.filter((r) => r.statDate === date).reduce((s, r) => s + (r.impressions || 0), 0),
-  }));
-  const miniMaxReach = Math.max(1, ...miniDayBars.map((d) => d.reach));
-  const miniBestDayIdx = miniDayBars.reduce((best, d, i) => (d.reach > miniDayBars[best].reach ? i : best), 0);
-  const miniPostCount = miniDays.reduce((s, date) => s + rows.filter((r) => r.statDate === date).reduce((a, r) => a + (r.postCount || 0), 0), 0);
-
   const accountShares = connectedModels.map((m) => {
     const r = weekRows.filter((row) => row.model === m.name).reduce((s, row) => s + (row.impressions || 0), 0);
     return { name: m.name, reach: r, pct: weekTotals.reach > 0 ? Math.round((r / weekTotals.reach) * 100) : 0 };
@@ -2646,9 +2658,17 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
   const donutR = 40, donutCirc = 2 * Math.PI * donutR;
   let donutOffset = 0;
 
-  const topPosts = (bufferTopPosts || [])
-    .filter((p) => p.platform === "ig" && connectedNames.has(p.model) && (igAccount === "all" || p.model === igAccount))
-    .sort((a, b) => (b.impressions || 0) - (a.impressions || 0));
+  // Real post list (grows with the 7D/30D toggle) when the live fetch has
+  // landed; falls back to the 5-post rolling snapshot table if it hasn't
+  // loaded yet or errored, so this section is never just empty.
+  const topPosts = livePosts?.length
+    ? livePosts.map((p) => ({
+        model: demoModelName, text: p.text, thumbnailUrl: p.thumbnailUrl,
+        externalLink: p.postLink, impressions: p.reach,
+      }))
+    : (bufferTopPosts || [])
+        .filter((p) => p.platform === "ig" && connectedNames.has(p.model) && (igAccount === "all" || p.model === igAccount))
+        .sort((a, b) => (b.impressions || 0) - (a.impressions || 0));
 
   const noAccounts = connectedModels.length === 0;
 
@@ -2844,26 +2864,27 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
                     <div className="fs-12 font-semibold">Post Stats</div>
                     <MoreDotsIG dark />
                   </div>
-                  {/* Always the last 7 days here regardless of the 7D/30D
-                      toggle — this mini card is too narrow to fit 30 bars
-                      without overflowing (that's the full-width area chart's
-                      job). Keeps its own "Posts · 7d" label honest. */}
-                  <div className="flex items-end justify-between gap-1" style={{ height: 90 }}>
-                    {miniDayBars.map((d, i) => (
-                      <div key={d.date} className="flex-1 flex flex-col items-center justify-end gap-1" style={{ height: "100%" }}>
-                        {i === miniBestDayIdx && <IGStar size={11} color={C.pinkA} />}
+                  {/* Follows the 7D/30D toggle now — bars shrink to fit
+                      (min-width:0 lets flex-1 actually compress them below
+                      content size, which is what was overflowing before)
+                      and per-bar date labels drop out past ~10 bars since
+                      30 of them side by side has no room to be legible. */}
+                  <div className="flex items-end justify-between gap-0.5" style={{ height: 90, overflow: "hidden" }}>
+                    {dayBars.map((d, i) => (
+                      <div key={d.date} className="flex-1 flex flex-col items-center justify-end gap-1" style={{ height: "100%", minWidth: 0 }}>
+                        {i === bestDayIdx && <IGStar size={11} color={C.pinkA} />}
                         <div className="rounded-full w-full" style={{
-                          height: `${Math.max(6, (d.reach / miniMaxReach) * 70)}px`,
-                          background: i === miniBestDayIdx ? `linear-gradient(180deg, ${C.pinkA}, ${C.pinkB})` : "rgba(255,255,255,0.08)",
-                          boxShadow: i === miniBestDayIdx ? `0 0 10px ${C.pinkA}77` : "none",
+                          height: `${Math.max(6, (d.reach / maxDayReach) * 70)}px`,
+                          background: i === bestDayIdx ? `linear-gradient(180deg, ${C.pinkA}, ${C.pinkB})` : "rgba(255,255,255,0.08)",
+                          boxShadow: i === bestDayIdx ? `0 0 10px ${C.pinkA}77` : "none",
                         }} />
-                        <span className="fs-9" style={{ color: C.sub }}>{d.label}</span>
+                        {igRange <= 10 && <span className="fs-9" style={{ color: C.sub }}>{d.label}</span>}
                       </div>
                     ))}
                   </div>
                   <div className="flex items-center justify-between pt-2 mt-2" style={{ borderTop: `1px solid ${C.ringTrack}` }}>
-                    <span className="fs-10" style={{ color: C.sub }}>Posts · 7d</span>
-                    <span className="fs-13 font-extrabold">{miniPostCount}</span>
+                    <span className="fs-10" style={{ color: C.sub }}>Posts · {igRange}d</span>
+                    <span className="fs-13 font-extrabold">{weekTotals.posts}</span>
                   </div>
                 </div>
               </div>
@@ -2909,12 +2930,15 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
             {/* Post activity table */}
             {topPosts.length > 0 && (
               <div className="rounded-3xl p-5" style={{ background: C.card, border: C.cardBorder }}>
-                <div className="fs-13 font-semibold mb-3">Top Posts · rolling 7 days</div>
-                <div className="flex flex-col gap-1">
-                  {topPosts.map((p) => {
+                <div className="fs-13 font-semibold mb-3">
+                  {livePosts?.length ? `Posts · last ${igRange} days (${topPosts.length})` : "Top Posts · rolling 7 days"}
+                  {livePostsLoading && <span className="fs-10 c-faint font-mono ml-2">refreshing…</span>}
+                </div>
+                <div className="flex flex-col gap-1 max-h-[28rem] overflow-y-auto pr-1">
+                  {topPosts.map((p, i) => {
                     const account = models.find((m) => m.name === p.model);
                     return (
-                      <a key={p.model} href={p.externalLink || undefined} target="_blank" rel="noreferrer"
+                      <a key={p.externalLink || i} href={p.externalLink || undefined} target="_blank" rel="noreferrer"
                         className="flex items-center gap-3 rounded-2xl p-2.5 transition-colors"
                         style={{ background: "transparent" }}
                         onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
@@ -5678,7 +5702,6 @@ function CreatorInsightsSection({ models, inflowwDailyStats, embedded, days = 30
 }
 
 function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats, inflowwSyncing, refreshInfloww, bufferDailyStats, bufferTopPosts }) {
-  const recent = [...cards].sort((a, b) => b.createdAt - a.createdAt).slice(0, 6);
   const [revRange, setRevRange] = useState(7); // 7 or 30
   // "+$X" flash shown briefly next to the big number after a manual refresh actually
   // changes the total — not on every render, only when refresh caused the delta.
@@ -5718,12 +5741,6 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
     el.style.transition = "transform 0.5s ease-out";
     el.style.transform = "perspective(1400px) rotateX(0deg) rotateY(0deg)";
   };
-
-  // Best reel from the most recent week that has any reels logged
-  const latestReelWeek = reels.length ? [...reels].map((r) => r.weekOf).sort().slice(-1)[0] : null;
-  const reelOfWeek = latestReelWeek
-    ? reels.filter((r) => r.weekOf === latestReelWeek).sort((a, b) => b.views - a.views)[0]
-    : null;
 
   // Agency revenue: every tracked model's Free + Paid Infloww earnings,
   // summed per day across the whole agency, for whichever range is selected.
@@ -5973,54 +5990,6 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
 
       <OfExtrasSection models={models} inflowwDailyStats={inflowwDailyStats}
         days={revRange} periodLabel={revRange === 7 ? "this week" : "this month"} sinceISO={days[0]} />
-
-      <div className="c-bg-surface border c-border rounded-xl p-4 mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <span className="fs-11 uppercase tracking-widest c-muted font-mono">Reel of the week</span>
-          <button onClick={() => onNavigate("stats")} className="fs-11 font-mono uppercase c-accent hover:underline">Log a reel →</button>
-        </div>
-        {!reelOfWeek ? (
-          <div className="fs-12 c-faint font-mono italic py-4">No reels logged yet, add them in Stats.</div>
-        ) : (
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="c-text text-sm font-medium">{reelOfWeek.title || "Untitled reel"}</span>
-              <span className="fs-10 font-mono c-accent uppercase">{reelOfWeek.model}</span>
-            </div>
-            <div className="flex gap-5 flex-wrap fs-11 font-mono c-muted mb-2">
-              <span><span className="c-text">{reelOfWeek.views.toLocaleString()}</span> views</span>
-              <span><span className="c-text">{reelOfWeek.likes.toLocaleString()}</span> likes</span>
-              <span><span className="c-text">{reelOfWeek.shares.toLocaleString()}</span> shares</span>
-              <span><span className="c-text">{reelOfWeek.comments.toLocaleString()}</span> comments</span>
-            </div>
-            {reelOfWeek.link && (
-              <a href={reelOfWeek.link} target="_blank" rel="noopener noreferrer" className="fs-11 font-mono c-accent hover-accent-text">Open reel →</a>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="c-bg-surface border c-border rounded-xl p-4 mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <span className="fs-11 uppercase tracking-widest c-muted font-mono">Recent activity</span>
-        </div>
-        {recent.length === 0 ? (
-          <div className="fs-11 c-faint font-mono italic py-6 text-center">nothing yet</div>
-        ) : (
-          <div className="space-y-2">
-            {recent.map((c) => {
-              const stage = STAGES.find((s) => s.id === c.stage);
-              return (
-                <div key={c.id} className="flex items-center gap-2 text-xs">
-                  <Circle size={6} fill={stage.color} color={stage.color} />
-                  <span className="c-text truncate flex-1">{c.title || "Untitled"}</span>
-                  <span className="c-muted font-mono fs-10">{c.model || "—"}</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
       {showAllWeeksModal && (() => {
         const allWeeks = getAllWeeksHistory();
@@ -12269,7 +12238,7 @@ function App() {
               <span>Log out</span>
             </button>
           </div>
-          <div className="px-4 py-3 border-t c-border hidden sm:block">
+          <div className="px-4 py-3 hidden sm:block">
             <div className="flex items-center gap-2">
               <Circle size={7} fill="#39e673" color="#39e673" className="anim-pulse-dot" />
               <span className="fs-10 font-mono uppercase tracking-widest c-muted">All systems online</span>
