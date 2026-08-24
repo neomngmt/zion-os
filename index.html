@@ -1083,6 +1083,9 @@ const trendsToDB = (t) => ({
 const integrationsToJS = (r) => ({ id: r.id, name: r.name, status: r.status, note: r.note || "", help: r.help || "", agency: r.agency });
 const integrationsToDB = (i) => ({ id: i.id, name: i.name, status: i.status, note: i.note || "", help: i.help || "", agency: i.agency });
 
+const xCompetitorProfilesToJS = (r) => ({ id: r.id, handle: r.handle || "", note: r.note || "" });
+const xCompetitorProfilesToDB = (c) => ({ id: c.id, handle: c.handle || "", note: c.note || "" });
+
 // ---------- shared bits ----------
 
 function CountUp({ value, prefix = "", duration = 600 }) {
@@ -1507,7 +1510,76 @@ function XCaptionStudio({ models, restrictModel, filterModel }) {
     </div>
   );
 }
-function ContentDirector({ cards, persistCards, models, restrictModel, forcedNetwork, reels, persistReels }) {
+
+// Agency-wide list of X accounts worth keeping an eye on for inspiration —
+// not tied to any one model. Just a plain add/remove list for now; nothing
+// scrapes these yet (Publer has no public competitor-analytics endpoint —
+// once there's a real list here, tracking gets built as an extension of the
+// weekly-trends-scrape mechanism already used for Instagram).
+function XCompetitorSettings({ competitors, persistCompetitors }) {
+  const [open, setOpen] = React.useState(false);
+  const [handle, setHandle] = React.useState("");
+  const [note, setNote] = React.useState("");
+
+  const addCompetitor = async () => {
+    const clean = handle.trim().replace(/^@/, "");
+    if (!clean) return;
+    await persistCompetitors([...(competitors || []), { id: uid(), handle: clean, note: note.trim() }]);
+    setHandle(""); setNote("");
+  };
+  const removeCompetitor = async (id) => {
+    await persistCompetitors((competitors || []).filter((c) => c.id !== id));
+  };
+
+  return (
+    <div className="mt-4 c-bg-surface border c-border rounded-xl p-4">
+      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between tap">
+        <div className="flex items-center gap-2">
+          <Settings size={14} className="c-muted" />
+          <span className="fs-12 font-semibold c-text">Competitor tracking</span>
+          <span className="fs-10 font-mono c-faint">({(competitors || []).length})</span>
+        </div>
+        <ChevronDown size={14} className={`c-muted transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="mt-3 pt-3 border-t c-border">
+          <p className="fs-11 c-muted font-mono mb-3 max-w-lg">
+            X accounts worth watching for inspiration/benchmarking. No tracking runs against these yet — this is just the list, wired up once there's something worth scraping.
+          </p>
+          <div className="flex flex-wrap gap-2 mb-3">
+            <input value={handle} onChange={(e) => setHandle(e.target.value)} placeholder="@handle"
+              onKeyDown={(e) => e.key === "Enter" && addCompetitor()}
+              className="flex-1 min-w-[140px] c-bg-app border c-border rounded-lg px-2.5 py-1.5 fs-12 font-mono c-text" />
+            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="note (optional)"
+              onKeyDown={(e) => e.key === "Enter" && addCompetitor()}
+              className="flex-1 min-w-[140px] c-bg-app border c-border rounded-lg px-2.5 py-1.5 fs-12 font-mono c-text" />
+            <button onClick={addCompetitor} disabled={!handle.trim()}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg c-bg-accent c-onaccent fs-11 font-mono uppercase tracking-wide font-semibold hover-bg-accent2 disabled:opacity-40 tap">
+              <Plus size={12} /> Add
+            </button>
+          </div>
+          {(competitors || []).length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              {competitors.map((c) => (
+                <div key={c.id} className="flex items-center justify-between c-bg-app border c-border rounded-lg px-2.5 py-1.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="fs-12 font-mono c-text">@{c.handle}</span>
+                    {c.note && <span className="fs-10 c-faint truncate">{c.note}</span>}
+                  </div>
+                  <button onClick={() => removeCompetitor(c.id)} className="c-muted hover-text-accent tap">
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ContentDirector({ cards, persistCards, models, restrictModel, forcedNetwork, reels, persistReels, xCompetitors, persistXCompetitors }) {
   const [detail, setDetail] = useState(null);
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -1599,7 +1671,10 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
     return xModelName ? (
       <XCaptionStudio key={xModelName} models={models} restrictModel={xModelName} filterModel={xModelName} />
     ) : (
-      <IGModelPicker models={models} onPick={setFilter} subtitle="Opens her dedicated X caption studio." handleKey="xHandle" handleLabel="X" />
+      <>
+        <IGModelPicker models={models} onPick={setFilter} subtitle="Opens her dedicated X caption studio." handleKey="xHandle" handleLabel="X" />
+        <XCompetitorSettings competitors={xCompetitors} persistCompetitors={persistXCompetitors} />
+      </>
     );
   }
 
@@ -10469,6 +10544,7 @@ function App() {
   const { value: settings, loading: settingsLoading, persist: persistSettings } = useSupaSettings({ adminPinCZ: "2748", adminPinUS: "1234", inflowwApiKey: "", monthlyRevenueGoal: 20000 });
   const { value: integrations, loading: integrationsLoading, persist: persistIntegrations } = useSupaTable("integrations", "id", DEFAULT_INTEGRATIONS, integrationsToJS, integrationsToDB);
   const { value: weeklyTrendReels, loading: weeklyTrendReelsLoading, reload: reloadWeeklyTrendReels } = useSupaTable("weekly_trend_reels", "id", [], weeklyTrendReelsToJS, weeklyTrendReelsToDB);
+  const { value: xCompetitors, persist: persistXCompetitors } = useSupaTable("x_competitor_profiles", "id", [], xCompetitorProfilesToJS, xCompetitorProfilesToDB);
   const [session, setSession] = useState(() => loadSavedSession());
   const [showLanding, setShowLanding] = useState(true);
   const [view, setView] = useState(null);
@@ -10754,7 +10830,7 @@ function App() {
             {currentView === "dashboard" && (session.role === "admin"
               ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} inflowwDailyStats={inflowwDailyStats} inflowwSyncing={inflowwSyncing} refreshInfloww={refreshInfloww} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} />
               : <CreatorDashboard stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} ofDailyStats={ofDailyStats} inflowwDailyStats={inflowwDailyStats} />)}
-            {currentView === "content" && <ContentDirector cards={isAdmin ? scopedCards : cards} persistCards={isAdmin ? scopedPersistCards : persistCards} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} forcedNetwork={contentPlatform} reels={isAdmin ? scopedReels : reels} persistReels={isAdmin ? scopedPersistReels : persistReels} />}
+            {currentView === "content" && <ContentDirector cards={isAdmin ? scopedCards : cards} persistCards={isAdmin ? scopedPersistCards : persistCards} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} forcedNetwork={contentPlatform} reels={isAdmin ? scopedReels : reels} persistReels={isAdmin ? scopedPersistReels : persistReels} xCompetitors={xCompetitors} persistXCompetitors={persistXCompetitors} />}
             {currentView === "calendar" && <CalendarView cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks} onNavigate={setView} restrictModel={restrictModel} />}
             {currentView === "tasks" && <TaskManager tasks={isAdmin ? scopedTasks : tasks} persistTasks={isAdmin ? scopedPersistTasks : persistTasks} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} />}
             {currentView === "stats" && <StatsManager stats={scopedStats} persistStats={scopedPersistStats} models={agencyModels} reels={scopedReels} persistReels={scopedPersistReels} />}
