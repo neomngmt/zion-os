@@ -1309,19 +1309,23 @@ function XCaptionStudio({ models, restrictModel, filterModel }) {
   const [generating, setGenerating] = React.useState(false);
   const [pairs, setPairs] = React.useState([]);
   const [genError, setGenError] = React.useState("");
+  const fileInputRef = React.useRef(null);
 
-  const addMockPhotos = () => {
-    const n = 3 + Math.floor(Math.random() * 3);
-    const hues = [140, 200, 320, 20, 260, 60];
-    const newPhotos = Array.from({ length: n }, () => ({
-      id: uid(),
-      name: `IMG_${Math.floor(1000 + Math.random() * 9000)}.HEIC`,
-      hue: hues[Math.floor(Math.random() * hues.length)],
-    }));
+  const addPhotos = (fileList) => {
+    const files = Array.from(fileList || []).filter((f) => f.type.startsWith("image/"));
+    if (!files.length) return;
+    const newPhotos = files.map((file) => ({ id: uid(), file, name: file.name, previewUrl: URL.createObjectURL(file) }));
     setPhotos((prev) => [...prev, ...newPhotos]);
     setPairs([]);
   };
-  const removePhoto = (id) => { setPhotos((prev) => prev.filter((p) => p.id !== id)); setPairs([]); };
+  const removePhoto = (id) => {
+    setPhotos((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((p) => p.id !== id);
+    });
+    setPairs([]);
+  };
 
   const generateCaptions = async () => {
     if (!photos.length || !selectedModel) return;
@@ -1341,13 +1345,57 @@ function XCaptionStudio({ models, restrictModel, filterModel }) {
       const captions = data?.captions || [];
       if (!captions.length) throw new Error("No captions came back");
       const newPairs = targetPhotos.map((p, i) => ({
-        photo: p, caption: captions[i % captions.length], time: i % 2 === 0 ? "11:00" : "17:00",
+        id: p.id, photo: p, caption: captions[i % captions.length], time: i % 2 === 0 ? "11:00" : "17:00",
       }));
       setPairs(newPairs);
     } catch (e) {
       setGenError(e.message || "Failed to generate captions");
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const [queueStates, setQueueStates] = React.useState({});
+  const setQueueState = (id, patch) => setQueueStates((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+
+  const nextSlotFor = (timeLabel) => {
+    const [h, m] = timeLabel.split(":").map(Number);
+    const d = new Date();
+    d.setSeconds(0, 0);
+    d.setHours(h, m);
+    if (d.getTime() <= Date.now() + 60000) d.setDate(d.getDate() + 1);
+    return d.toISOString();
+  };
+
+  const queuePost = async (pair) => {
+    if (!selectedModel) return;
+    setQueueState(pair.id, { status: "uploading", error: "" });
+    try {
+      const form = new FormData();
+      form.append("file", pair.photo.file, pair.photo.name);
+      const uploadResp = await fetch(`${SUPABASE_URL}/functions/v1/publer-upload-media`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+        body: form,
+      });
+      const uploadJson = await uploadResp.json();
+      if (!uploadResp.ok || uploadJson.error) throw new Error(uploadJson.error || "Upload failed");
+
+      setQueueState(pair.id, { status: "scheduling" });
+      const scheduleResp = await fetch(`${SUPABASE_URL}/functions/v1/publer-schedule`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({
+          modelName: selectedModel, platform: "x", text: pair.caption,
+          mediaId: uploadJson.id, scheduledAt: nextSlotFor(pair.time),
+        }),
+      });
+      const scheduleJson = await scheduleResp.json();
+      if (!scheduleResp.ok || scheduleJson.error) throw new Error(scheduleJson.error || "Scheduling failed");
+
+      setQueueState(pair.id, { status: "done" });
+    } catch (e) {
+      setQueueState(pair.id, { status: "error", error: e.message || "Failed to queue" });
     }
   };
 
@@ -1361,7 +1409,7 @@ function XCaptionStudio({ models, restrictModel, filterModel }) {
         <XLogo size={12} className="c-muted" />
       </div>
       <p className="fs-11 c-muted font-mono mb-4 max-w-xl">
-        Drop photos in, generate captions from persona + recent performance, queue to post. Photo upload and scheduling are still being wired up — caption generation is live.
+        Drop photos in, generate captions from persona + recent performance, queue straight to Publer.
       </p>
 
       {!restrictModel && scopedModels.length > 1 && (
@@ -1378,14 +1426,17 @@ function XCaptionStudio({ models, restrictModel, filterModel }) {
       <div className="flex flex-col lg:flex-row gap-4">
         <div className="flex-1 min-w-0">
           <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2">Photos queued</div>
-          <button onClick={addMockPhotos}
+          <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden"
+            onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
+          <button onClick={() => fileInputRef.current?.click()}
             className="w-full flex items-center justify-center gap-2 border border-dashed c-border rounded-xl py-5 mb-2 fs-11 font-mono c-muted hover-border-accent hover-bg-surface transition-colors tap">
-            <Plus size={14} /> Drop photos here (Drive folder or upload)
+            <Plus size={14} /> Upload photos
           </button>
           {photos.length > 0 && (
             <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
               {photos.map((p) => (
-                <div key={p.id} className="relative rounded-lg overflow-hidden group" style={{ paddingTop: "100%", background: `linear-gradient(135deg, hsl(${p.hue} 55% 22%), hsl(${p.hue} 55% 12%))` }}>
+                <div key={p.id} className="relative rounded-lg overflow-hidden group" style={{ paddingTop: "100%" }}>
+                  <img src={p.previewUrl} alt={p.name} className="absolute inset-0 w-full h-full object-cover" />
                   <button onClick={() => removePhoto(p.id)}
                     className="absolute top-1 right-1 c-bg-app rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Trash2 size={10} className="c-muted" />
@@ -1429,21 +1480,27 @@ function XCaptionStudio({ models, restrictModel, filterModel }) {
         <div className="mt-4 pt-4 border-t c-border">
           <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2">Ready to queue</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {pairs.map((pair) => (
-              <div key={pair.photo.id} className="flex gap-3 c-bg-app border c-border rounded-xl p-3">
-                <div className="flex-shrink-0 rounded-lg overflow-hidden" style={{ width: 56, height: 56, background: `linear-gradient(135deg, hsl(${pair.photo.hue} 55% 22%), hsl(${pair.photo.hue} 55% 12%))` }} />
-                <div className="flex-1 min-w-0">
-                  <div className="fs-12 c-text leading-snug mb-1.5">{pair.caption}</div>
-                  <div className="flex items-center justify-between">
-                    <span className="fs-10 c-faint font-mono">Queue · {pair.time}</span>
-                    <button disabled title="Publer scheduling integration coming next"
-                      className="flex items-center gap-1 fs-10 font-mono uppercase px-2 py-1 rounded-lg border c-border c-faint cursor-not-allowed">
-                      <Send size={10} /> Queue
-                    </button>
+            {pairs.map((pair) => {
+              const qs = queueStates[pair.id] || {};
+              const busy = qs.status === "uploading" || qs.status === "scheduling";
+              return (
+                <div key={pair.id} className="flex gap-3 c-bg-app border c-border rounded-xl p-3">
+                  <img src={pair.photo.previewUrl} alt="" className="flex-shrink-0 rounded-lg object-cover" style={{ width: 56, height: 56 }} />
+                  <div className="flex-1 min-w-0">
+                    <div className="fs-12 c-text leading-snug mb-1.5">{pair.caption}</div>
+                    <div className="flex items-center justify-between">
+                      <span className="fs-10 c-faint font-mono">Queue · {pair.time}</span>
+                      <button onClick={() => queuePost(pair)} disabled={busy || qs.status === "done"}
+                        className={`flex items-center gap-1 fs-10 font-mono uppercase px-2 py-1 rounded-lg border tap disabled:cursor-not-allowed ${qs.status === "done" ? "c-border c-accent" : "c-border c-muted hover-bg-surface disabled:opacity-40"}`}>
+                        {busy ? <Loader2 size={10} className="animate-spin" /> : <Send size={10} />}
+                        {qs.status === "done" ? "Queued" : qs.status === "uploading" ? "Uploading..." : qs.status === "scheduling" ? "Scheduling..." : "Queue"}
+                      </button>
+                    </div>
+                    {qs.status === "error" && <div className="fs-9 font-mono mt-1 c-warn">{qs.error}</div>}
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
