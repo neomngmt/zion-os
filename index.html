@@ -2208,15 +2208,19 @@ function AccountShareRing({ name, color, value, shareOfTotal, sublabel }) {
 function PlatformOverviewDashboard({
   platform, label, icon, glowRgb, bgGradient,
   models, bufferDailyStats, bufferTopPosts, competitors, persistCompetitors,
-  onPlanPosts, planLabel = "Plan posts", extraSection, noAccountsHint,
+  onPlanPosts, planLabel = "Plan posts", extraSection, noAccountsHint, metricLabel = "Reach",
 }) {
-  const rows = (bufferDailyStats || []).filter((r) => r.platform === platform);
-  const connectedNames = new Set(rows.map((r) => r.model));
+  const [account, setAccount] = React.useState("all");
+  const [range, setRange] = React.useState(7);
+
+  const allRows = (bufferDailyStats || []).filter((r) => r.platform === platform);
+  const connectedNames = new Set(allRows.map((r) => r.model));
   const connectedModels = models.filter((m) => connectedNames.has(m.name));
+  const rows = account === "all" ? allRows : allRows.filter((r) => r.model === account);
 
   const dateNDaysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
-  const weekAgoStr = dateNDaysAgo(6);
-  const weekRows = rows.filter((r) => r.statDate >= weekAgoStr);
+  const rangeAgoStr = dateNDaysAgo(range - 1);
+  const weekRows = rows.filter((r) => r.statDate >= rangeAgoStr);
   const weekTotals = {
     reach: weekRows.reduce((s, r) => s + (r.impressions || 0), 0),
     posts: weekRows.reduce((s, r) => s + (r.postCount || 0), 0),
@@ -2231,7 +2235,7 @@ function PlatformOverviewDashboard({
       date,
       value: rows.filter((r) => r.statDate === date).reduce((s, r) => s + (r.impressions || 0), 0),
     }));
-  }, [rows.length]);
+  }, [rows.length, account]);
 
   const donutSegments = [
     { label: "Likes", value: weekTotals.likes, color: XNEON.pink.fg },
@@ -2242,7 +2246,7 @@ function PlatformOverviewDashboard({
   const accountColor = (name) => MASS_PLANNER_COLORS[connectedModels.findIndex((m) => m.name === name) % MASS_PLANNER_COLORS.length];
 
   const topPosts = (bufferTopPosts || [])
-    .filter((p) => p.platform === platform && connectedNames.has(p.model))
+    .filter((p) => p.platform === platform && connectedNames.has(p.model) && (account === "all" || p.model === account))
     .sort((a, b) => (b.impressions || 0) - (a.impressions || 0));
 
   return (
@@ -2274,26 +2278,56 @@ function PlatformOverviewDashboard({
         </div>
       ) : (
         <>
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
+            <div className="flex flex-wrap gap-1.5">
+              <button onClick={() => setAccount("all")}
+                className="fs-11 font-mono uppercase px-3 py-1.5 rounded-full tap"
+                style={account === "all"
+                  ? { background: `${glowRgb}22`, color: glowRgb, border: `1px solid ${glowRgb}66` }
+                  : { background: "transparent", color: "#9d9b95", border: "1px solid rgba(255,255,255,0.1)" }}>
+                All accounts
+              </button>
+              {connectedModels.map((m) => (
+                <button key={m.name} onClick={() => setAccount(m.name)}
+                  className="fs-11 font-mono uppercase px-3 py-1.5 rounded-full tap"
+                  style={account === m.name
+                    ? { background: `${glowRgb}22`, color: glowRgb, border: `1px solid ${glowRgb}66` }
+                    : { background: "transparent", color: "#9d9b95", border: "1px solid rgba(255,255,255,0.1)" }}>
+                  {m.name}
+                </button>
+              ))}
+            </div>
+            <div className="flex rounded-full p-0.5" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              {[7, 30].map((d) => (
+                <button key={d} onClick={() => setRange(d)}
+                  className="fs-11 font-mono uppercase px-3 py-1.5 rounded-full tap"
+                  style={range === d ? { background: glowRgb, color: "#050705" } : { background: "transparent", color: "#9d9b95" }}>
+                  {d}D
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="flex flex-wrap gap-2.5 mb-5">
-            <XNeonStatTile label="Reach · 7d" value={weekTotals.reach.toLocaleString()} color="blue" icon={<Eye size={11} style={{ color: XNEON.blue.fg }} />} />
-            <XNeonStatTile label="Posts · 7d" value={weekTotals.posts} color="green" icon={<Sparkles size={11} style={{ color: XNEON.green.fg }} />} />
-            <XNeonStatTile label="Likes · 7d" value={weekTotals.likes.toLocaleString()} color="pink" icon={<Heart size={11} style={{ color: XNEON.pink.fg }} />} />
+            <XNeonStatTile label={`${metricLabel} · ${range}d`} value={weekTotals.reach.toLocaleString()} color="blue" icon={<Eye size={11} style={{ color: XNEON.blue.fg }} />} />
+            <XNeonStatTile label={`Posts · ${range}d`} value={weekTotals.posts} color="green" icon={<Sparkles size={11} style={{ color: XNEON.green.fg }} />} />
+            <XNeonStatTile label={`Likes · ${range}d`} value={weekTotals.likes.toLocaleString()} color="pink" icon={<Heart size={11} style={{ color: XNEON.pink.fg }} />} />
             <XNeonStatTile label="Avg engagement" value={avgEr != null ? `${avgEr.toFixed(1)}%` : "—"} color="amber" icon={<Flame size={11} style={{ color: XNEON.amber.fg }} />} />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 mb-5">
             <div className="lg:col-span-3 c-bg-app rounded-xl p-4" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
-              <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-3">Reach · last 30 days</div>
+              <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-3">{metricLabel} · last 30 days</div>
               <AreaTrendChart data={trend30} color={glowRgb} />
             </div>
             <div className="lg:col-span-2 c-bg-app rounded-xl p-4 flex flex-col justify-center" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
-              <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-3">Engagement mix · 7d</div>
+              <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-3">Engagement mix · {range}d</div>
               <EngagementDonut segments={donutSegments} centerLabel="total" />
             </div>
           </div>
 
           <div className="c-bg-app rounded-xl p-4 mb-5" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
-            <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-3">Share of reach · 7d</div>
+            <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-3">Share of {metricLabel.toLowerCase()} · {range}d</div>
             <div className="flex flex-wrap gap-4">
               {connectedModels.map((m) => {
                 const color = accountColor(m.name);
@@ -2301,7 +2335,7 @@ function PlatformOverviewDashboard({
                 return (
                   <AccountShareRing key={m.name} name={m.name} color={color} value={m.name}
                     shareOfTotal={weekTotals.reach > 0 ? mReach / weekTotals.reach : 0}
-                    sublabel={`${mReach.toLocaleString()} reach`} />
+                    sublabel={`${mReach.toLocaleString()} ${metricLabel.toLowerCase()}`} />
                 );
               })}
             </div>
@@ -2324,7 +2358,7 @@ function PlatformOverviewDashboard({
                       )}
                       <span className="fs-10 font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: color + "26", color }}>{p.model}</span>
                       <div className="flex-1 min-w-0 fs-11 c-text truncate">{p.text || <span className="c-faint italic">No text</span>}</div>
-                      <div className="flex-shrink-0 fs-11 font-mono c-text font-semibold text-right" style={{ width: 70 }}>{(p.impressions || 0).toLocaleString()}<span className="c-faint fs-9 block">reach</span></div>
+                      <div className="flex-shrink-0 fs-11 font-mono c-text font-semibold text-right" style={{ width: 70 }}>{(p.impressions || 0).toLocaleString()}<span className="c-faint fs-9 block">{metricLabel.toLowerCase()}</span></div>
                     </a>
                   );
                 })}
@@ -2344,7 +2378,7 @@ function PlatformOverviewDashboard({
 function XOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, competitors, persistCompetitors, onPlanPosts }) {
   return (
     <PlatformOverviewDashboard
-      platform="x" label="X" icon={<XLogo size={18} className="c-accent" />} glowRgb="#39e673"
+      platform="x" label="X" icon={<XLogo size={18} className="c-accent" />} glowRgb="#39e673" metricLabel="Impressions"
       bgGradient="radial-gradient(ellipse 130% 100% at 10% 0%, rgba(57,230,115,0.12), transparent 55%), radial-gradient(ellipse 100% 80% at 100% 0%, rgba(56,189,248,0.08), transparent 55%), #0b0f0d"
       models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts}
       competitors={competitors} persistCompetitors={persistCompetitors} onPlanPosts={onPlanPosts}
@@ -2389,13 +2423,14 @@ function IGStar({ size = 14, color = "#fff" }) {
 // lines are decorative.
 function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanPosts }) {
   const C = {
-    page: "radial-gradient(ellipse 130% 100% at 10% 0%, rgba(255,46,120,0.14), transparent 55%), radial-gradient(ellipse 100% 80% at 100% 0%, rgba(255,122,61,0.10), transparent 55%), #0b0f0d",
+    page: "radial-gradient(ellipse 130% 100% at 10% 0%, rgba(57,230,115,0.14), transparent 55%), radial-gradient(ellipse 100% 80% at 100% 0%, rgba(56,189,248,0.10), transparent 55%), #0b0f0d",
     card: "rgba(255,255,255,0.035)", cardBorder: "1px solid rgba(255,255,255,0.08)",
     ink: "#ffffff", sub: "#9d9b95",
-    pinkA: "#ff2e78", pinkB: "#ff7a3d", pinkSoft: "rgba(255,46,120,0.14)", pinkIcon: "#ff5c9a",
+    pinkA: "#39e673", pinkB: "#17c58a", pinkSoft: "rgba(57,230,115,0.14)", pinkIcon: "#39e673",
+    igBrandA: "#ff2e78", igBrandB: "#ff7a3d", // Instagram's own brand gradient — kept only on the small platform-icon badge
     ringTrack: "rgba(255,255,255,0.08)",
   };
-  const DONUT_COLORS = ["#ff2e78", "#38bdf8", "#ffb020"];
+  const DONUT_COLORS = ["#39e673", "#38bdf8", "#ffb020"];
 
   const [igAccount, setIgAccount] = React.useState("all");
   const [igRange, setIgRange] = React.useState(7);
@@ -2446,11 +2481,11 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
   const noAccounts = connectedModels.length === 0;
 
   return (
-    <div className="mb-5 rounded-3xl overflow-hidden" style={{ background: C.page, color: C.ink, fontFamily: "system-ui, -apple-system, sans-serif", border: "1px solid rgba(255,46,120,0.16)" }}>
+    <div className="mb-5 rounded-3xl overflow-hidden" style={{ background: C.page, color: C.ink, fontFamily: "system-ui, -apple-system, sans-serif", border: "1px solid rgba(57,230,115,0.16)" }}>
       <div className="p-5 md:p-7">
         <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: `linear-gradient(135deg, ${C.pinkA}, ${C.pinkB})`, boxShadow: `0 0 20px ${C.pinkA}55` }}>
+            <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: `linear-gradient(135deg, ${C.igBrandA}, ${C.igBrandB})`, boxShadow: `0 0 20px ${C.igBrandA}55` }}>
               <Instagram size={18} color="#fff" />
             </div>
             <div>
@@ -2549,7 +2584,7 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
                       })}
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="rounded-full flex items-center justify-center" style={{ width: 44, height: 44, background: "rgba(255,46,120,0.16)", boxShadow: `0 0 16px ${C.pinkA}55` }}>
+                      <div className="rounded-full flex items-center justify-center" style={{ width: 44, height: 44, background: C.pinkSoft, boxShadow: `0 0 16px ${C.pinkA}55` }}>
                         <Heart size={18} color={C.pinkIcon} />
                       </div>
                     </div>
