@@ -5447,6 +5447,18 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
   const prevTotalRef = useRef(null);
   const refreshPendingRef = useRef(false);
 
+  // Subtle cursor-tilt on the Agency Revenue panel — same 3D parallax as the
+  // X/Instagram dashboards, for a consistent feel across the app's panels.
+  const tiltRef = useRef(null);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [tilting, setTilting] = useState(false);
+  const handleTiltMove = (e) => {
+    const rect = tiltRef.current.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width - 0.5;
+    const py = (e.clientY - rect.top) / rect.height - 0.5;
+    setTilt({ x: py * -3, y: px * 3 });
+  };
+
   // Best reel from the most recent week that has any reels logged
   const latestReelWeek = reels.length ? [...reels].map((r) => r.weekOf).sort().slice(-1)[0] : null;
   const reelOfWeek = latestReelWeek
@@ -5599,9 +5611,16 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
 
   return (
     <div>
-      <div className="c-bg-surface border rounded-xl p-5 mb-6" style={{
+      <div ref={tiltRef}
+        onMouseMove={handleTiltMove}
+        onMouseEnter={() => setTilting(true)}
+        onMouseLeave={() => { setTilting(false); setTilt({ x: 0, y: 0 }); }}
+        className="c-bg-surface border rounded-xl p-5 mb-6" style={{
         borderColor: "rgba(57,230,115,0.22)",
         animation: "cardIn 0.4s ease-out, auroraGlow 11s ease-in-out 0.4s infinite",
+        transform: `perspective(1200px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
+        transition: tilting ? "transform 0.1s ease-out" : "transform 0.5s ease-out",
+        transformStyle: "preserve-3d",
       }}>
         <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
           <span className="fs-11 uppercase tracking-widest c-muted font-mono">
