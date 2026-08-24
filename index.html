@@ -9837,14 +9837,13 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
             width: (isDesktopViewport ? Math.min(winWidth * 0.32, 650) : 300) * 0.98,
             height: (isDesktopViewport ? Math.min(winWidth * 0.32, 650) : 300) * 0.98,
             flexShrink: 0,
-            transform: isDesktopViewport ? `translate(4px, 0px)` : "none",
             zIndex: 100,
           }}>
-            <div style={{ position: "absolute", inset: 0, transform: isDesktopViewport ? `translate(-8px, -36px) scale(1.14)` : "none" }}>
+            <div style={{ position: "absolute", inset: 0, transform: isDesktopViewport ? `scale(1.14)` : "none" }}>
               <div ref={glowElRef} style={{ position: "absolute", inset: "8%", background: "radial-gradient(circle, rgba(57,230,115,0.65) 0%, rgba(57,230,115,0.3) 45%, transparent 75%)", filter: "blur(36px)", pointerEvents: "none", willChange: "transform, opacity" }} />
             </div>
             {/* tick-mark dial ring behind the orb — a bit of HUD/instrument-panel flair. Independently adjustable via the edit panel. */}
-            <div style={{ position: "absolute", inset: 0, transform: isDesktopViewport ? `translate(20px, -12px) scale(1.14)` : "none" }}>
+            <div style={{ position: "absolute", inset: 0, transform: isDesktopViewport ? `scale(1.14)` : "none" }}>
               <svg className="neo-ring-size" viewBox="0 0 400 400" style={{ position: "absolute", inset: "-6%", width: "112%", height: "112%", pointerEvents: "none" }}>
                 <circle cx="200" cy="200" r="196" fill="none" stroke="rgba(57,230,115,0.18)" strokeWidth="1" />
                 <circle cx="200" cy="200" r="182" fill="none" stroke="rgba(57,230,115,0.14)" strokeWidth="1" strokeDasharray="1,7" />
@@ -9873,7 +9872,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
                 <span style={{ display: "inline-block", width: "3px", height: "3px", borderRadius: "50%", background: amber, marginLeft: "3px", animation: "neoDotBlink 1.2s ease-in-out infinite 0.4s" }} />
               </div>
             )}
-            <div style={{ position: "absolute", inset: 0, transform: isDesktopViewport ? `translate(-8px, -44px) scale(1.18)` : "none", zIndex: 22 }}>
+            <div style={{ position: "absolute", inset: 0, transform: isDesktopViewport ? `scale(1.18)` : "none", zIndex: 22 }}>
               <NeoOrb3D thinking={thinking} speaking={speaking} listening={listening} speakBumpRef={speakBumpRef} liveAmpRef={liveAmpRef} onClick={orbClick} glowElRef={glowElRef} />
             </div>
           </div>
