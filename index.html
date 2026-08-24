@@ -617,8 +617,8 @@ const fontImport = `
   50% { background-position: 100% 50%; }
 }
 @keyframes panelGlowPulse {
-  0%, 100% { box-shadow: 0 0 70px -15px var(--glow-c, rgba(57,230,115,0.45)), 0 30px 60px -30px rgba(0,0,0,0.6); }
-  50% { box-shadow: 0 0 150px -10px var(--glow-c, rgba(57,230,115,0.75)), 0 30px 60px -30px rgba(0,0,0,0.6); }
+  0%, 100% { box-shadow: 0 0 24px -12px var(--glow-c, rgba(57,230,115,0.45)), 0 30px 60px -30px rgba(0,0,0,0.6); }
+  50% { box-shadow: 0 0 48px -10px var(--glow-c, rgba(57,230,115,0.65)), 0 30px 60px -30px rgba(0,0,0,0.6); }
 }
 
 .anim-view { animation: fadeInUp 0.28s ease-out; }
@@ -12149,7 +12149,7 @@ function App() {
 
         {/* Sidebar — slides in from the left on phones when the top-right
             menu button is tapped; always visible (static) from sm up. */}
-        <aside className={`fixed inset-y-0 left-0 z-50 w-56 shadow-2xl flex border-r c-border c-bg-panel flex-shrink-0 flex-col transition-transform duration-300 ease-out sm:static sm:z-auto sm:shadow-none sm:translate-x-0 ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <aside className={`fixed inset-y-0 left-0 z-50 w-56 shadow-2xl flex c-bg-panel flex-shrink-0 flex-col transition-transform duration-300 ease-out sm:static sm:z-auto sm:shadow-none sm:translate-x-0 ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}`}>
           {mobileNavOpen && (
             <div className="sm:hidden flex items-center justify-center pt-6 pb-5">
               <div style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: "8px", transform: "translateX(-6px)" }}>
