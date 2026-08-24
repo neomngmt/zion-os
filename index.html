@@ -1314,6 +1314,35 @@ function XCaptionStudio({ models, restrictModel, filterModel }) {
   const [genError, setGenError] = React.useState("");
   const fileInputRef = React.useRef(null);
 
+  const [postHistory, setPostHistory] = React.useState(null);
+  const [postHistoryLoading, setPostHistoryLoading] = React.useState(false);
+  const [postHistoryError, setPostHistoryError] = React.useState("");
+  React.useEffect(() => {
+    if (!selectedModel) { setPostHistory(null); return; }
+    let cancelled = false;
+    setPostHistoryLoading(true);
+    setPostHistoryError("");
+    (async () => {
+      try {
+        const { data, error } = await supabaseClient.functions.invoke("publer-posts", {
+          body: { modelName: selectedModel, platform: "x", days: 30 },
+        });
+        if (cancelled) return;
+        if (error) {
+          const body = await error.context?.json?.().catch(() => null);
+          throw new Error(body?.error || error.message);
+        }
+        if (data?.error) throw new Error(data.error);
+        setPostHistory(data);
+      } catch (e) {
+        if (!cancelled) setPostHistoryError(e.message || "Failed to load posts");
+      } finally {
+        if (!cancelled) setPostHistoryLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedModel]);
+
   const addPhotos = (fileList) => {
     const files = Array.from(fileList || []).filter((f) => f.type.startsWith("image/"));
     if (!files.length) return;
@@ -1466,10 +1495,21 @@ function XCaptionStudio({ models, restrictModel, filterModel }) {
               <div className="fs-11 c-faint italic font-mono">Pick a model above</div>
             )}
           </div>
-          <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2">Last week signal</div>
+          <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2">Last 30 days</div>
           <div className="c-bg-app border c-border rounded-xl p-3 mb-3 fs-11 c-muted font-mono leading-relaxed">
-            Top format: <span className="c-text">talking head, direct CTA</span><br />
-            Avg engagement: <span className="c-accent">+18% vs prior week</span>
+            {postHistoryLoading ? (
+              <span className="c-faint italic">Loading...</span>
+            ) : postHistoryError ? (
+              <span className="c-warn">{postHistoryError}</span>
+            ) : postHistory ? (
+              <>
+                Posts: <span className="c-text">{postHistory.summary.postCount}</span><br />
+                Total reach: <span className="c-text">{postHistory.summary.totalReach.toLocaleString()}</span><br />
+                Avg engagement: <span className="c-accent">{postHistory.summary.avgEngagementRate.toFixed(1)}%</span>
+              </>
+            ) : (
+              <span className="c-faint italic">Pick a model above</span>
+            )}
           </div>
           <button onClick={generateCaptions} disabled={!photos.length || generating}
             className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg c-bg-accent c-onaccent fs-12 font-mono uppercase tracking-wide font-semibold hover-bg-accent2 disabled:opacity-40 tap">
@@ -1504,6 +1544,32 @@ function XCaptionStudio({ models, restrictModel, filterModel }) {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {postHistory && postHistory.posts.length > 0 && (
+        <div className="mt-4 pt-4 border-t c-border">
+          <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2">
+            All posts · last 30 days ({postHistory.posts.length})
+          </div>
+          <div className="flex flex-col gap-1.5 max-h-96 overflow-y-auto pr-1">
+            {postHistory.posts.map((p) => (
+              <a key={p.id} href={p.postLink || undefined} target="_blank" rel="noreferrer"
+                className="flex gap-3 c-bg-app border c-border rounded-lg p-2.5 hover-border-accent transition-colors">
+                {p.thumbnailUrl ? (
+                  <img src={p.thumbnailUrl} alt="" className="flex-shrink-0 rounded-md object-cover" style={{ width: 44, height: 44 }} />
+                ) : (
+                  <div className="flex-shrink-0 rounded-md c-bg-surface" style={{ width: 44, height: 44 }} />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="fs-11 c-text leading-snug truncate">{p.text || <span className="c-faint italic">No text</span>}</div>
+                  <div className="fs-9 c-faint font-mono mt-1">
+                    {p.scheduledAt ? new Date(p.scheduledAt).toLocaleDateString() : "—"} · reach {p.reach.toLocaleString()} · {p.likes} likes · {p.engagementRate.toFixed(1)}% ER
+                  </div>
+                </div>
+              </a>
+            ))}
           </div>
         </div>
       )}
