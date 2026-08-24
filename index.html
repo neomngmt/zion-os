@@ -1434,6 +1434,7 @@ function XCaptionStudio({ models, restrictModel, filterModel }) {
   const persona = model ? [model.bio, model.note].filter(Boolean).join(" · ") : "";
 
   return (
+    <>
     <div className="mb-5 c-bg-surface border c-border rounded-xl p-4 relative overflow-hidden">
       <div className="flex items-center gap-2 mb-1">
         <Sparkles size={15} className="c-accent" />
@@ -1574,6 +1575,8 @@ function XCaptionStudio({ models, restrictModel, filterModel }) {
         </div>
       )}
     </div>
+    {model && <XMassPlanner models={models} defaultSelected={[model.name]} defaultOpen={false} />}
+    </>
   );
 }
 
@@ -1617,9 +1620,10 @@ function nextMassPlannerSlots(n) {
 // Picks all connected models at once, generates + auto-schedules a week of
 // captioned posts across their X accounts, and shows a preview grid before
 // anything actually gets uploaded/scheduled to Publer.
-function XMassPlanner({ models }) {
-  const [open, setOpen] = React.useState(true);
-  const [selected, setSelected] = React.useState([]);
+function XMassPlanner({ models, defaultSelected = [], defaultOpen = true }) {
+  const [open, setOpen] = React.useState(defaultOpen);
+  const [selected, setSelected] = React.useState(defaultSelected);
+  React.useEffect(() => { setSelected(defaultSelected); }, [defaultSelected.join(",")]);
   const [photos, setPhotos] = React.useState([]);
   const fileInputRef = React.useRef(null);
   const [plan, setPlan] = React.useState(null);
@@ -1721,111 +1725,198 @@ function XMassPlanner({ models }) {
     setRunningAll(false);
   };
 
-  const days = plan ? Array.from(new Set(plan.map((it) => it.scheduledAt.slice(0, 10)))).sort() : [];
   const allDone = plan && plan.length > 0 && plan.every((it) => itemStates[it.id]?.status === "done");
+  const doneCount = plan ? plan.filter((it) => itemStates[it.id]?.status === "done").length : 0;
+
+  // Always render a full Mon–Sun-from-today 7-day strip so the shape of the
+  // week is visible even on days with nothing scheduled, not just the days
+  // that happen to have a post.
+  const weekDays = React.useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(start);
+      d.setDate(d.getDate() + i);
+      return d.toISOString().slice(0, 10);
+    });
+  }, [plan]);
+
+  const renderAvatar = (name, size = 28) => (
+    <span className="rounded-full flex items-center justify-center font-bold flex-shrink-0"
+      style={{
+        width: size, height: size, fontSize: size * 0.42,
+        background: modelColor(name) + "26", color: modelColor(name),
+        border: `1.5px solid ${modelColor(name)}66`,
+      }}>
+      {name.slice(0, 1).toUpperCase()}
+    </span>
+  );
 
   return (
-    <div className="mb-5 c-bg-surface border c-border rounded-xl p-4">
+    <div className="mb-5 rounded-2xl p-5 relative overflow-hidden"
+      style={{
+        background: "radial-gradient(ellipse 120% 100% at 10% 0%, rgba(18,179,76,0.09), transparent 60%), #0b0f0d",
+        border: "1px solid rgba(57,230,115,0.16)",
+      }}>
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between tap">
-        <div className="flex items-center gap-2">
-          <Megaphone size={15} className="c-accent" />
-          <span className="fs-13 font-semibold c-text">Mass Planner</span>
-          <XLogo size={12} className="c-muted" />
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: "rgba(57,230,115,0.12)", border: "1px solid rgba(57,230,115,0.3)" }}>
+            <Megaphone size={16} className="c-accent" />
+          </div>
+          <div className="text-left">
+            <div className="flex items-center gap-2">
+              <span className="text-base font-extrabold tracking-tight c-text">Mass Planner</span>
+              <XLogo size={11} className="c-muted" />
+            </div>
+            <p className="fs-11 c-muted mt-0.5">Plan a week across every X account at once</p>
+          </div>
         </div>
-        <ChevronDown size={14} className={`c-muted transition-transform ${open ? "rotate-180" : ""}`} />
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {plan && plan.length > 0 && (
+            <span className="fs-10 font-mono uppercase px-2 py-1 rounded-lg c-bg-accent-a2 c-accent hidden sm:inline-block">
+              {plan.length} posts ready
+            </span>
+          )}
+          <ChevronDown size={16} className={`c-muted transition-transform ${open ? "rotate-180" : ""}`} />
+        </div>
       </button>
-      {open && (
-        <div className="mt-3 pt-3 border-t c-border">
-          <p className="fs-11 c-muted font-mono mb-3 max-w-xl">
-            Pick accounts, drop a shared batch of photos, and plan a week across all of them at once — 2 posts/day/account (11:00 &amp; 17:00). Nothing gets uploaded or scheduled until you confirm the preview below.
-          </p>
 
-          <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2">Accounts</div>
-          <div className="flex flex-wrap gap-1.5 mb-4">
+      {open && (
+        <div className="mt-4 pt-4 border-t" style={{ borderColor: "rgba(57,230,115,0.14)" }}>
+          <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2.5">Accounts</div>
+          <div className="flex flex-wrap gap-3 mb-5">
             {models.map((m) => {
               const isOn = selected.includes(m.name);
               return (
                 <button key={m.name} onClick={() => { toggleModel(m.name); setPlan(null); }}
-                  className={`flex items-center gap-1.5 fs-11 font-mono px-2.5 py-1.5 rounded-lg border tap ${isOn ? "c-border-accent c-accent c-bg-accent-a2" : "c-border c-muted hover-bg-surface"}`}>
-                  <span className="w-4 h-4 rounded-full flex items-center justify-center fs-9 font-bold"
-                    style={{ background: isOn ? modelColor(m.name) + "33" : "rgba(255,255,255,0.08)", color: isOn ? modelColor(m.name) : undefined }}>
-                    {m.name.slice(0, 1).toUpperCase()}
-                  </span>
-                  {m.name}
+                  className="flex flex-col items-center gap-1.5 tap group" style={{ width: 60 }}>
+                  <div className="relative">
+                    <div className="rounded-full flex items-center justify-center font-bold transition-all"
+                      style={{
+                        width: 44, height: 44, fontSize: 16,
+                        background: isOn ? modelColor(m.name) + "22" : "rgba(255,255,255,0.04)",
+                        border: isOn ? `2px solid ${modelColor(m.name)}` : "2px solid rgba(255,255,255,0.10)",
+                        color: isOn ? modelColor(m.name) : "var(--c-faint, #6b7280)",
+                        boxShadow: isOn ? `0 0 14px ${modelColor(m.name)}40` : "none",
+                      }}>
+                      {m.name.slice(0, 1).toUpperCase()}
+                    </div>
+                    {isOn && (
+                      <div className="absolute -bottom-0.5 -right-0.5 rounded-full flex items-center justify-center"
+                        style={{ width: 16, height: 16, background: modelColor(m.name) }}>
+                        <Sparkles size={9} style={{ color: "#04150a" }} />
+                      </div>
+                    )}
+                  </div>
+                  <span className={`fs-10 font-mono truncate w-full text-center ${isOn ? "c-text font-semibold" : "c-faint"}`}>{m.name}</span>
                 </button>
               );
             })}
           </div>
 
-          <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2">Shared photo batch</div>
+          <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2.5">Shared photo batch</div>
           <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden"
             onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
-          <button onClick={() => fileInputRef.current?.click()}
-            className="w-full flex items-center justify-center gap-2 border border-dashed c-border rounded-xl py-4 mb-2 fs-11 font-mono c-muted hover-border-accent hover-bg-surface transition-colors tap">
-            <Plus size={14} /> Upload photos ({photos.length} queued)
-          </button>
-          {photos.length > 0 && (
-            <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-2 mb-3">
-              {photos.map((p) => (
-                <div key={p.id} className="relative rounded-lg overflow-hidden group" style={{ paddingTop: "100%" }}>
-                  <img src={p.previewUrl} alt={p.name} className="absolute inset-0 w-full h-full object-cover" />
-                  <button onClick={() => removePhoto(p.id)}
-                    className="absolute top-0.5 right-0.5 c-bg-app rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Trash2 size={9} className="c-muted" />
-                  </button>
-                </div>
-              ))}
+          {photos.length === 0 ? (
+            <button onClick={() => fileInputRef.current?.click()}
+              className="w-full flex flex-col items-center justify-center gap-1.5 border border-dashed rounded-2xl py-8 mb-4 transition-colors tap"
+              style={{ borderColor: "rgba(255,255,255,0.14)" }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(57,230,115,0.5)"; e.currentTarget.style.background = "rgba(57,230,115,0.03)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.14)"; e.currentTarget.style.background = "transparent"; }}>
+              <div className="w-9 h-9 rounded-full flex items-center justify-center mb-1" style={{ background: "rgba(255,255,255,0.06)" }}>
+                <Plus size={16} className="c-muted" />
+              </div>
+              <span className="fs-12 c-muted font-mono">Upload photos</span>
+              <span className="fs-10 c-faint font-mono">drops get split evenly across the accounts above</span>
+            </button>
+          ) : (
+            <div className="mb-4">
+              <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-2 mb-2">
+                {photos.map((p) => (
+                  <div key={p.id} className="relative rounded-xl overflow-hidden group" style={{ paddingTop: "100%", boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
+                    <img src={p.previewUrl} alt={p.name} className="absolute inset-0 w-full h-full object-cover" />
+                    <button onClick={() => removePhoto(p.id)}
+                      className="absolute top-1 right-1 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{ background: "rgba(0,0,0,0.6)" }}>
+                      <Trash2 size={10} className="text-white" />
+                    </button>
+                  </div>
+                ))}
+                <button onClick={() => fileInputRef.current?.click()}
+                  className="rounded-xl flex items-center justify-center border border-dashed c-border hover-border-accent tap" style={{ paddingTop: "100%", position: "relative" }}>
+                  <Plus size={16} className="c-muted absolute" />
+                </button>
+              </div>
+              <span className="fs-10 c-faint font-mono">{photos.length} photos queued</span>
             </div>
           )}
 
           <button onClick={generatePlan} disabled={!selected.length || !photos.length || planning}
-            className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg c-bg-accent c-onaccent fs-12 font-mono uppercase tracking-wide font-semibold hover-bg-accent2 disabled:opacity-40 tap mb-1">
+            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl c-bg-accent c-onaccent fs-12 font-mono uppercase tracking-wide font-semibold hover-bg-accent2 disabled:opacity-40 tap mb-1"
+            style={{ boxShadow: selected.length && photos.length ? "0 0 20px rgba(57,230,115,0.25)" : "none" }}>
             {planning ? <><Loader2 size={14} className="animate-spin" /> Building preview...</> : <><Sparkles size={14} /> Generate preview</>}
           </button>
           {planError && <div className="fs-10 font-mono mt-1 c-warn">{planError}</div>}
 
           {plan && plan.length > 0 && (
-            <div className="mt-4 pt-4 border-t c-border">
-              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                <div className="fs-10 uppercase tracking-widest c-faint font-mono">Preview — {plan.length} posts across {selected.length} accounts</div>
+            <div className="mt-5 pt-4 border-t" style={{ borderColor: "rgba(57,230,115,0.14)" }}>
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-3 c-bg-app rounded-xl px-4 py-3" style={{ border: "1px solid rgba(57,230,115,0.12)" }}>
+                <div>
+                  <div className="text-lg font-extrabold c-text">{plan.length} posts</div>
+                  <div className="fs-10 c-muted font-mono">across {selected.length} account{selected.length !== 1 ? "s" : ""} · {new Date(weekDays[0] + "T12:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" })} – {new Date(weekDays[6] + "T12:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" })}</div>
+                </div>
                 <button onClick={confirmAndScheduleAll} disabled={runningAll || allDone}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg fs-11 font-mono uppercase tracking-wide font-semibold tap disabled:opacity-40 ${allDone ? "c-bg-app c-accent border c-border-accent" : "c-bg-accent c-onaccent hover-bg-accent2"}`}>
-                  {runningAll ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-                  {allDone ? "All scheduled" : runningAll ? "Scheduling..." : "Confirm & schedule all"}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl fs-12 font-mono uppercase tracking-wide font-semibold tap disabled:opacity-40 ${allDone ? "c-bg-app c-accent border c-border-accent" : "c-bg-accent c-onaccent hover-bg-accent2"}`}
+                  style={{ boxShadow: !allDone && !runningAll ? "0 0 20px rgba(57,230,115,0.3)" : "none" }}>
+                  {allDone ? <Sparkles size={14} /> : runningAll ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                  {allDone ? "All scheduled" : runningAll ? `Scheduling... ${doneCount}/${plan.length}` : "Confirm & schedule all"}
                 </button>
               </div>
 
-              <div className="flex gap-3 overflow-x-auto pb-2">
-                {days.map((day) => {
+              <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(7, minmax(140px, 1fr))", overflowX: "auto" }}>
+                {weekDays.map((day) => {
                   const dayItems = plan.filter((it) => it.scheduledAt.slice(0, 10) === day);
-                  const dateLabel = new Date(day + "T12:00:00").toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+                  const isToday = day === new Date().toISOString().slice(0, 10);
+                  const dayName = new Date(day + "T12:00:00").toLocaleDateString(undefined, { weekday: "short" });
+                  const dateNum = new Date(day + "T12:00:00").getDate();
                   return (
-                    <div key={day} className="flex-shrink-0" style={{ width: 168 }}>
-                      <div className="fs-10 font-mono uppercase c-faint mb-2 sticky top-0">{dateLabel}</div>
-                      <div className="flex flex-col gap-2">
-                        {dayItems.map((it) => {
-                          const st = itemStates[it.id]?.status;
-                          return (
-                            <div key={it.id} className="c-bg-app border c-border rounded-lg p-2 relative">
-                              <div className="flex items-center gap-1.5 mb-1.5">
-                                <span className="w-4 h-4 rounded-full flex items-center justify-center fs-9 font-bold flex-shrink-0"
-                                  style={{ background: modelColor(it.model) + "33", color: modelColor(it.model) }}>
-                                  {it.model.slice(0, 1).toUpperCase()}
-                                </span>
-                                <span className="fs-9 font-mono c-faint">{new Date(it.scheduledAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                                <span className="ml-auto">
-                                  {st === "done" && <Sparkles size={10} className="c-accent" />}
-                                  {(st === "uploading" || st === "scheduling") && <Loader2 size={10} className="animate-spin c-muted" />}
-                                  {st === "error" && <span className="fs-9 c-warn">!</span>}
-                                </span>
-                              </div>
-                              <img src={it.photo.previewUrl} alt="" className="w-full rounded object-cover mb-1.5" style={{ aspectRatio: "1/1" }} />
-                              <div className="fs-9 c-muted leading-snug line-clamp-3">{it.caption}</div>
-                              {st === "error" && <div className="fs-9 c-warn font-mono mt-1">{itemStates[it.id].error}</div>}
-                            </div>
-                          );
-                        })}
+                    <div key={day} className="flex-shrink-0 rounded-xl p-2"
+                      style={{ background: isToday ? "rgba(57,230,115,0.05)" : "rgba(255,255,255,0.015)", border: isToday ? "1px solid rgba(57,230,115,0.25)" : "1px solid rgba(255,255,255,0.06)", minHeight: 120 }}>
+                      <div className="flex items-baseline gap-1.5 mb-2 px-0.5">
+                        <span className={`fs-11 font-mono uppercase font-semibold ${isToday ? "c-accent" : "c-muted"}`}>{dayName}</span>
+                        <span className="fs-10 font-mono c-faint">{dateNum}</span>
                       </div>
+                      {dayItems.length === 0 ? (
+                        <div className="fs-9 c-faint font-mono italic text-center py-6 opacity-50">—</div>
+                      ) : (
+                        <div className="flex flex-col gap-2">
+                          {dayItems.map((it) => {
+                            const st = itemStates[it.id]?.status;
+                            return (
+                              <div key={it.id} className="relative rounded-lg overflow-hidden" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.35)" }}>
+                                <img src={it.photo.previewUrl} alt="" className="w-full object-cover" style={{ aspectRatio: "1/1" }} />
+                                <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.85) 100%)" }} />
+                                <div className="absolute top-1 left-1">{renderAvatar(it.model, 20)}</div>
+                                <div className="absolute top-1.5 right-1.5 fs-9 font-mono px-1 rounded" style={{ background: "rgba(0,0,0,0.55)", color: "#fff" }}>
+                                  {new Date(it.scheduledAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                </div>
+                                <div className="absolute bottom-1 left-1.5 right-1.5 fs-9 leading-snug line-clamp-2" style={{ color: "rgba(255,255,255,0.92)" }}>
+                                  {it.caption}
+                                </div>
+                                {st && (
+                                  <div className="absolute inset-0 flex items-center justify-center"
+                                    style={{ background: st === "error" ? "rgba(120,20,20,0.45)" : "rgba(0,0,0,0.45)" }}>
+                                    {st === "done" && <div className="rounded-full p-1.5" style={{ background: "rgba(57,230,115,0.9)" }}><Sparkles size={12} style={{ color: "#04150a" }} /></div>}
+                                    {(st === "uploading" || st === "scheduling") && <Loader2 size={16} className="animate-spin text-white" />}
+                                    {st === "error" && <span className="fs-9 font-mono text-white text-center px-1">{itemStates[it.id].error}</span>}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -1837,7 +1928,6 @@ function XMassPlanner({ models }) {
     </div>
   );
 }
-
 // Agency-wide list of X accounts worth keeping an eye on for inspiration —
 // not tied to any one model. Just a plain add/remove list for now; nothing
 // scrapes these yet (Publer has no public competitor-analytics endpoint —
@@ -1999,8 +2089,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
       <XCaptionStudio key={xModelName} models={models} restrictModel={xModelName} filterModel={xModelName} />
     ) : (
       <>
-        <XMassPlanner models={models} />
-        <IGModelPicker models={models} onPick={setFilter} subtitle="Opens her dedicated X caption studio." handleKey="xHandle" handleLabel="X" />
+        <IGModelPicker models={models} onPick={setFilter} subtitle="Opens her X dashboard — stats, captions, and the mass planner." handleKey="xHandle" handleLabel="X" />
         <XCompetitorSettings competitors={xCompetitors} persistCompetitors={persistXCompetitors} />
       </>
     );
