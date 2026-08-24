@@ -2451,12 +2451,67 @@ function IGStar({ size = 14, color = "#fff" }) {
   );
 }
 
-// Light "widget" dashboard, deliberately styled 1:1 off a reference (cream
-// page, white cards, pink→orange hero gradient, ring + squiggle + bar chart)
-// rather than the app's own dark theme — an intentional island, same as the
-// X dashboard is a deliberate dark-neon island. Uses real Instagram numbers
-// from buffer_daily_stats/buffer_top_posts throughout; only the squiggle
-// lines are decorative.
+// ISO-3166 alpha-2 -> flag emoji via regional indicator symbols — no lookup
+// table needed, the Unicode code points are just A-Z offset into that block.
+function flagEmoji(countryCode) {
+  if (!countryCode || countryCode.length !== 2) return "🏳️";
+  return String.fromCodePoint(...[...countryCode.toUpperCase()].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+}
+
+// Packed-circle age-range breakdown, sized by share — same idea as the
+// reference dashboard's overlapping bubbles, laid out as a clean row instead
+// of hand-tuned absolute overlaps (which don't hold up across data changes).
+function AgeRangeBubbles({ ages, colors }) {
+  if (!ages.length) return null;
+  const maxPx = 132, minPx = 46;
+  const maxPct = Math.max(...ages.map((a) => a.pct));
+  return (
+    <div className="flex items-end justify-center gap-3 flex-wrap py-2">
+      {ages.map((a, i) => {
+        const size = Math.round(minPx + (maxPx - minPx) * (a.pct / Math.max(1, maxPct)));
+        const color = colors[i % colors.length];
+        return (
+          <div key={a.label} className="rounded-full flex flex-col items-center justify-center flex-shrink-0"
+            style={{
+              width: size, height: size, background: `${color}22`, border: `1.5px solid ${color}66`,
+              boxShadow: `0 0 20px ${color}33`,
+            }}>
+            <span className="font-extrabold" style={{ color, fontSize: Math.max(14, size * 0.22) }}>{a.pct}%</span>
+            <span className="fs-9 font-mono c-faint mt-0.5">{a.label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TopCountriesCard({ countries, totalImpressions }) {
+  const max = Math.max(1, ...countries.map((c) => c.value));
+  return (
+    <div>
+      <div className="text-2xl font-extrabold c-text">{totalImpressions.toLocaleString()}</div>
+      <div className="fs-10 c-faint font-mono mb-3">views worldwide</div>
+      <div className="flex flex-col gap-2">
+        {countries.map((c) => (
+          <div key={c.code} className="flex items-center gap-2">
+            <span className="fs-13">{flagEmoji(c.code)}</span>
+            <span className="fs-11 font-mono c-muted" style={{ width: 28 }}>{c.code}</span>
+            <div className="flex-1 rounded-full overflow-hidden" style={{ height: 5, background: "rgba(255,255,255,0.08)" }}>
+              <div className="rounded-full h-full" style={{ width: `${(c.value / max) * 100}%`, background: "#39e673", boxShadow: "0 0 8px rgba(57,230,115,0.6)" }} />
+            </div>
+            <span className="fs-11 font-mono c-text font-semibold" style={{ width: 50, textAlign: "right" }}>{c.value.toLocaleString()}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Dark-neon dashboard for Instagram, mirroring the X dashboard's visual
+// language (hero card, donut, mini stats, bar chart) with real numbers from
+// buffer_daily_stats/buffer_top_posts, plus an audience-demographics section
+// backed by Publer's account-level chart_data endpoint (separate from
+// post_insights — see publer-demographics).
 function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanPosts }) {
   const C = {
     page: "radial-gradient(ellipse 130% 100% at 10% 0%, rgba(57,230,115,0.14), transparent 55%), radial-gradient(ellipse 100% 80% at 100% 0%, rgba(56,189,248,0.10), transparent 55%), #0b0f0d",
@@ -2475,6 +2530,33 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
   const connectedNames = new Set(allRows.map((r) => r.model));
   const connectedModels = models.filter((m) => connectedNames.has(m.name));
   const rows = igAccount === "all" ? allRows : allRows.filter((r) => r.model === igAccount);
+
+  // Audience demographics (age range, top countries) — a separate Publer
+  // endpoint from post_insights, needs a Business-tier Publer plan and only
+  // accumulates going forward (not retroactive), so this can legitimately
+  // stay empty for a while on a freshly-upgraded workspace. "All accounts"
+  // has no single audience to show, so demographics fall back to whichever
+  // connected account is first in that case.
+  const demoModelName = igAccount !== "all" ? igAccount : connectedModels[0]?.name;
+  const [demographics, setDemographics] = React.useState(null);
+  const [demoLoading, setDemoLoading] = React.useState(false);
+  React.useEffect(() => {
+    if (!demoModelName) { setDemographics(null); return; }
+    let cancelled = false;
+    setDemoLoading(true);
+    (async () => {
+      try {
+        const { data, error } = await supabaseClient.functions.invoke("publer-demographics", { body: { modelName: demoModelName, platform: "ig" } });
+        if (cancelled) return;
+        setDemographics(error ? null : data);
+      } catch (e) {
+        if (!cancelled) setDemographics(null);
+      } finally {
+        if (!cancelled) setDemoLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [demoModelName]);
 
   const dateNDaysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
   const rangeAgoStr = dateNDaysAgo(igRange - 1);
@@ -2760,6 +2842,39 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
                 </div>
               </div>
             )}
+
+            {/* Audience demographics — separate Publer endpoint, needs a
+                Business-tier plan and only accumulates going forward, so
+                this shows a friendly empty state rather than data most of
+                the time until Publer has had a chance to collect any. */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+              <div className="rounded-3xl p-5" style={{ background: C.card, border: C.cardBorder }}>
+                <div className="fs-13 font-semibold mb-1">Age range</div>
+                <div className="fs-10 c-faint font-mono mb-2">{demoModelName || "—"}</div>
+                {demoLoading ? (
+                  <div className="fs-11 c-faint font-mono italic py-8 text-center">Loading...</div>
+                ) : demographics?.ages?.length ? (
+                  <AgeRangeBubbles ages={demographics.ages} colors={DONUT_COLORS.concat(["#a78bfa"])} />
+                ) : (
+                  <div className="fs-11 c-faint font-mono italic py-8 text-center">
+                    No age data from Publer yet — audience demographics only start collecting from when the Business plan kicked in, not retroactively.
+                  </div>
+                )}
+              </div>
+              <div className="rounded-3xl p-5" style={{ background: C.card, border: C.cardBorder }}>
+                <div className="fs-13 font-semibold mb-1">Impressions</div>
+                <div className="fs-10 c-faint font-mono mb-2">{demoModelName || "—"} · top countries</div>
+                {demoLoading ? (
+                  <div className="fs-11 c-faint font-mono italic py-8 text-center">Loading...</div>
+                ) : demographics?.countries?.length ? (
+                  <TopCountriesCard countries={demographics.countries} totalImpressions={demographics.totalImpressions} />
+                ) : (
+                  <div className="fs-11 c-faint font-mono italic py-8 text-center">
+                    No geography data from Publer yet — same as age range, this fills in over time.
+                  </div>
+                )}
+              </div>
+            </div>
           </>
         )}
       </div>
