@@ -1292,16 +1292,7 @@ function CardDetail({ card, models, restrictModel, onClose, onSave, onDelete }) 
   );
 }
 
-// ---------- X bulk upload & auto-caption studio (visual preview, not wired up yet) ----------
-
-const XCAPTION_MOCK_TEMPLATES = [
-  "new drop just went live 👀 who's checking it first tonight?",
-  "feeling myself in this one ngl... link in bio if you know you know",
-  "not gonna lie this set might be a favorite. thoughts?",
-  "quick one before bed 🌙 tell me what you want to see more of",
-  "been sitting on this one for a minute, finally posting it",
-  "this took way too many takes to get right lol, worth it though",
-];
+// ---------- X bulk upload & auto-caption studio ----------
 
 function XCaptionStudio({ models, restrictModel, filterModel }) {
   const scopedModels = restrictModel ? models.filter((m) => m.name === restrictModel) : models;
@@ -1317,6 +1308,7 @@ function XCaptionStudio({ models, restrictModel, filterModel }) {
   const [photos, setPhotos] = React.useState([]);
   const [generating, setGenerating] = React.useState(false);
   const [pairs, setPairs] = React.useState([]);
+  const [genError, setGenError] = React.useState("");
 
   const addMockPhotos = () => {
     const n = 3 + Math.floor(Math.random() * 3);
@@ -1331,34 +1323,45 @@ function XCaptionStudio({ models, restrictModel, filterModel }) {
   };
   const removePhoto = (id) => { setPhotos((prev) => prev.filter((p) => p.id !== id)); setPairs([]); };
 
-  const generateCaptions = () => {
-    if (!photos.length) return;
+  const generateCaptions = async () => {
+    if (!photos.length || !selectedModel) return;
     setGenerating(true);
     setPairs([]);
-    setTimeout(() => {
-      const shuffled = [...XCAPTION_MOCK_TEMPLATES].sort(() => Math.random() - 0.5);
-      const newPairs = photos.slice(0, 4).map((p, i) => ({
-        photo: p, caption: shuffled[i % shuffled.length], time: i % 2 === 0 ? "11:00" : "17:00",
+    setGenError("");
+    const targetPhotos = photos.slice(0, 8);
+    try {
+      const { data, error } = await supabaseClient.functions.invoke("x-caption-generate", {
+        body: { modelName: selectedModel, count: targetPhotos.length },
+      });
+      if (error) {
+        const body = await error.context?.json?.().catch(() => null);
+        throw new Error(body?.error || error.message);
+      }
+      if (data?.error) throw new Error(data.error);
+      const captions = data?.captions || [];
+      if (!captions.length) throw new Error("No captions came back");
+      const newPairs = targetPhotos.map((p, i) => ({
+        photo: p, caption: captions[i % captions.length], time: i % 2 === 0 ? "11:00" : "17:00",
       }));
       setPairs(newPairs);
+    } catch (e) {
+      setGenError(e.message || "Failed to generate captions");
+    } finally {
       setGenerating(false);
-    }, 900);
+    }
   };
 
   const persona = model ? [model.bio, model.note].filter(Boolean).join(" · ") : "";
 
   return (
     <div className="mb-5 c-bg-surface border c-border rounded-xl p-4 relative overflow-hidden">
-      <div className="absolute top-0 right-0 fs-9 tracking-widest uppercase font-mono px-2 py-1 rounded-bl-lg c-bg-accent-a2 c-accent">
-        Preview · not live yet
-      </div>
       <div className="flex items-center gap-2 mb-1">
         <Sparkles size={15} className="c-accent" />
         <span className="fs-13 font-semibold c-text">Bulk Upload &amp; Auto-Captions</span>
         <XLogo size={12} className="c-muted" />
       </div>
       <p className="fs-11 c-muted font-mono mb-4 max-w-xl">
-        Drop photos in, generate captions from last week's performance + this model's persona, queue straight to Buffer. This is a preview of the workflow — nothing here posts yet.
+        Drop photos in, generate captions from persona + recent performance, queue to post. Photo upload and scheduling are still being wired up — caption generation is live.
       </p>
 
       {!restrictModel && scopedModels.length > 1 && (
@@ -1418,6 +1421,7 @@ function XCaptionStudio({ models, restrictModel, filterModel }) {
             className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg c-bg-accent c-onaccent fs-12 font-mono uppercase tracking-wide font-semibold hover-bg-accent2 disabled:opacity-40 tap">
             {generating ? <><Loader2 size={14} className="animate-spin" /> Generating...</> : <><Sparkles size={14} /> Generate captions</>}
           </button>
+          {genError && <div className="fs-10 font-mono mt-2 c-warn">{genError}</div>}
         </div>
       </div>
 
@@ -1432,7 +1436,7 @@ function XCaptionStudio({ models, restrictModel, filterModel }) {
                   <div className="fs-12 c-text leading-snug mb-1.5">{pair.caption}</div>
                   <div className="flex items-center justify-between">
                     <span className="fs-10 c-faint font-mono">Queue · {pair.time}</span>
-                    <button disabled title="Buffer API integration coming next"
+                    <button disabled title="Publer scheduling integration coming next"
                       className="flex items-center gap-1 fs-10 font-mono uppercase px-2 py-1 rounded-lg border c-border c-faint cursor-not-allowed">
                       <Send size={10} /> Queue
                     </button>
