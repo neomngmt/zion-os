@@ -2259,17 +2259,33 @@ function PlatformOverviewDashboard({
   // twitch re-render the whole tree, which restarted the chart bars' own
   // mount animation on every frame — a variant of the exact bug we fixed
   // for the mobile nav toggle earlier. Kept deliberately small (max ~1.5deg).
+  // The rect is cached on enter (not read on every mousemove — that forces
+  // a synchronous layout each time, which combined with the panel's own
+  // animated glow was the actual source of the visible stutter/jank), and
+  // the transform write is rAF-throttled so a burst of mousemove events
+  // only ever produces one style write per frame.
   const tiltRef = React.useRef(null);
+  const tiltRectRef = React.useRef(null);
+  const tiltRafRef = React.useRef(null);
+  const handleTiltEnter = () => {
+    if (tiltRef.current) tiltRectRef.current = tiltRef.current.getBoundingClientRect();
+  };
   const handleTiltMove = (e) => {
     const el = tiltRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const px = (e.clientX - rect.left) / rect.width - 0.5;
-    const py = (e.clientY - rect.top) / rect.height - 0.5;
-    el.style.transition = "transform 0.1s ease-out";
-    el.style.transform = `perspective(1400px) rotateX(${py * -1.5}deg) rotateY(${px * 1.5}deg)`;
+    const rect = tiltRectRef.current;
+    if (!el || !rect) return;
+    if (tiltRafRef.current) return;
+    const clientX = e.clientX, clientY = e.clientY;
+    tiltRafRef.current = requestAnimationFrame(() => {
+      tiltRafRef.current = null;
+      const px = (clientX - rect.left) / rect.width - 0.5;
+      const py = (clientY - rect.top) / rect.height - 0.5;
+      el.style.transition = "transform 0.1s ease-out";
+      el.style.transform = `perspective(1400px) rotateX(${py * -1.5}deg) rotateY(${px * 1.5}deg)`;
+    });
   };
   const handleTiltLeave = () => {
+    if (tiltRafRef.current) { cancelAnimationFrame(tiltRafRef.current); tiltRafRef.current = null; }
     const el = tiltRef.current;
     if (!el) return;
     el.style.transition = "transform 0.5s ease-out";
@@ -2278,6 +2294,7 @@ function PlatformOverviewDashboard({
 
   return (
     <div ref={tiltRef}
+      onMouseEnter={handleTiltEnter}
       onMouseMove={handleTiltMove}
       onMouseLeave={handleTiltLeave}
       className="rounded-2xl p-5 md:p-7 relative overflow-hidden mb-5"
@@ -2500,20 +2517,31 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
   const noAccounts = connectedModels.length === 0;
 
   // Cursor-tilt via direct DOM mutation (not React state) — see the same
-  // note in PlatformOverviewDashboard for why: setState-per-mousemove was
-  // re-rendering this whole panel and restarting the bar chart's mount
-  // animation on every frame.
+  // note in PlatformOverviewDashboard: rect cached on enter (not read every
+  // mousemove, which forces a layout each time) and the write is
+  // rAF-throttled so a burst of mousemove events doesn't spam style writes.
   const tiltRef = React.useRef(null);
+  const tiltRectRef = React.useRef(null);
+  const tiltRafRef = React.useRef(null);
+  const handleTiltEnter = () => {
+    if (tiltRef.current) tiltRectRef.current = tiltRef.current.getBoundingClientRect();
+  };
   const handleTiltMove = (e) => {
     const el = tiltRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const px = (e.clientX - rect.left) / rect.width - 0.5;
-    const py = (e.clientY - rect.top) / rect.height - 0.5;
-    el.style.transition = "transform 0.1s ease-out";
-    el.style.transform = `perspective(1400px) rotateX(${py * -1.5}deg) rotateY(${px * 1.5}deg)`;
+    const rect = tiltRectRef.current;
+    if (!el || !rect) return;
+    if (tiltRafRef.current) return;
+    const clientX = e.clientX, clientY = e.clientY;
+    tiltRafRef.current = requestAnimationFrame(() => {
+      tiltRafRef.current = null;
+      const px = (clientX - rect.left) / rect.width - 0.5;
+      const py = (clientY - rect.top) / rect.height - 0.5;
+      el.style.transition = "transform 0.1s ease-out";
+      el.style.transform = `perspective(1400px) rotateX(${py * -1.5}deg) rotateY(${px * 1.5}deg)`;
+    });
   };
   const handleTiltLeave = () => {
+    if (tiltRafRef.current) { cancelAnimationFrame(tiltRafRef.current); tiltRafRef.current = null; }
     const el = tiltRef.current;
     if (!el) return;
     el.style.transition = "transform 0.5s ease-out";
@@ -2522,6 +2550,7 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
 
   return (
     <div ref={tiltRef}
+      onMouseEnter={handleTiltEnter}
       onMouseMove={handleTiltMove}
       onMouseLeave={handleTiltLeave}
       className="mb-5 rounded-3xl overflow-hidden"
@@ -5468,16 +5497,27 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
   // mount animation on every mouse twitch — the state-based version did
   // exactly that).
   const tiltRef = useRef(null);
+  const tiltRectRef = useRef(null);
+  const tiltRafRef = useRef(null);
+  const handleTiltEnter = () => {
+    if (tiltRef.current) tiltRectRef.current = tiltRef.current.getBoundingClientRect();
+  };
   const handleTiltMove = (e) => {
     const el = tiltRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const px = (e.clientX - rect.left) / rect.width - 0.5;
-    const py = (e.clientY - rect.top) / rect.height - 0.5;
-    el.style.transition = "transform 0.1s ease-out";
-    el.style.transform = `perspective(1400px) rotateX(${py * -1.5}deg) rotateY(${px * 1.5}deg)`;
+    const rect = tiltRectRef.current;
+    if (!el || !rect) return;
+    if (tiltRafRef.current) return;
+    const clientX = e.clientX, clientY = e.clientY;
+    tiltRafRef.current = requestAnimationFrame(() => {
+      tiltRafRef.current = null;
+      const px = (clientX - rect.left) / rect.width - 0.5;
+      const py = (clientY - rect.top) / rect.height - 0.5;
+      el.style.transition = "transform 0.1s ease-out";
+      el.style.transform = `perspective(1400px) rotateX(${py * -1.5}deg) rotateY(${px * 1.5}deg)`;
+    });
   };
   const handleTiltLeave = () => {
+    if (tiltRafRef.current) { cancelAnimationFrame(tiltRafRef.current); tiltRafRef.current = null; }
     const el = tiltRef.current;
     if (!el) return;
     el.style.transition = "transform 0.5s ease-out";
@@ -5637,6 +5677,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
   return (
     <div>
       <div ref={tiltRef}
+        onMouseEnter={handleTiltEnter}
         onMouseMove={handleTiltMove}
         onMouseLeave={handleTiltLeave}
         className="c-bg-surface border rounded-xl p-5 mb-6" style={{
