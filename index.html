@@ -2901,6 +2901,25 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
                     ))}
                   </div>
                 </div>
+
+                <div className="pt-3 mt-3" style={{ borderTop: `1px solid ${C.ringTrack}` }}>
+                  <div className="flex items-baseline gap-1.5 mb-1.5">
+                    <span className="fs-11 font-semibold">Link clicks</span>
+                    <span className="fs-9 c-faint font-mono">· {igRange}d</span>
+                  </div>
+                  <div className="text-xl font-extrabold c-text mb-1.5">{(demographics?.linkClicks?.total || 0).toLocaleString()}</div>
+                  {demoLoading ? (
+                    <div className="fs-10 c-faint font-mono italic py-2">Loading...</div>
+                  ) : (
+                    <AreaTrendChart
+                      data={(demographics?.linkClicks?.series?.length
+                        ? demographics.linkClicks.series
+                        : rangeDays.map((d) => ({ date: d, value: 0 }))
+                      )}
+                      color={C.pinkA} height={40}
+                    />
+                  )}
+                </div>
               </div>
 
               {/* Right column: two mini stat cards */}
@@ -2946,34 +2965,6 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
                   </div>
                 </div>
               </div>
-            </div>
-
-            {/* Link clicks — sits under Engagement mix, follows the same
-                7D/30D toggle as everything else on this dashboard. */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
-              <div className="hidden lg:block lg:col-span-5" />
-              <div className="lg:col-span-4 rounded-3xl p-5" style={{ background: C.card, border: C.cardBorder }}>
-                <div className="flex items-center justify-between mb-1">
-                  <div className="fs-13 font-semibold">Link clicks</div>
-                  <MoreDotsIG dark />
-                </div>
-                <div className="text-2xl font-extrabold c-text mb-2" style={{ textShadow: `0 0 12px ${C.pinkA}33` }}>
-                  {(demographics?.linkClicks?.total || 0).toLocaleString()}
-                  <span className="fs-10 c-faint font-mono ml-1.5" style={{ textShadow: "none" }}>· {igRange}d</span>
-                </div>
-                {demoLoading ? (
-                  <div className="fs-11 c-faint font-mono italic py-4 text-center">Loading...</div>
-                ) : (
-                  <AreaTrendChart
-                    data={(demographics?.linkClicks?.series?.length
-                      ? demographics.linkClicks.series
-                      : rangeDays.map((d) => ({ date: d, value: 0 }))
-                    )}
-                    color={C.pinkA} height={56}
-                  />
-                )}
-              </div>
-              <div className="hidden lg:block lg:col-span-3" />
             </div>
 
             {/* Audience demographics — real Publer chart_data when it has
