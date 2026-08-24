@@ -2057,13 +2057,166 @@ function XNeonStatTile({ label, value, color, icon }) {
   );
 }
 
-function XOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, competitors, persistCompetitors, onPlanPosts }) {
-  const xRows = (bufferDailyStats || []).filter((r) => r.platform === "x");
-  const connectedNames = new Set(xRows.map((r) => r.model));
+// ---- shared analytics primitives (used by both the X and IG dashboards) ----
+
+// Gradient-filled "mountain" trend line with a hover crosshair + tooltip.
+// Single series only — two measures of different scale get two of these,
+// never a second y-axis on the same chart.
+function AreaTrendChart({ data, color, height = 160, valueFormat }) {
+  const [hoverIdx, setHoverIdx] = React.useState(null);
+  const svgRef = React.useRef(null);
+  const W = 600, H = height, PAD_TOP = 18, PAD_BOTTOM = 22;
+  const plotH = H - PAD_TOP - PAD_BOTTOM;
+  const values = data.map((d) => d.value);
+  const max = Math.max(1, ...values);
+  const n = data.length;
+  const xAt = (i) => (n <= 1 ? W / 2 : (i / (n - 1)) * W);
+  const yAt = (v) => PAD_TOP + plotH - (v / max) * plotH;
+
+  const linePath = data.map((d, i) => `${i === 0 ? "M" : "L"} ${xAt(i)},${yAt(d.value)}`).join(" ");
+  const areaPath = `${linePath} L ${xAt(n - 1)},${H - PAD_BOTTOM} L ${xAt(0)},${H - PAD_BOTTOM} Z`;
+  const gradId = React.useMemo(() => `areaGrad${Math.random().toString(36).slice(2)}`, []);
+
+  const handleMove = (e) => {
+    if (!svgRef.current || n === 0) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const relX = ((e.clientX - rect.left) / rect.width) * W;
+    let idx = Math.round((relX / W) * (n - 1));
+    idx = Math.max(0, Math.min(n - 1, idx));
+    setHoverIdx(idx);
+  };
+
+  const fmt = valueFormat || ((v) => v.toLocaleString());
+  const hover = hoverIdx != null ? data[hoverIdx] : null;
+
+  return (
+    <div className="relative">
+      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ display: "block" }}
+        onMouseMove={handleMove} onMouseLeave={() => setHoverIdx(null)}>
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {[0.25, 0.5, 0.75].map((f) => (
+          <line key={f} x1="0" x2={W} y1={PAD_TOP + plotH * f} y2={PAD_TOP + plotH * f}
+            stroke="rgba(255,255,255,0.06)" strokeDasharray="3,4" />
+        ))}
+        <path d={areaPath} fill={`url(#${gradId})`} />
+        <path d={linePath} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        {hoverIdx != null && (
+          <>
+            <line x1={xAt(hoverIdx)} x2={xAt(hoverIdx)} y1={PAD_TOP} y2={H - PAD_BOTTOM} stroke={color} strokeOpacity="0.35" strokeWidth="1.5" />
+            <circle cx={xAt(hoverIdx)} cy={yAt(hover.value)} r="4.5" fill={color} stroke="#0b0f0d" strokeWidth="2" style={{ filter: `drop-shadow(0 0 6px ${color})` }} />
+          </>
+        )}
+      </svg>
+      {hover && (
+        <div className="absolute pointer-events-none px-2.5 py-1.5 rounded-lg fs-9 font-mono whitespace-nowrap"
+          style={{
+            left: `${(xAt(hoverIdx) / W) * 100}%`, top: 0, transform: `translate(${hoverIdx > n / 2 ? "-105%" : "5%"}, 0)`,
+            background: "#0c0f0d", border: `1px solid ${color}55`, boxShadow: "0 8px 20px rgba(0,0,0,0.5)",
+          }}>
+          <div className="c-faint">{new Date(hover.date + "T12:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" })}</div>
+          <div className="font-bold" style={{ color }}>{fmt(hover.value)}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Donut with a centered total and a legend — the only chart form here with
+// more than one series, so it's the one that needs the legend.
+function EngagementDonut({ segments, centerLabel }) {
+  const total = segments.reduce((s, seg) => s + seg.value, 0);
+  const R = 42, CX = 50, CY = 50, STROKE = 14;
+  const circumference = 2 * Math.PI * R;
+  let offsetAcc = 0;
+  return (
+    <div className="flex items-center gap-5 flex-wrap">
+      <div className="relative flex-shrink-0" style={{ width: 128, height: 128 }}>
+        <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%", transform: "rotate(-90deg)" }}>
+          <circle cx={CX} cy={CY} r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={STROKE} />
+          {total > 0 && segments.map((seg, i) => {
+            const frac = seg.value / total;
+            const dash = frac * circumference;
+            const gap = circumference - dash;
+            const el = (
+              <circle key={i} cx={CX} cy={CY} r={R} fill="none" stroke={seg.color} strokeWidth={STROKE}
+                strokeDasharray={`${Math.max(dash - 1.5, 0)} ${gap + 1.5}`} strokeDashoffset={-offsetAcc}
+                strokeLinecap="round" style={{ filter: `drop-shadow(0 0 4px ${seg.color}88)` }} />
+            );
+            offsetAcc += dash;
+            return el;
+          })}
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <div className="text-lg font-extrabold c-text leading-none">{total.toLocaleString()}</div>
+          <div className="fs-9 c-faint font-mono uppercase mt-0.5">{centerLabel}</div>
+        </div>
+      </div>
+      <div className="flex flex-col gap-1.5 min-w-0">
+        {segments.map((seg) => (
+          <div key={seg.label} className="flex items-center gap-2 fs-11 font-mono">
+            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: seg.color, boxShadow: `0 0 6px ${seg.color}` }} />
+            <span className="c-muted">{seg.label}</span>
+            <span className="c-text font-semibold ml-auto pl-3">{seg.value.toLocaleString()}</span>
+            <span className="c-faint" style={{ width: 36, textAlign: "right" }}>{total > 0 ? Math.round((seg.value / total) * 100) : 0}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// One ring per account, sized by its share of the group total — same
+// pattern as a small-multiple bar set, just circular to match the rest of
+// this dashboard's rounded language.
+function AccountShareRing({ name, color, value, shareOfTotal, sublabel }) {
+  const R = 26, STROKE = 5;
+  const circumference = 2 * Math.PI * R;
+  const dash = Math.max(0, Math.min(1, shareOfTotal)) * circumference;
+  return (
+    <div className="flex flex-col items-center gap-2" style={{ width: 84 }}>
+      <div className="relative" style={{ width: 64, height: 64 }}>
+        <svg viewBox="0 0 64 64" style={{ width: "100%", height: "100%", transform: "rotate(-90deg)" }}>
+          <circle cx="32" cy="32" r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={STROKE} />
+          <circle cx="32" cy="32" r={R} fill="none" stroke={color} strokeWidth={STROKE}
+            strokeDasharray={`${dash} ${circumference - dash}`} strokeLinecap="round"
+            style={{ filter: `drop-shadow(0 0 5px ${color}aa)` }} />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center fs-12 font-bold" style={{ color }}>
+          {name.slice(0, 1).toUpperCase()}
+        </div>
+      </div>
+      <div className="text-center">
+        <div className="fs-11 font-semibold c-text leading-none">{value}</div>
+        <div className="fs-9 c-faint font-mono mt-0.5">{sublabel}</div>
+      </div>
+    </div>
+  );
+}
+
+// Shared landing dashboard for a social platform (X or Instagram): connected
+// accounts, a 30-day reach trend, an engagement-mix donut, per-account share
+// rings, and a top-posts table — all real numbers from buffer_daily_stats /
+// buffer_top_posts, which publer-sync populates hourly for whichever
+// platform each Publer account is on. "Plan posts" is the doorway into the
+// per-model workflow (caption studio + planner for X; the existing
+// Instagram hub for IG).
+function PlatformOverviewDashboard({
+  platform, label, icon, glowRgb, bgGradient,
+  models, bufferDailyStats, bufferTopPosts, competitors, persistCompetitors,
+  onPlanPosts, planLabel = "Plan posts", extraSection, noAccountsHint,
+}) {
+  const rows = (bufferDailyStats || []).filter((r) => r.platform === platform);
+  const connectedNames = new Set(rows.map((r) => r.model));
   const connectedModels = models.filter((m) => connectedNames.has(m.name));
 
-  const weekAgoStr = (() => { const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().slice(0, 10); })();
-  const weekRows = xRows.filter((r) => r.statDate >= weekAgoStr);
+  const dateNDaysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+  const weekAgoStr = dateNDaysAgo(6);
+  const weekRows = rows.filter((r) => r.statDate >= weekAgoStr);
   const weekTotals = {
     reach: weekRows.reduce((s, r) => s + (r.impressions || 0), 0),
     posts: weekRows.reduce((s, r) => s + (r.postCount || 0), 0),
@@ -2072,74 +2225,143 @@ function XOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, competit
   const erDays = weekRows.filter((r) => r.engagementRate != null);
   const avgEr = erDays.length ? erDays.reduce((s, r) => s + r.engagementRate, 0) / erDays.length : null;
 
+  const trend30 = React.useMemo(() => {
+    const dates = Array.from({ length: 30 }, (_, i) => dateNDaysAgo(29 - i));
+    return dates.map((date) => ({
+      date,
+      value: rows.filter((r) => r.statDate === date).reduce((s, r) => s + (r.impressions || 0), 0),
+    }));
+  }, [rows.length]);
+
+  const donutSegments = [
+    { label: "Likes", value: weekTotals.likes, color: XNEON.pink.fg },
+    { label: "Replies", value: weekRows.reduce((s, r) => s + (r.comments || 0), 0), color: XNEON.blue.fg },
+    { label: "Reposts", value: weekRows.reduce((s, r) => s + (r.reposts || 0), 0), color: MASS_PLANNER_COLORS[4] },
+  ];
+
   const accountColor = (name) => MASS_PLANNER_COLORS[connectedModels.findIndex((m) => m.name === name) % MASS_PLANNER_COLORS.length];
+
+  const topPosts = (bufferTopPosts || [])
+    .filter((p) => p.platform === platform && connectedNames.has(p.model))
+    .sort((a, b) => (b.impressions || 0) - (a.impressions || 0));
 
   return (
     <div className="rounded-2xl p-5 md:p-7 relative overflow-hidden mb-5"
-      style={{
-        background: "radial-gradient(ellipse 130% 100% at 10% 0%, rgba(57,230,115,0.12), transparent 55%), radial-gradient(ellipse 100% 80% at 100% 0%, rgba(56,189,248,0.08), transparent 55%), #0b0f0d",
-        border: "1px solid rgba(57,230,115,0.16)",
-      }}>
+      style={{ background: bgGradient, border: `1px solid ${glowRgb}29` }}>
       <div className="flex items-start justify-between gap-3 mb-6 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: "rgba(57,230,115,0.12)", border: "1px solid rgba(57,230,115,0.3)" }}>
-            <XLogo size={18} className="c-accent" />
+            style={{ background: `${glowRgb}1f`, border: `1px solid ${glowRgb}4d` }}>
+            {icon}
           </div>
           <div>
-            <div className="text-2xl font-extrabold tracking-tight c-text" style={{ textShadow: "0 0 20px rgba(57,230,115,0.35)" }}>X Dashboard</div>
+            <div className="text-2xl font-extrabold tracking-tight c-text" style={{ textShadow: `0 0 20px ${glowRgb}59` }}>{label} Dashboard</div>
             <p className="c-muted text-sm mt-0.5">
               {connectedModels.length} account{connectedModels.length !== 1 ? "s" : ""} connected via Publer
             </p>
           </div>
         </div>
         <button onClick={onPlanPosts}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl c-bg-accent c-onaccent fs-12 font-mono uppercase tracking-wide font-semibold hover-bg-accent2 tap"
-          style={{ boxShadow: "0 0 20px rgba(57,230,115,0.25)" }}>
-          <Megaphone size={14} /> Plan posts
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl fs-12 font-mono uppercase tracking-wide font-semibold tap"
+          style={{ background: glowRgb, color: "#050705", boxShadow: `0 0 20px ${glowRgb}66` }}>
+          <Megaphone size={14} /> {planLabel}
         </button>
       </div>
 
       {connectedModels.length === 0 ? (
         <div className="fs-12 c-faint font-mono italic py-10 text-center rounded-xl" style={{ border: "1px dashed rgba(255,255,255,0.12)" }}>
-          No X accounts connected yet — connect one in Publer, then sync will pick it up automatically.
+          {noAccountsHint || "No accounts connected yet — connect one in Publer, then sync will pick it up automatically."}
         </div>
       ) : (
         <>
-          <div className="flex flex-wrap gap-2.5 mb-4">
+          <div className="flex flex-wrap gap-2.5 mb-5">
             <XNeonStatTile label="Reach · 7d" value={weekTotals.reach.toLocaleString()} color="blue" icon={<Eye size={11} style={{ color: XNEON.blue.fg }} />} />
             <XNeonStatTile label="Posts · 7d" value={weekTotals.posts} color="green" icon={<Sparkles size={11} style={{ color: XNEON.green.fg }} />} />
             <XNeonStatTile label="Likes · 7d" value={weekTotals.likes.toLocaleString()} color="pink" icon={<Heart size={11} style={{ color: XNEON.pink.fg }} />} />
             <XNeonStatTile label="Avg engagement" value={avgEr != null ? `${avgEr.toFixed(1)}%` : "—"} color="amber" icon={<Flame size={11} style={{ color: XNEON.amber.fg }} />} />
           </div>
 
-          <div className="flex flex-wrap gap-2 mb-5">
-            {connectedModels.map((m) => {
-              const color = accountColor(m.name);
-              const mRows = weekRows.filter((r) => r.model === m.name);
-              const mReach = mRows.reduce((s, r) => s + (r.impressions || 0), 0);
-              return (
-                <div key={m.name} className="flex items-center gap-2.5 rounded-xl pl-2 pr-3.5 py-2"
-                  style={{ background: color + "14", border: `1px solid ${color}40` }}>
-                  <span className="w-7 h-7 rounded-full flex items-center justify-center fs-11 font-bold flex-shrink-0"
-                    style={{ background: color + "26", color, boxShadow: `0 0 10px ${color}55` }}>
-                    {m.name.slice(0, 1).toUpperCase()}
-                  </span>
-                  <div>
-                    <div className="fs-11 font-semibold c-text leading-none">{m.name}</div>
-                    <div className="fs-9 font-mono c-faint mt-0.5">{mReach.toLocaleString()} reach · 7d</div>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 mb-5">
+            <div className="lg:col-span-3 c-bg-app rounded-xl p-4" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+              <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-3">Reach · last 30 days</div>
+              <AreaTrendChart data={trend30} color={glowRgb} />
+            </div>
+            <div className="lg:col-span-2 c-bg-app rounded-xl p-4 flex flex-col justify-center" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+              <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-3">Engagement mix · 7d</div>
+              <EngagementDonut segments={donutSegments} centerLabel="total" />
+            </div>
           </div>
 
-          <XStatsSection models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} />
+          <div className="c-bg-app rounded-xl p-4 mb-5" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+            <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-3">Share of reach · 7d</div>
+            <div className="flex flex-wrap gap-4">
+              {connectedModels.map((m) => {
+                const color = accountColor(m.name);
+                const mReach = weekRows.filter((r) => r.model === m.name).reduce((s, r) => s + (r.impressions || 0), 0);
+                return (
+                  <AccountShareRing key={m.name} name={m.name} color={color} value={m.name}
+                    shareOfTotal={weekTotals.reach > 0 ? mReach / weekTotals.reach : 0}
+                    sublabel={`${mReach.toLocaleString()} reach`} />
+                );
+              })}
+            </div>
+          </div>
+
+          {topPosts.length > 0 && (
+            <div className="c-bg-app rounded-xl p-4 mb-5" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+              <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-3">Top posts · rolling 7 days</div>
+              <div className="flex flex-col gap-1.5">
+                {topPosts.map((p) => {
+                  const color = accountColor(p.model);
+                  return (
+                    <a key={p.model} href={p.externalLink || undefined} target="_blank" rel="noreferrer"
+                      className="flex items-center gap-3 rounded-lg p-2 hover-border-accent transition-colors"
+                      style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+                      {p.thumbnailUrl ? (
+                        <img src={p.thumbnailUrl} alt="" className="flex-shrink-0 rounded-lg object-cover" style={{ width: 48, height: 48 }} />
+                      ) : (
+                        <div className="flex-shrink-0 rounded-lg c-bg-surface" style={{ width: 48, height: 48 }} />
+                      )}
+                      <span className="fs-10 font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: color + "26", color }}>{p.model}</span>
+                      <div className="flex-1 min-w-0 fs-11 c-text truncate">{p.text || <span className="c-faint italic">No text</span>}</div>
+                      <div className="flex-shrink-0 fs-11 font-mono c-text font-semibold text-right" style={{ width: 70 }}>{(p.impressions || 0).toLocaleString()}<span className="c-faint fs-9 block">reach</span></div>
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {extraSection}
         </>
       )}
 
-      <XCompetitorSettings competitors={competitors} persistCompetitors={persistCompetitors} />
+      {persistCompetitors && <XCompetitorSettings competitors={competitors} persistCompetitors={persistCompetitors} />}
     </div>
+  );
+}
+
+function XOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, competitors, persistCompetitors, onPlanPosts }) {
+  return (
+    <PlatformOverviewDashboard
+      platform="x" label="X" icon={<XLogo size={18} className="c-accent" />} glowRgb="#39e673"
+      bgGradient="radial-gradient(ellipse 130% 100% at 10% 0%, rgba(57,230,115,0.12), transparent 55%), radial-gradient(ellipse 100% 80% at 100% 0%, rgba(56,189,248,0.08), transparent 55%), #0b0f0d"
+      models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts}
+      competitors={competitors} persistCompetitors={persistCompetitors} onPlanPosts={onPlanPosts}
+      extraSection={<XStatsSection models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} />}
+    />
+  );
+}
+
+function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanPosts }) {
+  return (
+    <PlatformOverviewDashboard
+      platform="ig" label="Instagram" icon={<Instagram size={18} style={{ color: "#f472b6" }} />} glowRgb="#f472b6"
+      bgGradient="radial-gradient(ellipse 130% 100% at 10% 0%, rgba(244,114,182,0.14), transparent 55%), radial-gradient(ellipse 100% 80% at 100% 0%, rgba(251,146,60,0.10), transparent 55%), #0b0f0d"
+      models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts}
+      onPlanPosts={onPlanPosts} planLabel="Plan content"
+      noAccountsHint="No Instagram accounts connected yet — connect one in Publer, then sync will pick it up automatically."
+    />
   );
 }
 
@@ -2152,6 +2374,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
   const [filter, setFilter] = useState(restrictModel || "all");
   const [network, setNetwork] = useState(forcedNetwork || "all");
   const [xPlanningMode, setXPlanningMode] = useState(false);
+  const [igPlanningMode, setIgPlanningMode] = useState(false);
 
   // The sidebar's Content Director arrow lets you jump straight to a
   // platform (Instagram / TikTok / X) — when that changes, follow it here.
@@ -2196,19 +2419,36 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
   const igMode = network === "ig" && !restrictModel;
 
   if (igMode) {
-    return igModelName ? (
-      <InstagramContentHub
-        key={igModelName}
-        modelName={igModelName}
-        modelObj={igModelObj}
-        cards={cards}
-        persistCards={persistCards}
-        reels={reels || []}
-        persistReels={persistReels}
-        onBackToModels={() => setFilter("all")}
-      />
-    ) : (
-      <IGModelPicker models={models} onPick={setFilter} />
+    if (igModelName) {
+      return (
+        <InstagramContentHub
+          key={igModelName}
+          modelName={igModelName}
+          modelObj={igModelObj}
+          cards={cards}
+          persistCards={persistCards}
+          reels={reels || []}
+          persistReels={persistReels}
+          onBackToModels={() => setFilter("all")}
+        />
+      );
+    }
+    if (!igPlanningMode) {
+      return (
+        <IGOverviewDashboard
+          models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts}
+          onPlanPosts={() => setIgPlanningMode(true)}
+        />
+      );
+    }
+    return (
+      <>
+        <button onClick={() => setIgPlanningMode(false)}
+          className="flex items-center gap-1 fs-10 font-mono uppercase c-faint hover-accent-text mb-3 transition-colors">
+          <ChevronLeft size={12} /> Instagram Dashboard
+        </button>
+        <IGModelPicker models={models} onPick={setFilter} />
+      </>
     );
   }
 
