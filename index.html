@@ -2441,6 +2441,18 @@ function XOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, competit
   );
 }
 
+function TikTokOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanPosts }) {
+  return (
+    <PlatformOverviewDashboard
+      platform="tiktok" label="TikTok" icon={<TikTokLogo size={18} className="c-accent" />} glowRgb="#39e673"
+      bgGradient="radial-gradient(ellipse 130% 100% at 10% 0%, rgba(57,230,115,0.12), transparent 55%), radial-gradient(ellipse 100% 80% at 100% 0%, rgba(56,189,248,0.08), transparent 55%), #0b0f0d"
+      models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts}
+      onPlanPosts={onPlanPosts} planLabel="Open console"
+      noAccountsHint="No TikTok accounts connected yet — connect one in Publer, then sync will pick it up automatically."
+    />
+  );
+}
+
 // A tiny decorative sine-ish squiggle — purely ornamental (no axis, no
 // legend needed), matching the reference dashboard's wavy line-under-hero
 // motif. Derived loosely from real values so it's not pure noise, but it's
@@ -2608,6 +2620,17 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
   }));
   const maxDayReach = Math.max(1, ...dayBars.map((d) => d.reach));
   const bestDayIdx = dayBars.reduce((best, d, i) => (d.reach > dayBars[best].reach ? i : best), 0);
+
+  // Fixed 7-day version for the narrow "Post Stats" mini card, independent
+  // of the 7D/30D toggle above (that toggle only widens the big area chart).
+  const miniDays = Array.from({ length: 7 }, (_, i) => dateNDaysAgo(6 - i));
+  const miniDayBars = miniDays.map((date) => ({
+    date, label: new Date(date + "T12:00:00").toLocaleDateString(undefined, { weekday: "narrow" }),
+    reach: rows.filter((r) => r.statDate === date).reduce((s, r) => s + (r.impressions || 0), 0),
+  }));
+  const miniMaxReach = Math.max(1, ...miniDayBars.map((d) => d.reach));
+  const miniBestDayIdx = miniDayBars.reduce((best, d, i) => (d.reach > miniDayBars[best].reach ? i : best), 0);
+  const miniPostCount = miniDays.reduce((s, date) => s + rows.filter((r) => r.statDate === date).reduce((a, r) => a + (r.postCount || 0), 0), 0);
 
   const accountShares = connectedModels.map((m) => {
     const r = weekRows.filter((row) => row.model === m.name).reduce((s, row) => s + (row.impressions || 0), 0);
@@ -2821,14 +2844,18 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
                     <div className="fs-12 font-semibold">Post Stats</div>
                     <MoreDotsIG dark />
                   </div>
+                  {/* Always the last 7 days here regardless of the 7D/30D
+                      toggle — this mini card is too narrow to fit 30 bars
+                      without overflowing (that's the full-width area chart's
+                      job). Keeps its own "Posts · 7d" label honest. */}
                   <div className="flex items-end justify-between gap-1" style={{ height: 90 }}>
-                    {dayBars.map((d, i) => (
+                    {miniDayBars.map((d, i) => (
                       <div key={d.date} className="flex-1 flex flex-col items-center justify-end gap-1" style={{ height: "100%" }}>
-                        {i === bestDayIdx && <IGStar size={11} color={C.pinkA} />}
+                        {i === miniBestDayIdx && <IGStar size={11} color={C.pinkA} />}
                         <div className="rounded-full w-full" style={{
-                          height: `${Math.max(6, (d.reach / maxDayReach) * 70)}px`,
-                          background: i === bestDayIdx ? `linear-gradient(180deg, ${C.pinkA}, ${C.pinkB})` : "rgba(255,255,255,0.08)",
-                          boxShadow: i === bestDayIdx ? `0 0 10px ${C.pinkA}77` : "none",
+                          height: `${Math.max(6, (d.reach / miniMaxReach) * 70)}px`,
+                          background: i === miniBestDayIdx ? `linear-gradient(180deg, ${C.pinkA}, ${C.pinkB})` : "rgba(255,255,255,0.08)",
+                          boxShadow: i === miniBestDayIdx ? `0 0 10px ${C.pinkA}77` : "none",
                         }} />
                         <span className="fs-9" style={{ color: C.sub }}>{d.label}</span>
                       </div>
@@ -2836,7 +2863,7 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
                   </div>
                   <div className="flex items-center justify-between pt-2 mt-2" style={{ borderTop: `1px solid ${C.ringTrack}` }}>
                     <span className="fs-10" style={{ color: C.sub }}>Posts · 7d</span>
-                    <span className="fs-13 font-extrabold">{weekTotals.posts}</span>
+                    <span className="fs-13 font-extrabold">{miniPostCount}</span>
                   </div>
                 </div>
               </div>
@@ -2935,6 +2962,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
   const [network, setNetwork] = useState(forcedNetwork || "all");
   const [xPlanningMode, setXPlanningMode] = useState(false);
   const [igPlanningMode, setIgPlanningMode] = useState(false);
+  const [ttPlanningMode, setTtPlanningMode] = useState(false);
 
   // The sidebar's Content Director arrow lets you jump straight to a
   // platform (Instagram / TikTok / X) — when that changes, follow it here.
@@ -3016,16 +3044,33 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
   const ttModelName = restrictModel || (filter !== "all" ? filter : null);
   const ttMode = network === "tiktok" && !restrictModel;
   if (ttMode) {
-    return ttModelName ? (
-      <TikTokContentHub
-        key={ttModelName}
-        models={models}
-        cards={cards}
-        selectedModelName={ttModelName}
-        onBackToModels={() => setFilter("all")}
-      />
-    ) : (
-      <IGModelPicker models={models} onPick={setFilter} subtitle="Opens her dedicated TikTok automation console." handleKey="tiktokHandle" handleLabel="TikTok" />
+    if (ttModelName) {
+      return (
+        <TikTokContentHub
+          key={ttModelName}
+          models={models}
+          cards={cards}
+          selectedModelName={ttModelName}
+          onBackToModels={() => setFilter("all")}
+        />
+      );
+    }
+    if (!ttPlanningMode) {
+      return (
+        <TikTokOverviewDashboard
+          models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts}
+          onPlanPosts={() => setTtPlanningMode(true)}
+        />
+      );
+    }
+    return (
+      <>
+        <button onClick={() => setTtPlanningMode(false)}
+          className="flex items-center gap-1 fs-10 font-mono uppercase c-faint hover-accent-text mb-3 transition-colors">
+          <ChevronLeft size={12} /> TikTok Dashboard
+        </button>
+        <IGModelPicker models={models} onPick={setFilter} subtitle="Opens her dedicated TikTok automation console." handleKey="tiktokHandle" handleLabel="TikTok" />
+      </>
     );
   }
 
