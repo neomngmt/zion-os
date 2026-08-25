@@ -2279,6 +2279,43 @@ function PlatformOverviewDashboard({
         .filter((p) => p.platform === platform && connectedNames.has(p.model) && (account === "all" || p.model === account))
         .sort((a, b) => (b.impressions || 0) - (a.impressions || 0));
 
+  // Cursor-tilt, scoped to just the header row (icon/title/CTA) rather than
+  // the whole panel — this used to be applied to the entire outer container,
+  // which was fine back when that container was small, but it grew into a
+  // page-length block (stat tiles, charts, top posts all stacked under it)
+  // and rotating something that tall around a small 1400px perspective
+  // visibly warped the layout near the top/bottom edges. The header is a
+  // fixed-height block regardless of how much data loads below it, so the
+  // same bug can't recur here. Direct DOM mutation (not React state) so
+  // mouse movement never triggers a re-render of the heavy panel below.
+  const tiltRef = React.useRef(null);
+  const tiltRectRef = React.useRef(null);
+  const tiltRafRef = React.useRef(null);
+  const handleTiltEnter = () => {
+    if (tiltRef.current) tiltRectRef.current = tiltRef.current.getBoundingClientRect();
+  };
+  const handleTiltMove = (e) => {
+    const el = tiltRef.current;
+    const rect = tiltRectRef.current;
+    if (!el || !rect) return;
+    if (tiltRafRef.current) return;
+    const clientX = e.clientX, clientY = e.clientY;
+    tiltRafRef.current = requestAnimationFrame(() => {
+      tiltRafRef.current = null;
+      const px = (clientX - rect.left) / rect.width - 0.5;
+      const py = (clientY - rect.top) / rect.height - 0.5;
+      el.style.transition = "transform 0.1s ease-out";
+      el.style.transform = `perspective(1400px) rotateX(${py * -3}deg) rotateY(${px * 3}deg)`;
+    });
+  };
+  const handleTiltLeave = () => {
+    if (tiltRafRef.current) { cancelAnimationFrame(tiltRafRef.current); tiltRafRef.current = null; }
+    const el = tiltRef.current;
+    if (!el) return;
+    el.style.transition = "transform 0.5s ease-out";
+    el.style.transform = "perspective(1400px) rotateX(0deg) rotateY(0deg)";
+  };
+
   return (
     <div
       className="rounded-2xl p-5 md:p-7 relative overflow-hidden mb-5"
@@ -2287,7 +2324,12 @@ function PlatformOverviewDashboard({
         "--glow-c": `${glowRgb}73`,
         animation: "panelGlowPulse 6s ease-in-out infinite",
       }}>
-      <div className="flex items-start justify-between gap-3 mb-6 flex-wrap">
+      <div ref={tiltRef}
+        onMouseEnter={handleTiltEnter}
+        onMouseMove={handleTiltMove}
+        onMouseLeave={handleTiltLeave}
+        className="flex items-start justify-between gap-3 mb-6 flex-wrap"
+        style={{ transformStyle: "preserve-3d" }}>
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
             style={{ background: `${glowRgb}1f`, border: `1px solid ${glowRgb}4d` }}>
@@ -2695,6 +2737,36 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
 
   const noAccounts = connectedModels.length === 0;
 
+  // Cursor-tilt, scoped to just the header row — see the note in
+  // PlatformOverviewDashboard for why this isn't on the whole panel anymore.
+  const tiltRef = React.useRef(null);
+  const tiltRectRef = React.useRef(null);
+  const tiltRafRef = React.useRef(null);
+  const handleTiltEnter = () => {
+    if (tiltRef.current) tiltRectRef.current = tiltRef.current.getBoundingClientRect();
+  };
+  const handleTiltMove = (e) => {
+    const el = tiltRef.current;
+    const rect = tiltRectRef.current;
+    if (!el || !rect) return;
+    if (tiltRafRef.current) return;
+    const clientX = e.clientX, clientY = e.clientY;
+    tiltRafRef.current = requestAnimationFrame(() => {
+      tiltRafRef.current = null;
+      const px = (clientX - rect.left) / rect.width - 0.5;
+      const py = (clientY - rect.top) / rect.height - 0.5;
+      el.style.transition = "transform 0.1s ease-out";
+      el.style.transform = `perspective(1400px) rotateX(${py * -3}deg) rotateY(${px * 3}deg)`;
+    });
+  };
+  const handleTiltLeave = () => {
+    if (tiltRafRef.current) { cancelAnimationFrame(tiltRafRef.current); tiltRafRef.current = null; }
+    const el = tiltRef.current;
+    if (!el) return;
+    el.style.transition = "transform 0.5s ease-out";
+    el.style.transform = "perspective(1400px) rotateX(0deg) rotateY(0deg)";
+  };
+
   return (
     <div
       className="mb-5 rounded-3xl overflow-hidden"
@@ -2705,7 +2777,12 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
         animation: "panelGlowPulse 6s ease-in-out infinite",
       }}>
       <div className="p-5 md:p-7">
-        <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
+        <div ref={tiltRef}
+          onMouseEnter={handleTiltEnter}
+          onMouseMove={handleTiltMove}
+          onMouseLeave={handleTiltLeave}
+          className="flex items-center justify-between gap-3 mb-5 flex-wrap"
+          style={{ transformStyle: "preserve-3d" }}>
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: `linear-gradient(135deg, ${C.igBrandA}, ${C.igBrandB})`, boxShadow: `0 0 14px ${C.igBrandA}40` }}>
               <Instagram size={18} color="#fff" />
@@ -5943,21 +6020,32 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
             </div>
 
             <div className="mt-5 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="fs-10 uppercase tracking-widest c-muted font-mono">
-                  Monthly goal
-                  <span className="ml-2 normal-case" style={{ opacity: 0.6 }}>· same number Neo shows</span>
-                </span>
-                <span className="fs-11 font-mono c-accent font-semibold">
-                  ${Math.round(monthRevenue).toLocaleString()} <span className="c-faint">/ ${Math.round(monthGoal).toLocaleString()}</span> · {monthPct}%
-                </span>
+              <div className="fs-10 uppercase tracking-widest c-muted font-mono mb-2">
+                Primary Objective — Monthly Revenue
+                <span className="ml-2 normal-case" style={{ opacity: 0.6 }}>· same number Neo shows</span>
               </div>
-              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "#0a5c2c" }}>
-                <div className="h-full transition-all" style={{ width: `${monthPct}%`, background: "linear-gradient(90deg, #12b34c, #39e673)", boxShadow: "0 0 8px rgba(57,230,115,0.5)" }} />
-              </div>
-              <div className="flex justify-between fs-9 mt-1 c-muted" style={{ letterSpacing: "1px" }}>
-                <span>DAY {dayOfMonth}/{daysInMonth}</span>
-                <span>${Math.max(0, Math.round(monthGoal - monthRevenue)).toLocaleString()} remaining</span>
+              <div className="flex items-center gap-7 flex-wrap">
+                <div className="text-3xl font-bold c-accent" style={{ textShadow: "0 0 12px rgba(57,230,115,0.45)" }}>
+                  $<CountUp value={monthRevenue} />
+                </div>
+                <div className="flex gap-5">
+                  <div className="fs-13 c-accent">
+                    ${Math.round(monthGoal).toLocaleString()}
+                    <span className="block fs-9 mt-0.5 c-muted" style={{ letterSpacing: "1.5px" }}>GOAL</span>
+                  </div>
+                  <div className="fs-13 c-accent">
+                    ${Math.max(0, Math.round(monthGoal - monthRevenue)).toLocaleString()}
+                    <span className="block fs-9 mt-0.5 c-muted" style={{ letterSpacing: "1.5px" }}>REMAINING</span>
+                  </div>
+                </div>
+                <div className="flex-1 minw-180">
+                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "#0a5c2c" }}>
+                    <div className="h-full transition-all" style={{ width: `${monthPct}%`, background: "linear-gradient(90deg, #12b34c, #39e673)", boxShadow: "0 0 8px rgba(57,230,115,0.5)" }} />
+                  </div>
+                  <div className="flex justify-between fs-9 mt-1 c-muted" style={{ letterSpacing: "1px" }}>
+                    <span>DAY {dayOfMonth}/{daysInMonth}</span><span>{monthPct}%</span>
+                  </div>
+                </div>
               </div>
             </div>
 
