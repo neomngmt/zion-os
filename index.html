@@ -301,7 +301,7 @@ const {
   Plus, X, Clapperboard, Users, ChevronRight, ChevronDown, MapPin, Calendar, User,
   Trash2, Loader2, LayoutGrid, Film, UserCircle2, Send, Circle,
   CheckCircle2, Repeat, ChevronLeft, CheckSquare, Lock, LogOut, ShieldCheck,
-  TrendingUp, TrendingDown, DollarSign, Instagram, Eye, Minus, Plug, Flame, Sparkles, Mic, Bell, Settings, Search, XLogo, TikTokLogo, Menu, Zap, Megaphone,
+  TrendingUp, TrendingDown, DollarSign, Instagram, Eye, Minus, Flame, Sparkles, Mic, Bell, Settings, Search, XLogo, TikTokLogo, Menu, Zap, Megaphone,
   Play, Copy, Heart, FileText, BarChart3, Shuffle, ExternalLink, Link2,
 } = Icons;
 
@@ -436,11 +436,6 @@ const TABLES = {
       sentAt: row.sent_at ? new Date(row.sent_at).getTime() : null,
       syncedAt: row.synced_at ? new Date(row.synced_at).getTime() : Date.now(),
     }),
-  },
-  "pipeline:integrations": {
-    table: "integrations", mode: "list", idKey: "id",
-    toDb: (i) => ({ id: i.id, name: i.name || "", status: i.status || "planned", note: i.note || "", help: i.help || "", agency: i.agency || "CZ" }),
-    fromDb: (r) => ({ id: r.id, name: r.name || "", status: r.status || "planned", note: r.note || "", help: r.help || "", agency: r.agency || "CZ" }),
   },
   "pipeline:settings": {
     table: "settings", mode: "singleton",
@@ -1101,9 +1096,6 @@ const trendsToDB = (t) => ({
   title: t.title || "", description: t.description || "", link: t.link || "",
   week_of: t.weekOf || null, created_at: t.createdAt ? new Date(t.createdAt).toISOString() : new Date().toISOString(),
 });
-
-const integrationsToJS = (r) => ({ id: r.id, name: r.name, status: r.status, note: r.note || "", help: r.help || "", agency: r.agency });
-const integrationsToDB = (i) => ({ id: i.id, name: i.name, status: i.status, note: i.note || "", help: i.help || "", agency: i.agency });
 
 const xCompetitorProfilesToJS = (r) => ({ id: r.id, handle: r.handle || "", note: r.note || "" });
 const xCompetitorProfilesToDB = (c) => ({ id: c.id, handle: c.handle || "", note: c.note || "" });
@@ -7899,19 +7891,6 @@ function LoginScreen({ models, settings, onLogin, onRegisterPassword }) {
 
 // ---------- settings (admin pin) ----------
 
-const DEFAULT_INTEGRATIONS = [
-  { id: "infloww-cz", name: "Infloww", status: "planned", note: "", help: "API is in Beta, request access from your Infloww contact.", agency: "CZ" },
-  { id: "infloww-us", name: "Infloww", status: "planned", note: "", help: "API is in Beta, request access from your Infloww contact.", agency: "US" },
-  { id: "buffer-cz", name: "Buffer", status: "planned", note: "", help: "Has a real public API (personal API key from Buffer settings).", agency: "CZ" },
-  { id: "buffer-us", name: "Buffer", status: "planned", note: "", help: "Has a real public API (personal API key from Buffer settings).", agency: "US" },
-];
-
-const STATUS_STYLES = {
-  connected: { label: "Connected", color: "#39e673" },
-  manual: { label: "Manual only", color: "#8B93A1" },
-  planned: { label: "Not connected", color: "#5c6e65" },
-};
-
 function CreatorSettingsPanel({ model, persistModels, models }) {
   return (
     <div className="max-w-lg">
@@ -7930,7 +7909,7 @@ function CreatorSettingsPanel({ model, persistModels, models }) {
   );
 }
 
-function SettingsPanel({ settings, persistSettings, integrations, persistIntegrations, agency }) {
+function SettingsPanel({ settings, persistSettings, agency }) {
   const [pinCZ, setPinCZ] = useState(settings.adminPinCZ || "");
   const [pinUS, setPinUS] = useState(settings.adminPinUS || "");
   const [monthlyGoal, setMonthlyGoal] = useState(settings.monthlyRevenueGoal || 20000);
@@ -7945,14 +7924,6 @@ function SettingsPanel({ settings, persistSettings, integrations, persistIntegra
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-  };
-
-  const list = (integrations && integrations.length ? integrations : DEFAULT_INTEGRATIONS)
-    .filter((i) => DEFAULT_INTEGRATIONS.some((d) => d.id === i.id))
-    .filter((i) => (i.agency || "CZ") === agency);
-  const updateIntegration = async (id, patch) => {
-    const next = list.map((i) => (i.id === id ? { ...i, ...patch } : i));
-    await persistIntegrations(next);
   };
 
   return (
@@ -8005,36 +7976,6 @@ function SettingsPanel({ settings, persistSettings, integrations, persistIntegra
         </p>
       </div>
 
-      <div className="border-t c-border pt-6">
-        <div className="flex items-center gap-2 mb-1.5">
-          <Plug size={15} className="c-accent" />
-          <span className="text-sm c-text font-medium">Integrations</span>
-        </div>
-        <p className="c-muted text-xs mb-4">Team-only. Placeholders for now, wired up one at a time as real API access comes through.</p>
-
-        <div className="space-y-2.5">
-          {list.map((i) => {
-            const st = STATUS_STYLES[i.status] || STATUS_STYLES.planned;
-            return (
-              <div key={i.id} className="c-bg-surface border c-border rounded-xl p-3">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-sm c-text">{i.name}</span>
-                  <span style={{ color: st.color, borderColor: st.color }} className="fs-9 font-mono uppercase border px-1.5 py-0.5 rounded-lg">
-                    {st.label}
-                  </span>
-                </div>
-                <p className="fs-10 c-muted font-mono mb-2">{i.help}</p>
-                <input value={i.note} onChange={(e) => updateIntegration(i.id, { note: e.target.value })}
-                  placeholder="API key / account note (kept in this workspace only)"
-                  className="w-full c-bg-app border c-border rounded-lg px-2.5 py-1.5 text-xs c-text outline-none focus-border-accent" />
-              </div>
-            );
-          })}
-        </div>
-        <p className="fs-10 c-faint font-mono mt-4">
-          Nothing here calls out to these services yet, it's a place to hold notes and keys until each is actually wired in.
-        </p>
-      </div>
     </div>
   );
 }
@@ -11654,7 +11595,6 @@ function App() {
   const { value: ofDailyStats, loading: ofDailyStatsLoading } = useSupaOfDailyStats();
   const { value: inflowwDailyStats, loading: inflowwDailyStatsLoading, syncing: inflowwSyncing, refresh: refreshInfloww } = useSupaInflowwDailyStats();
   const { value: settings, loading: settingsLoading, persist: persistSettings } = useSupaSettings({ adminPinCZ: "2748", adminPinUS: "1234", inflowwApiKey: "", monthlyRevenueGoal: 20000 });
-  const { value: integrations, loading: integrationsLoading, persist: persistIntegrations } = useSupaTable("integrations", "id", DEFAULT_INTEGRATIONS, integrationsToJS, integrationsToDB);
   const { value: weeklyTrendReels, loading: weeklyTrendReelsLoading, reload: reloadWeeklyTrendReels } = useSupaTable("weekly_trend_reels", "id", [], weeklyTrendReelsToJS, weeklyTrendReelsToDB);
   const { value: xCompetitors, persist: persistXCompetitors } = useSupaTable("x_competitor_profiles", "id", [], xCompetitorProfilesToJS, xCompetitorProfilesToDB);
   const [session, setSession] = useState(() => loadSavedSession());
@@ -11670,7 +11610,7 @@ function App() {
     if (view === "neo" && prevViewRef.current !== "neo") setNeoBooting(true);
     prevViewRef.current = view;
   }, [view]);
-  const loading = cardsLoading || modelsLoading || tasksLoading || settingsLoading || statsLoading || reelsLoading || trendsLoading || integrationsLoading;
+  const loading = cardsLoading || modelsLoading || tasksLoading || settingsLoading || statsLoading || reelsLoading || trendsLoading;
 
   const isAdmin = !!session && session.role === "admin";
   const agencyModels = useMemo(
@@ -11759,14 +11699,6 @@ function App() {
   const scopedPersistModels = isAdmin
     ? async (next) => persistModels([...models.filter((m) => (m.agency || "CZ") !== session.agency), ...next])
     : persistModels;
-  const scopedPersistIntegrations = isAdmin
-    ? async (next) => {
-        const currentList = integrations && integrations.length ? integrations : DEFAULT_INTEGRATIONS;
-        const otherAgencyItems = currentList.filter((i) => (i.agency || "CZ") !== session.agency);
-        await persistIntegrations([...otherAgencyItems, ...next]);
-      }
-    : persistIntegrations;
-
   return (
     <div className="min-h-screen c-bg-app flex flex-col" style={{ fontFamily: "Inter, sans-serif" }}>
       <style>{fontImport}</style>
@@ -11953,7 +11885,7 @@ function App() {
             {currentView === "models" && <ModelManager models={agencyModels} persistModels={scopedPersistModels} cards={scopedCards} reels={scopedReels} agency={session.agency} />}
             {currentView === "whatsnew" && <WhatsNewPage />}
             {currentView === "settings" && (isAdmin
-              ? <SettingsPanel settings={settings} persistSettings={persistSettings} integrations={integrations} persistIntegrations={scopedPersistIntegrations} agency={session.agency} />
+              ? <SettingsPanel settings={settings} persistSettings={persistSettings} agency={session.agency} />
               : <CreatorSettingsPanel model={models.find((m) => m.name === session.name)} persistModels={persistModels} models={models} />)}
           </main>
         </div>
