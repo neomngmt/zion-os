@@ -5721,7 +5721,7 @@ function CreatorInsightsSection({ models, inflowwDailyStats, embedded, days = 30
   );
 }
 
-function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats, inflowwSyncing, refreshInfloww, bufferDailyStats, bufferTopPosts }) {
+function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats, inflowwSyncing, refreshInfloww, bufferDailyStats, bufferTopPosts, settings }) {
   const [revRange, setRevRange] = useState(7); // 7 or 30
   // "+$X" flash shown briefly next to the big number after a manual refresh actually
   // changes the total — not on every render, only when refresh caused the delta.
@@ -5768,6 +5768,18 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
   const myInflowwRows = (inflowwDailyStats || []).filter((r) => agencyModelNames.has(r.model));
   const hasInflowwData = myInflowwRows.length > 0;
 
+  // Primary Objective — same monthly-revenue-vs-goal strip Neo shows under its
+  // orb, mirrored here so it's visible without opening Neo. Same source (this
+  // calendar month's real Infloww revenue, all models, Free + Paid combined)
+  // and the same $20k fallback goal when no agency goal is set.
+  const objNow = new Date();
+  const objMonthStart = `${objNow.getFullYear()}-${String(objNow.getMonth() + 1).padStart(2, "0")}-01`;
+  const monthRevenue = myInflowwRows.filter((r) => r.statDate >= objMonthStart).reduce((sum, r) => sum + (r.earningsNet || 0), 0);
+  const monthGoal = (settings && settings.monthlyRevenueGoal) || 20000;
+  const monthPct = Math.min(100, Math.round((monthRevenue / monthGoal) * 100));
+  const dayOfMonth = objNow.getDate();
+  const daysInMonth = new Date(objNow.getFullYear(), objNow.getMonth() + 1, 0).getDate();
+
   // "Week" is a rolling 7-day window ending today. "Month" is the calendar month —
   // the 1st through today — by design for the Team dashboard (Creator-side per-model
   // cards use rolling 30/7 day windows instead; different intent, don't unify them).
@@ -5806,6 +5818,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
   // lines up with a real payout boundary. The tradeoff: the first/last week of
   // a month can be shorter than 7 days if the month doesn't start/end on a
   // Monday/Sunday — that's correct, not a bug, same as the main chart above.
+  const ORDINAL_WEEK_LABELS = ["First week", "Second week", "Third week", "Fourth week", "Fifth week", "Sixth week"];
   const bucketIntoWeeks = (dayList) => {
     const weeks = [];
     let current = null;
@@ -5915,6 +5928,38 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
 
   return (
     <div>
+      <div className="c-bg-surface border c-border rounded-xl p-5 mb-6" style={{ animation: "cardIn 0.4s ease-out" }}>
+        <div className="flex items-center gap-7 flex-wrap">
+          <div>
+            <div className="fs-9 tracking-widest uppercase c-muted font-mono" style={{ letterSpacing: "2px" }}>
+              Primary Objective — Monthly Revenue
+              <span className="ml-2 normal-case" style={{ opacity: 0.6 }}>· synced hourly</span>
+            </div>
+            <div className="text-3xl font-bold c-accent" style={{ textShadow: "0 0 12px rgba(57,230,115,0.45)" }}>
+              $<CountUp value={monthRevenue} />
+            </div>
+          </div>
+          <div className="flex gap-5">
+            <div className="fs-13 c-accent">
+              ${Math.round(monthGoal).toLocaleString()}
+              <span className="block fs-9 mt-0.5 c-muted" style={{ letterSpacing: "1.5px" }}>GOAL</span>
+            </div>
+            <div className="fs-13 c-accent">
+              ${Math.max(0, Math.round(monthGoal - monthRevenue)).toLocaleString()}
+              <span className="block fs-9 mt-0.5 c-muted" style={{ letterSpacing: "1.5px" }}>REMAINING</span>
+            </div>
+          </div>
+          <div className="flex-1 minw-180">
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "#0a5c2c" }}>
+              <div className="h-full transition-all" style={{ width: `${monthPct}%`, background: "linear-gradient(90deg, #12b34c, #39e673)", boxShadow: "0 0 8px rgba(57,230,115,0.5)" }} />
+            </div>
+            <div className="flex justify-between fs-9 mt-1 c-muted" style={{ letterSpacing: "1px" }}>
+              <span>DAY {dayOfMonth}/{daysInMonth}</span><span>{monthPct}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div ref={tiltRef}
         onMouseEnter={handleTiltEnter}
         onMouseMove={handleTiltMove}
@@ -5982,17 +6027,18 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
                 {(() => {
                   const weeksMax = Math.max(1, ...weeksThisMonth.map((w) => w.total));
                   const todayISO0 = toISO(new Date());
-                  // Newest week first (top), oldest at the bottom — same order and
-                  // same real date-range labels as "See all weeks", not an ordinal
-                  // "First/Second week" count that can drift from it.
-                  return [...weeksThisMonth].reverse().map((w) => {
+                  // Newest week first (top), oldest at the bottom. Bucketing comes from
+                  // the same real-history buckets as "See all weeks" (so the count and
+                  // totals always agree), but the label here is the ordinal position
+                  // within the month rather than the modal's date range.
+                  return weeksThisMonth.map((w, i) => ({ w, i })).reverse().map(({ w, i }) => {
                     const pct = (w.total / weeksMax) * 100;
                     const isCurrent = todayISO0 >= w.startISO && todayISO0 <= w.endISO;
                     return (
                       <div key={w.startISO} className="flex items-center gap-3">
-                        <div className={`fs-11 font-mono whitespace-nowrap flex items-center gap-1.5 ${isCurrent ? "c-accent" : "c-muted"}`} style={{ width: 150, flexShrink: 0 }}>
+                        <div className={`fs-11 font-mono truncate flex items-center gap-1.5 ${isCurrent ? "c-accent" : "c-muted"}`} style={{ width: 110, flexShrink: 0 }}>
                           {isCurrent && <Circle size={5} fill="#39e673" color="#39e673" className="anim-pulse-dot" />}
-                          {fmtWeekRange(w.startISO, w.endISO)}
+                          {ORDINAL_WEEK_LABELS[i] || `Week ${i + 1}`}
                         </div>
                         <div className="flex-1 rounded-full overflow-hidden" style={{ height: 6, background: "rgba(255,255,255,0.06)" }}>
                           <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isCurrent ? "#39e673" : "rgba(57,230,115,0.55)", boxShadow: isCurrent ? "0 0 8px rgba(57,230,115,0.5)" : "none" }} />
@@ -11894,7 +11940,7 @@ function App() {
             )}
 
             {currentView === "dashboard" && (session.role === "admin"
-              ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} inflowwDailyStats={inflowwDailyStats} inflowwSyncing={inflowwSyncing} refreshInfloww={refreshInfloww} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} />
+              ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} inflowwDailyStats={inflowwDailyStats} inflowwSyncing={inflowwSyncing} refreshInfloww={refreshInfloww} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} settings={settings} />
               : <CreatorDashboard stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} ofDailyStats={ofDailyStats} inflowwDailyStats={inflowwDailyStats} />)}
             {currentView === "content" && <ContentDirector cards={isAdmin ? scopedCards : cards} persistCards={isAdmin ? scopedPersistCards : persistCards} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} forcedNetwork={contentPlatform} reels={isAdmin ? scopedReels : reels} persistReels={isAdmin ? scopedPersistReels : persistReels} xCompetitors={xCompetitors} persistXCompetitors={persistXCompetitors} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} />}
             {currentView === "calendar" && <CalendarView cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks} onNavigate={setView} restrictModel={restrictModel} />}
