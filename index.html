@@ -5806,7 +5806,6 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
   // lines up with a real payout boundary. The tradeoff: the first/last week of
   // a month can be shorter than 7 days if the month doesn't start/end on a
   // Monday/Sunday — that's correct, not a bug, same as the main chart above.
-  const ORDINAL_WEEK_LABELS = ["First week", "Second week", "Third week", "Fourth week", "Fifth week", "Sixth week"];
   const bucketIntoWeeks = (dayList) => {
     const weeks = [];
     let current = null;
@@ -5825,13 +5824,6 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
     }));
   };
   const [showAllWeeksModal, setShowAllWeeksModal] = useState(false);
-  const weeksThisMonth = (() => {
-    const now = new Date();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const lastDay = Math.min(daysInMonth, now.getDate());
-    const monthDays = Array.from({ length: lastDay }, (_, i) => toISO(new Date(now.getFullYear(), now.getMonth(), i + 1)));
-    return bucketIntoWeeks(monthDays);
-  })();
   const getAllWeeksHistory = () => {
     if (!myInflowwRows.length) return [];
     const earliest = [...new Set(myInflowwRows.map((r) => r.statDate))].sort()[0];
@@ -5841,6 +5833,23 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
     for (const d = new Date(earliest + "T00:00:00"); toISO(d) <= todayISO; d.setDate(d.getDate() + 1)) allDays.push(toISO(d));
     return bucketIntoWeeks(allDays).reverse();
   };
+  // Same real Monday-Sunday buckets as "See all weeks" (built from the whole
+  // history), just filtered down to weeks whose start falls in the current
+  // calendar month — not a fresh rebucketing from day 1 of the month, which
+  // used to invent a bogus short "week" for day 1-2 whenever the month didn't
+  // start on a Monday. Those stray leading days actually belong to the last
+  // week of the PREVIOUS month, same as "See all weeks" already treats them,
+  // so this keeps the two views in agreement on both the week boundaries and
+  // how many weeks the month actually has.
+  const weeksThisMonth = (() => {
+    const now = new Date();
+    return getAllWeeksHistory()
+      .filter((w) => {
+        const d = new Date(w.startISO + "T00:00:00");
+        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      })
+      .sort((a, b) => a.startISO.localeCompare(b.startISO));
+  })();
   const fmtWeekRange = (startISO, endISO) => {
     const s = new Date(startISO + "T00:00:00"), e = new Date(endISO + "T00:00:00");
     const fmt = (d, withYear) => d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: withYear ? "numeric" : undefined });
@@ -5973,15 +5982,17 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
                 {(() => {
                   const weeksMax = Math.max(1, ...weeksThisMonth.map((w) => w.total));
                   const todayISO0 = toISO(new Date());
-                  // Newest week first (top), First week at the bottom.
-                  return weeksThisMonth.map((w, i) => ({ w, i })).reverse().map(({ w, i }) => {
+                  // Newest week first (top), oldest at the bottom — same order and
+                  // same real date-range labels as "See all weeks", not an ordinal
+                  // "First/Second week" count that can drift from it.
+                  return [...weeksThisMonth].reverse().map((w) => {
                     const pct = (w.total / weeksMax) * 100;
                     const isCurrent = todayISO0 >= w.startISO && todayISO0 <= w.endISO;
                     return (
                       <div key={w.startISO} className="flex items-center gap-3">
-                        <div className={`fs-11 font-mono truncate flex items-center gap-1.5 ${isCurrent ? "c-accent" : "c-muted"}`} style={{ width: 110, flexShrink: 0 }}>
+                        <div className={`fs-11 font-mono whitespace-nowrap flex items-center gap-1.5 ${isCurrent ? "c-accent" : "c-muted"}`} style={{ width: 150, flexShrink: 0 }}>
                           {isCurrent && <Circle size={5} fill="#39e673" color="#39e673" className="anim-pulse-dot" />}
-                          {ORDINAL_WEEK_LABELS[i] || `Week ${i + 1}`}
+                          {fmtWeekRange(w.startISO, w.endISO)}
                         </div>
                         <div className="flex-1 rounded-full overflow-hidden" style={{ height: 6, background: "rgba(255,255,255,0.06)" }}>
                           <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isCurrent ? "#39e673" : "rgba(57,230,115,0.55)", boxShadow: isCurrent ? "0 0 8px rgba(57,230,115,0.5)" : "none" }} />
