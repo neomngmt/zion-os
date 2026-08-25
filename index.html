@@ -1128,20 +1128,6 @@ function CountUp({ value, prefix = "", duration = 600 }) {
   return <>{prefix}{display.toLocaleString()}</>;
 }
 
-function Sparkline({ data, color = "#39e673", height = 36 }) {
-  if (!data || data.length < 2) return null;
-  const max = Math.max(...data, 1);
-  const min = Math.min(...data, 0);
-  const range = max - min || 1;
-  const w = 100;
-  const points = data.map((v, i) => `${(i / (data.length - 1)) * w},${height - ((v - min) / range) * height}`).join(" ");
-  return (
-    <svg viewBox={`0 0 ${w} ${height}`} preserveAspectRatio="none" className="w-full" style={{ height }}>
-      <polyline points={points} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 function Badge({ children, color }) {
   return (
     <span
@@ -1150,17 +1136,6 @@ function Badge({ children, color }) {
     >
       {children}
     </span>
-  );
-}
-
-function StatCard({ label, value, color }) {
-  return (
-    <div className="c-bg-surface border c-border rounded-xl px-4 py-3.5 flex-1 minw-140 hover-lift">
-      <div className="fs-10 uppercase tracking-widest c-muted font-mono mb-1.5">{label}</div>
-      <div style={{ color: color || "#f2f5f0" }} className="text-2xl font-semibold">
-        {typeof value === "number" ? <CountUp value={value} /> : value}
-      </div>
-    </div>
   );
 }
 
@@ -2269,9 +2244,40 @@ function PlatformOverviewDashboard({
 
   const accountColor = (name) => MASS_PLANNER_COLORS[connectedModels.findIndex((m) => m.name === name) % MASS_PLANNER_COLORS.length];
 
-  const topPosts = (bufferTopPosts || [])
-    .filter((p) => p.platform === platform && connectedNames.has(p.model) && (account === "all" || p.model === account))
-    .sort((a, b) => (b.impressions || 0) - (a.impressions || 0));
+  // Live post list (not just the 5-post rolling-7-day snapshot buffer_top_posts
+  // keeps) so "Top posts" actually grows/shrinks to match the 7D/30D toggle —
+  // same fix already applied on the IG dashboard, backported here. Fetches per
+  // selected account, or per every connected account (merged) when "all" is
+  // selected, since one publer-posts call only covers a single account.
+  const [livePosts, setLivePosts] = React.useState(null);
+  React.useEffect(() => {
+    const targets = account === "all" ? connectedModels.map((m) => m.name) : [account];
+    if (!targets.length) { setLivePosts(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const results = await Promise.all(targets.map((modelName) =>
+          supabaseClient.functions.invoke("publer-posts", { body: { modelName, platform, days: range } })
+        ));
+        if (cancelled) return;
+        const merged = results.flatMap((r, i) =>
+          !r.error && r.data?.posts ? r.data.posts.map((p) => ({ ...p, model: targets[i] })) : []
+        );
+        setLivePosts(merged.length ? merged : (results.some((r) => !r.error) ? [] : null));
+      } catch (e) {
+        if (!cancelled) setLivePosts(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [account, range, platform, connectedModels.map((m) => m.name).join(",")]);
+
+  const topPosts = livePosts?.length
+    ? livePosts
+        .map((p) => ({ model: p.model, text: p.text, thumbnailUrl: p.thumbnailUrl, externalLink: p.postLink, impressions: p.reach }))
+        .sort((a, b) => (b.impressions || 0) - (a.impressions || 0))
+    : (bufferTopPosts || [])
+        .filter((p) => p.platform === platform && connectedNames.has(p.model) && (account === "all" || p.model === account))
+        .sort((a, b) => (b.impressions || 0) - (a.impressions || 0));
 
   // Subtle cursor-tilt — mutates the DOM directly via ref instead of React
   // state, so mouse movement never triggers a re-render of this (heavy,
@@ -2415,12 +2421,14 @@ function PlatformOverviewDashboard({
 
           {topPosts.length > 0 && (
             <div className="c-bg-app rounded-xl p-4 mb-5" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
-              <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-3">Top posts · rolling 7 days</div>
+              <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-3">
+                {livePosts?.length ? `Top posts · last ${range} days (${topPosts.length})` : "Top posts · rolling 7 days"}
+              </div>
               <div className="flex flex-col gap-1.5">
-                {topPosts.map((p) => {
+                {topPosts.map((p, i) => {
                   const color = accountColor(p.model);
                   return (
-                    <a key={p.model} href={p.externalLink || undefined} target="_blank" rel="noreferrer"
+                    <a key={p.externalLink || `${p.model}-${i}`} href={p.externalLink || undefined} target="_blank" rel="noreferrer"
                       className="flex items-center gap-3 rounded-lg p-2 hover-border-accent transition-colors"
                       style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
                       {p.thumbnailUrl ? (
@@ -4552,6 +4560,8 @@ function ModelManager({ models, persistModels, cards, reels, agency }) {
           </div>
           {rows.map((r, i) => (
             <div key={r.model.name} onClick={() => setDetailName(r.model.name)}
+              role="button" tabIndex={0}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetailName(r.model.name); } }}
               className="group relative grid grid-cols-2 md:grid-cols-1 gap-2 px-4 py-3 items-center cursor-pointer transition-colors hover:bg-white/[0.02]"
               style={{ gridTemplateColumns: "32px 1.3fr 1fr 2fr 90px 90px", borderTop: i === 0 ? "none" : "1px solid rgba(255,255,255,0.06)" }}>
               <button onClick={(e) => { e.stopPropagation(); removeModel(r.model.name); }}
@@ -4957,77 +4967,6 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, 
           Save changes
         </button>
       </div>
-    </div>
-  );
-}
-
-// ---------- creator submission ----------
-
-function CreatorForm({ models, cards, persistCards, restrictModel }) {
-  const [model, setModel] = useState(restrictModel || "");
-  const [title, setTitle] = useState("");
-  const [sceneType, setSceneType] = useState("");
-  const [location, setLocation] = useState("");
-  const [notes, setNotes] = useState("");
-  const [sent, setSent] = useState(false);
-
-  const nextSeq = () => (cards.reduce((m, c) => Math.max(m, c.seq || 0), 0) + 1);
-
-  const submit = async () => {
-    const chosenModel = restrictModel || model;
-    if (!chosenModel || !title.trim()) return;
-    const card = {
-      id: uid(), seq: nextSeq(), title, model: chosenModel, sceneType, location,
-      deadline: "", assignee: "", scriptLink: "", notes,
-      stage: "idea", source: "creator", createdAt: Date.now(),
-    };
-    await persistCards([...cards, card]);
-    setSent(true);
-    setTitle(""); setSceneType(""); setLocation(""); setNotes("");
-    setTimeout(() => setSent(false), 2500);
-  };
-
-  return (
-    <div className="max-w-md">
-      <p className="c-muted text-sm mb-5">Tell us what you want to shoot next. It lands straight on the board as a new idea.</p>
-
-      {!restrictModel && (
-        <>
-          <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Your name</label>
-          <select value={model} onChange={(e) => setModel(e.target.value)}
-            className="w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text mb-3 outline-none focus-border-accent">
-            <option value="">Select your name</option>
-            {models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
-          </select>
-        </>
-      )}
-
-      <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">What do you want to shoot?</label>
-      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. cooking breakfast, morning routine bit..."
-        className="w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text mb-3 outline-none focus-border-accent" />
-
-      <div className="grid grid-cols-2 gap-3 mb-3">
-        <div>
-          <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Vibe / type</label>
-          <input value={sceneType} onChange={(e) => setSceneType(e.target.value)} placeholder="girl next door..."
-            className="w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text outline-none focus-border-accent" />
-        </div>
-        <div>
-          <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Where</label>
-          <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="bedroom, kitchen..."
-            className="w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text outline-none focus-border-accent" />
-        </div>
-      </div>
-
-      <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Anything else</label>
-      <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="outfit ideas, props, timing..."
-        className="w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text mb-4 outline-none focus-border-accent resize-none" />
-
-      <button onClick={submit}
-        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold hover-bg-accent2">
-        <Send size={13} /> Send idea to team
-      </button>
-      {sent && <p className="c-success text-xs font-mono text-center mt-3">Sent. It's on the board.</p>}
     </div>
   );
 }
@@ -5834,10 +5773,8 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
   // cards use rolling 30/7 day windows instead; different intent, don't unify them).
   // Early in a new month this legitimately has few days of data — that's expected,
   // not a bug, same as any month-to-date figure anywhere else.
-  // Local calendar date, not UTC — d.toISOString() converts through UTC first, which
-  // silently shifts every date back a day for any timezone ahead of UTC (e.g. CEST),
-  // dropping "today" from month-to-date and mislabeling every other day in the range.
-  const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // toISO is the shared local-calendar-date helper defined below with the other
+  // date helpers (not UTC-shifted — see its comment there).
   // Calendar week, Monday through today — not a rolling 7-day window. At Monday
   // 00:00 this collapses to just today (a single fresh candle) and fills back in
   // day by day through Sunday, same "to-date" shape as the Month view below.
@@ -6144,7 +6081,7 @@ Dashboard = React.memo(Dashboard);
 
 // ---------- date helpers ----------
 
-const toISO = (d) => d.toISOString().slice(0, 10);
+const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const todayISO = () => toISO(new Date());
 const addDays = (iso, n) => {
   const d = new Date(iso + "T00:00:00");
@@ -8049,133 +7986,6 @@ function SettingsPanel({ settings, persistSettings, integrations, persistIntegra
 
 // ---------- trends ----------
 
-function TrendManager({ trends, persistTrends }) {
-  const [adding, setAdding] = useState(false);
-  const [category, setCategory] = useState("");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [link, setLink] = useState("");
-  const [weekOf, setWeekOf] = useState(todayISO());
-  const [showCZ, setShowCZ] = useState(true);
-  const [showUS, setShowUS] = useState(true);
-  const [filter, setFilter] = useState("all");
-
-  const categories = Array.from(new Set(trends.map((t) => t.category).filter(Boolean)));
-
-  const addTrend = async () => {
-    if (!title.trim()) return;
-    const entry = {
-      id: uid(), showCZ, showUS, category: category.trim() || "General", title, description, link, weekOf,
-      createdAt: Date.now(),
-    };
-    await persistTrends([...trends, entry]);
-    setCategory(""); setTitle(""); setDescription(""); setLink(""); setShowCZ(true); setShowUS(true); setAdding(false);
-  };
-  const deleteTrend = async (id) => {
-    await persistTrends(trends.filter((t) => t.id !== id));
-  };
-
-  const visible = [...trends]
-    .filter((t) => filter === "all" || t.category === filter)
-    .sort((a, b) => (b.weekOf || "").localeCompare(a.weekOf || "") || b.createdAt - a.createdAt);
-
-  return (
-    <div>
-      <p className="c-muted text-sm mb-4">
-        Weekly viral video report, usually sourced from the US market — pick which audience(s) each one goes to. Ask Claude to research current trends, then drop the highlights here.
-      </p>
-
-      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <button onClick={() => setFilter("all")}
-            className={`fs-11 font-mono uppercase px-2.5 py-1 rounded-lg border ${filter === "all" ? "c-border-accent c-accent" : "c-border c-muted"}`}>
-            All
-          </button>
-          {categories.map((c) => (
-            <button key={c} onClick={() => setFilter(c)}
-              className={`fs-11 font-mono uppercase px-2.5 py-1 rounded-lg border ${filter === c ? "c-border-accent c-accent" : "c-border c-muted"}`}>
-              {c}
-            </button>
-          ))}
-        </div>
-        <button onClick={() => setAdding(true)}
-          className="flex items-center gap-1.5 fs-11 font-mono uppercase tracking-wide c-bg-accent c-onaccent px-3 py-1.5 rounded-lg font-semibold hover-bg-accent2">
-          <Plus size={13} /> Add trend
-        </button>
-      </div>
-
-      {adding && (
-        <div className="mb-5 c-bg-surface border c-border rounded-xl p-4 grid grid-cols-2 gap-3">
-          <div className="col-span-2">
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Title</label>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Grocery store GRWM POV"
-              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
-          </div>
-          <div>
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Week of</label>
-            <input type="date" value={weekOf} onChange={(e) => setWeekOf(e.target.value)}
-              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
-          </div>
-          <div>
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Category</label>
-            <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="POV, GRWM, storytime..."
-              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
-          </div>
-          <div className="col-span-2">
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Example link</label>
-            <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://..."
-              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
-          </div>
-          <div className="col-span-2">
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Why it's working</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3}
-              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent resize-none" />
-          </div>
-          <div className="col-span-2">
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-2">Send to</label>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-1.5 text-sm c-text cursor-pointer">
-                <input type="checkbox" checked={showCZ} onChange={(e) => setShowCZ(e.target.checked)} /> 🇨🇿 CZ models
-              </label>
-              <label className="flex items-center gap-1.5 text-sm c-text cursor-pointer">
-                <input type="checkbox" checked={showUS} onChange={(e) => setShowUS(e.target.checked)} /> 🇺🇸 US models
-              </label>
-            </div>
-          </div>
-          <div className="col-span-2 flex gap-2">
-            <button onClick={addTrend} className="px-3 py-2 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase font-semibold">Post trend</button>
-            <button onClick={() => setAdding(false)} className="px-3 py-2 rounded-lg border c-border c-muted text-xs font-mono uppercase">Cancel</button>
-          </div>
-        </div>
-      )}
-
-      {visible.length === 0 ? (
-        <div className="fs-12 c-faint font-mono italic py-10 text-center border border-dashed c-border rounded-xl">no trends posted yet</div>
-      ) : (
-        <div className="space-y-2.5">
-          {visible.map((t) => (
-            <div key={t.id} className="c-bg-surface border c-border rounded-xl p-4 group relative">
-              <button onClick={() => deleteTrend(t.id)}
-                className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 c-muted hover-warn">
-                <Trash2 size={13} />
-              </button>
-              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                <span className="fs-10 font-mono c-accent uppercase">Week of {fmtDay(t.weekOf)}</span>
-                <Badge color="#12b34c">{t.category}</Badge>
-                {t.showCZ && <Badge color="#5B8FA8">🇨🇿 CZ</Badge>}
-                {t.showUS && <Badge color="#5B8FA8">🇺🇸 US</Badge>}
-              </div>
-              <div className="c-text text-sm font-medium mb-1">{t.title}</div>
-              {t.description && <div className="c-muted text-xs mb-2">{t.description}</div>}
-              {t.link && <a href={t.link} target="_blank" rel="noopener noreferrer" className="fs-11 font-mono c-accent hover-accent-text">Watch example →</a>}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function CreatorTrending({ trends, agency }) {
   const [filter, setFilter] = useState("all");
   const mine = trends.filter((t) => (agency === "US" ? t.showUS : t.showCZ))
@@ -8496,192 +8306,6 @@ class SimplexNoise3D {
 // flowing simplex noise, rendered as glowing wireframe, matching the
 // "organic warped glass sphere" reference much more closely than a 2D
 // canvas approximation can.
-// Layered, shader-driven orb — a faithful adaptation of the open-source
-// "voiceorb" project (github.com/aguscruiz/voiceorb): 3 nested translucent
-// spheres, each with a custom GLSL shader combining wave + simplex-noise
-// surface distortion and a fresnel edge glow. Recolored to green (no
-// rainbow/chromatic-aberration effect, which the original uses but we don't
-// want). Critically: every reactive value (scale, distortion amount) is
-// smoothed through a lerp before it ever touches the mesh — that's what
-// keeps it from looking like it's glitching, even though the underlying
-// audio signal driving it jumps around.
-function NeoOrbLayered({ thinking, speaking, listening, liveAmpRef, onClick }) {
-  const mountRef = useRef(null);
-  const stateRef = useRef({ thinking, speaking, listening });
-  stateRef.current = { thinking, speaking, listening };
-
-  useEffect(() => {
-    if (!window.THREE) return;
-    const THREE = window.THREE;
-    const mount = mountRef.current;
-    const size = Math.min(mount.clientWidth || 380, 380);
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-    camera.position.z = 4.4;
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(size, size);
-    mount.innerHTML = "";
-    mount.appendChild(renderer.domElement);
-
-    const vertexShader = `
-      varying vec3 vNormal;
-      varying vec3 vPosition;
-      uniform float time;
-      uniform float audioLevel;
-      uniform float layerOffset;
-      vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}
-      vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}
-      vec4 permute(vec4 x){return mod289(((x*34.0)+1.0)*x);}
-      vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-0.85373472095314*r;}
-      float snoise(vec3 v){
-        const vec2 C=vec2(1.0/6.0,1.0/3.0); const vec4 D=vec4(0.0,0.5,1.0,2.0);
-        vec3 i=floor(v+dot(v,C.yyy)); vec3 x0=v-i+dot(i,C.xxx);
-        vec3 g=step(x0.yzx,x0.xyz); vec3 l=1.0-g;
-        vec3 i1=min(g.xyz,l.zxy); vec3 i2=max(g.xyz,l.zxy);
-        vec3 x1=x0-i1+C.xxx; vec3 x2=x0-i2+C.yyy; vec3 x3=x0-D.yyy;
-        i=mod289(i);
-        vec4 p=permute(permute(permute(i.z+vec4(0.0,i1.z,i2.z,1.0))+i.y+vec4(0.0,i1.y,i2.y,1.0))+i.x+vec4(0.0,i1.x,i2.x,1.0));
-        float n_=0.142857142857; vec3 ns=n_*D.wyz-D.xzx;
-        vec4 j=p-49.0*floor(p*ns.z*ns.z);
-        vec4 x_=floor(j*ns.z); vec4 y_=floor(j-7.0*x_);
-        vec4 x=x_*ns.x+ns.yyyy; vec4 y=y_*ns.x+ns.yyyy; vec4 h=1.0-abs(x)-abs(y);
-        vec4 b0=vec4(x.xy,y.xy); vec4 b1=vec4(x.zw,y.zw);
-        vec4 s0=floor(b0)*2.0+1.0; vec4 s1=floor(b1)*2.0+1.0; vec4 sh=-step(h,vec4(0.0));
-        vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy; vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
-        vec3 p0=vec3(a0.xy,h.x); vec3 p1=vec3(a0.zw,h.y); vec3 p2=vec3(a1.xy,h.z); vec3 p3=vec3(a1.zw,h.w);
-        vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
-        p0*=norm.x; p1*=norm.y; p2*=norm.z; p3*=norm.w;
-        vec4 m=max(0.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.0); m=m*m;
-        return 42.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
-      }
-      void main(){
-        vNormal = normalize(normalMatrix * normal);
-        vec3 pos = position;
-        float wave1 = sin(pos.y*2.5+time*1.5+layerOffset)*cos(pos.x*2.0-time*1.2);
-        float wave2 = sin(pos.x*3.0-time*1.8+layerOffset)*cos(pos.z*2.5+time*1.5);
-        float noise1 = snoise(pos*1.2+time*0.3+layerOffset);
-        float distortion = (wave1+wave2)*0.01 + noise1*0.012;
-        distortion *= (0.3 + audioLevel*0.7);
-        pos = pos + normal * distortion;
-        vPosition = pos;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos,1.0);
-      }
-    `;
-    const fragmentShader = `
-      varying vec3 vNormal;
-      varying vec3 vPosition;
-      uniform vec3 sphereColor;
-      uniform float opacity;
-      uniform float time;
-      void main(){
-        vec3 viewDirection = normalize(cameraPosition - vPosition);
-        float fresnel = pow(1.0 - abs(dot(viewDirection, normalize(vNormal))), 2.0);
-        float shimmer = sin(vPosition.x*8.0+vPosition.y*6.0+time*2.0)*0.04+0.96;
-        vec3 color = sphereColor * shimmer;
-        color += fresnel * vec3(0.55, 1.0, 0.72) * 0.7;
-        gl_FragColor = vec4(color, opacity + fresnel * 0.25);
-      }
-    `;
-
-    const LAYER_CFG = [
-      { scale: 1.0, opacity: 0.18, color: 0x0e6b34, rot: { x: 0.0016, y: 0.0026, z: 0 } },
-      { scale: 0.84, opacity: 0.24, color: 0x1cbf5c, rot: { x: -0.0022, y: 0.0034, z: 0.0012 } },
-      { scale: 0.66, opacity: 0.4, color: 0x9dffc4, rot: { x: 0.0032, y: -0.0024, z: -0.0014 } },
-    ];
-    const layers = LAYER_CFG.map((cfg, i) => {
-      const geo = new THREE.SphereGeometry(cfg.scale, 64, 64);
-      const mat = new THREE.ShaderMaterial({
-        vertexShader, fragmentShader,
-        uniforms: {
-          time: { value: 0 }, audioLevel: { value: 0 }, layerOffset: { value: i * 2.0 },
-          sphereColor: { value: new THREE.Color(cfg.color) }, opacity: { value: cfg.opacity },
-        },
-        transparent: true, side: THREE.DoubleSide, depthWrite: false,
-      });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.userData = { baseScale: cfg.scale, rot: cfg.rot };
-      scene.add(mesh);
-      return { mesh, geo, mat };
-    });
-
-    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-
-    let raf;
-    const clock = new THREE.Clock();
-    let currentScale = 1.0;
-    let currentAudioLevel = 0.15;
-    // A slow, organic "breathing" target for idle/listening cadence — not
-    // driven by raw jumpy input, just its own gentle randomized wander.
-    let cadence = { intensity: 0.15, next: 0 };
-
-    const animate = () => {
-      const { thinking: th, speaking: sp, listening: li } = stateRef.current;
-      const elapsed = clock.getElapsedTime();
-      const now = elapsed;
-
-      let targetScale = 1.0;
-      let targetAudioLevel = 0.15;
-
-      if (th) {
-        const breathe = (Math.sin(now * 1.5) + 1) / 2;
-        targetScale = 1.0 + 0.03 + breathe * 0.09;
-        targetAudioLevel = 0.35 + breathe * 0.15;
-      } else if (sp) {
-        // Real TTS amplitude (0.4-1, updates in bursts) is only ever used as
-        // a *target* — currentScale eases toward it, never snaps to it.
-        const amp = liveAmpRef?.current || 0.5;
-        targetScale = 1.0 + 0.05 + amp * 0.14;
-        targetAudioLevel = 0.5 + amp * 0.35;
-      } else if (li) {
-        if (now >= cadence.next) {
-          cadence.intensity = 0.3 + Math.random() * 0.5;
-          cadence.next = now + 0.15 + Math.random() * 0.25;
-        }
-        targetScale = 1.0 + 0.02 + cadence.intensity * 0.16;
-        targetAudioLevel = 0.4 + cadence.intensity * 0.3;
-      } else {
-        targetScale = 1.0;
-        targetAudioLevel = 0.15;
-      }
-
-      // The smoothing step — this is the whole trick. Even a jumpy target
-      // becomes a smooth ease once it only ever nudges a running value.
-      currentScale += (targetScale - currentScale) * 0.08;
-      currentAudioLevel += (targetAudioLevel - currentAudioLevel) * 0.06;
-
-      layers.forEach(({ mesh, mat }) => {
-        mat.uniforms.time.value += 0.012;
-        mat.uniforms.audioLevel.value = currentAudioLevel;
-        mesh.rotation.x += mesh.userData.rot.x;
-        mesh.rotation.y += mesh.userData.rot.y;
-        mesh.rotation.z += mesh.userData.rot.z;
-        const s = mesh.userData.baseScale * currentScale;
-        mesh.scale.set(s, s, s);
-      });
-
-      renderer.render(scene, camera);
-      raf = requestAnimationFrame(animate);
-    };
-    animate();
-
-    return () => {
-      cancelAnimationFrame(raf);
-      layers.forEach(({ geo, mat }) => { geo.dispose(); mat.dispose(); });
-      renderer.dispose();
-      if (mount) mount.innerHTML = "";
-    };
-  }, []);
-
-  return (
-    <div ref={mountRef} onClick={onClick}
-      className="mx-auto cursor-pointer"
-      style={{ width: "100%", height: "100%" }} />
-  );
-}
-
 function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onClick, glowElRef }) {
   const mountRef = useRef(null);
   const stateRef = useRef({ thinking, speaking, listening });
@@ -8970,89 +8594,6 @@ function NeoOrbV3({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
   return <canvas ref={canvasRef} onClick={onClick} className="block mx-auto cursor-pointer" />;
 }
 
-
-function NeoRadar({ active }) {
-  const canvasRef = useRef(null);
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    const size = 160;
-    canvas.width = size * dpr; canvas.height = size * dpr;
-    canvas.style.width = size + "px"; canvas.style.height = size + "px";
-    ctx.scale(dpr, dpr);
-    const cx = size / 2, cy = size / 2, rad = size / 2 - 6;
-    let sweep = 0, raf;
-    const render = () => {
-      ctx.clearRect(0, 0, size, size);
-      ctx.strokeStyle = "rgba(18,179,76,0.3)";
-      ctx.lineWidth = 1;
-      [1, 0.66, 0.33].forEach((f) => { ctx.beginPath(); ctx.arc(cx, cy, rad * f, 0, Math.PI * 2); ctx.stroke(); });
-      ctx.beginPath(); ctx.moveTo(cx - rad, cy); ctx.lineTo(cx + rad, cy); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(cx, cy - rad); ctx.lineTo(cx, cy + rad); ctx.stroke();
-
-      const grad = ctx.createConicGradient(sweep - 0.9, cx, cy);
-      grad.addColorStop(0, "rgba(18,179,76,0)");
-      grad.addColorStop(1, `rgba(18,179,76,${active ? 0.5 : 0.3})`);
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, rad, sweep - 0.9, sweep);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.strokeStyle = "rgba(120,255,160,0.9)";
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(cx + Math.cos(sweep) * rad, cy + Math.sin(sweep) * rad);
-      ctx.stroke();
-
-      sweep += active ? 0.045 : 0.02;
-      raf = requestAnimationFrame(render);
-    };
-    render();
-    return () => cancelAnimationFrame(raf);
-  }, [active]);
-  return <canvas ref={canvasRef} />;
-}
-
-function NeoWaveform({ amplitude, liveAmpRef, speaking }) {
-  const canvasRef = useRef(null);
-  const ampRef = useRef(amplitude);
-  ampRef.current = amplitude;
-  const speakingRef2 = useRef(speaking);
-  speakingRef2.current = speaking;
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    const w = 220, h = 60;
-    canvas.width = w * dpr; canvas.height = h * dpr;
-    canvas.style.width = w + "px"; canvas.style.height = h + "px";
-    ctx.scale(dpr, dpr);
-    let t = 0, raf;
-    const render = () => {
-      ctx.clearRect(0, 0, w, h);
-      ctx.strokeStyle = "rgba(120,255,160,0.85)";
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      const live = speakingRef2.current ? (liveAmpRef?.current || 0) : 0;
-      const amp = ampRef.current + live * 22;
-      for (let x = 0; x < w; x++) {
-        const y = h / 2 + Math.sin(x * 0.09 + t) * amp * Math.sin(t * 0.6) + Math.sin(x * 0.2 + t * 2) * (amp * 0.35);
-        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-      t += 0.06;
-      raf = requestAnimationFrame(render);
-    };
-    render();
-    return () => cancelAnimationFrame(raf);
-  }, []);
-  return <canvas ref={canvasRef} />;
-}
 
 function NeoClock() {
   const [now, setNow] = useState(new Date());
@@ -10847,6 +10388,55 @@ function useSupaInflowwDailyStats() {
   return { value, loading, syncing, refresh };
 }
 
+// Defined at module scope (not inline inside CreatorDashboard's render body) so
+// it keeps a stable identity across CreatorDashboard re-renders — an inline
+// component gets a fresh function identity every render, which makes React
+// treat it as a brand-new component type and remount it, discarding this
+// card's own range state (the 7D/30D toggle) every time the parent re-renders.
+function InflowwRevenueCard({ myInflowwRows, accountType, title, last7Dates, dayList30, sumInfloww }) {
+  const rowsAll = myInflowwRows.filter((r) => r.accountType === accountType);
+  const [range, setRange] = useState(7);
+  if (!rowsAll.length) return null;
+  const days = range === 7 ? last7Dates : dayList30;
+  const sumForDay = (day) => rowsAll.filter((r) => r.statDate === day).reduce((t, r) => t + (r.earningsNet || 0), 0);
+  const chartData = days.map((day) => ({ date: day, value: sumForDay(day) }));
+  const rangeTotal = chartData.reduce((t, d) => t + d.value, 0);
+  const prevDays = (range === 7
+    ? Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (13 - i)); return d.toISOString().slice(0, 10); })
+    : Array.from({ length: 30 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (59 - i)); return d.toISOString().slice(0, 10); }));
+  const prevTotal = prevDays.reduce((t, day) => t + sumForDay(day), 0);
+  const rangeRows = rowsAll.filter((r) => days.includes(r.statDate));
+
+  return (
+    <div className="c-bg-surface border c-border rounded-xl p-4 mb-3">
+      <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
+        <span className="fs-10 uppercase tracking-widest c-muted font-mono">
+          {title}
+          <span className="fs-9 ml-2 normal-case c-muted" style={{ opacity: 0.6 }}>· synced hourly</span>
+        </span>
+        <div className="flex items-center gap-2">
+          <DeltaTag current={rangeTotal} previous={prevTotal} />
+          <div className="flex rounded-lg border c-border overflow-hidden">
+            {[7, 30].map((n) => (
+              <button key={n} onClick={() => setRange(n)}
+                className={`tap px-2 py-0.5 fs-9 font-mono uppercase transition-colors ${range === n ? "c-bg-accent c-onaccent" : "c-muted hover-bg-surface"}`}>
+                {n}D
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="text-2xl font-extrabold c-accent mb-1">$<CountUp value={rangeTotal} /></div>
+      <div className="mb-2"><RevenueChart data={chartData} height={200} /></div>
+      <div className="flex gap-4 fs-10 font-mono c-faint uppercase">
+        <span><CountUp value={sumInfloww(rangeRows, "messagesCount")} /> messages</span>
+        <span><CountUp value={sumInfloww(rangeRows, "tipsCount")} /> tips</span>
+        <span><CountUp value={sumInfloww(rangeRows, "subsCount")} /> subs</span>
+      </div>
+    </div>
+  );
+}
+
 function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDailyStats, bufferTopPosts, ofDailyStats, inflowwDailyStats }) {
   const mine = stats.filter((s) => s.model === restrictModel).sort((a, b) => b.weekOf.localeCompare(a.weekOf));
   const latest = mine[0];
@@ -10875,56 +10465,12 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
     const d = new Date(); d.setDate(d.getDate() - (29 - i)); return d.toISOString().slice(0, 10);
   });
 
-  const InflowwRevenueCard = ({ accountType, title }) => {
-    const rowsAll = myInflowwRows.filter((r) => r.accountType === accountType);
-    const [range, setRange] = useState(7);
-    if (!rowsAll.length) return null;
-    const days = range === 7 ? last7Dates : dayList30;
-    const sumForDay = (day) => rowsAll.filter((r) => r.statDate === day).reduce((t, r) => t + (r.earningsNet || 0), 0);
-    const chartData = days.map((day) => ({ date: day, value: sumForDay(day) }));
-    const rangeTotal = chartData.reduce((t, d) => t + d.value, 0);
-    const prevDays = (range === 7
-      ? Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (13 - i)); return d.toISOString().slice(0, 10); })
-      : Array.from({ length: 30 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (59 - i)); return d.toISOString().slice(0, 10); }));
-    const prevTotal = prevDays.reduce((t, day) => t + sumForDay(day), 0);
-    const rangeRows = rowsAll.filter((r) => days.includes(r.statDate));
-
-    return (
-      <div className="c-bg-surface border c-border rounded-xl p-4 mb-3">
-        <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-          <span className="fs-10 uppercase tracking-widest c-muted font-mono">
-            {title}
-            <span className="fs-9 ml-2 normal-case c-muted" style={{ opacity: 0.6 }}>· synced hourly</span>
-          </span>
-          <div className="flex items-center gap-2">
-            <DeltaTag current={rangeTotal} previous={prevTotal} />
-            <div className="flex rounded-lg border c-border overflow-hidden">
-              {[7, 30].map((n) => (
-                <button key={n} onClick={() => setRange(n)}
-                  className={`tap px-2 py-0.5 fs-9 font-mono uppercase transition-colors ${range === n ? "c-bg-accent c-onaccent" : "c-muted hover-bg-surface"}`}>
-                  {n}D
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="text-2xl font-extrabold c-accent mb-1">$<CountUp value={rangeTotal} /></div>
-        <div className="mb-2"><RevenueChart data={chartData} height={200} /></div>
-        <div className="flex gap-4 fs-10 font-mono c-faint uppercase">
-          <span><CountUp value={sumInfloww(rangeRows, "messagesCount")} /> messages</span>
-          <span><CountUp value={sumInfloww(rangeRows, "tipsCount")} /> tips</span>
-          <span><CountUp value={sumInfloww(rangeRows, "subsCount")} /> subs</span>
-        </div>
-      </div>
-    );
-  };
-
   const hasFreeInfloww = myInflowwRows.some((r) => r.accountType === "free");
   const hasPaidInfloww = myInflowwRows.some((r) => r.accountType === "paid");
   const inflowwSection = (hasFreeInfloww || hasPaidInfloww) && (
     <div className="mb-6">
-      {hasPaidInfloww && <InflowwRevenueCard accountType="paid" title="OnlyFans · Paid" />}
-      {hasFreeInfloww && <InflowwRevenueCard accountType="free" title="OnlyFans · Free" />}
+      {hasPaidInfloww && <InflowwRevenueCard myInflowwRows={myInflowwRows} last7Dates={last7Dates} dayList30={dayList30} sumInfloww={sumInfloww} accountType="paid" title="OnlyFans · Paid" />}
+      {hasFreeInfloww && <InflowwRevenueCard myInflowwRows={myInflowwRows} last7Dates={last7Dates} dayList30={dayList30} sumInfloww={sumInfloww} accountType="free" title="OnlyFans · Free" />}
     </div>
   );
   const myBufferRows = (bufferDailyStats || []).filter((r) => r.model === restrictModel && r.statDate >= sevenDaysAgoStr);
