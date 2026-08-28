@@ -1506,6 +1506,40 @@ async function computeBestHours(modelName) {
   return ranked.length ? ranked : null;
 }
 
+// Downscales + re-encodes a photo before it goes to x-caption-generate as a
+// vision input — Claude only needs enough resolution to read what's in the
+// shot, not the original multi-megabyte file, and keeping the request small
+// matters since a batch sends every photo in one call. Capped at 1024px on
+// the long edge, re-encoded as JPEG q=0.82.
+function fileToVisionImage(file, maxDim = 1024) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob((blob) => {
+        if (!blob) { reject(new Error("Failed to encode image")); return; }
+        const reader = new FileReader();
+        reader.onload = () => resolve({ mediaType: "image/jpeg", data: String(reader.result).split(",")[1] });
+        reader.onerror = () => reject(new Error("Failed to read encoded image"));
+        reader.readAsDataURL(blob);
+      }, "image/jpeg", 0.82);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Failed to load image")); };
+    img.src = url;
+  });
+}
+
 // Picks all connected models at once, generates + auto-schedules a week of
 // captioned posts across their X accounts, and shows a preview grid before
 // anything actually gets uploaded/scheduled to Publer.
@@ -1583,8 +1617,9 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
       for (const modelName of selected) {
         const modelPhotos = groups[modelName];
         if (!modelPhotos.length) continue;
+        const images = await Promise.all(modelPhotos.map((p) => fileToVisionImage(p.file)));
         const { data, error } = await supabaseClient.functions.invoke("x-caption-generate", {
-          body: { modelName, count: modelPhotos.length },
+          body: { modelName, images },
         });
         if (error) {
           const body = await error.context?.json?.().catch(() => null);
@@ -1593,8 +1628,11 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
         if (data?.error) throw new Error(`${modelName}: ${data.error}`);
         const captions = data.captions || [];
         const slots = nextMassPlannerSlots(modelPhotos.length, activeHours);
+        // One caption per photo, in the same order they were sent — no more
+        // modulo-cycling a small caption pool, since each caption is now
+        // written to match that specific photo.
         modelPhotos.forEach((photo, i) => {
-          items.push({ id: uid(), model: modelName, photo, caption: captions[i % captions.length], scheduledAt: slots[i].toISOString() });
+          items.push({ id: uid(), model: modelName, photo, caption: captions[i] || "", scheduledAt: slots[i].toISOString() });
         });
       }
       items.sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
@@ -1804,7 +1842,7 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
           <button onClick={generatePlan} disabled={!selected.length || !photos.length || planning}
             className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl c-bg-accent c-onaccent fs-12 font-mono uppercase tracking-wide font-semibold hover-bg-accent2 disabled:opacity-40 tap mb-1"
             style={{ boxShadow: selected.length && photos.length ? "0 0 20px rgba(57,230,115,0.25)" : "none" }}>
-            {planning ? <><Loader2 size={14} className="animate-spin" /> Building preview...</> : <><Sparkles size={14} /> Generate preview</>}
+            {planning ? <><Loader2 size={14} className="animate-spin" /> Generating captions...</> : <><Sparkles size={14} /> Generate captions</>}
           </button>
           {planError && <div className="fs-10 font-mono mt-1 c-warn">{planError}</div>}
 
@@ -1819,7 +1857,7 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-xl fs-12 font-mono uppercase tracking-wide font-semibold tap disabled:opacity-40 ${allDone ? "c-bg-app c-accent border c-border-accent" : "c-bg-accent c-onaccent hover-bg-accent2"}`}
                   style={{ boxShadow: !allDone && !runningAll ? "0 0 20px rgba(57,230,115,0.3)" : "none" }}>
                   {allDone ? <Sparkles size={14} /> : runningAll ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                  {allDone ? "All scheduled" : runningAll ? `Scheduling... ${doneCount}/${plan.length}` : "Confirm & schedule all"}
+                  {allDone ? "All scheduled" : runningAll ? `Scheduling... ${doneCount}/${plan.length}` : "Schedule"}
                 </button>
               </div>
 
