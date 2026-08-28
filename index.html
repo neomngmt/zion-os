@@ -4476,7 +4476,8 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
     return MM_COLORS[hash % MM_COLORS.length];
   };
   const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
-  const platformKey = platformFocus === "tt" ? "tiktok" : "ig";
+  const platformKey = platformFocus === "tt" ? "tiktok" : platformFocus === "x" ? "x" : "ig";
+  const handleKeyFor = platformFocus === "tt" ? "tiktokHandle" : platformFocus === "x" ? "xHandle" : "igHandle";
   const cutoff7d = new Date(); cutoff7d.setDate(cutoff7d.getDate() - 6);
   const cutoff7dStr = toISO(cutoff7d);
 
@@ -4543,6 +4544,11 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
             style={platformFocus === "ig" ? { background: "#fff", color: "#0b0f0d" } : { color: "#8B93A1" }}>
             IG only
           </button>
+          <button onClick={() => setPlatformFocus("x")}
+            className="fs-10 font-mono uppercase px-3 py-2 transition-colors"
+            style={platformFocus === "x" ? { background: "#fff", color: "#0b0f0d" } : { color: "#8B93A1" }}>
+            X only
+          </button>
         </div>
 
         <div className="flex rounded-full overflow-hidden border" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
@@ -4601,8 +4607,42 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
       </div>
 
       {mmTab === "accounts" ? (
-        <div className="fs-12 c-faint font-mono italic py-10 text-center rounded-xl" style={{ border: "1px dashed rgba(255,255,255,0.12)" }}>
-          per-platform account breakdown — not wired yet
+        <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
+          <div className="hidden md:grid gap-2 px-4 py-2 fs-9 font-mono uppercase c-faint tracking-wide"
+            style={{ gridTemplateColumns: "1.3fr 1fr 1fr 1fr", background: "rgba(255,255,255,0.02)" }}>
+            <span>Model</span><span>Instagram</span><span>X</span><span>TikTok</span>
+          </div>
+          {models.map((m, i) => (
+            <div key={m.name} className="grid grid-cols-1 md:grid-cols-4 gap-2 px-4 py-3 items-center"
+              style={{ borderTop: i === 0 ? "none" : "1px solid rgba(255,255,255,0.06)" }}>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: colorFor(m.name) }} />
+                <span className="c-text fs-12 font-medium truncate">{m.name}</span>
+              </div>
+              {[
+                { key: "ig", handle: m.igHandle },
+                { key: "x", handle: m.xHandle },
+                { key: "tiktok", handle: m.tiktokHandle },
+              ].map(({ key, handle }) => {
+                const platRows = (bufferDailyStats || []).filter((r) => r.model === m.name && r.platform === key);
+                const connected = platRows.length > 0;
+                const lastDate = platRows.map((r) => r.statDate).sort().pop();
+                const lastLabel = lastDate ? timeAgo(new Date(lastDate + "T12:00:00").getTime()) : null;
+                const imp7d = platRows.filter((r) => r.statDate >= cutoff7dStr).reduce((s, r) => s + (r.impressions || 0), 0);
+                return (
+                  <div key={key} className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: connected ? "#39e673" : "rgba(255,255,255,0.15)" }} />
+                    <div className="min-w-0">
+                      <div className="fs-10 font-mono c-faint truncate">{handle ? `@${handle}` : "no handle set"}</div>
+                      <div className="fs-9 font-mono" style={{ color: connected ? "#39e673" : "#5c6e65" }}>
+                        {connected ? `${imp7d.toLocaleString()} · 7d · synced ${lastLabel}` : "not synced via Publer"}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
       ) : (
       <>
@@ -4659,9 +4699,7 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
                 <div className="min-w-0">
                   <div className="c-text fs-12 font-medium truncate">{r.model.name}</div>
                   <div className="fs-9 font-mono c-faint truncate">
-                    {platformFocus === "tt"
-                      ? (r.model.tiktokHandle ? `@${r.model.tiktokHandle}` : "no TT handle")
-                      : (r.model.igHandle ? `@${r.model.igHandle}` : "no IG handle")}
+                    {r.model[handleKeyFor] ? `@${r.model[handleKeyFor]}` : `no ${platformFocus.toUpperCase()} handle`}
                   </div>
                 </div>
               </div>
