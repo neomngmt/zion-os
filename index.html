@@ -1390,7 +1390,56 @@ async function computeBestHours(modelName) {
 // shot, not the original multi-megabyte file, and keeping the request small
 // matters since a batch sends every photo in one call. Capped at 1024px on
 // the long edge, re-encoded as JPEG q=0.82.
-function fileToVisionImage(file, maxDim = 1024) {
+//
+// This ONLY produces a throwaway copy for the caption-generation API call —
+// the actual file that gets uploaded to Publer/X (confirmAndScheduleAll,
+// below) is always the untouched original, EXIF and all, so nothing here
+// can affect what actually gets posted.
+//
+// Phone photos routinely store their real orientation as an EXIF tag rather
+// than physically rotating the pixels — drawing straight onto a <canvas>
+// ignores that tag and can hand Claude a sideways/upside-down copy (which
+// then risks a caption that doesn't match what's actually in frame, even
+// though the real posted photo is fine). createImageBitmap with
+// imageOrientation:"from-image" decodes it already corrected; the manual
+// <img> fallback is only for environments where that option isn't supported.
+async function fileToVisionImage(file, maxDim = 1024) {
+  const drawToJpeg = (source, width, height) => new Promise((resolve, reject) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext("2d").drawImage(source, 0, 0, width, height);
+    canvas.toBlob((blob) => {
+      if (!blob) { reject(new Error("Failed to encode image")); return; }
+      const reader = new FileReader();
+      reader.onload = () => resolve({ mediaType: "image/jpeg", data: String(reader.result).split(",")[1] });
+      reader.onerror = () => reject(new Error("Failed to read encoded image"));
+      reader.readAsDataURL(blob);
+    }, "image/jpeg", 0.82);
+  });
+
+  if (typeof createImageBitmap === "function") {
+    let bitmap;
+    try {
+      bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    } catch (e) {
+      bitmap = null; // fall through to the <img> path below
+    }
+    if (bitmap) {
+      let { width, height } = bitmap;
+      if (width > maxDim || height > maxDim) {
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      try {
+        return await drawToJpeg(bitmap, width, height);
+      } finally {
+        bitmap.close();
+      }
+    }
+  }
+
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -1401,22 +1450,118 @@ function fileToVisionImage(file, maxDim = 1024) {
         width = Math.round(width * scale);
         height = Math.round(height * scale);
       }
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
-      URL.revokeObjectURL(url);
-      canvas.toBlob((blob) => {
-        if (!blob) { reject(new Error("Failed to encode image")); return; }
-        const reader = new FileReader();
-        reader.onload = () => resolve({ mediaType: "image/jpeg", data: String(reader.result).split(",")[1] });
-        reader.onerror = () => reject(new Error("Failed to read encoded image"));
-        reader.readAsDataURL(blob);
-      }, "image/jpeg", 0.82);
+      drawToJpeg(img, width, height).then(resolve, reject).finally(() => URL.revokeObjectURL(url));
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Failed to load image")); };
     img.src = url;
   });
+}
+
+// Compact inline calendar for picking the Week Planner's posting window —
+// swapped in for the old pair of native <input type="date"> fields, which
+// looked (and felt) completely disconnected from the rest of the app's
+// styling. First click sets the start (and clears any end); a second click
+// on/after that date sets the end; clicking before the current start just
+// starts a new range from there. Renders inline below its trigger (no
+// floating/portal positioning to get wrong) and closes itself once a full
+// range is picked or "No end date" is chosen.
+function DateRangePicker({ start, end, onChange }) {
+  const [open, setOpen] = React.useState(false);
+  const [cursor, setCursor] = React.useState(() => {
+    const d = new Date((start || toISO(new Date())) + "T00:00:00");
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+
+  const first = new Date(cursor.year, cursor.month, 1);
+  const startOffset = (first.getDay() + 6) % 7; // Monday-first
+  const daysInMonth = new Date(cursor.year, cursor.month + 1, 0).getDate();
+  const monthLabel = first.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const dayISO = (d) => `${cursor.year}-${String(cursor.month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const shiftMonth = (delta) => {
+    let m = cursor.month + delta, y = cursor.year;
+    if (m < 0) { m = 11; y -= 1; } else if (m > 11) { m = 0; y += 1; }
+    setCursor({ year: y, month: m });
+  };
+
+  const cells = [];
+  for (let i = 0; i < startOffset; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const pickDay = (iso) => {
+    if (!start || end || iso < start) {
+      onChange(iso, "");
+    } else {
+      onChange(start, iso);
+      setOpen(false);
+    }
+  };
+
+  const fmt = (iso) => iso ? new Date(iso + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : null;
+  const todayStr = toISO(new Date());
+
+  return (
+    <div>
+      <button onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-2 c-bg-app border c-border rounded-lg px-3 py-2 fs-11 font-mono c-text tap hover-border-accent transition-colors">
+        <Calendar size={12} className="c-accent" />
+        {fmt(start) || "Pick a start date"}
+        <span className="c-faint">→</span>
+        {fmt(end) || <span className="c-faint">no end date</span>}
+        <ChevronDown size={12} className={`c-faint transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="mt-2 c-bg-app border c-border rounded-xl p-3 inline-block">
+          <div className="flex items-center justify-between mb-3 gap-4">
+            <span className="fs-11 c-text font-medium">{monthLabel}</span>
+            <div className="flex gap-1">
+              <button onClick={() => shiftMonth(-1)} className="p-1 rounded-lg border c-border c-muted hover-accent-text hover-border-accent"><ChevronLeft size={12} /></button>
+              <button onClick={() => shiftMonth(1)} className="p-1 rounded-lg border c-border c-muted hover-accent-text hover-border-accent"><ChevronRight size={12} /></button>
+            </div>
+          </div>
+          <div className="grid grid-cols-7 gap-1 mb-1">
+            {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((d) => (
+              <div key={d} className="fs-9 font-mono uppercase c-faint text-center" style={{ width: 30 }}>{d}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {cells.map((d, i) => {
+              if (!d) return <div key={i} style={{ width: 30, height: 30 }} />;
+              const iso = dayISO(d);
+              const isPast = iso < todayStr;
+              const isStart = iso === start;
+              const isEnd = iso === end;
+              const inRange = start && end && iso > start && iso < end;
+              const isToday = iso === todayStr;
+              return (
+                <button key={i} disabled={isPast} onClick={() => pickDay(iso)}
+                  className="rounded-lg fs-10 font-mono flex items-center justify-center transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+                  style={{
+                    width: 30, height: 30,
+                    background: isStart || isEnd ? "#39e673" : inRange ? "rgba(57,230,115,0.16)" : "transparent",
+                    color: isStart || isEnd ? "#050705" : isToday ? "#39e673" : undefined,
+                    border: isToday && !isStart && !isEnd ? "1px solid rgba(57,230,115,0.4)" : "1px solid transparent",
+                    fontWeight: isStart || isEnd ? 700 : 400,
+                  }}>
+                  {d}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex items-center justify-between mt-3 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+            <button onClick={() => { onChange(start || todayStr, ""); }}
+              className="fs-10 font-mono uppercase c-faint hover-accent-text transition-colors">
+              No end date
+            </button>
+            <button onClick={() => setOpen(false)}
+              className="fs-10 font-mono uppercase c-accent hover-accent-text transition-colors">
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // Picks all connected models at once, generates + auto-schedules a week of
@@ -1702,21 +1847,13 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
             </span>
           </div>
 
-          <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2.5">Post between</div>
-          <div className="flex items-center gap-2 flex-wrap mb-5">
-            <input type="date" value={rangeStart} onChange={(e) => { setRangeStart(e.target.value); setPlan(null); }}
-              className="c-bg-app border c-border rounded-lg px-2.5 py-1.5 fs-11 font-mono c-text outline-none focus-border-accent" />
-            <span className="fs-11 c-faint font-mono">→</span>
-            <input type="date" value={rangeEnd} min={rangeStart} placeholder="no end date"
-              onChange={(e) => { setRangeEnd(e.target.value); setPlan(null); }}
-              className="c-bg-app border c-border rounded-lg px-2.5 py-1.5 fs-11 font-mono c-text outline-none focus-border-accent" />
-            {rangeEnd && (
-              <button onClick={() => { setRangeEnd(""); setPlan(null); }}
-                className="fs-10 font-mono uppercase c-faint hover-accent-text transition-colors">
-                clear end date
-              </button>
-            )}
-            <span className="fs-10 font-mono c-faint">{rangeEnd ? "" : "· runs forward as long as it takes"}</span>
+          <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2.5">
+            Post between
+            <span className="ml-2 normal-case" style={{ opacity: 0.7 }}>{rangeEnd ? "" : "· runs forward as long as it takes"}</span>
+          </div>
+          <div className="mb-5">
+            <DateRangePicker start={rangeStart} end={rangeEnd}
+              onChange={(s, e) => { setRangeStart(s); setRangeEnd(e); setPlan(null); }} />
           </div>
 
           <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2.5">
@@ -2483,7 +2620,7 @@ function TopCountriesCard({ countries, unit = "" }) {
 // buffer_daily_stats/buffer_top_posts, plus an audience-demographics section
 // backed by Publer's account-level chart_data endpoint (separate from
 // post_insights — see publer-demographics).
-function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanPosts }) {
+function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanPosts, onMakeContentPlan }) {
   const C = {
     page: "radial-gradient(ellipse 130% 100% at 10% 0%, rgba(57,230,115,0.14), transparent 55%), radial-gradient(ellipse 100% 80% at 100% 0%, rgba(56,189,248,0.10), transparent 55%), #0b0f0d",
     card: "rgba(255,255,255,0.035)", cardBorder: "1px solid rgba(255,255,255,0.08)",
@@ -2663,11 +2800,20 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
               <p className="text-sm mt-0.5" style={{ color: C.sub }}>{connectedModels.length} account{connectedModels.length !== 1 ? "s" : ""} connected via Publer</p>
             </div>
           </div>
-          <button onClick={onPlanPosts}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-full fs-12 font-mono uppercase tracking-wide font-semibold tap"
-            style={{ background: `linear-gradient(135deg, ${C.pinkA}, ${C.pinkB})`, color: "#fff", boxShadow: `0 0 14px ${C.pinkA}40` }}>
-            <Megaphone size={14} /> Plan content
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {onMakeContentPlan && (
+              <button onClick={onMakeContentPlan}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-full fs-12 font-mono uppercase tracking-wide font-semibold tap"
+                style={{ background: "transparent", color: C.pinkIcon, border: `1px solid ${C.pinkA}66` }}>
+                <BarChart3 size={14} /> Make content plan
+              </button>
+            )}
+            <button onClick={onPlanPosts}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full fs-12 font-mono uppercase tracking-wide font-semibold tap"
+              style={{ background: `linear-gradient(135deg, ${C.pinkA}, ${C.pinkB})`, color: "#fff", boxShadow: `0 0 14px ${C.pinkA}40` }}>
+              <Megaphone size={14} /> Plan content
+            </button>
+          </div>
         </div>
 
         {!noAccounts && (
@@ -2944,6 +3090,11 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
   const [network, setNetwork] = useState(forcedNetwork || "all");
   const [xPlanningMode, setXPlanningMode] = useState(false);
   const [igPlanningMode, setIgPlanningMode] = useState(false);
+  // Which screen InstagramContentHub should open on once a model is picked —
+  // "menu" (the normal "Plan content" entry) or "plan" (the "Make content
+  // plan" shortcut on the IG dashboard, which skips straight to the Full
+  // Content Plan screen instead of making the user click through the menu).
+  const [igEntryScreen, setIgEntryScreen] = useState("menu");
   const [ttPlanningMode, setTtPlanningMode] = useState(false);
 
   // The sidebar's Content Director arrow lets you jump straight to a
@@ -3000,6 +3151,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
           reels={reels || []}
           persistReels={persistReels}
           onBackToModels={() => setFilter("all")}
+          initialScreen={igEntryScreen}
         />
       );
     }
@@ -3007,7 +3159,8 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
       return (
         <IGOverviewDashboard
           models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts}
-          onPlanPosts={() => setIgPlanningMode(true)}
+          onPlanPosts={() => { setIgEntryScreen("menu"); setIgPlanningMode(true); }}
+          onMakeContentPlan={() => { setIgEntryScreen("plan"); setIgPlanningMode(true); }}
         />
       );
     }
@@ -3335,8 +3488,8 @@ function IGModelPicker({ models, onPick, subtitle = "Opens her dedicated Instagr
   );
 }
 
-function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, persistReels, onBackToModels }) {
-  const [screen, setScreen] = useState("menu"); // menu | batch | variation | plan | reels
+function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, persistReels, onBackToModels, initialScreen = "menu" }) {
+  const [screen, setScreen] = useState(initialScreen); // menu | batch | variation | plan | reels
   const [videosThisWeek, setVideosThisWeek] = useState(18);
   const [acrossDays, setAcrossDays] = useState(6);
   const [mix, setMix] = useState({ generation: 6, variation: 6, replication: 6 });
