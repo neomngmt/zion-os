@@ -1298,147 +1298,24 @@ function XCaptionStudio({ models, restrictModel, filterModel, onBackToModels }) 
 
   const model = scopedModels.find((m) => m.name === selectedModel);
 
-  const [postHistory, setPostHistory] = React.useState(null);
-  const [postHistoryLoading, setPostHistoryLoading] = React.useState(false);
-  const [postHistoryError, setPostHistoryError] = React.useState("");
-  React.useEffect(() => {
-    if (!selectedModel) { setPostHistory(null); return; }
-    let cancelled = false;
-    setPostHistoryLoading(true);
-    setPostHistoryError("");
-    (async () => {
-      try {
-        const { data, error } = await supabaseClient.functions.invoke("publer-posts", {
-          body: { modelName: selectedModel, platform: "x", days: 30 },
-        });
-        if (cancelled) return;
-        if (error) {
-          const body = await error.context?.json?.().catch(() => null);
-          throw new Error(body?.error || error.message);
-        }
-        if (data?.error) throw new Error(data.error);
-        setPostHistory(data);
-      } catch (e) {
-        if (!cancelled) setPostHistoryError(e.message || "Failed to load posts");
-      } finally {
-        if (!cancelled) setPostHistoryLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [selectedModel]);
-
-  const persona = model ? [model.bio, model.note].filter(Boolean).join(" · ") : "";
-
   return (
     <>
-    <div className="mb-5 c-bg-surface border c-border rounded-xl p-4 relative overflow-hidden">
-      {onBackToModels && (
-        <button onClick={onBackToModels}
-          className="flex items-center gap-1 fs-10 font-mono uppercase c-faint hover-accent-text mb-2 transition-colors">
-          <ChevronLeft size={12} /> All models
-        </button>
-      )}
-      <div className="flex items-center gap-2 mb-1">
-        <Sparkles size={15} className="c-accent" />
-        <span className="fs-13 font-semibold c-text">Persona &amp; Performance</span>
-        <XLogo size={12} className="c-muted" />
+    {onBackToModels && (
+      <button onClick={onBackToModels}
+        className="flex items-center gap-1 fs-10 font-mono uppercase c-faint hover-accent-text mb-3 transition-colors">
+        <ChevronLeft size={12} /> All models
+      </button>
+    )}
+    {!restrictModel && scopedModels.length > 1 && (
+      <div className="flex items-center gap-1.5 flex-wrap mb-4">
+        {scopedModels.map((m) => (
+          <button key={m.name} onClick={() => setSelectedModel(m.name)}
+            className={`fs-11 font-mono uppercase px-2.5 py-1 rounded-lg border ${selectedModel === m.name ? "c-border-accent c-accent c-bg-accent-a2" : "c-border c-muted hover-bg-surface"}`}>
+            {m.name}
+          </button>
+        ))}
       </div>
-      <p className="fs-11 c-muted font-mono mb-4 max-w-xl">
-        Context for her captions and a look at what's already working — the Week Planner below is where photos actually turn into scheduled posts.
-      </p>
-
-      {!restrictModel && scopedModels.length > 1 && (
-        <div className="flex items-center gap-1.5 flex-wrap mb-4">
-          {scopedModels.map((m) => (
-            <button key={m.name} onClick={() => setSelectedModel(m.name)}
-              className={`fs-11 font-mono uppercase px-2.5 py-1 rounded-lg border ${selectedModel === m.name ? "c-border-accent c-accent c-bg-accent-a2" : "c-border c-muted hover-bg-surface"}`}>
-              {m.name}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2">Persona context</div>
-          <div className="c-bg-app border c-border rounded-xl p-3">
-            {model ? (
-              <>
-                <div className="fs-12 font-semibold c-text mb-1">{model.name}</div>
-                <div className="fs-11 c-muted leading-snug">
-                  {persona || <span className="c-faint italic">No bio/notes set in Model Manager yet</span>}
-                </div>
-                {model.xHandle && <div className="fs-10 c-faint font-mono mt-1.5">@{model.xHandle}</div>}
-              </>
-            ) : (
-              <div className="fs-11 c-faint italic font-mono">Pick a model above</div>
-            )}
-          </div>
-        </div>
-        <div>
-          <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2">Last 30 days</div>
-          <div className="c-bg-app border c-border rounded-xl p-3 fs-11 c-muted font-mono leading-relaxed">
-            {postHistoryLoading ? (
-              <span className="c-faint italic">Loading...</span>
-            ) : postHistoryError ? (
-              <span className="c-warn">{postHistoryError}</span>
-            ) : postHistory ? (
-              <>
-                Posts: <span className="c-text">{postHistory.summary.postCount}</span><br />
-                Total reach: <span className="c-text">{postHistory.summary.totalReach.toLocaleString()}</span><br />
-                Avg engagement: <span className="c-accent">{postHistory.summary.avgEngagementRate.toFixed(1)}%</span>
-              </>
-            ) : (
-              <span className="c-faint italic">Pick a model above</span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {postHistory && postHistory.posts.length > 0 && (
-        <div className="mt-4 pt-4 border-t c-border">
-          <div className="flex items-center justify-between mb-2.5">
-            <div className="fs-10 uppercase tracking-widest c-faint font-mono">
-              All posts · last 30 days ({postHistory.posts.length})
-            </div>
-            <div className="fs-9 font-mono c-faint hidden sm:block">reach · engagement</div>
-          </div>
-          <div className="flex flex-col gap-1 max-h-[32rem] overflow-y-auto pr-1">
-            {postHistory.posts.map((p) => {
-              const avgEr = postHistory.summary.avgEngagementRate;
-              const erColor = p.engagementRate >= avgEr * 1.15 ? "#39e673" : p.engagementRate <= avgEr * 0.7 ? "#f87171" : undefined;
-              return (
-                <a key={p.id} href={p.postLink || undefined} target="_blank" rel="noreferrer"
-                  className="flex items-center gap-3 c-bg-app border c-border rounded-xl p-2 hover-border-accent transition-colors">
-                  {p.thumbnailUrl ? (
-                    <img src={p.thumbnailUrl} alt="" className="flex-shrink-0 rounded-lg object-cover" style={{ width: 56, height: 56 }} />
-                  ) : (
-                    <div className="flex-shrink-0 rounded-lg c-bg-surface" style={{ width: 56, height: 56 }} />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="fs-11 c-text leading-snug line-clamp-2">{p.text || <span className="c-faint italic">No text</span>}</div>
-                    <div className="fs-9 c-faint font-mono mt-1">
-                      {p.scheduledAt ? new Date(p.scheduledAt).toLocaleDateString() : "—"}
-                    </div>
-                  </div>
-                  <div className="flex-shrink-0 text-right font-mono" style={{ width: 88 }}>
-                    <div className="fs-12 c-text font-semibold">{p.reach.toLocaleString()}</div>
-                    <div className="fs-9 c-faint">reach</div>
-                  </div>
-                  <div className="flex-shrink-0 flex items-center gap-2.5 fs-10 font-mono c-muted" style={{ width: 90 }}>
-                    <span className="flex items-center gap-0.5"><Heart size={10} className="c-faint" />{p.likes}</span>
-                    <span className="flex items-center gap-0.5">💬{p.comments}</span>
-                  </div>
-                  <div className="flex-shrink-0 fs-11 font-mono font-semibold text-right" style={{ width: 48, color: erColor }}>
-                    {p.engagementRate.toFixed(1)}%
-                  </div>
-                </a>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
+    )}
     {model && <XMassPlanner models={models} lockedModel={model.name} defaultOpen={true} />}
     </>
   );
