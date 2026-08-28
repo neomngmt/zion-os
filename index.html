@@ -3796,7 +3796,21 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
       {screen === "plan" && (
         <div>
           <h2 className="text-2xl font-extrabold tracking-tight c-text mb-1.5">Full Content Plan</h2>
-          <p className="c-muted text-sm mb-6">The whole week for her — new scripts, variations and winner remakes, spread across real dates.</p>
+          <p className="c-muted text-sm mb-3">The whole week for her — new scripts, variations and winner remakes, spread across real dates.</p>
+
+          <div className="flex items-start gap-2 rounded-xl p-3 mb-6" style={{ background: "rgba(57,230,115,0.06)", border: "1px solid rgba(57,230,115,0.2)" }}>
+            <UserCircle2 size={14} className="c-accent flex-shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <div className="fs-9 uppercase tracking-widest c-faint font-mono mb-0.5">Niche / persona — what to scrape and shoot for</div>
+              {modelObj?.note ? (
+                <div className="fs-12 c-text">{modelObj.note}</div>
+              ) : (
+                <div className="fs-11 c-faint italic">
+                  No persona note set for {modelName} yet — add one in Model Manager so scripts and future scraped references actually match her.
+                </div>
+              )}
+            </div>
+          </div>
 
           <div className="flex gap-8 flex-wrap mb-7">
             <div>
@@ -4931,23 +4945,23 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, 
               className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
           </div>
           <div>
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Buffer Channel ID (Instagram)</label>
-            <input value={form.bufferChannelIdIg || ""} onChange={(e) => set("bufferChannelIdIg", e.target.value)} placeholder="only if IG is connected in Buffer"
+            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Instagram handle</label>
+            <input value={form.igHandle || ""} onChange={(e) => set("igHandle", e.target.value.replace(/^@/, ""))} placeholder="username, no @"
               className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
           </div>
           <div>
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Buffer Channel ID (X)</label>
-            <input value={form.bufferChannelIdX || ""} onChange={(e) => set("bufferChannelIdX", e.target.value)} placeholder="only if X is connected in Buffer"
+            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">X handle</label>
+            <input value={form.xHandle || ""} onChange={(e) => set("xHandle", e.target.value.replace(/^@/, ""))} placeholder="username, no @"
               className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
           </div>
           <div>
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Buffer Channel ID (TikTok)</label>
-            <input value={form.bufferChannelIdTiktok || ""} onChange={(e) => set("bufferChannelIdTiktok", e.target.value)} placeholder="only if TikTok is connected in Buffer"
+            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">TikTok handle</label>
+            <input value={form.tiktokHandle || ""} onChange={(e) => set("tiktokHandle", e.target.value.replace(/^@/, ""))} placeholder="username, no @"
               className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
           </div>
           <div>
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Buffer Channel ID (Facebook)</label>
-            <input value={form.bufferChannelIdFb || ""} onChange={(e) => set("bufferChannelIdFb", e.target.value)} placeholder="only if Facebook is connected in Buffer"
+            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">OnlyFans URL</label>
+            <input value={form.ofUrl || ""} onChange={(e) => set("ofUrl", e.target.value)} placeholder="https://onlyfans.com/..."
               className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
           </div>
           <div>
