@@ -2298,6 +2298,26 @@ function PlatformOverviewDashboard({
         .filter((p) => p.platform === platform && connectedNames.has(p.model) && (account === "all" || p.model === account))
         .sort((a, b) => (b.impressions || 0) - (a.impressions || 0));
 
+  // Not-yet-published queue — separate Publer endpoint (state: scheduled)
+  // from the analytics one topPosts uses, so it's its own fetch/section.
+  const [scheduledPosts, setScheduledPosts] = React.useState(null);
+  React.useEffect(() => {
+    if (!connectedModels.length) { setScheduledPosts(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabaseClient.functions.invoke("publer-scheduled", {
+          body: { platform, ...(account !== "all" ? { modelName: account } : {}) },
+        });
+        if (cancelled) return;
+        setScheduledPosts(!error && data?.scheduled ? data.scheduled : []);
+      } catch (e) {
+        if (!cancelled) setScheduledPosts([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [account, platform, connectedModels.map((m) => m.name).join(",")]);
+
   // Cursor-tilt, scoped to just the header row (icon/title/CTA) rather than
   // the whole panel — this used to be applied to the entire outer container,
   // which was fine back when that container was small, but it grew into a
@@ -2436,6 +2456,37 @@ function PlatformOverviewDashboard({
               })}
             </div>
           </div>
+
+          {scheduledPosts?.length > 0 && (
+            <div className="c-bg-app rounded-xl p-4 mb-5" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+              <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-3">
+                Scheduled · upcoming ({scheduledPosts.length})
+              </div>
+              <div className="flex flex-col gap-1.5">
+                {scheduledPosts.map((p) => {
+                  const color = accountColor(p.model);
+                  const ts = p.scheduledAt ? new Date(p.scheduledAt).getTime() : null;
+                  return (
+                    <div key={p.id}
+                      className="flex items-center gap-3 rounded-lg p-2"
+                      style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+                      {p.thumbnailUrl ? (
+                        <img src={p.thumbnailUrl} alt="" className="flex-shrink-0 rounded-lg object-cover" style={{ width: 48, height: 48 }} />
+                      ) : (
+                        <div className="flex-shrink-0 rounded-lg c-bg-surface" style={{ width: 48, height: 48 }} />
+                      )}
+                      <span className="fs-10 font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: color + "26", color }}>{p.model}</span>
+                      <div className="flex-1 min-w-0 fs-11 c-text truncate">{p.text || <span className="c-faint italic">No text</span>}</div>
+                      <div className="flex-shrink-0 fs-11 font-mono c-text font-semibold text-right" style={{ width: 90 }}>
+                        {ts ? timeUntil(ts) : "—"}
+                        <span className="c-faint fs-9 block">{ts ? new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : ""}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {topPosts.length > 0 && (
             <div className="c-bg-app rounded-xl p-4 mb-5" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
@@ -9715,6 +9766,18 @@ function timeAgo(ts) {
   if (hrs < 24) return `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
   return `${days}d ago`;
+}
+
+function timeUntil(ts) {
+  if (!ts) return "";
+  const diffMs = ts - Date.now();
+  if (diffMs <= 0) return "now";
+  const mins = Math.round(diffMs / 60000);
+  if (mins < 60) return `in ${mins}m`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `in ${hrs}h`;
+  const days = Math.round(hrs / 24);
+  return `in ${days}d`;
 }
 
 function NotificationBell({ model, cards, tasks, trends, agency, models, persistModels, onNavigate }) {
