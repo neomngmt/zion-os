@@ -2195,13 +2195,13 @@ function PlatformOverviewDashboard({
         "--glow-c": `${glowRgb}73`,
         animation: "panelGlowPulse 6s ease-in-out infinite",
       }}>
-      <div ref={tiltRef}
-        onMouseEnter={handleTiltEnter}
-        onMouseMove={handleTiltMove}
-        onMouseLeave={handleTiltLeave}
-        className="flex items-start justify-between gap-3 mb-6 flex-wrap"
-        style={{ transformStyle: "preserve-3d" }}>
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between gap-3 mb-6 flex-wrap">
+        <div ref={tiltRef}
+          onMouseEnter={handleTiltEnter}
+          onMouseMove={handleTiltMove}
+          onMouseLeave={handleTiltLeave}
+          className="flex items-center gap-3"
+          style={{ transformStyle: "preserve-3d" }}>
           <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
             style={{ background: `${glowRgb}1f`, border: `1px solid ${glowRgb}4d` }}>
             {icon}
@@ -2648,13 +2648,13 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
         animation: "panelGlowPulse 6s ease-in-out infinite",
       }}>
       <div className="p-5 md:p-7">
-        <div ref={tiltRef}
-          onMouseEnter={handleTiltEnter}
-          onMouseMove={handleTiltMove}
-          onMouseLeave={handleTiltLeave}
-          className="flex items-center justify-between gap-3 mb-5 flex-wrap"
-          style={{ transformStyle: "preserve-3d" }}>
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
+          <div ref={tiltRef}
+            onMouseEnter={handleTiltEnter}
+            onMouseMove={handleTiltMove}
+            onMouseLeave={handleTiltLeave}
+            className="flex items-center gap-3"
+            style={{ transformStyle: "preserve-3d" }}>
             <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: `linear-gradient(135deg, ${C.igBrandA}, ${C.igBrandB})`, boxShadow: `0 0 14px ${C.igBrandA}40` }}>
               <Instagram size={18} color="#fff" />
             </div>
