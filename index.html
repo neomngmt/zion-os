@@ -1471,6 +1471,13 @@ function DateRangePicker({ start, end, onChange }) {
     const d = new Date((start || toISO(new Date())) + "T00:00:00");
     return { year: d.getFullYear(), month: d.getMonth() };
   });
+  // Whether the next click sets the end date rather than restarting the
+  // range from scratch. Always false right after opening, so the very first
+  // click always sets a fresh start — otherwise the pre-filled default start
+  // (today) meant clicking any later date was read as "set the end" and you
+  // could never move the start itself forward (e.g. picking a start of
+  // tomorrow was impossible: the first click just extended today->tomorrow).
+  const [pickingEnd, setPickingEnd] = React.useState(false);
 
   const first = new Date(cursor.year, cursor.month, 1);
   const startOffset = (first.getDay() + 6) % 7; // Monday-first
@@ -1488,11 +1495,15 @@ function DateRangePicker({ start, end, onChange }) {
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
   const pickDay = (iso) => {
-    if (!start || end || iso < start) {
+    if (!pickingEnd) {
       onChange(iso, "");
+      setPickingEnd(true);
+    } else if (iso < start) {
+      onChange(iso, ""); // clicked before the chosen start - restart from here
     } else {
       onChange(start, iso);
       setOpen(false);
+      setPickingEnd(false);
     }
   };
 
@@ -1501,7 +1512,7 @@ function DateRangePicker({ start, end, onChange }) {
 
   return (
     <div>
-      <button onClick={() => setOpen((o) => !o)}
+      <button onClick={() => { setOpen((o) => !o); setPickingEnd(false); }}
         className="flex items-center gap-2 c-bg-app border c-border rounded-lg px-3 py-2 fs-11 font-mono c-text tap hover-border-accent transition-colors">
         <Calendar size={12} className="c-accent" />
         {fmt(start) || "Pick a start date"}
@@ -1535,11 +1546,11 @@ function DateRangePicker({ start, end, onChange }) {
               const isToday = iso === todayStr;
               return (
                 <button key={i} disabled={isPast} onClick={() => pickDay(iso)}
-                  className="rounded-lg fs-10 font-mono flex items-center justify-center transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+                  className="rounded-lg fs-10 font-mono flex items-center justify-center transition-colors disabled:cursor-not-allowed"
                   style={{
                     width: 30, height: 30,
                     background: isStart || isEnd ? "#39e673" : inRange ? "rgba(57,230,115,0.16)" : "transparent",
-                    color: isStart || isEnd ? "#050705" : isToday ? "#39e673" : undefined,
+                    color: isStart || isEnd ? "#050705" : isToday ? "#39e673" : isPast ? "rgba(255,255,255,0.25)" : "#f2f5f0",
                     border: isToday && !isStart && !isEnd ? "1px solid rgba(57,230,115,0.4)" : "1px solid transparent",
                     fontWeight: isStart || isEnd ? 700 : 400,
                   }}>
