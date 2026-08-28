@@ -1331,24 +1331,26 @@ const WORLD_MAP_VIEWBOX = "30.767 241.591 784.077 458.627";
 const DEFAULT_SLOT_HOURS = { 1: [11], 2: [11, 17], 3: [9, 13, 19] };
 
 // Builds the next N posting slots from a sorted list of hours-of-day (e.g.
-// [9, 13, 19]), starting from whichever is next available (at least a few
-// minutes from now) and cycling through the list, one day at a time once it
-// wraps. Each model gets her own independent sequence — two different models
-// both landing on the same day/time is fine, they're different accounts.
-function nextMassPlannerSlots(n, hours) {
+// [9, 13, 19]), starting from whichever is next available on/after
+// startFrom (at least a few minutes from now, if startFrom is today or
+// earlier) and cycling through the list, one day at a time once it wraps.
+// Each model gets her own independent sequence — two different models both
+// landing on the same day/time is fine, they're different accounts.
+function nextMassPlannerSlots(n, hours, startFrom) {
   const list = hours && hours.length ? [...hours].sort((a, b) => a - b) : DEFAULT_SLOT_HOURS[2];
   const slots = [];
   const now = new Date();
+  const base = startFrom && startFrom > now ? startFrom : now;
   let dayOffset = 0;
   let hourIdx = list.findIndex((h) => {
-    const candidate = new Date(now);
+    const candidate = new Date(base);
     candidate.setHours(h, 0, 0, 0);
-    return candidate > now;
+    return candidate > base;
   });
   if (hourIdx === -1) { hourIdx = 0; dayOffset = 1; }
   for (let i = 0; i < n; i++) {
-    const slot = new Date(now);
-    slot.setDate(now.getDate() + dayOffset);
+    const slot = new Date(base);
+    slot.setDate(base.getDate() + dayOffset);
     slot.setHours(list[hourIdx], 0, 0, 0);
     slots.push(slot);
     hourIdx++;
@@ -1460,6 +1462,15 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
     ? bestHours.slice(0, frequency).map((h) => h.hour).sort((a, b) => a - b)
     : DEFAULT_SLOT_HOURS[frequency];
 
+  // Posting window — when the batch should start and (optionally) the last
+  // day it's allowed to land on. Start defaults to today; end is optional
+  // (an empty end just means "run forward as long as it takes" like before).
+  // When an end date IS set, generatePlan checks the batch actually fits
+  // (frequency x days in range) before generating anything, instead of
+  // silently spilling past the date the user asked to stop at.
+  const [rangeStart, setRangeStart] = React.useState(() => toISO(new Date()));
+  const [rangeEnd, setRangeEnd] = React.useState("");
+
   const toggleModel = (name) => setSelected((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
 
   const addPhotos = (fileList) => {
@@ -1490,6 +1501,20 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
       selected.forEach((n) => { groups[n] = []; });
       photos.forEach((p, i) => groups[selected[i % selected.length]].push(p));
 
+      // If an end date is set, make sure the batch actually fits in the
+      // window at the chosen frequency before generating anything (and
+      // spending API credit on captions) — better to tell the user up front
+      // than to silently spill posts past the date they asked to stop at.
+      const startAt = new Date(rangeStart + "T00:00:00");
+      if (rangeEnd) {
+        const endAt = new Date(rangeEnd + "T23:59:59");
+        const daysInRange = Math.max(1, Math.floor((endAt - startAt) / 86400000) + 1);
+        const capacity = daysInRange * activeHours.length;
+        if (photos.length > capacity) {
+          throw new Error(`${photos.length} photos won't fit between ${rangeStart} and ${rangeEnd} at ${frequency}x/day (room for ${capacity}) — pick a later end date, or a higher frequency.`);
+        }
+      }
+
       const items = [];
       for (const modelName of selected) {
         const modelPhotos = groups[modelName];
@@ -1504,7 +1529,7 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
         }
         if (data?.error) throw new Error(`${modelName}: ${data.error}`);
         const captions = data.captions || [];
-        const slots = nextMassPlannerSlots(modelPhotos.length, activeHours);
+        const slots = nextMassPlannerSlots(modelPhotos.length, activeHours, startAt);
         // One caption per photo, in the same order they were sent — no more
         // modulo-cycling a small caption pool, since each caption is now
         // written to match that specific photo.
@@ -1675,6 +1700,23 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
                 </span>
               )}
             </span>
+          </div>
+
+          <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2.5">Post between</div>
+          <div className="flex items-center gap-2 flex-wrap mb-5">
+            <input type="date" value={rangeStart} onChange={(e) => { setRangeStart(e.target.value); setPlan(null); }}
+              className="c-bg-app border c-border rounded-lg px-2.5 py-1.5 fs-11 font-mono c-text outline-none focus-border-accent" />
+            <span className="fs-11 c-faint font-mono">→</span>
+            <input type="date" value={rangeEnd} min={rangeStart} placeholder="no end date"
+              onChange={(e) => { setRangeEnd(e.target.value); setPlan(null); }}
+              className="c-bg-app border c-border rounded-lg px-2.5 py-1.5 fs-11 font-mono c-text outline-none focus-border-accent" />
+            {rangeEnd && (
+              <button onClick={() => { setRangeEnd(""); setPlan(null); }}
+                className="fs-10 font-mono uppercase c-faint hover-accent-text transition-colors">
+                clear end date
+              </button>
+            )}
+            <span className="fs-10 font-mono c-faint">{rangeEnd ? "" : "· runs forward as long as it takes"}</span>
           </div>
 
           <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2.5">
