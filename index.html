@@ -4415,7 +4415,7 @@ function TikTokContentHub({ models, cards, selectedModelName, onBackToModels }) 
 
 // ---------- model manager ----------
 
-function ModelManager({ models, persistModels, cards, reels, agency }) {
+function ModelManager({ models, persistModels, cards, reels, agency, bufferDailyStats }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [note, setNote] = useState("");
@@ -4452,24 +4452,28 @@ function ModelManager({ models, persistModels, cards, reels, agency }) {
   const detailModel = models.find((m) => m.name === detailName);
   const editModel = models.find((m) => m.name === editName);
 
-  // ---- real derived stats (no invented numbers — everything below comes
-  // straight from cards/reels; auto-scan and cadence stay static/shell) ----
+  // ---- real derived stats — Views 7d / Last active / Link scale come from
+  // bufferDailyStats (Publer-synced, hourly), filtered to whichever platform
+  // the TT/IG toggle has selected. Cards-derived cadence stays as before. ----
   const MM_COLORS = ["#39e673", "#5B8FA8", "#8B7FD9", "#E2725B", "#D9B45B", "#5BD9C0", "#D95B9E", "#7FD95B"];
   const colorFor = (n) => {
     let hash = 0;
     for (let i = 0; i < n.length; i++) hash = (hash * 31 + n.charCodeAt(i)) >>> 0;
     return MM_COLORS[hash % MM_COLORS.length];
   };
-  const weekMs = 7 * 86400000;
   const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+  const platformKey = platformFocus === "tt" ? "tiktok" : "ig";
+  const cutoff7d = new Date(); cutoff7d.setDate(cutoff7d.getDate() - 6);
+  const cutoff7dStr = toISO(cutoff7d);
 
   const rows = models.map((m) => {
     const own = cards.filter((c) => c.model === m.name);
     const active = own.filter((c) => c.stage !== "posted").length;
     const posted = own.filter((c) => c.stage === "posted").length;
-    const myReels = (reels || []).filter((r) => r.model === m.name);
-    const views7d = myReels.filter((r) => Date.now() - (r.createdAt || 0) < weekMs).reduce((s, r) => s + (r.views || 0), 0);
-    const lastActiveTs = Math.max(0, ...own.map((c) => c.createdAt || 0), ...myReels.map((r) => r.createdAt || 0));
+    const myStats = (bufferDailyStats || []).filter((r) => r.model === m.name && r.platform === platformKey);
+    const views7d = myStats.filter((r) => r.statDate >= cutoff7dStr).reduce((s, r) => s + (r.impressions || 0), 0);
+    const lastActiveDate = myStats.filter((r) => (r.postCount || 0) > 0).map((r) => r.statDate).sort().pop();
+    const lastActiveTs = lastActiveDate ? new Date(lastActiveDate + "T12:00:00").getTime() : 0;
     return { model: m, own, active, posted, views7d, lastActiveTs, color: colorFor(m.name) };
   }).sort((a, b) => b.views7d - a.views7d);
 
@@ -4477,7 +4481,7 @@ function ModelManager({ models, persistModels, cards, reels, agency }) {
   const weeklyAvgPct = rows.length ? Math.round(rows.reduce((s, r) => s + Math.round((r.views7d / maxViews) * 100), 0) / rows.length) : 0;
   const cardsToday = cards.filter((c) => (c.createdAt || 0) >= dayStart.getTime()).length;
   const onTheRiseCount = rows.filter((r) => r.views7d > 0 && r.views7d >= maxViews * 0.5).length;
-  const connectedCount = models.filter((m) => m.bufferChannelIdIg || m.bufferChannelIdTiktok || m.bufferChannelIdX).length;
+  const connectedCount = models.filter((m) => (bufferDailyStats || []).some((r) => r.model === m.name)).length;
 
   const nextScan = new Date();
   nextScan.setHours(Math.ceil((nextScan.getHours() + 0.01) / 4) * 4, 0, 0, 0);
@@ -4603,7 +4607,7 @@ function ModelManager({ models, persistModels, cards, reels, agency }) {
         <div className="rounded-xl p-3.5" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)" }}>
           <div className="fs-9 font-mono uppercase c-faint tracking-wide mb-1 flex items-center gap-1"><Link2 size={11} className="c-accent" /> 03 · Link scale</div>
           <div className="text-xl font-mono font-bold c-text">{connectedCount}/{models.length}</div>
-          <div className="fs-10 font-mono c-muted mt-1">Buffer channels connected</div>
+          <div className="fs-10 font-mono c-muted mt-1">have synced Publer data</div>
         </div>
         <div className="rounded-xl p-3.5" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)" }}>
           <div className="fs-9 font-mono uppercase c-faint tracking-wide mb-1 flex items-center gap-1"><ShieldCheck size={11} className="c-accent" /> 04 · Flagged</div>
@@ -11959,7 +11963,7 @@ function App() {
             {currentView === "titlegen" && isAdmin && <TitleGeneratorPage />}
             {currentView === "weeklytrends" && isAdmin && <TrendsPage weeklyTrendReels={weeklyTrendReels} onReload={reloadWeeklyTrendReels} />}
             {currentView === "trending" && <CreatorTrending trends={trends} agency={session.agency} />}
-            {currentView === "models" && <ModelManager models={agencyModels} persistModels={scopedPersistModels} cards={scopedCards} reels={scopedReels} agency={session.agency} />}
+            {currentView === "models" && <ModelManager models={agencyModels} persistModels={scopedPersistModels} cards={scopedCards} reels={scopedReels} agency={session.agency} bufferDailyStats={bufferDailyStats} />}
             {currentView === "whatsnew" && <WhatsNewPage />}
             {currentView === "settings" && (isAdmin
               ? <SettingsPanel settings={settings} persistSettings={persistSettings} agency={session.agency} />
