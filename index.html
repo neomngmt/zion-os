@@ -4437,9 +4437,28 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
   const [detailName, setDetailName] = useState(null);
   const [editName, setEditName] = useState(null);
   const [mmTab, setMmTab] = useState("models"); // models | accounts
-  const [platformFocus, setPlatformFocus] = useState("tt"); // tt | ig — which handle shows under each name
-  const [autoScanOn, setAutoScanOn] = useState(true);
+  const [platformFocus, setPlatformFocus] = useState("tt"); // tt | ig | x — which handle shows under each name
+  const [syncingNow, setSyncingNow] = useState(false);
+  const [syncResult, setSyncResult] = useState("");
   const clock = useLiveClock();
+
+  const runSyncNow = async () => {
+    setSyncingNow(true);
+    setSyncResult("");
+    try {
+      const { data, error } = await supabaseClient.functions.invoke("publer-sync", { body: {} });
+      if (error) {
+        const body = await error.context?.json?.().catch(() => null);
+        throw new Error(body?.error || error.message);
+      }
+      if (data?.error) throw new Error(data.error);
+      setSyncResult(`✓ synced ${data?.accountsFound ?? "?"} account${data?.accountsFound === 1 ? "" : "s"} just now`);
+    } catch (e) {
+      setSyncResult(`Sync failed: ${e.message || "unknown error"}`);
+    } finally {
+      setSyncingNow(false);
+    }
+  };
 
   const addModel = async () => {
     if (!name.trim()) return;
@@ -4498,8 +4517,11 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
   const onTheRiseCount = rows.filter((r) => r.views7d > 0 && r.views7d >= maxViews * 0.5).length;
   const connectedCount = models.filter((m) => (bufferDailyStats || []).some((r) => r.model === m.name)).length;
 
-  const nextScan = new Date();
-  nextScan.setHours(Math.ceil((nextScan.getHours() + 0.01) / 4) * 4, 0, 0, 0);
+  // bufferDailyStats' syncedAt is a raw ISO string (not a ms timestamp like
+  // most *Ts fields elsewhere), so it needs an explicit Date parse — Math.max
+  // coerces its arguments to Number() directly, and Number("2026-...") is
+  // NaN, which silently made this always show "never yet" otherwise.
+  const lastSyncedTs = Math.max(0, ...(bufferDailyStats || []).map((r) => (r.syncedAt ? new Date(r.syncedAt).getTime() : 0))) || null;
 
   return (
     <div className="rounded-2xl p-5 md:p-7 relative overflow-hidden"
@@ -4590,21 +4612,24 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
         </div>
       )}
 
-      {/* ---- auto-scan bar ---- */}
+      {/* ---- publer sync bar — real: publer-sync runs hourly via Supabase
+          cron and matches Publer accounts to models by name automatically,
+          nothing to configure per-model. This used to be a fake toggle with
+          an invented "sweep every 4h" schedule that didn't match the real
+          cron and did nothing when clicked. ---- */}
       <div className="flex items-center gap-3 flex-wrap rounded-xl px-4 py-3 mb-5" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)" }}>
-        <button onClick={() => setAutoScanOn((v) => !v)}
-          className="w-9 h-5 rounded-full relative transition-colors flex-shrink-0"
-          style={{ background: autoScanOn ? "#39e673" : "rgba(255,255,255,0.15)" }}>
-          <span className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all" style={{ left: autoScanOn ? "18px" : "2px" }} />
-        </button>
-        <span className="fs-11 font-mono uppercase c-text font-semibold flex-shrink-0">Auto-scan</span>
+        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#39e673", boxShadow: "0 0 6px #39e673" }} />
+        <span className="fs-11 font-mono uppercase c-text font-semibold flex-shrink-0">Publer sync</span>
         <span className="fs-11 c-muted">
-          08:00–20:00 · sweep every 4h · every day · {agency === "US" ? "Miami / New York (US East)" : "Prague (CZ)"} · next run {nextScan.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+          runs every hour · auto-matches Publer accounts to models by name · last synced {lastSyncedTs ? timeAgo(lastSyncedTs) : "never yet"}
         </span>
-        <button className="ml-auto fs-10 font-mono uppercase c-muted hover-accent-text transition-colors flex-shrink-0 flex items-center gap-1">
-          <Settings size={11} /> Configure <ChevronRight size={11} />
+        <button onClick={runSyncNow} disabled={syncingNow}
+          className="ml-auto fs-10 font-mono uppercase c-muted hover-accent-text transition-colors flex-shrink-0 flex items-center gap-1 disabled:opacity-50">
+          {syncingNow ? <Loader2 size={11} className="animate-spin" /> : <Repeat size={11} />}
+          {syncingNow ? "Syncing…" : "Sync now"}
         </button>
       </div>
+      {syncResult && <div className="fs-10 font-mono c-faint mt-1 mb-3">{syncResult}</div>}
 
       {mmTab === "accounts" ? (
         <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
