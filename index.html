@@ -7479,13 +7479,13 @@ const LANDING_PAGE_BODY = `
       <li><b>Account identifiers</b> — name, role (Team or Creator), and the agency (CZ/US) you belong to.</li>
       <li><b>Authentication data</b> — Team PINs and Creator passwords, stored hashed, never in plain text.</li>
       <li><b>Operational data you enter</b> — model names, social handles, content pipeline cards, task notes.</li>
-      <li><b>Buffer &amp; revenue data</b> — post metrics synced daily via the Buffer API, and OnlyFans earnings entered manually each week.</li>
+      <li><b>Publer &amp; revenue data</b> — post metrics synced hourly via the Publer API, and OnlyFans earnings synced from Infloww.</li>
       <li><b>Assistant queries</b> — messages sent to Neo, used only to generate an answer from your own data.</li>
     </ul>
     <p>We do not collect advertising identifiers, browsing history outside the app, or precise location.</p>
 
     <h2>2. Where it lives</h2>
-    <p>Everything is stored in Supabase (hosted Postgres), encrypted at rest. The Buffer sync and Neo assistant run as serverless functions that read and write to that same database, nothing is copied elsewhere.</p>
+    <p>Everything is stored in Supabase (hosted Postgres), encrypted at rest. The Publer sync and Neo assistant run as serverless functions that read and write to that same database, nothing is copied elsewhere.</p>
 
     <h2>3. Your rights</h2>
     <p>Since this is a private tool with a small, known roster, access or deletion requests go directly to the agency owner rather than through a support form.</p>
@@ -7507,7 +7507,7 @@ const LANDING_PAGE_BODY = `
     <p>Team members sign in with a PIN set per agency. Each creator signs in with her own name and sets a password the first time she logs in. Credentials are personal; sharing a login between people isn't allowed.</p>
 
     <h2>3. Acceptable use</h2>
-    <p>The tool is for running this agency's own roster. No unauthorized access, no scraping beyond what the Buffer integration already does, no using the assistant to generate anything unrelated to the agency's own content.</p>
+    <p>The tool is for running this agency's own roster. No unauthorized access, no scraping beyond what the Publer integration already does, no using the assistant to generate anything unrelated to the agency's own content.</p>
   </div>
 </div>
 
@@ -7529,7 +7529,7 @@ const LANDING_PAGE_BODY = `
     <div class="status-tag mono">COMPONENTS</div>
     <div class="status-row"><span class="status-dot"></span><div><div class="status-name">Web app &amp; login</div><div class="status-sub mono">WEB</div></div><div class="status-ok mono">Operational</div></div>
     <div class="status-row"><span class="status-dot"></span><div><div class="status-name">Supabase database</div><div class="status-sub mono">DB</div></div><div class="status-ok mono">Operational</div></div>
-    <div class="status-row"><span class="status-dot"></span><div><div class="status-name">Buffer sync</div><div class="status-sub mono">BUFFER</div></div><div class="status-ok mono">Operational</div></div>
+    <div class="status-row"><span class="status-dot"></span><div><div class="status-name">Publer sync</div><div class="status-sub mono">PUBLER</div></div><div class="status-ok mono">Operational</div></div>
     <div class="status-row"><span class="status-dot"></span><div><div class="status-name">Neo assistant</div><div class="status-sub mono">GROQ</div></div><div class="status-ok mono">Operational</div></div>
   </div>
 </div>
@@ -7955,7 +7955,7 @@ function LoginScreen({ models, settings, onLogin, onRegisterPassword }) {
                   <li><b>Account identifiers</b> — name, role (Team or Creator), and the agency (CZ/US) you belong to.</li>
                   <li><b>Authentication data</b> — Team PINs and Creator passwords, stored hashed, never in plain text.</li>
                   <li><b>Operational data you enter</b> — model names, social handles, content pipeline cards, task notes.</li>
-                  <li><b>Buffer &amp; revenue data</b> — post metrics and OnlyFans earnings synced automatically, or entered manually.</li>
+                  <li><b>Publer &amp; revenue data</b> — post metrics and OnlyFans earnings synced automatically, or entered manually.</li>
                   <li><b>Assistant queries</b> — messages sent to Neo, used only to generate an answer from your own data.</li>
                 </ul>
                 <p>We do not collect advertising identifiers, browsing history outside the app, or precise location.</p>
