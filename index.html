@@ -3060,7 +3060,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
           className="flex items-center gap-1 fs-10 font-mono uppercase c-faint hover-accent-text mb-3 transition-colors">
           <ChevronLeft size={12} /> Instagram Dashboard
         </button>
-        <IGModelPicker models={models} onPick={setFilter} />
+        <IGModelPicker models={models} onPick={setFilter} bufferDailyStats={bufferDailyStats} platform="ig" />
       </>
     );
   }
@@ -3094,7 +3094,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
           className="flex items-center gap-1 fs-10 font-mono uppercase c-faint hover-accent-text mb-3 transition-colors">
           <ChevronLeft size={12} /> TikTok Dashboard
         </button>
-        <IGModelPicker models={models} onPick={setFilter} subtitle="Opens her dedicated TikTok automation console." handleKey="tiktokHandle" handleLabel="TikTok" />
+        <IGModelPicker models={models} onPick={setFilter} subtitle="Opens her dedicated TikTok automation console." handleKey="tiktokHandle" handleLabel="TikTok" bufferDailyStats={bufferDailyStats} platform="tiktok" />
       </>
     );
   }
@@ -3121,7 +3121,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
           className="flex items-center gap-1 fs-10 font-mono uppercase c-faint hover-accent-text mb-3 transition-colors">
           <ChevronLeft size={12} /> X Dashboard
         </button>
-        <IGModelPicker models={models} onPick={setFilter} subtitle="Opens her X dashboard — stats, captions, and the mass planner." handleKey="xHandle" handleLabel="X" />
+        <IGModelPicker models={models} onPick={setFilter} subtitle="Opens her X dashboard — stats, captions, and the mass planner." handleKey="xHandle" handleLabel="X" bufferDailyStats={bufferDailyStats} platform="x" />
       </>
     );
   }
@@ -3290,8 +3290,30 @@ const IG_MIX_TYPES = [
     desc: "Almost literal — spam what already blew up, change next to nothing." },
 ];
 
-function IGModelPicker({ models, onPick, subtitle = "Opens her dedicated Instagram console.", handleKey = "igHandle", handleLabel = "IG" }) {
+function IGModelPicker({ models, onPick, subtitle = "Opens her dedicated Instagram console.", handleKey = "igHandle", handleLabel = "IG", bufferDailyStats, platform }) {
   const clock = useLiveClock();
+
+  // Small at-a-glance stats per card — 7-day reach and how recently she
+  // posted — pulled from bufferDailyStats, which every caller already has
+  // loaded for its overview dashboard. No extra fetch, and only shown for
+  // accounts that actually have a handle set (an unconnected account has
+  // nothing real to show here, so it stays a plain placeholder card).
+  const modelStats = (name) => {
+    const rows = (bufferDailyStats || []).filter((r) => r.platform === platform && r.model === name);
+    if (!rows.length) return null;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 6);
+    const cutoffStr = toISO(cutoff);
+    const reach7d = rows.filter((r) => r.statDate >= cutoffStr).reduce((s, r) => s + (r.impressions || 0), 0);
+    const lastActiveDate = rows.filter((r) => (r.postCount || 0) > 0).map((r) => r.statDate).sort().pop();
+    let lastActive = "—";
+    if (lastActiveDate) {
+      const days = Math.round((Date.now() - new Date(lastActiveDate + "T00:00:00").getTime()) / 86400000);
+      lastActive = days <= 0 ? "today" : days === 1 ? "1d ago" : `${days}d ago`;
+    }
+    return { reach7d, lastActive };
+  };
+
   return (
     <div className="rounded-2xl p-5 md:p-7 relative overflow-hidden"
       style={{
@@ -3320,25 +3342,37 @@ function IGModelPicker({ models, onPick, subtitle = "Opens her dedicated Instagr
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {models.map((m) => (
-          <button key={m.name} onClick={() => onPick(m.name)}
-            className="text-left rounded-2xl p-4 flex items-center gap-3 transition-all hover:-translate-y-0.5"
-            style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)" }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(57,230,115,0.5)"; e.currentTarget.style.boxShadow = "0 0 20px rgba(57,230,115,0.12)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; e.currentTarget.style.boxShadow = "none"; }}>
-            <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 fs-14 font-bold c-accent"
-              style={{ background: "rgba(57,230,115,0.12)", border: "1px solid rgba(57,230,115,0.3)" }}>
-              {m.name.slice(0, 1).toUpperCase()}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="c-text font-semibold text-sm truncate">{m.name}</div>
-              <div className="fs-11 c-muted font-mono truncate">{m[handleKey] ? `@${m[handleKey]}` : `no ${handleLabel} handle set`}</div>
-              <div className="fs-9 font-mono c-faint uppercase tracking-wide mt-1 flex items-center gap-1">
-                Open her Content Director <ChevronRight size={10} />
+        {models.map((m, i) => {
+          const color = MASS_PLANNER_COLORS[i % MASS_PLANNER_COLORS.length];
+          const stats = m[handleKey] ? modelStats(m.name) : null;
+          return (
+            <button key={m.name} onClick={() => onPick(m.name)}
+              className="text-left rounded-2xl p-4 flex items-center gap-3 transition-all hover:-translate-y-0.5"
+              style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)" }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${color}80`; e.currentTarget.style.boxShadow = `0 0 20px ${color}20`; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; e.currentTarget.style.boxShadow = "none"; }}>
+              <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 fs-14 font-bold"
+                style={{ background: `${color}1f`, border: `1px solid ${color}4d`, color }}>
+                {m.name.slice(0, 1).toUpperCase()}
               </div>
-            </div>
-          </button>
-        ))}
+              <div className="min-w-0 flex-1">
+                <div className="c-text font-semibold text-sm truncate">{m.name}</div>
+                <div className="fs-11 c-muted font-mono truncate">{m[handleKey] ? `@${m[handleKey]}` : `no ${handleLabel} handle set`}</div>
+                {stats ? (
+                  <div className="fs-9 font-mono c-faint uppercase tracking-wide mt-1 flex items-center gap-2">
+                    <span style={{ color }}>{stats.reach7d.toLocaleString()}</span> reach · 7d
+                    <span>·</span>
+                    <span>posted {stats.lastActive}</span>
+                  </div>
+                ) : (
+                  <div className="fs-9 font-mono c-faint uppercase tracking-wide mt-1 flex items-center gap-1">
+                    Open her Content Director <ChevronRight size={10} />
+                  </div>
+                )}
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
