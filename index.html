@@ -6959,7 +6959,7 @@ a:focus-visible, button:focus-visible{ outline:2px solid var(--lp-green); outlin
 .neo-orb-wrap{ position:relative; width:260px; height:260px; margin:0 auto; }
 .neo-orb-glow{
   position:absolute; inset:6%; border-radius:50%;
-  background:radial-gradient(circle, rgba(57,230,115,0.55) 0%, rgba(57,230,115,0.22) 45%, transparent 75%);
+  background:radial-gradient(circle at 30% 32%, rgba(79,182,255,0.55) 0%, transparent 55%), radial-gradient(circle at 70% 68%, rgba(226,63,214,0.5) 0%, transparent 55%);
   filter:blur(28px); animation:neoOrbBreathe 3.2s ease-in-out infinite;
 }
 .neo-orb-dial{ position:absolute; inset:0; width:100%; height:100%; }
@@ -8412,21 +8412,150 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
       }
     }, 150);
 
-    // detail 24 (~5,760 vertices) was wildly overkill for a wireframe orb —
-    // 6 keeps the same silhouette at a small fraction of the per-frame noise
-    // displacement cost, worse on mobile than desktop.
-    const geometry = new THREE.IcosahedronGeometry(1, 6);
-    const basePositions = geometry.attributes.position.array.slice();
+    // A grid-line "globe" — latitude/longitude wires only, no diagonal facet
+    // edges like the old icosahedron wireframe — reads as a softer, more
+    // organic mesh (matches the reference look the boss picked). Segment
+    // counts keep it dense without the per-frame noise displacement cost
+    // exploding (same tradeoff the icosahedron's detail level used to make).
+    const WIDTH_SEGMENTS = 44;
+    const HEIGHT_SEGMENTS = 28;
+    const gridCols = WIDTH_SEGMENTS + 1;
+    const gridRows = HEIGHT_SEGMENTS + 1;
+    const basePositions = new Float32Array(gridRows * gridCols * 3);
+    for (let iy = 0; iy < gridRows; iy++) {
+      const theta = (iy / HEIGHT_SEGMENTS) * Math.PI;
+      // Every longitude line shares the exact same point at the poles, so
+      // noise displacement (same input -> same output) can never pull them
+      // apart — without this they'd stay pinched into a sharp funnel, which
+      // never rotates out of view since the animation spins around this same
+      // axis. A small jitter that fades in near the poles and vanishes by
+      // the equator breaks the singularity into a soft, irregular cap
+      // instead, closer to the reference's crumpled-paper look.
+      const poleJitter = 0.16 * Math.pow(Math.abs(Math.cos(theta)), 4);
+      for (let ix = 0; ix < gridCols; ix++) {
+        const phi = (ix / WIDTH_SEGMENTS) * Math.PI * 2;
+        const p = (iy * gridCols + ix) * 3;
+        basePositions[p] = -Math.cos(phi) * Math.sin(theta) + (Math.random() * 2 - 1) * poleJitter;
+        basePositions[p + 1] = Math.cos(theta) + (Math.random() * 2 - 1) * poleJitter;
+        basePositions[p + 2] = Math.sin(phi) * Math.sin(theta) + (Math.random() * 2 - 1) * poleJitter;
+      }
+    }
+    // Every latitude ring (horizontal) and longitude arc (vertical) as pairs
+    // of indices into basePositions — built once, reused every frame to
+    // write the actual line-segment buffer after noise displacement.
+    const segmentIndexPairs = [];
+    for (let iy = 0; iy < gridRows; iy++) {
+      for (let ix = 0; ix < WIDTH_SEGMENTS; ix++) {
+        segmentIndexPairs.push(iy * gridCols + ix, iy * gridCols + ix + 1);
+      }
+    }
+    for (let ix = 0; ix < gridCols; ix++) {
+      for (let iy = 0; iy < HEIGHT_SEGMENTS; iy++) {
+        segmentIndexPairs.push(iy * gridCols + ix, (iy + 1) * gridCols + ix);
+      }
+    }
+    const segmentCount = segmentIndexPairs.length / 2;
 
-    const material = new THREE.MeshBasicMaterial({
-      color: 0x8effb5,
-      wireframe: true,
+    const geometry = new THREE.BufferGeometry();
+    const linePositions = new Float32Array(segmentCount * 6);
+    const lineColors = new Float32Array(segmentCount * 6);
+    geometry.setAttribute("position", new THREE.BufferAttribute(linePositions, 3));
+    geometry.setAttribute("color", new THREE.BufferAttribute(lineColors, 3));
+
+    const material = new THREE.LineBasicMaterial({
+      vertexColors: true,
       transparent: true,
-      opacity: 0.55,
+      opacity: 0.68,
       blending: THREE.AdditiveBlending,
     });
-    const mesh = new THREE.Mesh(geometry, material);
+    const mesh = new THREE.LineSegments(geometry, material);
     scene.add(mesh);
+
+    // Two-tone "lit from two corners" scheme — cyan-blue from the upper
+    // left, magenta from the lower right, dark violet in between — computed
+    // in the globe's own local space so it spins naturally with the mesh
+    // instead of needing a per-frame world-space transform.
+    const colorDark = new THREE.Color(0x140a2e);
+    const colorBlue = new THREE.Color(0x3fb6ff);
+    const colorMagenta = new THREE.Color(0xe23fd6);
+    const blueDir = new THREE.Vector3(-0.75, 0.6, 0.28).normalize();
+    const magentaDir = new THREE.Vector3(0.7, -0.62, -0.25).normalize();
+    const colorAt = (nx, ny, nz, out) => {
+      const dBlue = Math.max(0, nx * blueDir.x + ny * blueDir.y + nz * blueDir.z);
+      const dMag = Math.max(0, nx * magentaDir.x + ny * magentaDir.y + nz * magentaDir.z);
+      out.copy(colorDark);
+      if (dBlue > 0) out.lerp(colorBlue, Math.min(1, Math.pow(dBlue, 1.6)));
+      if (dMag > 0) out.lerp(colorMagenta, Math.min(1, Math.pow(dMag, 1.6)));
+      return out;
+    };
+
+    // Colors depend only on each point's fixed direction on the unit sphere
+    // (never on the noise-displaced position), so this only needs computing
+    // once — never inside the animation loop.
+    const scratchColor = new THREE.Color();
+    for (let s = 0; s < segmentCount; s++) {
+      const ia = segmentIndexPairs[s * 2], ib = segmentIndexPairs[s * 2 + 1];
+      const vi = s * 6;
+      colorAt(basePositions[ia * 3], basePositions[ia * 3 + 1], basePositions[ia * 3 + 2], scratchColor);
+      lineColors[vi] = scratchColor.r; lineColors[vi + 1] = scratchColor.g; lineColors[vi + 2] = scratchColor.b;
+      colorAt(basePositions[ib * 3], basePositions[ib * 3 + 1], basePositions[ib * 3 + 2], scratchColor);
+      lineColors[vi + 3] = scratchColor.r; lineColors[vi + 4] = scratchColor.g; lineColors[vi + 5] = scratchColor.b;
+    }
+    geometry.attributes.color.needsUpdate = true;
+
+    // This frame's noise-displaced grid points, keyed by the same index used
+    // in basePositions/segmentIndexPairs — reused every frame instead of
+    // reallocating.
+    const displaced = new Float32Array(basePositions.length);
+
+    // Sparse dust of particles in a shell around the globe, tinted with the
+    // same two-tone gradient, parented to the mesh so it rotates/scales as
+    // one piece with the wireframe with zero extra per-frame work.
+    const PARTICLE_COUNT = 260;
+    const particlePositions = new Float32Array(PARTICLE_COUNT * 3);
+    const particleColors = new Float32Array(PARTICLE_COUNT * 3);
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const dx = Math.random() * 2 - 1, dy = Math.random() * 2 - 1, dz = Math.random() * 2 - 1;
+      const len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+      const nx = dx / len, ny = dy / len, nz = dz / len;
+      const shellR = 1.08 + Math.random() * 0.75;
+      particlePositions[i * 3] = nx * shellR;
+      particlePositions[i * 3 + 1] = ny * shellR;
+      particlePositions[i * 3 + 2] = nz * shellR;
+      colorAt(nx, ny, nz, scratchColor);
+      particleColors[i * 3] = scratchColor.r;
+      particleColors[i * 3 + 1] = scratchColor.g;
+      particleColors[i * 3 + 2] = scratchColor.b;
+    }
+    const particleGeometry = new THREE.BufferGeometry();
+    particleGeometry.setAttribute("position", new THREE.BufferAttribute(particlePositions, 3));
+    particleGeometry.setAttribute("color", new THREE.BufferAttribute(particleColors, 3));
+
+    // A small radial-gradient canvas as the point sprite — a plain square
+    // point looks nothing like the soft glowing dust in the reference.
+    const dotCanvas = document.createElement("canvas");
+    dotCanvas.width = dotCanvas.height = 32;
+    const dctx = dotCanvas.getContext("2d");
+    const dotGrad = dctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+    dotGrad.addColorStop(0, "rgba(255,255,255,1)");
+    dotGrad.addColorStop(0.4, "rgba(255,255,255,0.7)");
+    dotGrad.addColorStop(1, "rgba(255,255,255,0)");
+    dctx.fillStyle = dotGrad;
+    dctx.fillRect(0, 0, 32, 32);
+    const dotTexture = new THREE.CanvasTexture(dotCanvas);
+
+    const particleMaterial = new THREE.PointsMaterial({
+      size: 0.05,
+      map: dotTexture,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.9,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true,
+    });
+    const particles = new THREE.Points(particleGeometry, particleMaterial);
+    mesh.add(particles);
 
     const noise = new SimplexNoise3D(7);
 
@@ -8469,19 +8598,23 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
       const noiseAmp = 0.09 + pulse * 0.02;
       const t = noisePhase;
 
-      const posAttr = geometry.attributes.position;
-      const arr = posAttr.array;
-      for (let i = 0; i < arr.length; i += 3) {
-        const x = basePositions[i], y = basePositions[i + 1], z = basePositions[i + 2];
+      for (let p = 0; p < gridRows * gridCols; p++) {
+        const x = basePositions[p * 3], y = basePositions[p * 3 + 1], z = basePositions[p * 3 + 2];
         const n = noise.noise(x * 1.6 + t, y * 1.6 + t, z * 1.6 + t);
         const scale = 1 + n * noiseAmp;
-        arr[i] = x * scale;
-        arr[i + 1] = y * scale;
-        arr[i + 2] = z * scale;
+        displaced[p * 3] = x * scale;
+        displaced[p * 3 + 1] = y * scale;
+        displaced[p * 3 + 2] = z * scale;
       }
-      posAttr.needsUpdate = true;
-      // Not computeVertexNormals() here — MeshBasicMaterial (below) never
-      // reads normals at all, so this was pure wasted work every frame.
+      for (let s = 0; s < segmentCount; s++) {
+        const ia = segmentIndexPairs[s * 2], ib = segmentIndexPairs[s * 2 + 1];
+        const vi = s * 6;
+        linePositions[vi] = displaced[ia * 3]; linePositions[vi + 1] = displaced[ia * 3 + 1]; linePositions[vi + 2] = displaced[ia * 3 + 2];
+        linePositions[vi + 3] = displaced[ib * 3]; linePositions[vi + 4] = displaced[ib * 3 + 1]; linePositions[vi + 5] = displaced[ib * 3 + 2];
+      }
+      geometry.attributes.position.needsUpdate = true;
+      // Colors are static (computed once above from each point's fixed
+      // sphere direction) — only position needs a per-frame GPU upload.
 
       mesh.rotation.y += th ? 0.006 : sp ? 0.0045 : li ? 0.003 : 0.0015;
       mesh.rotation.x += 0.0006;
@@ -8537,6 +8670,9 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
       clearTimeout(settleTimer);
       geometry.dispose();
       material.dispose();
+      particleGeometry.dispose();
+      particleMaterial.dispose();
+      dotTexture.dispose();
       renderer.dispose();
       if (mount) mount.innerHTML = "";
     };
@@ -9438,7 +9574,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
             zIndex: 100,
           }}>
             <div style={{ position: "absolute", inset: 0, transform: isDesktopViewport ? `scale(1.14)` : "none" }}>
-              <div ref={glowElRef} style={{ position: "absolute", inset: "8%", background: "radial-gradient(circle, rgba(57,230,115,0.65) 0%, rgba(57,230,115,0.3) 45%, transparent 75%)", filter: "blur(36px)", pointerEvents: "none", willChange: "transform, opacity" }} />
+              <div ref={glowElRef} style={{ position: "absolute", inset: "8%", background: "radial-gradient(circle at 30% 32%, rgba(79,182,255,0.6) 0%, transparent 55%), radial-gradient(circle at 70% 68%, rgba(226,63,214,0.55) 0%, transparent 55%)", filter: "blur(36px)", pointerEvents: "none", willChange: "transform, opacity" }} />
             </div>
             {/* tick-mark dial ring behind the orb — a bit of HUD/instrument-panel flair. Independently adjustable via the edit panel. */}
             <div style={{ position: "absolute", inset: 0, transform: isDesktopViewport ? `scale(1.14)` : "none" }}>
