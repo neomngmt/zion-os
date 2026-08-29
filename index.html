@@ -8431,7 +8431,7 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
       // axis. A small jitter that fades in near the poles and vanishes by
       // the equator breaks the singularity into a soft, irregular cap
       // instead, closer to the reference's crumpled-paper look.
-      const poleJitter = 0.16 * Math.pow(Math.abs(Math.cos(theta)), 4);
+      const poleJitter = 0.07 * Math.pow(Math.abs(Math.cos(theta)), 4);
       for (let ix = 0; ix < gridCols; ix++) {
         const phi = (ix / WIDTH_SEGMENTS) * Math.PI * 2;
         const p = (iy * gridCols + ix) * 3;
@@ -8509,55 +8509,6 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
     // reallocating.
     const displaced = new Float32Array(basePositions.length);
 
-    // Sparse dust of particles in a shell around the globe, tinted with the
-    // same two-tone gradient, parented to the mesh so it rotates/scales as
-    // one piece with the wireframe with zero extra per-frame work.
-    const PARTICLE_COUNT = 260;
-    const particlePositions = new Float32Array(PARTICLE_COUNT * 3);
-    const particleColors = new Float32Array(PARTICLE_COUNT * 3);
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      const dx = Math.random() * 2 - 1, dy = Math.random() * 2 - 1, dz = Math.random() * 2 - 1;
-      const len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
-      const nx = dx / len, ny = dy / len, nz = dz / len;
-      const shellR = 1.08 + Math.random() * 0.75;
-      particlePositions[i * 3] = nx * shellR;
-      particlePositions[i * 3 + 1] = ny * shellR;
-      particlePositions[i * 3 + 2] = nz * shellR;
-      colorAt(nx, ny, nz, scratchColor);
-      particleColors[i * 3] = scratchColor.r;
-      particleColors[i * 3 + 1] = scratchColor.g;
-      particleColors[i * 3 + 2] = scratchColor.b;
-    }
-    const particleGeometry = new THREE.BufferGeometry();
-    particleGeometry.setAttribute("position", new THREE.BufferAttribute(particlePositions, 3));
-    particleGeometry.setAttribute("color", new THREE.BufferAttribute(particleColors, 3));
-
-    // A small radial-gradient canvas as the point sprite — a plain square
-    // point looks nothing like the soft glowing dust in the reference.
-    const dotCanvas = document.createElement("canvas");
-    dotCanvas.width = dotCanvas.height = 32;
-    const dctx = dotCanvas.getContext("2d");
-    const dotGrad = dctx.createRadialGradient(16, 16, 0, 16, 16, 16);
-    dotGrad.addColorStop(0, "rgba(255,255,255,1)");
-    dotGrad.addColorStop(0.4, "rgba(255,255,255,0.7)");
-    dotGrad.addColorStop(1, "rgba(255,255,255,0)");
-    dctx.fillStyle = dotGrad;
-    dctx.fillRect(0, 0, 32, 32);
-    const dotTexture = new THREE.CanvasTexture(dotCanvas);
-
-    const particleMaterial = new THREE.PointsMaterial({
-      size: 0.05,
-      map: dotTexture,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.9,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      sizeAttenuation: true,
-    });
-    const particles = new THREE.Points(particleGeometry, particleMaterial);
-    mesh.add(particles);
-
     const noise = new SimplexNoise3D(7);
 
     let raf;
@@ -8596,7 +8547,7 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
 
       const noiseSpeed = th ? 0.3 : sp ? 0.24 : li ? 0.16 : 0.08;
       noisePhase += noiseSpeed * delta;
-      const noiseAmp = 0.09 + pulse * 0.02;
+      const noiseAmp = 0.035 + pulse * 0.01;
       const t = noisePhase;
 
       for (let p = 0; p < gridRows * gridCols; p++) {
@@ -8671,9 +8622,6 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
       clearTimeout(settleTimer);
       geometry.dispose();
       material.dispose();
-      particleGeometry.dispose();
-      particleMaterial.dispose();
-      dotTexture.dispose();
       renderer.dispose();
       if (mount) mount.innerHTML = "";
     };
