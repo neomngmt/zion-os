@@ -8424,33 +8424,30 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
     const basePositions = new Float32Array(gridRows * gridCols * 3);
     for (let iy = 0; iy < gridRows; iy++) {
       const theta = (iy / HEIGHT_SEGMENTS) * Math.PI;
-      // Every longitude line shares the exact same point at the poles, so
-      // noise displacement (same input -> same output) can never pull them
-      // apart — without this they'd stay pinched into a sharp funnel, which
-      // never rotates out of view since the animation spins around this same
-      // axis. A small jitter that fades in near the poles and vanishes by
-      // the equator breaks the singularity into a soft, irregular cap
-      // instead, closer to the reference's crumpled-paper look.
-      const poleJitter = 0.07 * Math.pow(Math.abs(Math.cos(theta)), 4);
       for (let ix = 0; ix < gridCols; ix++) {
         const phi = (ix / WIDTH_SEGMENTS) * Math.PI * 2;
         const p = (iy * gridCols + ix) * 3;
-        basePositions[p] = -Math.cos(phi) * Math.sin(theta) + (Math.random() * 2 - 1) * poleJitter;
-        basePositions[p + 1] = Math.cos(theta) + (Math.random() * 2 - 1) * poleJitter;
-        basePositions[p + 2] = Math.sin(phi) * Math.sin(theta) + (Math.random() * 2 - 1) * poleJitter;
+        basePositions[p] = -Math.cos(phi) * Math.sin(theta);
+        basePositions[p + 1] = Math.cos(theta);
+        basePositions[p + 2] = Math.sin(phi) * Math.sin(theta);
       }
     }
-    // Every latitude ring (horizontal) and longitude arc (vertical) as pairs
-    // of indices into basePositions — built once, reused every frame to
-    // write the actual line-segment buffer after noise displacement.
+    // Every longitude line converges on the exact same point at the poles —
+    // with 44 of them that's not a subtle pinch, it's a visibly tangled knot
+    // (confirmed live, looked broken rather than "soft"). A jitter hack
+    // couldn't fix that: it's a density problem, not a position problem.
+    // The actual fix is to just not draw the near-pole rings/arcs at all —
+    // small round gaps at the very top/bottom read fine (the glow behind
+    // fills them in) and the tangle is gone entirely.
+    const POLE_SKIP_ROWS = 3;
     const segmentIndexPairs = [];
-    for (let iy = 0; iy < gridRows; iy++) {
+    for (let iy = POLE_SKIP_ROWS; iy < gridRows - POLE_SKIP_ROWS; iy++) {
       for (let ix = 0; ix < WIDTH_SEGMENTS; ix++) {
         segmentIndexPairs.push(iy * gridCols + ix, iy * gridCols + ix + 1);
       }
     }
     for (let ix = 0; ix < gridCols; ix++) {
-      for (let iy = 0; iy < HEIGHT_SEGMENTS; iy++) {
+      for (let iy = POLE_SKIP_ROWS; iy < HEIGHT_SEGMENTS - POLE_SKIP_ROWS; iy++) {
         segmentIndexPairs.push(iy * gridCols + ix, (iy + 1) * gridCols + ix);
       }
     }
@@ -9476,8 +9473,11 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-center items-center" style={{ gap: "3rem", minHeight: "70vh" }}>
 
           {/* left: identity + live status — desktop only now; mobile keeps
-              its earlier simpler version below instead */}
-          <div className="hidden sm:flex sm:flex-col items-center sm:items-start text-center sm:text-left" style={{ width: 280, flexShrink: 0 }}>
+              its earlier simpler version below instead. Backed by a solid-
+              ish backdrop so the circuit-board background's randomly-placed
+              traces (regenerated fresh each mount) can never visibly cut
+              through the text sitting on top of them. */}
+          <div className="hidden sm:flex sm:flex-col items-center sm:items-start text-center sm:text-left" style={{ width: 280, flexShrink: 0, background: "rgba(3,7,5,0.55)", backdropFilter: "blur(4px)", borderRadius: "10px", padding: "10px 12px", margin: "-10px -12px" }}>
             <div style={{ transform: isDesktopViewport ? `translate(12px, -12px)` : "none" }}>
               <div className="flex items-baseline gap-2 neo-fade-in" style={{ animationDelay: "0.15s" }}>
                 <span style={{
