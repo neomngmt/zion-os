@@ -6959,7 +6959,7 @@ a:focus-visible, button:focus-visible{ outline:2px solid var(--lp-green); outlin
 .neo-orb-wrap{ position:relative; width:260px; height:260px; margin:0 auto; }
 .neo-orb-glow{
   position:absolute; inset:6%; border-radius:50%;
-  background:radial-gradient(circle at 30% 32%, rgba(79,182,255,0.55) 0%, transparent 55%), radial-gradient(circle at 70% 68%, rgba(226,63,214,0.5) 0%, transparent 55%);
+  background:radial-gradient(circle, rgba(57,230,115,0.55) 0%, rgba(57,230,115,0.22) 45%, transparent 75%);
   filter:blur(28px); animation:neoOrbBreathe 3.2s ease-in-out infinite;
 }
 .neo-orb-dial{ position:absolute; inset:0; width:100%; height:100%; }
@@ -8471,13 +8471,14 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
     const mesh = new THREE.LineSegments(geometry, material);
     scene.add(mesh);
 
-    // Two-tone "lit from two corners" scheme — cyan-blue from the upper
-    // left, magenta from the lower right, dark violet in between — computed
-    // in the globe's own local space so it spins naturally with the mesh
-    // instead of needing a per-frame world-space transform.
-    const colorDark = new THREE.Color(0x140a2e);
-    const colorBlue = new THREE.Color(0x3fb6ff);
-    const colorMagenta = new THREE.Color(0xe23fd6);
+    // Two-tone "lit from two corners" scheme, both ends kept on-brand green
+    // (light mint upper-left, solid brand green lower-right, dark green in
+    // between) — computed in the globe's own local space so it spins
+    // naturally with the mesh instead of needing a per-frame world-space
+    // transform.
+    const colorDark = new THREE.Color(0x0a2015);
+    const colorBlue = new THREE.Color(0x8effb5);
+    const colorMagenta = new THREE.Color(0x39e673);
     const blueDir = new THREE.Vector3(-0.75, 0.6, 0.28).normalize();
     const magentaDir = new THREE.Vector3(0.7, -0.62, -0.25).normalize();
     const colorAt = (nx, ny, nz, out) => {
@@ -9316,7 +9317,16 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
   const micPrimedRef = useRef(false);
 
   const startActiveListen = () => {
-    if (!speechSupported) return;
+    // Safari (desktop and iOS) has never implemented the Web Speech
+    // Recognition API at all — window.SpeechRecognition/webkitSpeechRecognition
+    // simply doesn't exist there, unlike most other webkit-prefixed APIs.
+    // This used to fail completely silently (nothing happened on click, no
+    // error, no state change), which looked exactly like a broken click
+    // handler — surface it instead so it's obvious what's actually going on.
+    if (!speechSupported) {
+      setHeard("(voice input isn't supported in this browser — try Chrome)");
+      return;
+    }
 
     const begin = () => {
       activeListenRef.current = true;
@@ -9574,7 +9584,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
             zIndex: 100,
           }}>
             <div style={{ position: "absolute", inset: 0, transform: isDesktopViewport ? `scale(1.14)` : "none" }}>
-              <div ref={glowElRef} style={{ position: "absolute", inset: "8%", background: "radial-gradient(circle at 30% 32%, rgba(79,182,255,0.6) 0%, transparent 55%), radial-gradient(circle at 70% 68%, rgba(226,63,214,0.55) 0%, transparent 55%)", filter: "blur(36px)", pointerEvents: "none", willChange: "transform, opacity" }} />
+              <div ref={glowElRef} style={{ position: "absolute", inset: "8%", background: "radial-gradient(circle, rgba(57,230,115,0.65) 0%, rgba(57,230,115,0.3) 45%, transparent 75%)", filter: "blur(36px)", pointerEvents: "none", willChange: "transform, opacity" }} />
             </div>
             {/* tick-mark dial ring behind the orb — a bit of HUD/instrument-panel flair. Independently adjustable via the edit panel. */}
             <div style={{ position: "absolute", inset: 0, transform: isDesktopViewport ? `scale(1.14)` : "none" }}>
