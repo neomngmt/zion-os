@@ -8350,6 +8350,11 @@ class SimplexNoise3D {
 // flowing simplex noise, rendered as glowing wireframe, matching the
 // "organic warped glass sphere" reference much more closely than a 2D
 // canvas approximation can.
+// Must match the .neo-orb-fade-in CSS animation duration (see its keyframes)
+// — used to delay the greeting's audio playback so Neo never starts talking
+// before the orb has visibly finished fading in.
+const ORB_FADE_IN_MS = 800;
+
 function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onClick, glowElRef }) {
   const mountRef = useRef(null);
   const stateRef = useRef({ thinking, speaking, listening });
@@ -8805,14 +8810,23 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
     const name = session.role === "admin" ? "Boss" : (session.name || "there");
     const greeting = `Hi ${name}! How can I help you today?`;
     setMessages([{ role: "neo", text: greeting }]);
+    // The orb itself fades in over ORB_FADE_IN_MS (see .neo-orb-fade-in) right
+    // as this page mounts. The TTS fetch is prefetched during the boot
+    // animation so it's usually ready the instant we get here — which used
+    // to mean Neo could start talking before the orb had visibly appeared.
+    // Delay only the *playback* trigger by the fade-in's own duration (the
+    // network fetch above keeps running in the background either way), so
+    // the voice never starts ahead of the thing that's supposed to be
+    // speaking.
+    const play = (url) => setTimeout(() => speakText(greeting, url), ORB_FADE_IN_MS);
     // If the nav click already kicked off a prefetch, wait for that instead
     // of starting a brand new (slower) fetch — this is what keeps the delay
     // between the original tap and actual audio.play() short enough for
     // strict mobile autoplay policies.
     if (prefetchedGreetingUrl) {
-      prefetchedGreetingUrl.then((url) => speakText(greeting, url));
+      prefetchedGreetingUrl.then((url) => play(url));
     } else {
-      speakText(greeting);
+      play();
     }
   }, []);
   const [voiceError, setVoiceError] = useState("");
