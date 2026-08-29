@@ -2567,7 +2567,7 @@ function PlatformOverviewDashboard({
             </div>
           </div>
 
-          {scheduledPosts?.length > 0 && (
+          {scheduledPosts != null && (
             <div className="c-bg-app rounded-xl p-4 mb-5" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
               <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-3">
                 Scheduled · upcoming ({scheduledPosts.length})
