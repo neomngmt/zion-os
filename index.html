@@ -7547,7 +7547,7 @@ const LANDING_PAGE_BODY = `
     <div class="status-row"><span class="status-dot"></span><div><div class="status-name">Web app &amp; login</div><div class="status-sub mono">WEB</div></div><div class="status-ok mono">Operational</div></div>
     <div class="status-row"><span class="status-dot"></span><div><div class="status-name">Supabase database</div><div class="status-sub mono">DB</div></div><div class="status-ok mono">Operational</div></div>
     <div class="status-row"><span class="status-dot"></span><div><div class="status-name">Publer sync</div><div class="status-sub mono">PUBLER</div></div><div class="status-ok mono">Operational</div></div>
-    <div class="status-row"><span class="status-dot"></span><div><div class="status-name">Neo assistant</div><div class="status-sub mono">GROQ</div></div><div class="status-ok mono">Operational</div></div>
+    <div class="status-row"><span class="status-dot"></span><div><div class="status-name">Neo assistant</div><div class="status-sub mono">CLAUDE</div></div><div class="status-ok mono">Operational</div></div>
   </div>
 </div>
 
@@ -8660,7 +8660,7 @@ function NeoBootSequence({ onDone }) {
   );
 }
 
-function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models, stats, reels, trends, bufferDailyStats, inflowwDailyStats, settings, persistSettings }) {
+function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models, stats, reels, trends, bufferDailyStats, bufferTopPosts, inflowwDailyStats, settings, persistSettings }) {
   const [messages, setMessages] = useState([]);
   // messages was tracked but never actually shown anywhere — if TTS fails
   // or the viewer has sound off, there was no way to read what Neo said.
@@ -8780,7 +8780,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
         if (error) {
           // supabase-js's FunctionsHttpError hides the real response body
           // behind a generic "non-2xx status code" message — the actual
-          // reason (e.g. a Groq error) is in error.context, the raw Response.
+          // reason (e.g. an Anthropic API error) is in error.context, the raw Response.
           let detail = error.message;
           try {
             if (error.context && typeof error.context.text === "function") {
@@ -8894,8 +8894,21 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
       }
     }
 
-    // heroModels (defined below) already scopes creators down to just their
-    // own record — reused here so Neo's context matches what's on screen.
+    // heroModels already scopes creators down to just their own record —
+    // reused everywhere below so Neo never sees another model's data in a
+    // creator session, same boundary the rest of the app enforces.
+    const heroNames = new Set(heroModels.map((m) => m.name));
+    const nDaysAgoStr = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return toISO(d); };
+
+    // "Most recent real value" for the Infloww Creator Report snapshot fields
+    // (reply time, active fans, rank, ...) — these are point-in-time
+    // snapshots, not something that makes sense to sum across days, same
+    // pattern CreatorInsightsSection uses on the dashboard.
+    const latestField = (rows, field) => {
+      const withValue = rows.filter((r) => r[field] != null).sort((a, b) => b.statDate.localeCompare(a.statDate));
+      return withValue.length ? withValue[0][field] : null;
+    };
+
     try {
       const { data, error } = await supabaseClient.functions.invoke("clever-service", {
         body: {
@@ -8912,59 +8925,124 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
               dayOfMonth,
               daysInMonth,
             },
-            cardCount: cards.length,
-            openTasks: tasks.filter((t) => t.status !== "done").length,
-            overdueTasks: tasks.filter((t) => t.status !== "done" && t.dueDate && t.dueDate < todayISO()).length,
-            modelNames: heroModels.map((m) => m.name),
-            // Per-model earnings/subs history, most recent week first, so Neo can
-            // answer "how much did X earn" or "who's growing fastest" directly.
+            todayDate: toISO(new Date()),
+            yesterdayDate: nDaysAgoStr(1),
+            cardCount: cards.filter((c) => heroNames.has(c.model)).length,
+            openTasksCount: tasks.filter((t) => heroNames.has(t.model) && t.status !== "done").length,
+            overdueTasksCount: tasks.filter((t) => heroNames.has(t.model) && t.status !== "done" && t.dueDate && t.dueDate < todayISO()).length,
+
+            // Full roster, not just names — handles/persona notes so Neo can
+            // reason about branding/content direction per model too.
+            models: heroModels.map((m) => ({
+              name: m.name, agency: m.agency, note: m.note || null,
+              igHandle: m.igHandle || null, xHandle: m.xHandle || null, tiktokHandle: m.tiktokHandle || null,
+              onboarded: !!m.onboarded,
+            })),
+
+            // Full content pipeline (not just a count) — every scene/card
+            // currently in flight, whatever stage it's at.
+            contentPipeline: cards.filter((c) => heroNames.has(c.model)).slice(0, 150)
+              .map((c) => ({ model: c.model, title: c.title, stage: c.stage, platform: c.platform, sceneType: c.sceneType || null, deadline: c.deadline || null, assignee: c.assignee || null })),
+
+            // Full task list (not just counts) — real titles/due dates so Neo
+            // can say what specifically is overdue, not just a number.
+            tasks: tasks.filter((t) => heroNames.has(t.model)).slice(0, 150)
+              .map((t) => ({ model: t.model, title: t.title, dueDate: t.dueDate || null, status: t.status, assignee: t.assignee || null, recurring: !!t.recurring })),
+
+            // Per-model manually-logged weekly earnings/growth history —
+            // extended window (16 weeks, ~4 months) since this is the only
+            // source for older IG-follower/reach trend data.
             earningsByModel: heroModels.map((m) => ({
               model: m.name,
               weeks: stats.filter((s) => s.model === m.name)
                 .sort((a, b) => (b.weekOf || "").localeCompare(a.weekOf || ""))
-                .slice(0, 6)
+                .slice(0, 16)
                 .map((s) => ({ weekOf: s.weekOf, ofEarnings: s.ofEarnings, ofSubs: s.ofSubs, igFollowers: s.igFollowers, igReach: s.igReach })),
             })),
-            // Best/worst performing reels so Neo can say what's working.
-            topReels: [...(reels || [])].filter((r) => heroModels.some((m) => m.name === r.model)).sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 12)
-              .map((r) => ({ model: r.model, title: r.title, weekOf: r.weekOf, views: r.views, likes: r.likes, shares: r.shares, comments: r.comments })),
-            recentTrends: trends.filter((t) => (agency === "US" ? t.showUS : t.showCZ)).slice(-6).map((t) => ({ title: t.title, category: t.category })),
-            // Buffer-synced social reach per model, last 7 days, so Neo can
-            // answer "how's Anna's X doing" or "who's growing on Instagram."
-            socialImpressions7d: heroModels.map((m) => ({
-              model: m.name,
-              instagram: impressionsFor(m.name, "ig"),
-              x: impressionsFor(m.name, "x"),
-              tiktok: impressionsFor(m.name, "tiktok"),
-            })),
-            // Real OnlyFans earnings synced from Infloww (Free + Paid accounts
-            // combined), last 7 and last 30 days per model — this is the
-            // primary source of truth for "how much did X earn" now.
+
+            // All logged reels, not just a top-12 sample — real title/link/
+            // full metrics so Neo can talk about anything shared, not only
+            // the biggest hits.
+            reelsLogged: reels.filter((r) => heroNames.has(r.model)).sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 60)
+              .map((r) => ({ model: r.model, title: r.title, link: r.link || null, weekOf: r.weekOf, views: r.views, likes: r.likes, shares: r.shares, comments: r.comments })),
+
+            recentTrends: trends.filter((t) => (agency === "US" ? t.showUS : t.showCZ)).slice(-15).map((t) => ({ title: t.title, category: t.category })),
+
+            // Publer-synced social performance, per model per platform:
+            // 7d/30d totals (posts, reach, likes, replies, reposts, avg
+            // engagement) plus the last 7 real days broken out day-by-day
+            // for pattern/timing questions ("does she do better posting at
+            // night").
+            socialStatsByModel: heroModels.flatMap((m) => ["ig", "x", "tiktok"].map((platform) => {
+              const rows = (bufferDailyStats || []).filter((r) => r.model === m.name && r.platform === platform);
+              if (!rows.length) return null;
+              const sumSince = (n, field) => rows.filter((r) => r.statDate >= nDaysAgoStr(n)).reduce((t, r) => t + (r[field] || 0), 0);
+              const last7 = rows.filter((r) => r.statDate >= nDaysAgoStr(7));
+              const avgEr7 = (() => { const withEr = last7.filter((r) => r.engagementRate != null); return withEr.length ? withEr.reduce((s, r) => s + r.engagementRate, 0) / withEr.length : null; })();
+              return {
+                model: m.name, platform,
+                last7Days: { posts: sumSince(7, "postCount"), impressions: sumSince(7, "impressions"), likes: sumSince(7, "reactions"), replies: sumSince(7, "comments"), reposts: sumSince(7, "reposts"), avgEngagementRate: avgEr7 != null ? Number(avgEr7.toFixed(2)) : null },
+                last30Days: { posts: sumSince(30, "postCount"), impressions: sumSince(30, "impressions") },
+                dailyLast7: last7.sort((a, b) => a.statDate.localeCompare(b.statDate)).map((r) => ({ date: r.statDate, posts: r.postCount || 0, impressions: r.impressions || 0, likes: r.reactions || 0 })),
+              };
+            })).filter(Boolean),
+
+            // Real best-performing post per model per platform (actual
+            // caption text, not just a number) — this table only ever holds
+            // the current best one per model+platform, so it's cheap to send
+            // in full.
+            topPostsByPlatform: (bufferTopPosts || []).filter((p) => heroNames.has(p.model))
+              .map((p) => ({ model: p.model, platform: p.platform, text: p.text || null, impressions: p.impressions, likes: p.reactions, comments: p.comments, reposts: p.reposts, link: p.externalLink || null })),
+
+            // Real OnlyFans earnings synced from Infloww (Free + Paid
+            // accounts combined) — this is the current, authoritative
+            // source for "how much did X earn."
             inflowwEarningsByModel: heroModels.map((m) => {
               const rows = (inflowwDailyStats || []).filter((r) => r.model === m.name);
-              const sum = (days) => {
-                const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
-                const cutoffStr = cutoff.toISOString().slice(0, 10);
-                return rows.filter((r) => r.statDate >= cutoffStr).reduce((t, r) => t + (r.earningsNet || 0), 0);
-              };
+              const sum = (days) => rows.filter((r) => r.statDate >= nDaysAgoStr(days)).reduce((t, r) => t + (r.earningsNet || 0), 0);
               return rows.length ? { model: m.name, last7Days: Math.round(sum(7)), last30Days: Math.round(sum(30)) } : null;
             }).filter(Boolean),
-            // Day-by-day breakdown, last 14 calendar days, per model — this is what lets Neo
-            // answer "how much did X earn yesterday" or "on Tuesday" instead of only knowing
-            // rolled-up 7/30-day totals. today/yesterday dates are spelled out explicitly so
-            // Neo doesn't have to (mis)calculate them itself from a day-of-week guess.
-            todayDate: new Date().toISOString().slice(0, 10),
-            yesterdayDate: (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10); })(),
+
+            // Day-by-day earnings, last 14 calendar days — lets Neo answer
+            // "how much did X earn yesterday/on Tuesday" precisely instead
+            // of only knowing rolled-up totals.
             dailyEarningsByModel: heroModels.map((m) => {
               const rows = (inflowwDailyStats || []).filter((r) => r.model === m.name);
               const byDate = new Map();
               rows.forEach((r) => byDate.set(r.statDate, (byDate.get(r.statDate) || 0) + (r.earningsNet || 0)));
               const days = Array.from({ length: 14 }, (_, i) => {
-                const d = new Date(); d.setDate(d.getDate() - (13 - i));
-                const dateStr = d.toISOString().slice(0, 10);
+                const dateStr = nDaysAgoStr(13 - i);
                 return { date: dateStr, earnings: Math.round(byDate.get(dateStr) || 0) };
               });
               return rows.length ? { model: m.name, days } : null;
+            }).filter(Boolean),
+
+            // The rest of what Infloww syncs beyond raw earnings — the same
+            // "Creator Performance" numbers shown on the dashboard: reply
+            // time, active/expired fans, renew rate, profile rank, profile
+            // visitors, avg subscription length, refunds this week, and the
+            // chat-vs-subscription revenue ratio. Latest-available snapshot
+            // per field (these aren't meaningful to sum across days).
+            creatorPerformanceByModel: heroModels.map((m) => {
+              const rows = (inflowwDailyStats || []).filter((r) => r.model === m.name);
+              if (!rows.length) return null;
+              const weekRows = rows.filter((r) => r.statDate >= nDaysAgoStr(7));
+              const replyMs = latestField(rows, "replyTimeMs");
+              const renewOn = latestField(rows, "fansWithRenewOn");
+              const activeFans = latestField(rows, "activeFans");
+              return {
+                model: m.name,
+                replyTimeMinutes: replyMs != null ? Math.round(replyMs / 60000) : null,
+                activeFans, expiredFans: latestField(rows, "expiredFans"),
+                renewOnPercent: (renewOn != null && activeFans) ? Number(((renewOn / activeFans) * 100).toFixed(1)) : null,
+                performanceRank: latestField(rows, "performanceRank"),
+                profileVisitors7d: weekRows.reduce((t, r) => t + (r.profileVisitors || 0), 0),
+                avgSubscriptionLengthDays: latestField(rows, "avgSubscriptionLengthDays"),
+                refundsThisWeek: Math.round(weekRows.reduce((t, r) => t + (r.refundsNet || 0), 0)),
+                fansChattedLatest: latestField(rows, "fansChatted"),
+                messagesRevenue7d: Math.round(weekRows.reduce((t, r) => t + (r.messagesNet || 0), 0)),
+                subsRevenue7d: Math.round(weekRows.reduce((t, r) => t + (r.subsNet || 0), 0)),
+              };
             }).filter(Boolean),
           },
         },
@@ -8980,7 +9058,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
       const detail = e?.message || e?.context?.error || (typeof e === "string" ? e : JSON.stringify(e));
       console.error("Neo request failed", detail);
       const text = session.role === "admin"
-        ? `Couldn't reach Neo — ${detail || "unknown error"}. Check the clever-service function and GROQ_API_KEY secret in Supabase.`
+        ? `Couldn't reach Neo — ${detail || "unknown error"}. Check the clever-service function and ANTHROPIC_API_KEY secret in Supabase.`
         : "Couldn't reach Neo right now — try again in a moment.";
       setMessages((m) => [...m, { role: "neo", text }]);
     } finally {
@@ -11647,7 +11725,7 @@ function App() {
             {!neoBooting && (
               <NeoPage agency={session.agency} session={session} onNavigate={setView}
                 onSignOut={() => { clearSavedSession(); setSession(null); setView(null); setOnboardingDismissed(false); }}
-                cards={scopedCards} tasks={scopedTasks} models={agencyModels} stats={scopedStats} reels={scopedReels} trends={trends} bufferDailyStats={bufferDailyStats} inflowwDailyStats={inflowwDailyStats} settings={settings} persistSettings={persistSettings} />
+                cards={scopedCards} tasks={scopedTasks} models={agencyModels} stats={scopedStats} reels={scopedReels} trends={trends} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} inflowwDailyStats={inflowwDailyStats} settings={settings} persistSettings={persistSettings} />
             )}
           </div>
         </div>
