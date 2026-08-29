@@ -8412,99 +8412,18 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
       }
     }, 150);
 
-    // A grid-line "globe" — latitude/longitude wires only, no diagonal facet
-    // edges like the old icosahedron wireframe — reads as a softer, more
-    // organic mesh (matches the reference look the boss picked). Segment
-    // counts keep it dense without the per-frame noise displacement cost
-    // exploding (same tradeoff the icosahedron's detail level used to make).
-    const WIDTH_SEGMENTS = 44;
-    const HEIGHT_SEGMENTS = 28;
-    const gridCols = WIDTH_SEGMENTS + 1;
-    const gridRows = HEIGHT_SEGMENTS + 1;
-    const basePositions = new Float32Array(gridRows * gridCols * 3);
-    for (let iy = 0; iy < gridRows; iy++) {
-      const theta = (iy / HEIGHT_SEGMENTS) * Math.PI;
-      for (let ix = 0; ix < gridCols; ix++) {
-        const phi = (ix / WIDTH_SEGMENTS) * Math.PI * 2;
-        const p = (iy * gridCols + ix) * 3;
-        basePositions[p] = -Math.cos(phi) * Math.sin(theta);
-        basePositions[p + 1] = Math.cos(theta);
-        basePositions[p + 2] = Math.sin(phi) * Math.sin(theta);
-      }
-    }
-    // Every longitude line converges on the exact same point at the poles —
-    // with 44 of them that's not a subtle pinch, it's a visibly tangled knot
-    // (confirmed live, looked broken rather than "soft"). A jitter hack
-    // couldn't fix that: it's a density problem, not a position problem.
-    // The actual fix is to just not draw the near-pole rings/arcs at all —
-    // small round gaps at the very top/bottom read fine (the glow behind
-    // fills them in) and the tangle is gone entirely.
-    const POLE_SKIP_ROWS = 3;
-    const segmentIndexPairs = [];
-    for (let iy = POLE_SKIP_ROWS; iy < gridRows - POLE_SKIP_ROWS; iy++) {
-      for (let ix = 0; ix < WIDTH_SEGMENTS; ix++) {
-        segmentIndexPairs.push(iy * gridCols + ix, iy * gridCols + ix + 1);
-      }
-    }
-    for (let ix = 0; ix < gridCols; ix++) {
-      for (let iy = POLE_SKIP_ROWS; iy < HEIGHT_SEGMENTS - POLE_SKIP_ROWS; iy++) {
-        segmentIndexPairs.push(iy * gridCols + ix, (iy + 1) * gridCols + ix);
-      }
-    }
-    const segmentCount = segmentIndexPairs.length / 2;
+    const geometry = new THREE.IcosahedronGeometry(1, 24);
+    const basePositions = geometry.attributes.position.array.slice();
 
-    const geometry = new THREE.BufferGeometry();
-    const linePositions = new Float32Array(segmentCount * 6);
-    const lineColors = new Float32Array(segmentCount * 6);
-    geometry.setAttribute("position", new THREE.BufferAttribute(linePositions, 3));
-    geometry.setAttribute("color", new THREE.BufferAttribute(lineColors, 3));
-
-    const material = new THREE.LineBasicMaterial({
-      vertexColors: true,
+    const material = new THREE.MeshBasicMaterial({
+      color: 0x8effb5,
+      wireframe: true,
       transparent: true,
-      opacity: 0.68,
+      opacity: 0.55,
       blending: THREE.AdditiveBlending,
     });
-    const mesh = new THREE.LineSegments(geometry, material);
+    const mesh = new THREE.Mesh(geometry, material);
     scene.add(mesh);
-
-    // Two-tone "lit from two corners" scheme, both ends kept on-brand green
-    // (light mint upper-left, solid brand green lower-right, dark green in
-    // between) — computed in the globe's own local space so it spins
-    // naturally with the mesh instead of needing a per-frame world-space
-    // transform.
-    const colorDark = new THREE.Color(0x0a2015);
-    const colorBlue = new THREE.Color(0x8effb5);
-    const colorMagenta = new THREE.Color(0x39e673);
-    const blueDir = new THREE.Vector3(-0.75, 0.6, 0.28).normalize();
-    const magentaDir = new THREE.Vector3(0.7, -0.62, -0.25).normalize();
-    const colorAt = (nx, ny, nz, out) => {
-      const dBlue = Math.max(0, nx * blueDir.x + ny * blueDir.y + nz * blueDir.z);
-      const dMag = Math.max(0, nx * magentaDir.x + ny * magentaDir.y + nz * magentaDir.z);
-      out.copy(colorDark);
-      if (dBlue > 0) out.lerp(colorBlue, Math.min(1, Math.pow(dBlue, 1.6)));
-      if (dMag > 0) out.lerp(colorMagenta, Math.min(1, Math.pow(dMag, 1.6)));
-      return out;
-    };
-
-    // Colors depend only on each point's fixed direction on the unit sphere
-    // (never on the noise-displaced position), so this only needs computing
-    // once — never inside the animation loop.
-    const scratchColor = new THREE.Color();
-    for (let s = 0; s < segmentCount; s++) {
-      const ia = segmentIndexPairs[s * 2], ib = segmentIndexPairs[s * 2 + 1];
-      const vi = s * 6;
-      colorAt(basePositions[ia * 3], basePositions[ia * 3 + 1], basePositions[ia * 3 + 2], scratchColor);
-      lineColors[vi] = scratchColor.r; lineColors[vi + 1] = scratchColor.g; lineColors[vi + 2] = scratchColor.b;
-      colorAt(basePositions[ib * 3], basePositions[ib * 3 + 1], basePositions[ib * 3 + 2], scratchColor);
-      lineColors[vi + 3] = scratchColor.r; lineColors[vi + 4] = scratchColor.g; lineColors[vi + 5] = scratchColor.b;
-    }
-    geometry.attributes.color.needsUpdate = true;
-
-    // This frame's noise-displaced grid points, keyed by the same index used
-    // in basePositions/segmentIndexPairs — reused every frame instead of
-    // reallocating.
-    const displaced = new Float32Array(basePositions.length);
 
     const noise = new SimplexNoise3D(7);
 
@@ -8544,26 +8463,21 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
 
       const noiseSpeed = th ? 0.3 : sp ? 0.24 : li ? 0.16 : 0.08;
       noisePhase += noiseSpeed * delta;
-      const noiseAmp = 0.035 + pulse * 0.01;
+      const noiseAmp = 0.09 + pulse * 0.02;
       const t = noisePhase;
 
-      for (let p = 0; p < gridRows * gridCols; p++) {
-        const x = basePositions[p * 3], y = basePositions[p * 3 + 1], z = basePositions[p * 3 + 2];
+      const posAttr = geometry.attributes.position;
+      const arr = posAttr.array;
+      for (let i = 0; i < arr.length; i += 3) {
+        const x = basePositions[i], y = basePositions[i + 1], z = basePositions[i + 2];
         const n = noise.noise(x * 1.6 + t, y * 1.6 + t, z * 1.6 + t);
         const scale = 1 + n * noiseAmp;
-        displaced[p * 3] = x * scale;
-        displaced[p * 3 + 1] = y * scale;
-        displaced[p * 3 + 2] = z * scale;
+        arr[i] = x * scale;
+        arr[i + 1] = y * scale;
+        arr[i + 2] = z * scale;
       }
-      for (let s = 0; s < segmentCount; s++) {
-        const ia = segmentIndexPairs[s * 2], ib = segmentIndexPairs[s * 2 + 1];
-        const vi = s * 6;
-        linePositions[vi] = displaced[ia * 3]; linePositions[vi + 1] = displaced[ia * 3 + 1]; linePositions[vi + 2] = displaced[ia * 3 + 2];
-        linePositions[vi + 3] = displaced[ib * 3]; linePositions[vi + 4] = displaced[ib * 3 + 1]; linePositions[vi + 5] = displaced[ib * 3 + 2];
-      }
-      geometry.attributes.position.needsUpdate = true;
-      // Colors are static (computed once above from each point's fixed
-      // sphere direction) — only position needs a per-frame GPU upload.
+      posAttr.needsUpdate = true;
+      geometry.computeVertexNormals();
 
       mesh.rotation.y += th ? 0.006 : sp ? 0.0045 : li ? 0.003 : 0.0015;
       mesh.rotation.x += 0.0006;
