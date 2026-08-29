@@ -392,11 +392,16 @@ const fontImport = `
 .hover-border-2:hover { border-color: var(--border2) !important; }
 .focus-border-accent:focus { border-color: var(--accent) !important; }
 
+.fs-7 { font-size: 7px; }
+.fs-8 { font-size: 8px; }
 .fs-9 { font-size: 9px; }
 .fs-10 { font-size: 10px; }
 .fs-11 { font-size: 11px; }
 .fs-12 { font-size: 12px; }
 .fs-13 { font-size: 13px; }
+.fs-14 { font-size: 14px; }
+.fs-16 { font-size: 16px; }
+.fs-20 { font-size: 20px; }
 
 .minw-64 { min-width: 64px; }
 .minw-120 { min-width: 120px; }
@@ -971,7 +976,8 @@ function Badge({ children, color }) {
 // ---------- content director (kanban) ----------
 
 function CardTile({ card, onAdvance, onDelete, onOpen }) {
-  const nextStage = STAGES[STAGES.findIndex((s) => s.id === card.stage) + 1];
+  const stageIdx = STAGES.findIndex((s) => s.id === card.stage);
+  const nextStage = stageIdx === -1 ? undefined : STAGES[stageIdx + 1];
   return (
     <div
       className="relative c-bg-surface border c-border rounded-xl p-3 mb-3 group hover-border-2 transition-colors cursor-pointer hover-lift"
@@ -988,7 +994,8 @@ function CardTile({ card, onAdvance, onDelete, onOpen }) {
         </div>
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(card.id); }}
-          className="opacity-0 group-hover:opacity-100 c-muted hover-warn transition-opacity"
+          aria-label="Delete scene"
+          className="opacity-40 group-hover:opacity-100 group-focus-within:opacity-100 c-muted hover-warn transition-opacity"
         >
           <Trash2 size={13} />
         </button>
@@ -1397,7 +1404,7 @@ function DateRangePicker({ start, end, onChange }) {
             })}
           </div>
           <div className="flex items-center justify-between mt-3 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-            <button onClick={() => { onChange(start || todayStr, ""); }}
+            <button onClick={() => { onChange(start || todayStr, ""); setPickingEnd(false); setOpen(false); }}
               className="fs-10 font-mono uppercase c-faint hover-accent-text transition-colors">
               No end date
             </button>
@@ -1464,7 +1471,6 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
   const [rangeStart, setRangeStart] = React.useState(() => toISO(new Date()));
   const [rangeEnd, setRangeEnd] = React.useState("");
 
-  const toggleModel = (name) => setSelected((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
 
   const addPhotos = (fileList) => {
     const files = Array.from(fileList || []).filter((f) => f.type.startsWith("image/"));
@@ -1544,6 +1550,7 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
   const confirmAndScheduleAll = async () => {
     if (!plan || !plan.length) return;
     setRunningAll(true);
+    let allSucceeded = true;
     for (const item of plan) {
       if (itemStates[item.id]?.status === "done") continue;
       setItemState(item.id, { status: "uploading", error: "" });
@@ -1569,10 +1576,20 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
         if (!scheduleResp.ok || scheduleJson.error) throw new Error(scheduleJson.error || "Scheduling failed");
         setItemState(item.id, { status: "done" });
       } catch (e) {
+        allSucceeded = false;
         setItemState(item.id, { status: "error", error: e.message || "Failed" });
       }
     }
     setRunningAll(false);
+    // Clear the batch once every photo is genuinely posted — otherwise a
+    // second "Generate captions" run on a later add would re-plan (and
+    // re-upload/re-schedule) photos that already went out, since the fresh
+    // plan items get new ids that no longer match their "done" itemStates.
+    if (allSucceeded) {
+      setPhotos([]);
+      setPlan(null);
+      setItemStates({});
+    }
   };
 
   const allDone = plan && plan.length > 0 && plan.every((it) => itemStates[it.id]?.status === "done");
@@ -1636,41 +1653,6 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
 
       {open && (
         <div className="mt-4 pt-4 border-t" style={{ borderColor: "rgba(57,230,115,0.14)" }}>
-          {!lockedModel && (
-            <>
-              <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2.5">Accounts</div>
-              <div className="flex flex-wrap gap-3 mb-5">
-                {models.map((m) => {
-                  const isOn = selected.includes(m.name);
-                  return (
-                    <button key={m.name} onClick={() => { toggleModel(m.name); setPlan(null); }}
-                      className="flex flex-col items-center gap-1.5 tap group" style={{ width: 60 }}>
-                      <div className="relative">
-                        <div className="rounded-full flex items-center justify-center font-bold transition-all"
-                          style={{
-                            width: 44, height: 44, fontSize: 16,
-                            background: isOn ? modelColor(m.name) + "22" : "rgba(255,255,255,0.04)",
-                            border: isOn ? `2px solid ${modelColor(m.name)}` : "2px solid rgba(255,255,255,0.10)",
-                            color: isOn ? modelColor(m.name) : "var(--c-faint, #6b7280)",
-                            boxShadow: isOn ? `0 0 14px ${modelColor(m.name)}40` : "none",
-                          }}>
-                          {m.name.slice(0, 1).toUpperCase()}
-                        </div>
-                        {isOn && (
-                          <div className="absolute -bottom-0.5 -right-0.5 rounded-full flex items-center justify-center"
-                            style={{ width: 16, height: 16, background: modelColor(m.name) }}>
-                            <Sparkles size={9} style={{ color: "#04150a" }} />
-                          </div>
-                        )}
-                      </div>
-                      <span className={`fs-10 font-mono truncate w-full text-center ${isOn ? "c-text font-semibold" : "c-faint"}`}>{m.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </>
-          )}
-
           <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2.5">Posting frequency</div>
           <div className="flex items-center gap-3 flex-wrap mb-5">
             <div className="flex rounded-full p-0.5" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
@@ -1711,10 +1693,7 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
             onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
           {photos.length === 0 ? (
             <button onClick={() => fileInputRef.current?.click()}
-              className="w-full flex flex-col items-center justify-center gap-1.5 border border-dashed rounded-2xl py-8 mb-4 transition-colors tap"
-              style={{ borderColor: "rgba(255,255,255,0.14)" }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(57,230,115,0.5)"; e.currentTarget.style.background = "rgba(57,230,115,0.03)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.14)"; e.currentTarget.style.background = "transparent"; }}>
+              className="w-full flex flex-col items-center justify-center gap-1.5 border border-dashed rounded-2xl py-8 mb-4 transition-colors tap border-[rgba(255,255,255,0.14)] hover:border-[rgba(57,230,115,0.5)] hover:bg-[rgba(57,230,115,0.03)]">
               <div className="w-9 h-9 rounded-full flex items-center justify-center mb-1" style={{ background: "rgba(255,255,255,0.06)" }}>
                 <Plus size={16} className="c-muted" />
               </div>
@@ -1727,8 +1706,8 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
                 {photos.map((p) => (
                   <div key={p.id} className="relative rounded-xl overflow-hidden group" style={{ paddingTop: "100%", boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
                     <img src={p.previewUrl} alt={p.name} className="absolute inset-0 w-full h-full object-cover" />
-                    <button onClick={() => removePhoto(p.id)}
-                      className="absolute top-1 right-1 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    <button onClick={() => removePhoto(p.id)} aria-label="Remove photo"
+                      className="absolute top-1 right-1 rounded-full p-1 opacity-60 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
                       style={{ background: "rgba(0,0,0,0.6)" }}>
                       <Trash2 size={10} className="text-white" />
                     </button>
@@ -2200,7 +2179,7 @@ function PlatformOverviewDashboard({
       date,
       value: rows.filter((r) => r.statDate === date).reduce((s, r) => s + (r.impressions || 0), 0),
     }));
-  }, [rows.length, account]);
+  }, [bufferDailyStats, platform, account]);
 
   const donutSegments = [
     { label: "Likes", value: weekTotals.likes, color: XNEON.pink.fg },
@@ -2409,7 +2388,7 @@ function PlatformOverviewDashboard({
               <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-3">
                 Scheduled · upcoming ({scheduledPosts.length})
               </div>
-              <ScheduledPostsCalendar posts={scheduledPosts} accountColor={accountColor} glowRgb={glowRgb} />
+              <ScheduledPostsCalendar key={account} posts={scheduledPosts} accountColor={accountColor} glowRgb={glowRgb} />
             </div>
           )}
 
@@ -2517,7 +2496,7 @@ const BUBBLE_FLOAT_ANIM = [
   { duration: "10s", delay: "-5s", name: "bubbleFloatA" },
 ];
 function AgeRangeBubbles({ ages, colors }) {
-  const data = (ages && ages.length ? ages : DEFAULT_AGES).slice(0, 4);
+  const data = [...(ages && ages.length ? ages : DEFAULT_AGES)].sort((a, b) => (b.pct || 0) - (a.pct || 0)).slice(0, 4);
   const containerPx = 260;
   return (
     <div className="relative mx-auto" style={{ width: containerPx, height: containerPx * 0.72 }}>
@@ -2611,7 +2590,7 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
     page: "radial-gradient(ellipse 130% 100% at 10% 0%, rgba(57,230,115,0.14), transparent 55%), radial-gradient(ellipse 100% 80% at 100% 0%, rgba(56,189,248,0.10), transparent 55%), #0b0f0d",
     card: "rgba(255,255,255,0.035)", cardBorder: "1px solid rgba(255,255,255,0.08)",
     ink: "#ffffff", sub: "#9d9b95",
-    pinkA: "#39e673", pinkB: "#17c58a", pinkSoft: "rgba(57,230,115,0.14)", pinkIcon: "#39e673",
+    accentA: "#39e673", accentB: "#17c58a", accentSoft: "rgba(57,230,115,0.14)", accentIcon: "#39e673",
     igBrandA: "#ff2e78", igBrandB: "#ff7a3d", // Instagram's own brand gradient — kept only on the small platform-icon badge
     ringTrack: "rgba(255,255,255,0.08)",
   };
@@ -2782,7 +2761,7 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
               <Instagram size={18} color="#fff" />
             </div>
             <div>
-              <div className="text-2xl font-extrabold tracking-tight" style={{ color: C.ink, textShadow: `0 0 12px ${C.pinkA}33` }}>Instagram Dashboard</div>
+              <div className="text-2xl font-extrabold tracking-tight" style={{ color: C.ink, textShadow: `0 0 12px ${C.accentA}33` }}>Instagram Dashboard</div>
               <p className="text-sm mt-0.5" style={{ color: C.sub }}>{connectedModels.length} account{connectedModels.length !== 1 ? "s" : ""} connected via Publer</p>
             </div>
           </div>
@@ -2790,13 +2769,13 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
             {onMakeContentPlan && (
               <button onClick={onMakeContentPlan}
                 className="flex items-center gap-2 px-4 py-2.5 rounded-full fs-12 font-mono uppercase tracking-wide font-semibold tap"
-                style={{ background: "transparent", color: C.pinkIcon, border: `1px solid ${C.pinkA}66` }}>
+                style={{ background: "transparent", color: C.accentIcon, border: `1px solid ${C.accentA}66` }}>
                 <BarChart3 size={14} /> Make content plan
               </button>
             )}
             <button onClick={onPlanPosts}
               className="flex items-center gap-2 px-4 py-2.5 rounded-full fs-12 font-mono uppercase tracking-wide font-semibold tap"
-              style={{ background: `linear-gradient(135deg, ${C.pinkA}, ${C.pinkB})`, color: "#fff", boxShadow: `0 0 14px ${C.pinkA}40` }}>
+              style={{ background: `linear-gradient(135deg, ${C.accentA}, ${C.accentB})`, color: "#fff", boxShadow: `0 0 14px ${C.accentA}40` }}>
               <Megaphone size={14} /> Plan content
             </button>
           </div>
@@ -2808,7 +2787,7 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
               <button onClick={() => setIgAccount("all")}
                 className="fs-11 font-mono uppercase px-3 py-1.5 rounded-full tap"
                 style={igAccount === "all"
-                  ? { background: C.pinkSoft, color: C.pinkIcon, border: `1px solid ${C.pinkA}66` }
+                  ? { background: C.accentSoft, color: C.accentIcon, border: `1px solid ${C.accentA}66` }
                   : { background: "transparent", color: C.sub, border: "1px solid rgba(255,255,255,0.1)" }}>
                 All accounts
               </button>
@@ -2816,7 +2795,7 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
                 <button key={m.name} onClick={() => setIgAccount(m.name)}
                   className="fs-11 font-mono uppercase px-3 py-1.5 rounded-full tap"
                   style={igAccount === m.name
-                    ? { background: C.pinkSoft, color: C.pinkIcon, border: `1px solid ${C.pinkA}66` }
+                    ? { background: C.accentSoft, color: C.accentIcon, border: `1px solid ${C.accentA}66` }
                     : { background: "transparent", color: C.sub, border: "1px solid rgba(255,255,255,0.1)" }}>
                   {m.name}
                 </button>
@@ -2826,7 +2805,7 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
               {[7, 30].map((d) => (
                 <button key={d} onClick={() => setIgRange(d)}
                   className="fs-11 font-mono uppercase px-3 py-1.5 rounded-full tap"
-                  style={igRange === d ? { background: C.pinkA, color: "#fff" } : { background: "transparent", color: C.sub }}>
+                  style={igRange === d ? { background: C.accentA, color: "#fff" } : { background: "transparent", color: C.sub }}>
                   {d}D
                 </button>
               ))}
@@ -2843,7 +2822,7 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
               {/* Hero: total views, gradient card */}
               <div className="lg:col-span-5 rounded-3xl p-5 relative overflow-hidden flex flex-col justify-between"
-                style={{ background: `linear-gradient(150deg, ${C.pinkA}, ${C.pinkB} 85%)`, minHeight: 220, boxShadow: `0 24px 48px ${C.pinkA}2e, inset 0 1px 0 rgba(255,255,255,0.25)` }}>
+                style={{ background: `linear-gradient(150deg, ${C.accentA}, ${C.accentB} 85%)`, minHeight: 220, boxShadow: `0 24px 48px ${C.accentA}2e, inset 0 1px 0 rgba(255,255,255,0.25)` }}>
                 {/* Decorative glow blobs — pure depth, no data encoded */}
                 <div className="absolute pointer-events-none" style={{ top: -60, right: -60, width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, rgba(255,255,255,0.35), transparent 70%)", filter: "blur(10px)" }} />
                 <div className="absolute pointer-events-none" style={{ bottom: -80, left: -40, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(0,0,0,0.18), transparent 70%)", filter: "blur(20px)" }} />
@@ -2862,7 +2841,7 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
                 <div className="flex items-center gap-2 pt-3 mt-1 relative flex-wrap" style={{ borderTop: "1px solid rgba(255,255,255,0.22)" }}>
                   {accountShares.length ? accountShares.map((a) => (
                     <div key={a.name} className="flex items-center gap-1.5 rounded-full pl-1 pr-2.5 py-1" style={{ background: "rgba(0,0,0,0.16)" }}>
-                      <span className="rounded-full flex items-center justify-center fs-9 font-bold" style={{ width: 18, height: 18, background: "rgba(255,255,255,0.9)", color: C.pinkA }}>
+                      <span className="rounded-full flex items-center justify-center fs-9 font-bold" style={{ width: 18, height: 18, background: "rgba(255,255,255,0.9)", color: C.accentA }}>
                         {a.name.slice(0, 1).toUpperCase()}
                       </span>
                       <span className="fs-10 font-mono" style={{ color: "rgba(255,255,255,0.85)" }}>{a.name}</span>
@@ -2895,8 +2874,8 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
                       })}
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="rounded-full flex items-center justify-center" style={{ width: 44, height: 44, background: C.pinkSoft, boxShadow: `0 0 16px ${C.pinkA}55` }}>
-                        <Heart size={18} color={C.pinkIcon} />
+                      <div className="rounded-full flex items-center justify-center" style={{ width: 44, height: 44, background: C.accentSoft, boxShadow: `0 0 16px ${C.accentA}55` }}>
+                        <Heart size={18} color={C.accentIcon} />
                       </div>
                     </div>
                   </div>
@@ -2925,7 +2904,7 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
                         ? demographics.linkClicks.series
                         : rangeDays.map((d) => ({ date: d, value: 0 }))
                       )}
-                      color={C.pinkA} height={40}
+                      color={C.accentA} height={40}
                     />
                   )}
                 </div>
@@ -2933,15 +2912,15 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
 
               {/* Right column: two mini stat cards */}
               <div className="lg:col-span-3 flex flex-col gap-4">
-                <div className="rounded-3xl p-4 flex items-center gap-3" style={{ background: C.pinkSoft, border: `1px solid ${C.pinkA}33` }}>
+                <div className="rounded-3xl p-4 flex items-center gap-3" style={{ background: C.accentSoft, border: `1px solid ${C.accentA}33` }}>
                   <div className="rounded-2xl flex items-center justify-center flex-shrink-0" style={{ width: 40, height: 40, background: "rgba(0,0,0,0.25)" }}>
-                    <Send size={16} color={C.pinkIcon} />
+                    <Send size={16} color={C.accentIcon} />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-lg font-extrabold leading-none" style={{ textShadow: `0 0 12px ${C.pinkA}66` }}>{fmtK(weekTotals.replies)}</div>
+                    <div className="text-lg font-extrabold leading-none" style={{ textShadow: `0 0 12px ${C.accentA}66` }}>{fmtK(weekTotals.replies)}</div>
                     <div className="fs-10 mt-1" style={{ color: C.sub }}>Replies</div>
                     <div className="rounded-full mt-1.5 overflow-hidden" style={{ width: "100%", height: 4, background: "rgba(255,255,255,0.1)" }}>
-                      <div style={{ width: `${Math.min(100, (weekTotals.replies / Math.max(1, weekTotals.likes)) * 100)}%`, height: "100%", background: C.pinkIcon }} />
+                      <div style={{ width: `${Math.min(100, (weekTotals.replies / Math.max(1, weekTotals.likes)) * 100)}%`, height: "100%", background: C.accentIcon }} />
                     </div>
                   </div>
                 </div>
@@ -2958,11 +2937,11 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
                   <div className="flex items-end justify-between gap-0.5" style={{ height: 90, overflow: "hidden" }}>
                     {dayBars.map((d, i) => (
                       <div key={d.date} className="flex-1 flex flex-col items-center justify-end gap-1" style={{ height: "100%", minWidth: 0 }}>
-                        {i === bestDayIdx && <IGStar size={11} color={C.pinkA} />}
+                        {i === bestDayIdx && <IGStar size={11} color={C.accentA} />}
                         <div className="rounded-full w-full" style={{
                           height: `${Math.max(6, (d.reach / maxDayReach) * 70)}px`,
-                          background: i === bestDayIdx ? `linear-gradient(180deg, ${C.pinkA}, ${C.pinkB})` : "rgba(255,255,255,0.08)",
-                          boxShadow: i === bestDayIdx ? `0 0 10px ${C.pinkA}77` : "none",
+                          background: i === bestDayIdx ? `linear-gradient(180deg, ${C.accentA}, ${C.accentB})` : "rgba(255,255,255,0.08)",
+                          boxShadow: i === bestDayIdx ? `0 0 10px ${C.accentA}77` : "none",
                         }} />
                         {igRange <= 10 && <span className="fs-9" style={{ color: C.sub }}>{d.label}</span>}
                       </div>
@@ -2980,6 +2959,9 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
                 collected any (Business-tier plan, forward-only — not
                 retroactive), zero-filled placeholders in the same shape
                 otherwise so the widgets are never just missing. */}
+            {igAccount === "all" && demoModelName && (
+              <div className="fs-10 font-mono mb-2" style={{ color: C.sub }}>Demographics below are for {demoModelName} — pick an account above to see hers instead.</div>
+            )}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
               <div className="lg:col-span-4 rounded-3xl p-5 flex flex-col" style={{ background: C.card, border: C.cardBorder }}>
                 <div className="flex items-center justify-between mb-3">
@@ -3013,7 +2995,11 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
                   <MoreDotsIG dark />
                 </div>
                 <div className="fs-10 c-faint font-mono mb-3">{demographics?.unit === "%" ? "by country" : "Impressions worldwide"}</div>
-                <TopCountriesCard countries={demographics?.countries} unit={demographics?.unit} />
+                {demoLoading ? (
+                  <div className="fs-11 c-faint font-mono italic py-8 text-center">Loading...</div>
+                ) : (
+                  <TopCountriesCard countries={demographics?.countries} unit={demographics?.unit} />
+                )}
               </div>
             </div>
 
@@ -3043,7 +3029,7 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
                             {p.text || "No caption"} {p.externalLink && <ExternalLink size={11} color={C.sub} />}
                           </div>
                         </div>
-                        <span className="fs-10 font-semibold px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: C.pinkSoft, color: C.pinkIcon }}>{p.model}</span>
+                        <span className="fs-10 font-semibold px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: C.accentSoft, color: C.accentIcon }}>{p.model}</span>
                         <div className="fs-11 font-mono flex-shrink-0" style={{ color: C.sub, width: 60, textAlign: "right" }}>{(p.impressions || 0).toLocaleString()}</div>
                       </a>
                     );
@@ -3486,6 +3472,12 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
   const [referenceReelId, setReferenceReelId] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [justGenerated, setJustGenerated] = useState(null);
+  const justGeneratedTimerRef = useRef(null);
+  const flashJustGenerated = (payload) => {
+    if (justGeneratedTimerRef.current) clearTimeout(justGeneratedTimerRef.current);
+    setJustGenerated(payload);
+    justGeneratedTimerRef.current = setTimeout(() => setJustGenerated(null), 5000);
+  };
   const [reelAdding, setReelAdding] = useState(false);
   const [reelTitle, setReelTitle] = useState("");
   const [reelLink, setReelLink] = useState("");
@@ -3526,8 +3518,7 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
     setGenerating(true);
     await persistCards([...cards, ...newCards]);
     setGenerating(false);
-    setJustGenerated({ count: newCards.length, days: acrossDays });
-    setTimeout(() => setJustGenerated(null), 5000);
+    flashJustGenerated({ count: newCards.length, days: acrossDays });
   };
 
   const addReel = async () => {
@@ -3557,8 +3548,7 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
     setGenerating(true);
     await persistCards([...cards, ...newCards]);
     setGenerating(false);
-    setJustGenerated({ count: newCards.length, days: batchDays });
-    setTimeout(() => setJustGenerated(null), 5000);
+    flashJustGenerated({ count: newCards.length, days: batchDays });
   };
 
   const generateVariations = async () => {
@@ -3579,8 +3569,7 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
     setGenerating(true);
     await persistCards([...cards, ...newCards]);
     setGenerating(false);
-    setJustGenerated({ count: newCards.length, days: variationDays });
-    setTimeout(() => setJustGenerated(null), 5000);
+    flashJustGenerated({ count: newCards.length, days: variationDays });
   };
 
   const sortedReels = [...myReels].sort((a, b) => (b.views || 0) - (a.views || 0));
@@ -3881,7 +3870,7 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
               const rank = rankOf(reel.views);
               const script = scriptForReel(reel);
               return (
-                <div key={reel.id} className="rounded-2xl p-3.5 flex gap-3 transition-all hover:-translate-y-0.5"
+                <div key={reel.id} className="rounded-2xl p-3.5 flex gap-3"
                   style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)" }}>
                   <div className="w-16 h-16 rounded-xl flex-shrink-0 flex items-center justify-center relative"
                     style={{ background: "linear-gradient(135deg, rgba(18,179,76,0.22), rgba(57,230,115,0.05))" }}>
@@ -4102,7 +4091,13 @@ function TikTokContentHub({ models, cards, selectedModelName, onBackToModels }) 
                         className="fs-9 font-mono uppercase c-muted hover-warn px-2 py-1 rounded-full border c-border transition-colors">
                         <X size={9} className="inline mr-1" />Reject
                       </button>
-                      <button className="fs-9 font-mono uppercase c-muted hover-accent-text px-2 py-1 rounded-full border c-border transition-colors">
+                      {/* Regen/Reject/Re-classify/Promote all just dismiss the signal for
+                          now — none of these are wired to distinct backend actions yet
+                          (no regenerate/reclassify/golden-pool logic exists for TikTok
+                          signals). Re-classify previously had no onClick at all; fixed to
+                          at least behave like its siblings instead of doing nothing. */}
+                      <button onClick={() => setDismissed((d) => [...d, s.id])}
+                        className="fs-9 font-mono uppercase c-muted hover-accent-text px-2 py-1 rounded-full border c-border transition-colors">
                         <Shuffle size={9} className="inline mr-1" />Re-classify
                       </button>
                       <button onClick={() => setDismissed((d) => [...d, s.id])}
@@ -4415,9 +4410,12 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
   const [platformFocus, setPlatformFocus] = useState("tt"); // tt | ig | x — which handle shows under each name
   const [syncingNow, setSyncingNow] = useState(false);
   const [syncResult, setSyncResult] = useState("");
-  const clock = useLiveClock();
+  const [syncCooldownUntil, setSyncCooldownUntil] = useState(0);
+  const clock = useLiveClock(); // also drives the cooldown countdown re-rendering below
+  const syncOnCooldown = Date.now() < syncCooldownUntil;
 
   const runSyncNow = async () => {
+    if (syncOnCooldown) return;
     setSyncingNow(true);
     setSyncResult("");
     try {
@@ -4432,6 +4430,7 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
       setSyncResult(`Sync failed: ${e.message || "unknown error"}`);
     } finally {
       setSyncingNow(false);
+      setSyncCooldownUntil(Date.now() + 30000); // 30s cooldown so it can't be spammed
     }
   };
 
@@ -4580,11 +4579,6 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
             className="flex items-center gap-1.5 fs-11 font-mono uppercase tracking-wide c-bg-accent c-onaccent px-3 py-1.5 rounded-full font-semibold hover-bg-accent2">
             <Plus size={13} /> Add model
           </button>
-          <button onClick={() => setAdding(true)}
-            className="flex items-center gap-1.5 fs-11 font-mono uppercase tracking-wide px-3 py-1.5 rounded-full font-semibold transition-colors"
-            style={{ background: "rgba(57,230,115,0.08)", color: "#39e673", border: "1px solid rgba(57,230,115,0.3)" }}>
-            <Sparkles size={13} /> Add with AI
-          </button>
         </div>
       </div>
 
@@ -4612,22 +4606,25 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
         <span className="fs-11 c-muted">
           runs every hour · auto-matches Publer accounts to models by name · last synced {lastSyncedTs ? timeAgo(lastSyncedTs) : "never yet"}
         </span>
-        <button onClick={runSyncNow} disabled={syncingNow}
+        <button onClick={runSyncNow} disabled={syncingNow || syncOnCooldown}
           className="ml-auto fs-10 font-mono uppercase c-muted hover-accent-text transition-colors flex-shrink-0 flex items-center gap-1 disabled:opacity-50">
           {syncingNow ? <Loader2 size={11} className="animate-spin" /> : <Repeat size={11} />}
-          {syncingNow ? "Syncing…" : "Sync now"}
+          {syncingNow ? "Syncing…" : syncOnCooldown ? `Wait ${Math.ceil((syncCooldownUntil - Date.now()) / 1000)}s` : "Sync now"}
         </button>
       </div>
       {syncResult && <div className="fs-10 font-mono c-faint mt-1 mb-3">{syncResult}</div>}
 
       {mmTab === "accounts" ? (
         <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
-          <div className="hidden md:grid gap-2 px-4 py-2 fs-9 font-mono uppercase c-faint tracking-wide"
-            style={{ gridTemplateColumns: "1.3fr 1fr 1fr 1fr", background: "rgba(255,255,255,0.02)" }}>
+          <div className="hidden md:grid md:grid-cols-[1.3fr_1fr_1fr_1fr] gap-2 px-4 py-2 fs-9 font-mono uppercase c-faint tracking-wide"
+            style={{ background: "rgba(255,255,255,0.02)" }}>
             <span>Model</span><span>Instagram</span><span>X</span><span>TikTok</span>
           </div>
+          {models.length === 0 && (
+            <div className="fs-12 c-faint font-mono italic py-8 text-center">no models yet — add your first one</div>
+          )}
           {models.map((m, i) => (
-            <div key={m.name} className="grid grid-cols-1 md:grid-cols-4 gap-2 px-4 py-3 items-center"
+            <div key={m.name} className="grid grid-cols-1 md:grid-cols-[1.3fr_1fr_1fr_1fr] gap-2 px-4 py-3 items-center"
               style={{ borderTop: i === 0 ? "none" : "1px solid rgba(255,255,255,0.06)" }}>
               <div className="flex items-center gap-2 min-w-0">
                 <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: colorFor(m.name) }} />
@@ -4693,18 +4690,18 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
       {/* ---- ranked leaderboard table ---- */}
       {rows.length > 0 && (
         <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
-          <div className="hidden md:grid gap-2 px-4 py-2 fs-9 font-mono uppercase c-faint tracking-wide"
-            style={{ gridTemplateColumns: "32px 1.3fr 1fr 2fr 90px 90px", background: "rgba(255,255,255,0.02)" }}>
+          <div className="hidden md:grid md:grid-cols-[32px_1.3fr_1fr_2fr_90px_90px] gap-2 px-4 py-2 fs-9 font-mono uppercase c-faint tracking-wide"
+            style={{ background: "rgba(255,255,255,0.02)" }}>
             <span>#</span><span>Model</span><span>Cadence</span><span>Week %</span><span>Views 7d</span><span>Last active</span>
           </div>
           {rows.map((r, i) => (
             <div key={r.model.name} onClick={() => setDetailName(r.model.name)}
               role="button" tabIndex={0}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetailName(r.model.name); } }}
-              className="group relative grid grid-cols-2 md:grid-cols-1 gap-2 px-4 py-3 items-center cursor-pointer transition-colors hover:bg-white/[0.02]"
-              style={{ gridTemplateColumns: "32px 1.3fr 1fr 2fr 90px 90px", borderTop: i === 0 ? "none" : "1px solid rgba(255,255,255,0.06)" }}>
-              <button onClick={(e) => { e.stopPropagation(); removeModel(r.model.name); }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 c-muted hover-warn transition-opacity">
+              className="group relative grid grid-cols-2 md:grid-cols-[32px_1.3fr_1fr_2fr_90px_90px] gap-2 px-4 py-3 items-center cursor-pointer transition-colors hover:bg-white/[0.02]"
+              style={{ borderTop: i === 0 ? "none" : "1px solid rgba(255,255,255,0.06)" }}>
+              <button onClick={(e) => { e.stopPropagation(); removeModel(r.model.name); }} aria-label="Remove model"
+                className="absolute right-2 top-1/2 -translate-y-1/2 opacity-40 group-hover:opacity-100 group-focus-within:opacity-100 c-muted hover-warn transition-opacity">
                 <Trash2 size={13} />
               </button>
               <span className="fs-11 font-mono c-faint">{i + 1}</span>
@@ -4717,7 +4714,7 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
                   </div>
                 </div>
               </div>
-              <span className="fs-10 font-mono c-muted">Agency default</span>
+              <span className="fs-10 font-mono c-faint">—</span>
               <div className="flex items-center gap-2 min-w-0">
                 <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
                   <div className="h-full rounded-full" style={{ width: `${Math.round((r.views7d / maxViews) * 100)}%`, background: r.color }} />
@@ -4737,6 +4734,7 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
 
       {detailModel && (
         <ModelProfileDashboard model={detailModel} cards={cards} reels={reels} maxViewsAcrossModels={maxViews}
+          myViews7d={rows.find((r) => r.model.name === detailModel.name)?.views7d || 0}
           onClose={() => setDetailName(null)} onEdit={() => { setDetailName(null); setEditName(detailModel.name); }} />
       )}
 
@@ -4748,7 +4746,7 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
   );
 }
 
-function ModelProfileDashboard({ model, cards, reels, maxViewsAcrossModels, onClose, onEdit }) {
+function ModelProfileDashboard({ model, cards, reels, maxViewsAcrossModels, myViews7d, onClose, onEdit }) {
   const [tab, setTab] = useState("overview"); // overview | journey
   const clock = useLiveClock();
 
@@ -4756,8 +4754,11 @@ function ModelProfileDashboard({ model, cards, reels, maxViewsAcrossModels, onCl
   const myReels = (reels || []).filter((r) => r.model === model.name);
 
   const weekMs = 7 * 86400000;
-  const views7d = myReels.filter((r) => Date.now() - (r.createdAt || 0) < weekMs).reduce((s, r) => s + (r.views || 0), 0);
-  const weeklyPct = Math.min(100, Math.round((views7d / Math.max(1, maxViewsAcrossModels)) * 100));
+  // Same real-reach metric maxViewsAcrossModels is computed from (Publer
+  // impressions via bufferDailyStats) — this used to divide manually-logged
+  // reel views by a Publer-impressions max, two unrelated scales that made
+  // the gauge's percentage meaningless.
+  const weeklyPct = Math.min(100, Math.round(((myViews7d || 0) / Math.max(1, maxViewsAcrossModels)) * 100));
 
   const totalViews = myReels.reduce((s, r) => s + (r.views || 0), 0);
   const totalLikes = myReels.reduce((s, r) => s + (r.likes || 0), 0);
@@ -5079,7 +5080,7 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, 
 
         <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Questionnaire / bio</label>
         {model.bioReceivedAt ? (
-          <p className="fs-10 c-success font-mono mb-1">Auto-filled from her Creator Bible submission, {fmtDay(new Date(model.bioReceivedAt).toISOString().slice(0, 10))}</p>
+          <p className="fs-10 c-success font-mono mb-1">Auto-filled from her Creator Bible submission, {fmtDay(toISO(new Date(model.bioReceivedAt)))}</p>
         ) : (
           <p className="fs-10 c-faint font-mono mb-1">Not received yet — paste it manually from the Formspree email if needed.</p>
         )}
@@ -5738,7 +5739,11 @@ const TONE_COLOR = { good: "#39e673", bad: "#E2725B", neutral: "#8B93A1" };
 // window regardless of the Agency Revenue toggle above, since these fields
 // (reply time, renew rate) are themselves already rolling/latest-snapshot values,
 // not day-specific — a shorter window would just be noisier for no real benefit.
-function CreatorInsightsSection({ models, inflowwDailyStats, embedded, days = 30, periodLabel = "30d", sinceISO }) {
+function CreatorInsightsSection({ models, inflowwDailyStats, embedded, days = 30, periodLabel = "30d", sinceISO, restrictModel }) {
+  // Guard here too, not just at the one call site that scopes correctly
+  // today — a future caller passing the full roster would otherwise show
+  // every model's revenue/active-fans/rank to a single creator.
+  models = restrictModel ? models.filter((m) => m.name === restrictModel) : models;
   // Mirrors the Agency Revenue Week/Month toggle above it — earnings and avgSpend
   // (both derived from earnings) actually change with the window; the snapshot
   // fields (reply time, renew %, rank, ...) don't, since they're latest-available
@@ -5974,6 +5979,12 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
     }));
   };
   const [showAllWeeksModal, setShowAllWeeksModal] = useState(false);
+  useEffect(() => {
+    if (!showAllWeeksModal) return;
+    const onKey = (e) => { if (e.key === "Escape") setShowAllWeeksModal(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [showAllWeeksModal]);
   const getAllWeeksHistory = () => {
     if (!myInflowwRows.length) return [];
     const earliest = [...new Set(myInflowwRows.map((r) => r.statDate))].sort()[0];
@@ -6039,29 +6050,6 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
         return out;
       })();
   const prevTotal = prevDays.reduce((t, day) => t + sumForDay(day), 0);
-
-  // Per-model split for the "Earnings by model" list below the chart — always the
-  // same rolling window as the chart above it (7 or 30 days), so the number here
-  // never disagrees with what's plotted. Goal: her latest weekly earningsGoal in
-  // 7D mode, her monthlyGoal in 30D mode — never the agency-wide default, an unset
-  // personal goal means no goal shown for her, not a borrowed agency number.
-  const daySet = new Set(days);
-  const modelEarnings = models
-    .map((m) => {
-      const value = myInflowwRows.filter((r) => r.model === m.name && daySet.has(r.statDate)).reduce((t, r) => t + (r.earningsNet || 0), 0);
-      let goal = null;
-      if (revRange === 7) {
-        const latestStat = [...stats].filter((s) => s.model === m.name && s.earningsGoal)
-          .sort((a, b) => (b.weekOf || "").localeCompare(a.weekOf || ""))[0];
-        goal = latestStat ? latestStat.earningsGoal : null;
-      } else {
-        goal = (m.monthlyGoal != null && m.monthlyGoal !== "") ? Number(m.monthlyGoal) : null;
-      }
-      return { name: m.name, value, goal };
-    })
-    .sort((a, b) => b.value - a.value);
-  const modelEarningsMax = Math.max(1, ...modelEarnings.map((m) => m.value));
-  const goalPeriodLabel = revRange === 7 ? "weekly" : "monthly";
 
   return (
     <div>
@@ -6215,7 +6203,8 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(2px)" }}
             onClick={() => setShowAllWeeksModal(false)}>
-            <div className="c-bg-panel border c-border rounded-xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-6"
+            <div role="dialog" aria-modal="true" aria-label="All weeks"
+              className="c-bg-panel border c-border rounded-xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-6"
               style={{ boxShadow: "0 0 60px rgba(57,230,115,0.08), 0 20px 60px rgba(0,0,0,0.5)" }}
               onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-5">
@@ -6400,8 +6389,8 @@ function TaskManager({ tasks, persistTasks, models, restrictModel }) {
                   {t.recurring && <span className="flex items-center gap-0.5"><Repeat size={10} />weekly</span>}
                 </div>
               </div>
-              <button onClick={() => deleteTask(t.id)}
-                className="opacity-0 group-hover:opacity-100 c-muted hover-warn transition-opacity flex-shrink-0">
+              <button onClick={() => deleteTask(t.id)} aria-label="Delete task"
+                className="opacity-40 group-hover:opacity-100 group-focus-within:opacity-100 c-muted hover-warn transition-opacity flex-shrink-0">
                 <Trash2 size={13} />
               </button>
             </div>
@@ -6432,7 +6421,7 @@ function CalendarView({ cards, tasks, onNavigate, restrictModel }) {
   const itemsByDate = {};
   scopedCards.forEach((c) => {
     if (!c.deadline) return;
-    (itemsByDate[c.deadline] ||= []).push({ type: "scene", label: c.title, color: STAGES.find((s) => s.id === c.stage)?.color, model: c.model });
+    (itemsByDate[c.deadline] ||= []).push({ type: "scene", label: c.title, color: STAGES.find((s) => s.id === c.stage)?.color || "#8B93A1", model: c.model });
   });
   scopedTasks.forEach((t) => {
     if (!t.dueDate || t.status === "done") return;
@@ -6639,7 +6628,10 @@ a:focus-visible, button:focus-visible{ outline:2px solid var(--lp-green); outlin
   background:linear-gradient(135deg, var(--lp-green-soft), var(--lp-green));
   padding:10px 20px; border-radius:999px; text-decoration:none;
 }
-@media (max-width:860px){ .nav .links{ display:none; } }
+@media (max-width:860px){
+  .nav{ flex-wrap:wrap; row-gap:14px; }
+  .nav .links{ order:3; width:100%; justify-content:center; gap:24px; font-size:13px; }
+}
 @media (min-width:861px){
   .nav .brand{ font-size:21px; gap:14px; }
   .nav .brand .mark{ width:29px; height:29px; }
@@ -6928,33 +6920,6 @@ a:focus-visible, button:focus-visible{ outline:2px solid var(--lp-green); outlin
 .door-tags{ font-size:11px; letter-spacing:1.5px; color:var(--lp-text-dim); }
 @media (max-width:760px){ .doors-grid{ grid-template-columns:1fr; } }
 
-/* ---------- modules ---------- */
-.module{ display:grid; grid-template-columns:90px 1fr 1fr; gap:36px; align-items:center; padding:44px 0; border-top:1px solid var(--lp-border); }
-.module:last-child{ border-bottom:1px solid var(--lp-border); }
-.module .num{ font-size:15px; font-weight:600; letter-spacing:2px; color:var(--lp-green-dim); }
-.module h3{ font-size:24px; font-weight:700; margin-bottom:12px; }
-.module p{ color:var(--lp-text-dim); line-height:1.65; font-size:15px; }
-.module ul{ list-style:none; margin-top:16px; }
-.module ul li{ font-size:14px; padding:6px 0 6px 18px; position:relative; }
-.module ul li::before{ content:"—"; position:absolute; left:0; color:var(--lp-green); }
-.module-visual{ border:1px solid var(--lp-border); border-radius:8px; background:var(--lp-panel); padding:20px; font-size:12.5px; color:var(--lp-green-dim); line-height:2.1; min-height:150px; }
-.module-visual .hl{ color:var(--lp-green); }
-.module-visual .amb{ color:var(--lp-green-soft); }
-@media (max-width:860px){ .module{ grid-template-columns:1fr; gap:16px; } }
-
-/* ---------- pricing ---------- */
-.pricing-grid{ display:grid; grid-template-columns:1fr 1fr; gap:22px; }
-.plan{ border:1px solid var(--lp-border); border-radius:10px; padding:34px; background:var(--lp-panel); }
-.plan.highlight{ border-color:var(--lp-green-dim); box-shadow:0 0 34px rgba(18,179,76,0.10); position:relative; }
-.plan.highlight::before{ content:"MOST USED"; position:absolute; top:-11px; right:22px; background:linear-gradient(135deg, var(--lp-green-soft), var(--lp-green)); color:#04140c; font-size:10px; letter-spacing:1.4px; padding:5px 12px; border-radius:999px; font-weight:700; }
-.plan .name{ font-size:12px; letter-spacing:2px; color:var(--lp-text-dim); margin-bottom:10px; }
-.plan .price{ font-size:34px; font-weight:800; margin-bottom:22px; }
-.plan .price span{ font-size:14px; color:var(--lp-text-dim); font-weight:400; }
-.plan ul{ list-style:none; margin-bottom:26px; }
-.plan ul li{ font-size:14px; padding:9px 0 9px 20px; position:relative; border-bottom:1px dashed var(--lp-border); }
-.plan ul li::before{ content:"—"; position:absolute; left:0; color:var(--lp-green); }
-@media (max-width:760px){ .pricing-grid{ grid-template-columns:1fr; } }
-
 /* ---------- closing ---------- */
 .closing{ text-align:center; padding:90px 0 110px; }
 .closing h2{ font-size:clamp(28px,5vw,44px); font-weight:800; margin-bottom:18px; letter-spacing:-0.01em; }
@@ -6962,7 +6927,7 @@ a:focus-visible, button:focus-visible{ outline:2px solid var(--lp-green); outlin
 
 .site-footer{ border-top:1px solid var(--lp-border); padding:26px 24px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; font-size:11px; color:var(--lp-text-dim); letter-spacing:1px; max-width:1180px; margin:0 auto; }
 .footer-mark{ color:var(--lp-green); }
-#mainContent{ -webkit-user-select:none; -moz-user-select:none; user-select:none; }
+.floor-ticker-track, .band-track{ -webkit-user-select:none; -moz-user-select:none; user-select:none; }
 .brand{ position:relative; }
 .by-neo-tag{
   position:absolute; right:0; top:100%; margin-top:0;
@@ -7213,7 +7178,7 @@ const LANDING_PAGE_BODY = `
       <div class="instrument">
         <div class="instrument-head">
           <div class="instrument-no script">No. 01</div>
-          <a class="arrow-btn" href="#floor-detail" aria-label="Model Manager">↘</a>
+          <a class="arrow-btn" href="#detail-model-manager" aria-label="Model Manager">↘</a>
         </div>
         <h3>Model Manager</h3>
         <p>The roster, watched daily. Every account tracked, every gap flagged before your models notice.</p>
@@ -7222,7 +7187,7 @@ const LANDING_PAGE_BODY = `
       <div class="instrument">
         <div class="instrument-head">
           <div class="instrument-no script">No. 02</div>
-          <a class="arrow-btn" href="#floor-detail" aria-label="Content Director">↘</a>
+          <a class="arrow-btn" href="#detail-content-director" aria-label="Content Director">↘</a>
         </div>
         <h3>Content Director</h3>
         <p>Ideas ranked, scripts written, nothing sits unclaimed. Your team stops guessing what to film next.</p>
@@ -7231,7 +7196,7 @@ const LANDING_PAGE_BODY = `
       <div class="instrument">
         <div class="instrument-head">
           <div class="instrument-no script">No. 03</div>
-          <a class="arrow-btn" href="#floor-detail" aria-label="The Ledger">↘</a>
+          <a class="arrow-btn" href="#detail-ledger" aria-label="The Ledger">↘</a>
         </div>
         <h3>The Ledger</h3>
         <p>Earnings and reach pulled in on their own schedule, synced from Publer. No spreadsheet at 2am.</p>
@@ -7240,7 +7205,7 @@ const LANDING_PAGE_BODY = `
       <div class="instrument">
         <div class="instrument-head">
           <div class="instrument-no script">No. 04</div>
-          <a class="arrow-btn" href="#floor-detail" aria-label="Neo">↘</a>
+          <a class="arrow-btn" href="#detail-neo" aria-label="Neo">↘</a>
         </div>
         <h3>Neo</h3>
         <p>Ask the agency anything, out loud. It answers with your numbers, your roster, your money. Not the internet's opinion.</p>
@@ -7267,7 +7232,7 @@ const LANDING_PAGE_BODY = `
 
     <div class="connector"><svg class="connector-svg" viewBox="0 0 60 240" preserveAspectRatio="none"><path class="connector-path" d="M 34 0 L 26 240"/></svg><div class="connector-dot"></div></div>
 
-    <div class="detail-block" data-reveal>
+    <div class="detail-block" id="detail-model-manager" data-reveal>
       <div class="detail-text">
         <div class="badge-pill mono">NO. 01 · MODEL MANAGER</div>
         <h3>The roster, <span class="script-accent">watched.</span></h3>
@@ -7312,7 +7277,7 @@ const LANDING_PAGE_BODY = `
       </div>
     </div>
 
-    <div class="detail-block reverse" data-reveal>
+    <div class="detail-block reverse" id="detail-content-director" data-reveal>
       <div class="detail-text">
           <div class="badge-pill mono">NO. 02 · CONTENT DIRECTOR · IG + X + TIKTOK</div>
           <h3>It reads the feed.<span class="script-inline">You film the winners.</span></h3>
@@ -7356,7 +7321,7 @@ const LANDING_PAGE_BODY = `
         </div>
       </div>
 
-      <div class="detail-block" data-reveal>
+      <div class="detail-block" id="detail-ledger" data-reveal>
       <div class="detail-text">
         <div class="badge-pill mono">NO. 03 · THE LEDGER</div>
         <h3>Revenue that <span class="script-accent">reports to you.</span></h3>
@@ -7387,7 +7352,7 @@ const LANDING_PAGE_BODY = `
 
     <div class="connector small"><svg class="connector-svg" viewBox="0 0 60 120" preserveAspectRatio="none"><path class="connector-path" d="M 42 0 L 16 120"/></svg><div class="connector-dot"></div></div>
 
-    <div class="detail-block reverse" data-reveal>
+    <div class="detail-block reverse" id="detail-neo" data-reveal>
       <div class="detail-text">
         <div class="badge-pill mono">NO. 04 · VOICE COMMAND</div>
         <h3>Ask Neo.</h3>
@@ -7529,7 +7494,7 @@ const LANDING_PAGE_BODY = `
     <p>Only what's needed to run the board:</p>
     <ul class="legal-list">
       <li><b>Account identifiers</b> — name, role (Team or Creator), and the agency (CZ/US) you belong to.</li>
-      <li><b>Authentication data</b> — Team PINs and Creator passwords, stored hashed, never in plain text.</li>
+      <li><b>Authentication data</b> — Team PINs and Creator passwords, verified server-side and never sent to your browser.</li>
       <li><b>Operational data you enter</b> — model names, social handles, content pipeline cards, task notes.</li>
       <li><b>Publer &amp; revenue data</b> — post metrics synced hourly via the Publer API, and OnlyFans earnings synced from Infloww.</li>
       <li><b>Assistant queries</b> — messages sent to Neo, used only to generate an answer from your own data.</li>
@@ -7863,6 +7828,13 @@ function LoginScreen({ models, onLogin }) {
   const [submitting, setSubmitting] = useState(false);
   const flagError = (msg) => { setError(msg); setErrorKey((k) => k + 1); };
 
+  useEffect(() => {
+    if (!legalModal) return;
+    const onKey = (e) => { if (e.key === "Escape") setLegalModal(null); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [legalModal]);
+
   // Real PINs/passwords are never fetched into the browser anymore (see
   // auth-verify) — verification is a round-trip to that Edge Function
   // instead of a local comparison against models/settings.
@@ -8026,7 +7998,8 @@ function LoginScreen({ models, onLogin }) {
       {legalModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}
           onClick={() => setLegalModal(null)}>
-          <div className="c-bg-panel border c-border rounded-xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-6"
+          <div role="dialog" aria-modal="true" aria-label={legalModal === "privacy" ? "Privacy Policy" : "Terms of Service"}
+            className="c-bg-panel border c-border rounded-xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-6"
             onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <span className="fs-10 uppercase tracking-widest c-accent font-mono">Legal</span>
@@ -8040,9 +8013,9 @@ function LoginScreen({ models, onLogin }) {
                 <p className="font-semibold mt-3">1. Data we store</p>
                 <ul className="list-disc pl-5 space-y-1 fs-12">
                   <li><b>Account identifiers</b> — name, role (Team or Creator), and the agency (CZ/US) you belong to.</li>
-                  <li><b>Authentication data</b> — Team PINs and Creator passwords, stored hashed, never in plain text.</li>
+                  <li><b>Authentication data</b> — Team PINs and Creator passwords, verified server-side and never sent to your browser.</li>
                   <li><b>Operational data you enter</b> — model names, social handles, content pipeline cards, task notes.</li>
-                  <li><b>Publer &amp; revenue data</b> — post metrics and OnlyFans earnings synced automatically, or entered manually.</li>
+                  <li><b>Publer &amp; revenue data</b> — post metrics synced hourly via the Publer API, and OnlyFans earnings synced from Infloww.</li>
                   <li><b>Assistant queries</b> — messages sent to Neo, used only to generate an answer from your own data.</li>
                 </ul>
                 <p>We do not collect advertising identifiers, browsing history outside the app, or precise location.</p>
@@ -8073,7 +8046,7 @@ function LoginScreen({ models, onLogin }) {
 
 // ---------- settings (admin pin) ----------
 
-function CreatorSettingsPanel({ model, persistModels, models }) {
+function CreatorSettingsPanel() {
   return (
     <div className="max-w-lg">
       <p className="fs-12 c-faint font-mono mb-6">Your personal account connections.</p>
@@ -8091,7 +8064,7 @@ function CreatorSettingsPanel({ model, persistModels, models }) {
   );
 }
 
-function SettingsPanel({ settings, persistSettings, agency }) {
+function SettingsPanel({ settings, persistSettings }) {
   const [pinCZ, setPinCZ] = useState(settings.adminPinCZ || "");
   const [pinUS, setPinUS] = useState(settings.adminPinUS || "");
   const [monthlyGoal, setMonthlyGoal] = useState(settings.monthlyRevenueGoal || 20000);
@@ -8115,12 +8088,12 @@ function SettingsPanel({ settings, persistSettings, agency }) {
         <div className="grid grid-cols-2 gap-3 max-w-sm mb-4">
           <div>
             <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">🇨🇿 CZ PIN</label>
-            <input value={pinCZ} onChange={(e) => setPinCZ(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="e.g. 2748"
+            <input type="password" value={pinCZ} onChange={(e) => setPinCZ(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="leave blank to keep current"
               className="w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text outline-none focus-border-accent" />
           </div>
           <div>
             <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">🇺🇸 US PIN</label>
-            <input value={pinUS} onChange={(e) => setPinUS(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="e.g. 1234"
+            <input type="password" value={pinUS} onChange={(e) => setPinUS(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="leave blank to keep current"
               className="w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text outline-none focus-border-accent" />
           </div>
         </div>
@@ -8236,195 +8209,6 @@ function CreatorTrending({ trends, agency }) {
 
 // ---------- Neo (AI assistant) ----------
 
-function NeoOrb({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onClick }) {
-  const canvasRef = useRef(null);
-  const rotRef = useRef(0);
-  const pulseRef = useRef(0.2);
-  const scaleRef = useRef(1);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    const size = 340;
-    canvas.width = size * dpr;
-    canvas.height = size * dpr;
-    canvas.style.width = "100%";
-    canvas.style.maxWidth = size + "px";
-    canvas.style.height = "auto";
-    canvas.style.aspectRatio = "1 / 1";
-    ctx.scale(dpr, dpr);
-
-    const N = 420;
-    const points = [];
-    const golden = Math.PI * (1 + Math.sqrt(5));
-    for (let i = 0; i < N; i++) {
-      const y = 1 - (i / (N - 1)) * 2;
-      const radius = Math.sqrt(1 - y * y);
-      const theta = golden * i;
-      points.push({ x: Math.cos(theta) * radius, y, z: Math.sin(theta) * radius });
-    }
-
-    // Precompute a mesh: each point connects to its handful of nearest
-    // neighbors, forming the dense "plexus ball" look when active. This is
-    // O(n^2) but only runs once at setup, not per frame.
-    const K = 6;
-    const edges = [];
-    const seen = new Set();
-    for (let i = 0; i < N; i++) {
-      const dists = [];
-      for (let j = 0; j < N; j++) {
-        if (i === j) continue;
-        const dx = points[i].x - points[j].x, dy = points[i].y - points[j].y, dz = points[i].z - points[j].z;
-        dists.push([dx * dx + dy * dy + dz * dz, j]);
-      }
-      dists.sort((a, b) => a[0] - b[0]);
-      for (let k = 0; k < K; k++) {
-        const j = dists[k][1];
-        const key = i < j ? `${i}-${j}` : `${j}-${i}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        edges.push([i, j]);
-      }
-    }
-
-    const cx = size / 2, cy = size / 2, baseR = 118;
-
-    const drawRing = (rx, ry, dash, alpha, rotDeg) => {
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(rotDeg);
-      ctx.strokeStyle = `rgba(18,179,76,${alpha})`;
-      ctx.lineWidth = 1;
-      ctx.setLineDash(dash || []);
-      ctx.beginPath();
-      ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    };
-
-    let raf;
-    const render = () => {
-      const active = thinking || speaking || listening;
-      const speed = thinking ? 0.013 : speaking ? 0.011 : listening ? 0.008 : 0.006;
-      rotRef.current += speed;
-
-      const sinceBump = Date.now() - (speakBumpRef?.current || 0);
-      const bump = speaking && sinceBump < 220 ? (1 - sinceBump / 220) * 0.55 : 0;
-      const liveAmp = speaking ? (liveAmpRef?.current || 0) : 0;
-      const basePulse = thinking ? 260 : speaking ? 180 : 900;
-      const baseAmp = thinking ? 0.3 : speaking ? 0.22 : 0.15;
-      pulseRef.current = 0.2 + Math.sin(Date.now() / basePulse) * baseAmp + bump + liveAmp * 0.5;
-
-      // Smoothly grow the orb when active, ease back down when idle.
-      const targetScale = active ? 1.22 + liveAmp * 0.06 : 1;
-      scaleRef.current += (targetScale - scaleRef.current) * (active ? 0.22 : 0.1);
-
-      const r = rotRef.current;
-      const pulse = pulseRef.current;
-      const scale = scaleRef.current;
-      const R = baseR * scale;
-      ctx.clearRect(0, 0, size, size);
-
-      drawRing(R + 34, R + 34, [2, 6], 0.25, r * 0.3);
-      drawRing(R + 22, R + 10, [], 0.18, -r * 0.5);
-      drawRing(R + 22, R + 10, [4, 4], 0.15, Math.PI / 2 - r * 0.5);
-
-      // HUD-style hexagon reticle + tick marks — the "JARVIS" touch
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(-r * 0.22);
-      ctx.strokeStyle = `rgba(57,230,115,${0.22 + pulse * 0.15})`;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      const hexR = R + 46;
-      for (let i = 0; i <= 6; i++) {
-        const a = (Math.PI / 3) * i - Math.PI / 2;
-        const hx = Math.cos(a) * hexR, hy = Math.sin(a) * hexR;
-        if (i === 0) ctx.moveTo(hx, hy); else ctx.lineTo(hx, hy);
-      }
-      ctx.stroke();
-      ctx.restore();
-
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(r * 0.15);
-      ctx.strokeStyle = `rgba(57,230,115,${0.35 + pulse * 0.25})`;
-      ctx.lineWidth = 1.2;
-      const tickR1 = R + 54, tickR2 = R + 62;
-      for (let i = 0; i < 24; i++) {
-        const a = (Math.PI * 2 * i) / 24;
-        if (i % 3 !== 0) continue;
-        ctx.beginPath();
-        ctx.moveTo(Math.cos(a) * tickR1, Math.sin(a) * tickR1);
-        ctx.lineTo(Math.cos(a) * tickR2, Math.sin(a) * tickR2);
-        ctx.stroke();
-      }
-      ctx.restore();
-
-      const glowScale = speaking ? 1.12 : 1;
-      const grad = ctx.createRadialGradient(cx, cy, 4, cx, cy, R * 0.95 * glowScale);
-      grad.addColorStop(0, `rgba(18,179,76,${0.16 + pulse * 0.12})`);
-      grad.addColorStop(1, "rgba(18,179,76,0)");
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(cx, cy, R * 0.95 * glowScale, 0, Math.PI * 2);
-      ctx.fill();
-
-      const cosR = Math.cos(r), sinR = Math.sin(r);
-      const proj = points.map((p) => {
-        const x = p.x * cosR - p.z * sinR;
-        const z = p.x * sinR + p.z * cosR;
-        return { x, y: p.y, z };
-      });
-
-      // Mesh lines between nearby points — only when active, fading in/out
-      // with the same scale/opacity transition as the grow animation.
-      const meshAlpha = Math.max(0, (scale - 1) / 0.22);
-      if (meshAlpha > 0.02) {
-        ctx.lineWidth = 0.7;
-        edges.forEach(([i, j]) => {
-          const a = proj[i], b = proj[j];
-          const depth = ((a.z + b.z) / 2 + 1) / 2;
-          ctx.strokeStyle = `rgba(140,255,175,${(0.14 + depth * 0.42) * meshAlpha})`;
-          ctx.beginPath();
-          ctx.moveTo(cx + a.x * R, cy + a.y * R * 0.98);
-          ctx.lineTo(cx + b.x * R, cy + b.y * R * 0.98);
-          ctx.stroke();
-        });
-      }
-
-      proj.sort((a, b) => a.z - b.z).forEach((p) => {
-        const depth = (p.z + 1) / 2;
-        const size2 = 0.6 + depth * 1.8 + pulse * 0.6;
-        const alpha = 0.25 + depth * 0.65;
-        const px = cx + p.x * R;
-        const py = cy + p.y * R * 0.98;
-        ctx.beginPath();
-        ctx.fillStyle = `rgba(120,255,160,${alpha})`;
-        ctx.shadowColor = "rgba(18,179,76,0.9)";
-        ctx.shadowBlur = 4 + depth * 4;
-        ctx.arc(px, py, size2, 0, Math.PI * 2);
-        ctx.fill();
-      });
-      ctx.shadowBlur = 0;
-
-      raf = requestAnimationFrame(render);
-    };
-    render();
-    return () => cancelAnimationFrame(raf);
-  }, [thinking, speaking, listening]);
-
-  return <canvas ref={canvasRef} onClick={onClick} className="block mx-auto cursor-pointer" />;
-}
-
-// EXPERIMENTAL alternate orb v3 — an organic, wavy contour-line sphere
-// (many perturbed latitude rings), matching a reference "flowing glass
-// orb" look. Swap <NeoOrb .../> for <NeoOrbV3 .../> in NeoPage to try it.
-// Compact 3D simplex noise (public-domain algorithm, ported to JS) — used to
-// organically displace the orb's mesh so it flows/warps like the reference
-// art, rather than a hand-rolled sine approximation.
 class SimplexNoise3D {
   constructor(seed = 1) {
     const p = new Uint8Array(256);
@@ -8543,7 +8327,10 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
       }
     }, 150);
 
-    const geometry = new THREE.IcosahedronGeometry(1, 24);
+    // detail 24 (~5,760 vertices) was wildly overkill for a wireframe orb —
+    // 6 keeps the same silhouette at a small fraction of the per-frame noise
+    // displacement cost, worse on mobile than desktop.
+    const geometry = new THREE.IcosahedronGeometry(1, 6);
     const basePositions = geometry.attributes.position.array.slice();
 
     const material = new THREE.MeshBasicMaterial({
@@ -8608,7 +8395,8 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
         arr[i + 2] = z * scale;
       }
       posAttr.needsUpdate = true;
-      geometry.computeVertexNormals();
+      // Not computeVertexNormals() here — MeshBasicMaterial (below) never
+      // reads normals at all, so this was pure wasted work every frame.
 
       mesh.rotation.y += th ? 0.006 : sp ? 0.0045 : li ? 0.003 : 0.0015;
       mesh.rotation.x += 0.0006;
@@ -8675,105 +8463,6 @@ function NeoOrb3D({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onC
       style={{ width: "100%", height: "100%" }} />
   );
 }
-
-function NeoOrbV3({ thinking, speaking, listening, speakBumpRef, liveAmpRef, onClick }) {
-  const canvasRef = useRef(null);
-  const rotRef = useRef(0);
-  const scaleRef = useRef(1);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    const size = 340;
-    canvas.width = size * dpr;
-    canvas.height = size * dpr;
-    canvas.style.width = "100%";
-    canvas.style.maxWidth = size + "px";
-    canvas.style.height = "auto";
-    canvas.style.aspectRatio = "1 / 1";
-    ctx.scale(dpr, dpr);
-
-    const cx = size / 2, cy = size / 2, baseR = 130;
-    const RINGS = 46;
-
-    // Fixed per-ring random seeds so the wobble pattern feels organic but
-    // stable frame-to-frame (only phase animates, not the pattern itself).
-    const seeds = Array.from({ length: RINGS }, () => ({
-      f1: 3 + Math.random() * 4,
-      f2: 5 + Math.random() * 6,
-      p1: Math.random() * Math.PI * 2,
-      p2: Math.random() * Math.PI * 2,
-    }));
-
-    let raf;
-    const render = () => {
-      const active = thinking || speaking || listening;
-      const speed = thinking ? 0.012 : speaking ? 0.009 : listening ? 0.006 : 0.003;
-      rotRef.current += speed;
-
-      const sinceBump = Date.now() - (speakBumpRef?.current || 0);
-      const bump = speaking && sinceBump < 220 ? (1 - sinceBump / 220) * 0.6 : 0;
-      const liveAmp = speaking ? (liveAmpRef?.current || 0) : 0;
-
-      const targetScale = active ? 1.14 + liveAmp * 0.08 : 1;
-      scaleRef.current += (targetScale - scaleRef.current) * (active ? 0.2 : 0.1);
-
-      const t = rotRef.current;
-      const scale = scaleRef.current;
-      const R = baseR * scale;
-      ctx.clearRect(0, 0, size, size);
-
-      // Soft ambient glow behind the sphere
-      const grad = ctx.createRadialGradient(cx, cy, 4, cx, cy, R * 1.05);
-      grad.addColorStop(0, `rgba(57,230,115,${0.10 + bump * 0.12 + liveAmp * 0.08})`);
-      grad.addColorStop(1, "rgba(57,230,115,0)");
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(cx, cy, R * 1.05, 0, Math.PI * 2);
-      ctx.fill();
-
-      const wobbleAmt = 5 + bump * 10 + liveAmp * 14;
-
-      // Latitude contour rings wrapping the sphere, each perturbed with a
-      // layered sine "noise" so the surface feels organically wavy rather
-      // than a clean geometric sphere.
-      for (let ri = 0; ri < RINGS; ri++) {
-        const lat = -Math.PI / 2 + (Math.PI * ri) / (RINGS - 1); // -90deg..+90deg
-        const ringR = Math.cos(lat) * R;           // horizontal radius at this latitude
-        const ringY = Math.sin(lat) * R * 0.92;    // vertical offset (slightly flattened)
-        if (ringR < 2) continue;
-
-        const seed = seeds[ri];
-        const depthFade = 0.25 + Math.cos(lat) * 0.55; // brighter near the equator, dimmer at poles
-        ctx.beginPath();
-        const STEPS = 90;
-        for (let i = 0; i <= STEPS; i++) {
-          const a = (Math.PI * 2 * i) / STEPS + t * (ri % 2 === 0 ? 1 : -1) * 0.6;
-          const noise =
-            Math.sin(a * seed.f1 + t * 1.3 + seed.p1) * wobbleAmt * 0.6 +
-            Math.sin(a * seed.f2 - t * 0.8 + seed.p2) * wobbleAmt * 0.4;
-          const rx = ringR + noise;
-          const x = cx + Math.cos(a) * rx;
-          const y = cy + ringY + Math.sin(a) * rx * 0.32; // squashed for a spherical feel
-          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        }
-        ctx.closePath();
-        ctx.strokeStyle = `rgba(190,255,215,${depthFade * (0.22 + bump * 0.2)})`;
-        ctx.lineWidth = 0.8;
-        ctx.stroke();
-      }
-
-      raf = requestAnimationFrame(render);
-    };
-    render();
-    return () => cancelAnimationFrame(raf);
-  }, [thinking, speaking, listening]);
-
-  return <canvas ref={canvasRef} onClick={onClick} className="block mx-auto cursor-pointer" />;
-}
-
 
 function NeoClock() {
   const [now, setNow] = useState(new Date());
@@ -8973,6 +8662,10 @@ function NeoBootSequence({ onDone }) {
 
 function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models, stats, reels, trends, bufferDailyStats, inflowwDailyStats, settings, persistSettings }) {
   const [messages, setMessages] = useState([]);
+  // messages was tracked but never actually shown anywhere — if TTS fails
+  // or the viewer has sound off, there was no way to read what Neo said.
+  // Surface at least her last reply's text once things go back to idle.
+  const lastNeoText = [...messages].reverse().find((m) => m.role === "neo")?.text || "";
   const [winWidth, setWinWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
   const rosterRef = useRef(null);
   useEffect(() => {
@@ -9009,7 +8702,11 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
     return () => {
       if (audioRef.current) { try { audioRef.current.pause(); } catch {} }
       if (activeOneShotRef.current) { try { activeOneShotRef.current.stop(); } catch {} }
-      if (recognitionRef.current) { try { recognitionRef.current.stop(); } catch {} }
+      // audio.pause() doesn't fire onended, so the speak-pulse interval it
+      // would normally stop is otherwise left running forever if this page
+      // unmounts mid-speech.
+      stopSpeakPulse();
+      if (listeningDebounceRef.current) clearTimeout(listeningDebounceRef.current);
       activeListenRef.current = false;
     };
   }, []);
@@ -9050,7 +8747,6 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
   const speakBumpRef = useRef(0);
   const glowElRef = useRef(null);
   const scrollRef = useRef(null);
-  const recognitionRef = useRef(null);
   const listeningDebounceRef = useRef(null);
   const activeListenRef = useRef(false);
   const thinkingRef = useRef(false);
@@ -9282,7 +8978,11 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
     } catch (e) {
       if (myRequestId !== requestIdRef.current) return;
       const detail = e?.message || e?.context?.error || (typeof e === "string" ? e : JSON.stringify(e));
-      setMessages((m) => [...m, { role: "neo", text: `Couldn't reach Neo — ${detail || "unknown error"}. Check the clever-service function and GROQ_API_KEY secret in Supabase.` }]);
+      console.error("Neo request failed", detail);
+      const text = session.role === "admin"
+        ? `Couldn't reach Neo — ${detail || "unknown error"}. Check the clever-service function and GROQ_API_KEY secret in Supabase.`
+        : "Couldn't reach Neo right now — try again in a moment.";
+      setMessages((m) => [...m, { role: "neo", text }]);
     } finally {
       if (myRequestId === requestIdRef.current) {
         thinkingRef.current = false;
@@ -9421,7 +9121,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
   const textDim = "#6f9a7a";
   const border = "rgba(18,179,76,0.25)";
   const bgPanel = "#0e1310";
-  const amber = "#39e673";
+  const amber = "#ffb432";
 
   // ---- real telemetry ----
   // Creators only ever see numbers derived from their own record here —
@@ -9530,9 +9230,14 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
               {/* fixed-height status area — content changes but the box never does, so it can't shove other elements around */}
               <div className="mt-3 neo-fade-in overflow-hidden" style={{ height: 40, maxWidth: 280, animationDelay: "0.4s" }}>
                 <div className="fs-13 italic" style={{ color: neoGreen, opacity: 0.9 }}>
-                  {thinking ? "thinking — click the orb to stop." : speaking ? "speaking — click the orb to stop." : listening ? "listening — click the orb to stop." : "click the orb to ask something."}
+                  {thinking ? "thinking — click the orb to stop." : speaking ? "speaking — click the orb to stop." : listening ? "listening — click the orb to stop." : (lastNeoText || "click the orb to ask something.")}
                 </div>
               </div>
+              {/* Desktop previously had no equivalent of the mobile block below —
+                  a denied mic or a failed TTS call just silently reverted to idle
+                  with zero feedback here. */}
+              {heard && <div className="fs-10 italic mt-1" style={{ color: neoGreen, opacity: 0.4 }}>heard: "{heard}"</div>}
+              {voiceError && <div className="fs-10 italic mt-1" style={{ color: "#e07a5f" }}>voice error: {voiceError}</div>}
             </div>
           </div>
 
@@ -9542,7 +9247,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
               N.E.O. — <b style={{ color: amber }}>NEURAL ENGAGEMENT ORCHESTRATOR</b>
             </div>
             <div className="fs-13 italic mt-3 max-w-sm neo-fade-in" style={{ color: neoGreen, opacity: 0.9, animationDelay: "0.6s" }}>
-              {thinking ? "thinking — click the orb to stop." : speaking ? "speaking — click the orb to stop." : listening ? "listening — click the orb to stop." : "click the orb to ask something."}
+              {thinking ? "thinking — click the orb to stop." : speaking ? "speaking — click the orb to stop." : listening ? "listening — click the orb to stop." : (lastNeoText || "click the orb to ask something.")}
             </div>
             {heard && <div className="fs-10 italic mt-1" style={{ color: neoGreen, opacity: 0.4 }}>heard: "{heard}"</div>}
             {voiceError && <div className="fs-10 italic mt-1" style={{ color: "#e07a5f" }}>voice error: {voiceError}</div>}
@@ -9565,7 +9270,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
             </div>
             {/* tick-mark dial ring behind the orb — a bit of HUD/instrument-panel flair. Independently adjustable via the edit panel. */}
             <div style={{ position: "absolute", inset: 0, transform: isDesktopViewport ? `scale(1.14)` : "none" }}>
-              <svg className="neo-ring-size" viewBox="0 0 400 400" style={{ position: "absolute", inset: "-6%", width: "112%", height: "112%", pointerEvents: "none" }}>
+              <svg viewBox="0 0 400 400" style={{ position: "absolute", inset: "-6%", width: "112%", height: "112%", pointerEvents: "none" }}>
                 <circle cx="200" cy="200" r="196" fill="none" stroke="rgba(57,230,115,0.18)" strokeWidth="1" />
                 <circle cx="200" cy="200" r="182" fill="none" stroke="rgba(57,230,115,0.14)" strokeWidth="1" strokeDasharray="1,7" />
                 {Array.from({ length: 48 }, (_, i) => {
@@ -10202,7 +9907,7 @@ function StatsManager({ stats, persistStats, models, reels, persistReels }) {
                   <td className="py-2 px-3 text-right font-mono">{s.igFollowers.toLocaleString()}</td>
                   <td className="py-2 px-3 text-right font-mono">{s.igReach.toLocaleString()}</td>
                   <td className="py-2 pl-3 text-right">
-                    <button onClick={() => deleteEntry(s.id)} className="opacity-0 group-hover:opacity-100 c-muted hover-warn">
+                    <button onClick={() => deleteEntry(s.id)} aria-label="Delete entry" className="opacity-40 group-hover:opacity-100 group-focus-within:opacity-100 c-muted hover-warn">
                       <Trash2 size={12} />
                     </button>
                   </td>
@@ -10303,7 +10008,7 @@ function StatsManager({ stats, persistStats, models, reels, persistReels }) {
                     <td className="py-2 px-3 text-right font-mono">{r.shares.toLocaleString()}</td>
                     <td className="py-2 px-3 text-right font-mono">{r.comments.toLocaleString()}</td>
                     <td className="py-2 pl-3 text-right">
-                      <button onClick={() => deleteReel(r.id)} className="opacity-0 group-hover:opacity-100 c-muted hover-warn">
+                      <button onClick={() => deleteReel(r.id)} aria-label="Delete reel" className="opacity-40 group-hover:opacity-100 group-focus-within:opacity-100 c-muted hover-warn">
                         <Trash2 size={12} />
                       </button>
                     </td>
@@ -10361,7 +10066,7 @@ function GoalCard({ latest }) {
     <div className="c-bg-surface border rounded-xl p-5 mb-6" style={{ borderColor: hit ? "#39e673" : undefined }}>
       <div className="flex items-center justify-between mb-2">
         <span className="fs-11 uppercase tracking-widest c-muted font-mono">This week's earnings goal</span>
-        {hit && <span className="fs-11 font-mono c-success uppercase tracking-wide">🔥 Goal hit!</span>}
+        {hit && <span className="fs-11 font-mono c-success uppercase tracking-wide flex items-center gap-1"><Flame size={12} className="c-success" />Goal hit!</span>}
       </div>
       <div className="flex items-baseline gap-2 mb-3">
         <span className="text-3xl font-extrabold c-text">${actual.toLocaleString()}</span>
@@ -10459,7 +10164,11 @@ function useSupaChangelog() {
 const CHANGELOG_SEEN_KEY = "agencyos_changelog_last_seen";
 
 function WhatsNewPage() {
-  const { value: entries, loading } = useSupaChangelog();
+  const { value: rawEntries, loading } = useSupaChangelog();
+  // Defensive: a since-removed debug CI workflow used to insert a hardcoded
+  // placeholder row on every push (id "cl_test_minimal_001") — filter it out
+  // if it's ever there, so a stray debug row can never render as real news.
+  const entries = rawEntries.filter((e) => e.id !== "cl_test_minimal_001");
 
   useEffect(() => {
     if (entries.length) {
@@ -10468,9 +10177,9 @@ function WhatsNewPage() {
   }, [entries]);
 
   const categoryStyle = {
-    feature: { label: "Big", bg: "rgba(18,179,76,0.16)", color: "#39e673" },
-    fix: { label: "Data", bg: "rgba(216,90,48,0.16)", color: "#e0876a" },
-    improvement: { label: "Trend", bg: "rgba(120,140,255,0.16)", color: "#9aa8ff" },
+    feature: { label: "Feature", bg: "rgba(18,179,76,0.16)", color: "#39e673" },
+    fix: { label: "Fix", bg: "rgba(216,90,48,0.16)", color: "#e0876a" },
+    improvement: { label: "Improvement", bg: "rgba(120,140,255,0.16)", color: "#9aa8ff" },
   };
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
@@ -10478,7 +10187,7 @@ function WhatsNewPage() {
     <div className="max-w-2xl">
       <p className="fs-13 c-muted mb-6">News and developments from the OnlyFans / creator economy world.</p>
 
-      {loading && <div className="fs-13 c-muted">Loading...</div>}
+      {loading && <div className="fs-13 c-muted flex items-center gap-2"><Loader2 size={14} className="animate-spin" />Loading...</div>}
       {!loading && !entries.length && (
         <div className="c-bg-surface border c-border rounded-xl px-4 py-6 text-center fs-13 c-muted">
           No news yet.
@@ -10586,8 +10295,8 @@ function InflowwRevenueCard({ myInflowwRows, accountType, title, last7Dates, day
   const chartData = days.map((day) => ({ date: day, value: sumForDay(day) }));
   const rangeTotal = chartData.reduce((t, d) => t + d.value, 0);
   const prevDays = (range === 7
-    ? Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (13 - i)); return d.toISOString().slice(0, 10); })
-    : Array.from({ length: 30 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (59 - i)); return d.toISOString().slice(0, 10); }));
+    ? Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (13 - i)); return toISO(d); })
+    : Array.from({ length: 30 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (59 - i)); return toISO(d); }));
   const prevTotal = prevDays.reduce((t, day) => t + sumForDay(day), 0);
   const rangeRows = rowsAll.filter((r) => days.includes(r.statDate));
 
@@ -10611,8 +10320,8 @@ function InflowwRevenueCard({ myInflowwRows, accountType, title, last7Dates, day
         </div>
       </div>
       <div className="text-2xl font-extrabold c-accent mb-1">$<CountUp value={rangeTotal} /></div>
-      <div className="mb-2"><RevenueChart data={chartData} height={200} /></div>
-      <div className="flex gap-4 fs-10 font-mono c-faint uppercase">
+      <div className="mb-2"><RevenueChart data={chartData} height={200} sparseUntil={range === 7 ? 7 : 0} /></div>
+      <div className="flex flex-wrap gap-4 fs-10 font-mono c-faint uppercase">
         <span><CountUp value={sumInfloww(rangeRows, "messagesCount")} /> messages</span>
         <span><CountUp value={sumInfloww(rangeRows, "tipsCount")} /> tips</span>
         <span><CountUp value={sumInfloww(rangeRows, "subsCount")} /> subs</span>
@@ -10628,25 +10337,17 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
 
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  const sevenDaysAgoStr = sevenDaysAgo.toISOString().slice(0, 10);
+  const sevenDaysAgoStr = toISO(sevenDaysAgo);
 
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const monthStr = todayStr.slice(0, 7);
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().slice(0, 10);
   const last7Dates = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d.toISOString().slice(0, 10);
+    const d = new Date(); d.setDate(d.getDate() - (6 - i)); return toISO(d);
   });
 
   const myInflowwRows = (inflowwDailyStats || []).filter((r) => r.model === restrictModel);
   const sumInfloww = (rows, field) => rows.reduce((t, r) => t + (r[field] || 0), 0);
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().slice(0, 10);
 
   const dayList30 = Array.from({ length: 30 }, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() - (29 - i)); return d.toISOString().slice(0, 10);
+    const d = new Date(); d.setDate(d.getDate() - (29 - i)); return toISO(d);
   });
 
   const hasFreeInfloww = myInflowwRows.some((r) => r.accountType === "free");
@@ -10770,6 +10471,10 @@ function OnboardingScreen({ name, url, onContinue, onQuestionnaireReceived }) {
 
   useEffect(() => {
     function handleMessage(event) {
+      // Without an origin check, any window (an ad iframe, a malicious tab)
+      // could post a fake { source: "creator-bible" } message and either
+      // skip onboarding or write arbitrary text into this model's bio.
+      if (event.origin !== "https://neomngmt.github.io") return;
       const data = event.data;
       if (!data || data.source !== "creator-bible") return;
       if (data.type === "submitted") {
@@ -10814,9 +10519,6 @@ function OnboardingScreen({ name, url, onContinue, onQuestionnaireReceived }) {
             Not loading? Open directly →
           </a>
         )}
-        <button onClick={onContinue} className="fs-10 font-mono c-faint hover-accent-text uppercase tracking-wide">
-          Continue to my dashboard (testing only)
-        </button>
       </div>
     </div>
   );
@@ -10915,6 +10617,7 @@ const REEL_SORTER_BODY = `
 https://www.instagram.com/reel/XyZ456.../
 ...jeden odkaz na řádek"></textarea>
     <button class="btn-primary btn-block" id="rsLoadBtn">Spustit</button>
+    <div id="rsLoadError" style="display:none; color:#e07a5f; font-size:12px; margin-top:8px; text-align:center;"></div>
     <div class="cat-manager">
       <h2>Kategorie</h2>
       <div class="cat-list" id="rsCatList"></div>
@@ -11128,6 +10831,7 @@ function ReelSorterPage() {
     const setupPanel = root.querySelector("#rsSetupPanel");
     const urlInput = root.querySelector("#rsUrlInput");
     const loadBtn = root.querySelector("#rsLoadBtn");
+    const loadError = root.querySelector("#rsLoadError");
     const catListEl = root.querySelector("#rsCatList");
     const newCatInput = root.querySelector("#rsNewCatInput");
     const addCatBtn = root.querySelector("#rsAddCatBtn");
@@ -11183,7 +10887,11 @@ function ReelSorterPage() {
         existing.add(url);
         items.push({ id: ++seq, url, category: null });
       });
-      if (items.length === 0) return;
+      if (items.length === 0) {
+        if (loadError) { loadError.textContent = "Nezadal jsi žádný platný odkaz."; loadError.style.display = "block"; }
+        return;
+      }
+      if (loadError) loadError.style.display = "none";
       setupPanel.style.display = "none";
       stageWrap.style.display = "block";
       root.classList.remove("setup-mode");
@@ -11319,7 +11027,14 @@ function ReelSorterPage() {
 
       const currentCat = document.createElement("div");
       currentCat.className = "stage-current-cat" + (item.category ? "" : " empty");
-      currentCat.innerHTML = item.category ? `Zařazeno: <b>${item.category}</b>` : "Zatím nezařazeno, vyber kategorii";
+      if (item.category) {
+        currentCat.appendChild(document.createTextNode("Zařazeno: "));
+        const b = document.createElement("b");
+        b.textContent = item.category;
+        currentCat.appendChild(b);
+      } else {
+        currentCat.textContent = "Zatím nezařazeno, vyber kategorii";
+      }
       card.appendChild(currentCat);
 
       const catRow = document.createElement("div");
@@ -11495,10 +11210,12 @@ function TrendReelCard({ post, fmt }) {
             <video src={post.videoUrl} poster={post.displayUrl} controls playsInline preload="none"
               className="absolute inset-0 w-full h-full object-cover" />
           ) : (
-            <img src={post.displayUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            <img src={post.displayUrl} alt={`Reel by @${post.username || post.profile || "unknown"}`} className="absolute inset-0 w-full h-full object-cover" />
           )}
           <div className="absolute top-2 right-2 c-bg-accent c-onaccent fs-9 font-mono font-bold px-1.5 py-0.5 rounded-lg" style={{ pointerEvents: "none" }}>{(post.ratio || 0).toFixed(1)}x avg</div>
-          <div className="absolute top-2 left-2 fs-10 font-mono px-1.5 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.6)", color: "#fff", pointerEvents: "none" }}>@{post.username || post.profile}</div>
+          {(post.username || post.profile) && (
+            <div className="absolute top-2 left-2 fs-10 font-mono px-1.5 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.6)", color: "#fff", pointerEvents: "none" }}>@{post.username || post.profile}</div>
+          )}
           <div className="absolute bottom-2 left-2 fs-9 font-mono px-1.5 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.6)", color: "#39e673", pointerEvents: "none" }}>{post.category || "Other"}</div>
         </div>
       )}
@@ -11535,7 +11252,7 @@ function TrendReelCard({ post, fmt }) {
   );
 }
 
-function TrendsPage({ weeklyTrendReels, onReload }) {
+function TrendsPage({ weeklyTrendReels, onReload, loading }) {
   const [filter, setFilter] = useState("all");
   const [topN, setTopN] = useState(15);
   const [generating, setGenerating] = useState(false);
@@ -11632,10 +11349,14 @@ function TrendsPage({ weeklyTrendReels, onReload }) {
         <p className="fs-11 c-muted">
           Actively scans the last 7 days of posts from every profile tracked in the <span className="c-text">weekly-trends-scrape</span> edge function, and surfaces the ones that beat that profile's own average — a fresh read on what's working right now, not a stale weekly snapshot.
         </p>
-        <div className="flex justify-center mt-3">
+        <div className="flex justify-center gap-2 mt-3">
           <button onClick={generateNow} disabled={generating}
             className="flex items-center gap-2 px-5 py-2.5 rounded-lg c-bg-accent c-onaccent fs-11 font-mono uppercase tracking-wide font-semibold hover-bg-accent2 disabled:opacity-40 tap">
             {generating ? <><Loader2 size={13} className="animate-spin" /> Generating...</> : <><Flame size={13} /> Generate now</>}
+          </button>
+          <button onClick={verifyProfiles} disabled={verifying}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg border c-border c-muted hover-bg-surface fs-11 font-mono uppercase tracking-wide font-semibold disabled:opacity-40 tap">
+            {verifying ? <><Loader2 size={13} className="animate-spin" /> Verifying...</> : "Verify profiles"}
           </button>
         </div>
         {lastSync && <p className="fs-10 c-faint font-mono mt-2 text-center">Last synced {new Date(lastSync).toLocaleString("en-US")}</p>}
@@ -11645,6 +11366,19 @@ function TrendsPage({ weeklyTrendReels, onReload }) {
           <div className="mt-2 text-center px-2" style={{ minWidth: 0 }}>
             <p className="fs-10 c-warn font-mono">{scrapeErrors.length} profile(s) failed this run:</p>
             <p className="fs-9 c-faint font-mono mt-1" style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>{scrapeErrors.map((e) => `${e.handle} (${e.error})`).join("  ·  ")}</p>
+          </div>
+        )}
+        {verifyError && <p className="fs-10 c-warn font-mono mt-2 text-center">{verifyError}</p>}
+        {verifyBroken && (
+          <div className="mt-2 text-center px-2" style={{ minWidth: 0 }}>
+            {verifyBroken.length === 0 ? (
+              <p className="fs-10 c-success font-mono">All tracked profiles scraped fine just now.</p>
+            ) : (
+              <>
+                <p className="fs-10 c-warn font-mono">{verifyBroken.length} profile(s) currently broken/blocked:</p>
+                <p className="fs-9 c-faint font-mono mt-1" style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>{verifyBroken.map((c) => `${c.handle} (${c.error})`).join("  ·  ")}</p>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -11685,7 +11419,12 @@ function TrendsPage({ weeklyTrendReels, onReload }) {
       )}
       {filter === "all" && <div className="mb-5" />}
 
-      {sorted.length === 0 && (
+      {loading && (
+        <div className="fs-12 c-faint font-mono italic py-16 text-center flex items-center justify-center gap-2">
+          <Loader2 size={14} className="animate-spin" /> Loading trends...
+        </div>
+      )}
+      {!loading && sorted.length === 0 && (
         <div className="fs-12 c-faint font-mono italic py-16 text-center border border-dashed c-border rounded-xl">
           {all.length === 0 ? "No trends synced yet. Add profiles in Settings, and check back after the next Sunday scan." : "Nothing in this category yet."}
         </div>
@@ -11794,7 +11533,16 @@ function App() {
   const [neoBooting, setNeoBooting] = useState(false);
   const prevViewRef = useRef(null);
   useEffect(() => {
-    if (view === "neo" && prevViewRef.current !== "neo") setNeoBooting(true);
+    // Only replay the boot animation the first time Neo is opened per
+    // browser session — it used to run in full on every single visit.
+    if (view === "neo" && prevViewRef.current !== "neo") {
+      let seen = false;
+      try { seen = sessionStorage.getItem("neoBooted") === "1"; } catch {}
+      if (!seen) {
+        setNeoBooting(true);
+        try { sessionStorage.setItem("neoBooted", "1"); } catch {}
+      }
+    }
     prevViewRef.current = view;
   }, [view]);
   const loading = cardsLoading || modelsLoading || tasksLoading || settingsLoading || statsLoading || reelsLoading || trendsLoading;
@@ -11891,7 +11639,7 @@ function App() {
           {neoBooting && <NeoBootSequence onDone={() => setNeoBooting(false)} />}
           <CircuitBoardBG />
           <button onClick={() => setView("dashboard")}
-            className="tap fixed top-4 right-4 z-50 flex items-center gap-2 px-3 py-2 rounded-lg border font-mono fs-11 uppercase tracking-widest transition-colors"
+            className="tap fixed top-4 right-4 z-[110] flex items-center gap-2 px-3 py-2 rounded-lg border font-mono fs-11 uppercase tracking-widest transition-colors"
             style={{ borderColor: "rgba(57,230,115,0.35)", color: "#39e673", background: "rgba(3,7,5,0.6)", backdropFilter: "blur(6px)" }}>
             <X size={14} /> Leave Neo
           </button>
@@ -12017,7 +11765,12 @@ function App() {
                 <button key={n.id} onClick={() => {
                   if (n.id === "neo") {
                     primeNeoAudioUnlock();
-                    setNeoBooting(true);
+                    let seen = false;
+                    try { seen = sessionStorage.getItem("neoBooted") === "1"; } catch {}
+                    if (!seen) {
+                      setNeoBooting(true);
+                      try { sessionStorage.setItem("neoBooted", "1"); } catch {}
+                    }
                     const gName = session.role === "admin" ? "Boss" : (session.name || "there");
                     prefetchNeoGreeting(`Hi ${gName}! How can I help you today?`);
                   }
@@ -12065,13 +11818,13 @@ function App() {
             {currentView === "stats" && <StatsManager stats={scopedStats} persistStats={scopedPersistStats} models={agencyModels} reels={scopedReels} persistReels={scopedPersistReels} />}
             {currentView === "reelsorter" && isAdmin && <ReelSorterPage />}
             {currentView === "titlegen" && isAdmin && <TitleGeneratorPage />}
-            {currentView === "weeklytrends" && isAdmin && <TrendsPage weeklyTrendReels={weeklyTrendReels} onReload={reloadWeeklyTrendReels} />}
+            {currentView === "weeklytrends" && isAdmin && <TrendsPage weeklyTrendReels={weeklyTrendReels} onReload={reloadWeeklyTrendReels} loading={weeklyTrendReelsLoading} />}
             {currentView === "trending" && <CreatorTrending trends={trends} agency={session.agency} />}
             {currentView === "models" && <ModelManager models={agencyModels} persistModels={scopedPersistModels} cards={scopedCards} reels={scopedReels} agency={session.agency} bufferDailyStats={bufferDailyStats} />}
             {currentView === "whatsnew" && <WhatsNewPage />}
             {currentView === "settings" && (isAdmin
-              ? <SettingsPanel settings={settings} persistSettings={persistSettings} agency={session.agency} />
-              : <CreatorSettingsPanel model={models.find((m) => m.name === session.name)} persistModels={persistModels} models={models} />)}
+              ? <SettingsPanel settings={settings} persistSettings={persistSettings} />
+              : <CreatorSettingsPanel />)}
           </main>
         </div>
       </div>
