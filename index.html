@@ -771,28 +771,39 @@ function useSupaSettings(fallback) {
 
 // buffer_daily_stats is populated by the Buffer-sync Edge Function on a
 // schedule — the frontend only ever reads it, never writes.
+// publer-sync writes buffer_daily_stats hourly on its own schedule server-
+// side — but a page that's just sitting open never knew that and kept
+// showing whatever it read on first load until someone hit refresh or
+// reloaded the tab. Re-reads every REFRESH_POLL_MS so a landed sync shows
+// up on its own; this is just a cheap Supabase table read (not a real
+// Publer API call), so polling it isn't expensive.
+const REFRESH_POLL_MS = 15 * 60 * 1000; // 15 min
+
 function useSupaBufferStats() {
   const [value, setValue] = useState([]);
   const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabaseClient.from("buffer_daily_stats").select("*");
-        if (error) throw error;
-        setValue((data || []).map((r) => ({
-          id: r.id, model: r.model, channelId: r.channel_id, statDate: r.stat_date,
-          postCount: r.post_count, reactions: r.reactions, comments: r.comments, reposts: r.reposts,
-          impressions: r.impressions, clicks: r.clicks, engagementRate: r.engagement_rate,
-          syncedAt: r.synced_at, platform: r.platform,
-        })));
-      } catch (e) {
-        console.error("load failed for buffer_daily_stats", e);
-        setValue([]);
-      }
-      setLoading(false);
-    })();
+  const load = useCallback(async (isFirst) => {
+    if (isFirst) setLoading(true);
+    try {
+      const { data, error } = await supabaseClient.from("buffer_daily_stats").select("*");
+      if (error) throw error;
+      setValue((data || []).map((r) => ({
+        id: r.id, model: r.model, channelId: r.channel_id, statDate: r.stat_date,
+        postCount: r.post_count, reactions: r.reactions, comments: r.comments, reposts: r.reposts,
+        impressions: r.impressions, clicks: r.clicks, engagementRate: r.engagement_rate,
+        syncedAt: r.synced_at, platform: r.platform,
+      })));
+    } catch (e) {
+      console.error("load failed for buffer_daily_stats", e);
+      if (isFirst) setValue([]);
+    }
+    if (isFirst) setLoading(false);
   }, []);
+  useEffect(() => {
+    load(true);
+    const t = setInterval(() => load(false), REFRESH_POLL_MS);
+    return () => clearInterval(t);
+  }, [load]);
   return { value, loading };
 }
 
@@ -801,26 +812,29 @@ function useSupaBufferStats() {
 function useSupaBufferTopPosts() {
   const [value, setValue] = useState([]);
   const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabaseClient.from("buffer_top_posts").select("*");
-        if (error) throw error;
-        setValue((data || []).map((r) => ({
-          id: r.id, model: r.model, platform: r.platform,
-          text: r.text || "", thumbnailUrl: r.thumbnail_url || "", sourceUrl: r.source_url || "",
-          externalLink: r.external_link || "", impressions: r.impressions || 0, reactions: r.reactions || 0,
-          comments: r.comments || 0, reposts: r.reposts || 0,
-          sentAt: r.sent_at ? new Date(r.sent_at).getTime() : null,
-        })));
-      } catch (e) {
-        console.error("load failed for buffer_top_posts", e);
-        setValue([]);
-      }
-      setLoading(false);
-    })();
+  const load = useCallback(async (isFirst) => {
+    if (isFirst) setLoading(true);
+    try {
+      const { data, error } = await supabaseClient.from("buffer_top_posts").select("*");
+      if (error) throw error;
+      setValue((data || []).map((r) => ({
+        id: r.id, model: r.model, platform: r.platform,
+        text: r.text || "", thumbnailUrl: r.thumbnail_url || "", sourceUrl: r.source_url || "",
+        externalLink: r.external_link || "", impressions: r.impressions || 0, reactions: r.reactions || 0,
+        comments: r.comments || 0, reposts: r.reposts || 0,
+        sentAt: r.sent_at ? new Date(r.sent_at).getTime() : null,
+      })));
+    } catch (e) {
+      console.error("load failed for buffer_top_posts", e);
+      if (isFirst) setValue([]);
+    }
+    if (isFirst) setLoading(false);
   }, []);
+  useEffect(() => {
+    load(true);
+    const t = setInterval(() => load(false), REFRESH_POLL_MS);
+    return () => clearInterval(t);
+  }, [load]);
   return { value, loading };
 }
 
@@ -10401,6 +10415,11 @@ function useSupaInflowwDailyStats() {
 
   useEffect(() => {
     (async () => { setLoading(true); await load(); setLoading(false); })();
+    // infloww-sync also runs hourly server-side on its own — re-read the
+    // table periodically so a landed sync shows up without anyone having to
+    // hit "refresh" (which re-triggers a real sync) or reload the tab.
+    const t = setInterval(() => { load(); }, REFRESH_POLL_MS);
+    return () => clearInterval(t);
   }, [load]);
 
   // Manual refresh: pokes the infloww-sync Edge Function (the same job that runs on its
