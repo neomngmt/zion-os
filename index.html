@@ -2036,13 +2036,17 @@ function AccountShareRing({ name, color, value, shareOfTotal, sublabel }) {
 // same visual language as the content-plan CalendarView (dots per day, a
 // side panel for the selected day) so "what's scheduled" reads the same
 // way everywhere in the app, instead of a plain chronological list.
-function ScheduledPostsCalendar({ posts, accountColor, glowRgb }) {
-  const initialMonth = React.useMemo(() => {
-    const first = posts.find((p) => p.scheduledAt);
-    const d = first ? new Date(first.scheduledAt) : new Date();
-    return { year: d.getFullYear(), month: d.getMonth() };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const [cursor, setCursor] = React.useState(initialMonth);
+// Shows both what's already gone out (status: "posted") and what's queued
+// up next (status: "scheduled") on the same month grid — each post's date
+// is normalized into `scheduledAt` regardless of which one it actually is
+// (its real publish time for a posted item, its scheduled time for a
+// queued one), so the rest of this component's date-bucketing logic
+// doesn't need to know the difference.
+function PlatformPostsCalendar({ posts, accountColor, glowRgb }) {
+  // Always open on today's month — the merged list spans both past
+  // (posted) and future (scheduled) dates now, so "the first post found"
+  // is no longer a reliable "what's relevant right now" default.
+  const [cursor, setCursor] = React.useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; });
   const postsByDate = React.useMemo(() => {
     const map = {};
     posts.forEach((p) => {
@@ -2053,8 +2057,16 @@ function ScheduledPostsCalendar({ posts, accountColor, glowRgb }) {
     Object.values(map).forEach((list) => list.sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt)));
     return map;
   }, [posts]);
-  const firstDateWithPosts = Object.keys(postsByDate).sort()[0];
-  const [selected, setSelected] = React.useState(firstDateWithPosts || todayISO());
+  // Land on today if it has anything; otherwise the nearest upcoming
+  // scheduled date; otherwise the most recent posted date; otherwise just
+  // today with an empty state.
+  const [selected, setSelected] = React.useState(() => {
+    const today = todayISO();
+    if (postsByDate[today]) return today;
+    const dates = Object.keys(postsByDate).sort();
+    const nextUp = dates.find((d) => d >= today);
+    return nextUp || dates[dates.length - 1] || today;
+  });
 
   const first = new Date(cursor.year, cursor.month, 1);
   const startOffset = (first.getDay() + 6) % 7;
@@ -2104,7 +2116,11 @@ function ScheduledPostsCalendar({ posts, accountColor, glowRgb }) {
                 <span className="fs-9 font-mono" style={{ color: isToday ? glowRgb : "#9d9b95" }}>{d}</span>
                 <div className="flex flex-wrap gap-0.5 mt-auto">
                   {items.slice(0, 4).map((p, idx) => (
-                    <span key={idx} style={{ backgroundColor: accountColor(p.model) }} className="w-1.5 h-1.5 rounded-full" />
+                    // Filled dot = already posted. Hollow ring = still scheduled.
+                    <span key={idx} className="w-1.5 h-1.5 rounded-full"
+                      style={p.status === "posted"
+                        ? { backgroundColor: accountColor(p.model) }
+                        : { backgroundColor: "transparent", border: `1.5px solid ${accountColor(p.model)}` }} />
                   ))}
                 </div>
               </button>
@@ -2116,12 +2132,13 @@ function ScheduledPostsCalendar({ posts, accountColor, glowRgb }) {
       <div className="lg:col-span-3 c-bg-surface rounded-xl p-4" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
         <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-3">{fmtDay(selected) || "—"}</div>
         {selectedPosts.length === 0 ? (
-          <div className="fs-11 c-faint font-mono italic py-8 text-center">nothing scheduled this day</div>
+          <div className="fs-11 c-faint font-mono italic py-8 text-center">nothing posted or scheduled this day</div>
         ) : (
           <div className="flex flex-col gap-1.5">
             {selectedPosts.map((p) => {
               const color = accountColor(p.model);
               const ts = p.scheduledAt ? new Date(p.scheduledAt).getTime() : null;
+              const isPosted = p.status === "posted";
               return (
                 <div key={p.id} className="flex items-center gap-3 rounded-lg p-2" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
                   {p.thumbnailUrl ? (
@@ -2129,9 +2146,15 @@ function ScheduledPostsCalendar({ posts, accountColor, glowRgb }) {
                   ) : (
                     <div className="flex-shrink-0 rounded-lg c-bg-app" style={{ width: 44, height: 44 }} />
                   )}
+                  {isPosted
+                    ? <CheckCircle2 size={13} className="flex-shrink-0" style={{ color: glowRgb }} />
+                    : <Calendar size={13} className="flex-shrink-0 c-faint" />}
                   <span className="fs-10 font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: color + "26", color }}>{p.model}</span>
                   <div className="flex-1 min-w-0 fs-11 c-text truncate">{p.text || <span className="c-faint italic">No text</span>}</div>
-                  <div className="flex-shrink-0 fs-10 font-mono c-faint">{ts ? new Date(ts).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : ""}</div>
+                  <div className="flex-shrink-0 fs-10 font-mono text-right" style={{ color: isPosted ? glowRgb : "#9d9b95" }}>
+                    {isPosted ? "posted" : "scheduled"}
+                    <span className="c-faint block">{ts ? new Date(ts).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : ""}</span>
+                  </div>
                 </div>
               );
             })}
@@ -2243,6 +2266,16 @@ function PlatformOverviewDashboard({
     })();
     return () => { cancelled = true; };
   }, [account, platform, connectedModels.map((m) => m.name).join(",")]);
+
+  // Merged calendar feed: everything already posted (from livePosts, real
+  // publish time in scheduledAt) plus everything still queued up
+  // (scheduledPosts) — same shape either way, just tagged with which one it
+  // is, so PlatformPostsCalendar can show both on one month grid.
+  const calendarPosts = React.useMemo(() => {
+    const posted = (livePosts || []).map((p) => ({ ...p, status: "posted" }));
+    const scheduled = (scheduledPosts || []).map((p) => ({ ...p, status: "scheduled" }));
+    return [...posted, ...scheduled];
+  }, [livePosts, scheduledPosts]);
 
   // Cursor-tilt, scoped to just the header row (icon/title/CTA) rather than
   // the whole panel — this used to be applied to the entire outer container,
@@ -2383,12 +2416,12 @@ function PlatformOverviewDashboard({
             </div>
           </div>
 
-          {scheduledPosts != null && (
+          {(livePosts != null || scheduledPosts != null) && (
             <div className="c-bg-app rounded-xl p-4 mb-5" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
               <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-3">
-                Scheduled · upcoming ({scheduledPosts.length})
+                Posts calendar ({(scheduledPosts || []).length} scheduled · {(livePosts || []).length} posted)
               </div>
-              <ScheduledPostsCalendar key={account} posts={scheduledPosts} accountColor={accountColor} glowRgb={glowRgb} />
+              <PlatformPostsCalendar key={account} posts={calendarPosts} accountColor={accountColor} glowRgb={glowRgb} />
             </div>
           )}
 
@@ -2661,6 +2694,30 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
     })();
     return () => { cancelled = true; };
   }, [demoModelName, igRange]);
+
+  // Not-yet-published queue, same pattern as the X/TikTok dashboards.
+  const [scheduledPosts, setScheduledPosts] = React.useState(null);
+  React.useEffect(() => {
+    if (!demoModelName) { setScheduledPosts(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabaseClient.functions.invoke("publer-scheduled", { body: { platform: "ig", modelName: demoModelName } });
+        if (cancelled) return;
+        setScheduledPosts(!error && data?.scheduled ? data.scheduled : []);
+      } catch (e) {
+        if (!cancelled) setScheduledPosts([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [demoModelName]);
+
+  const igAccountColor = (name) => MASS_PLANNER_COLORS[connectedModels.findIndex((m) => m.name === name) % MASS_PLANNER_COLORS.length];
+  const igCalendarPosts = React.useMemo(() => {
+    const posted = (livePosts || []).map((p) => ({ ...p, model: demoModelName, status: "posted" }));
+    const scheduled = (scheduledPosts || []).map((p) => ({ ...p, status: "scheduled" }));
+    return [...posted, ...scheduled];
+  }, [livePosts, scheduledPosts, demoModelName]);
 
   const dateNDaysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
   const rangeAgoStr = dateNDaysAgo(igRange - 1);
@@ -3002,6 +3059,15 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanP
                 )}
               </div>
             </div>
+
+            {(livePosts != null || scheduledPosts != null) && (
+              <div className="rounded-3xl p-5 mb-4" style={{ background: C.card, border: C.cardBorder }}>
+                <div className="fs-13 font-semibold mb-3">
+                  Posts calendar ({(scheduledPosts || []).length} scheduled · {(livePosts || []).length} posted)
+                </div>
+                <PlatformPostsCalendar key={demoModelName} posts={igCalendarPosts} accountColor={igAccountColor} glowRgb={C.accentA} />
+              </div>
+            )}
 
             {/* Post activity table */}
             {topPosts.length > 0 && (
