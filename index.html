@@ -316,188 +316,6 @@ const SUPABASE_ANON_KEY = "sb_publishable_LkaAa6azdXD1emOoN2rCOQ_E-4NSy7V";
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const TABLES = {
-  "pipeline:models": {
-    table: "models", mode: "list", idKey: "name",
-    toDb: (m) => ({
-      name: m.name, note: m.note || "", pin: m.pin || "", onboarded: !!m.onboarded,
-      ig_handle: m.igHandle || "", x_handle: m.xHandle || "", tiktok_handle: m.tiktokHandle || "",
-      of_url: m.ofUrl || "", drive_url: m.driveUrl || "", bio: m.bio || "",
-      bio_received_at: m.bioReceivedAt ? new Date(m.bioReceivedAt).toISOString() : null,
-      always_onboard: !!m.alwaysOnboard, agency: m.agency || "CZ",
-      buffer_channel_id_ig: m.bufferChannelIdIg || "", buffer_channel_id_x: m.bufferChannelIdX || "",
-      buffer_channel_id_tiktok: m.bufferChannelIdTiktok || "", buffer_channel_id_fb: m.bufferChannelIdFb || "",
-      infloww_creator_id_free: m.inflowwCreatorIdFree || "", infloww_creator_id_paid: m.inflowwCreatorIdPaid || "",
-      notif_last_seen: m.notifLastSeen ? new Date(m.notifLastSeen).toISOString() : new Date().toISOString(),
-    }),
-    fromDb: (r) => ({
-      name: r.name, note: r.note || "", pin: r.pin || "", onboarded: !!r.onboarded,
-      igHandle: r.ig_handle || "", xHandle: r.x_handle || "", tiktokHandle: r.tiktok_handle || "",
-      ofUrl: r.of_url || "", driveUrl: r.drive_url || "", bio: r.bio || "",
-      bioReceivedAt: r.bio_received_at ? new Date(r.bio_received_at).getTime() : null,
-      alwaysOnboard: !!r.always_onboard, agency: r.agency || "CZ",
-      bufferChannelIdIg: r.buffer_channel_id_ig || "", bufferChannelIdX: r.buffer_channel_id_x || "",
-      bufferChannelIdTiktok: r.buffer_channel_id_tiktok || "", bufferChannelIdFb: r.buffer_channel_id_fb || "",
-      inflowwCreatorIdFree: r.infloww_creator_id_free || "", inflowwCreatorIdPaid: r.infloww_creator_id_paid || "",
-      notifLastSeen: r.notif_last_seen ? new Date(r.notif_last_seen).getTime() : Date.now(),
-      addedAt: r.added_at ? new Date(r.added_at).getTime() : Date.now(),
-    }),
-  },
-  "pipeline:cards": {
-    table: "cards", mode: "list", idKey: "id",
-    toDb: (c) => ({
-      id: c.id, seq: c.seq, title: c.title || "", model: c.model || null,
-      scene_type: c.sceneType || "", location: c.location || "", deadline: c.deadline || null,
-      assignee: c.assignee || "", script_link: c.scriptLink || "", notes: c.notes || "",
-      stage: c.stage || "idea", source: c.source || "team", platform: c.platform || "ig",
-    }),
-    fromDb: (r) => ({
-      id: r.id, seq: r.seq, title: r.title || "", model: r.model,
-      sceneType: r.scene_type || "", location: r.location || "", deadline: r.deadline || "",
-      assignee: r.assignee || "", scriptLink: r.script_link || "", notes: r.notes || "",
-      stage: r.stage || "idea", source: r.source || "team", platform: r.platform || "ig",
-      createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
-    }),
-  },
-  "pipeline:tasks": {
-    table: "tasks", mode: "list", idKey: "id",
-    toDb: (t) => ({
-      id: t.id, seq: t.seq, title: t.title || "", model: t.model || null,
-      assignee: t.assignee || "", due_date: t.dueDate || null, recurring: !!t.recurring,
-      status: t.status || "todo", notes: t.notes || "",
-    }),
-    fromDb: (r) => ({
-      id: r.id, seq: r.seq, title: r.title || "", model: r.model, assignee: r.assignee || "",
-      dueDate: r.due_date || "", recurring: !!r.recurring, status: r.status || "todo", notes: r.notes || "",
-      createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
-    }),
-  },
-  "pipeline:stats": {
-    table: "stats", mode: "list", idKey: "id",
-    toDb: (s) => ({
-      id: s.id, model: s.model || null, week_of: s.weekOf || null,
-      of_earnings: s.ofEarnings || 0, earnings_goal: s.earningsGoal || 0,
-      of_subs: s.ofSubs || 0, ig_followers: s.igFollowers || 0, ig_reach: s.igReach || 0,
-    }),
-    fromDb: (r) => ({
-      id: r.id, model: r.model, weekOf: r.week_of || "",
-      ofEarnings: Number(r.of_earnings) || 0, earningsGoal: Number(r.earnings_goal) || 0,
-      ofSubs: r.of_subs || 0, igFollowers: r.ig_followers || 0, igReach: r.ig_reach || 0,
-      createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
-    }),
-  },
-  "pipeline:reels": {
-    table: "reels", mode: "list", idKey: "id",
-    toDb: (r) => ({
-      id: r.id, model: r.model || null, week_of: r.weekOf || null, title: r.title || "", link: r.link || "",
-      views: r.views || 0, likes: r.likes || 0, shares: r.shares || 0, comments: r.comments || 0,
-    }),
-    fromDb: (row) => ({
-      id: row.id, model: row.model, weekOf: row.week_of || "", title: row.title || "", link: row.link || "",
-      views: row.views || 0, likes: row.likes || 0, shares: row.shares || 0, comments: row.comments || 0,
-      createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
-    }),
-  },
-  "pipeline:trends": {
-    table: "trends", mode: "list", idKey: "id",
-    toDb: (t) => ({
-      id: t.id, show_cz: t.showCZ !== false, show_us: t.showUS !== false, category: t.category || "General",
-      title: t.title || "", description: t.description || "", link: t.link || "", week_of: t.weekOf || null,
-    }),
-    fromDb: (row) => ({
-      id: row.id, showCZ: !!row.show_cz, showUS: !!row.show_us, category: row.category || "General",
-      title: row.title || "", description: row.description || "", link: row.link || "", weekOf: row.week_of || "",
-      createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
-    }),
-  },
-  "pipeline:bufferDailyStats": {
-    // Written server-side once a day by the sync-buffer-stats Edge Function.
-    // The app only ever reads this — never persists to it directly.
-    table: "buffer_daily_stats", mode: "list", idKey: "id",
-    toDb: (r) => r, // not used in practice, but kept for shape consistency
-    fromDb: (row) => ({
-      id: row.id, model: row.model, platform: row.platform, statDate: row.stat_date,
-      postCount: row.post_count || 0, reactions: row.reactions || 0, comments: row.comments || 0,
-      reposts: row.reposts || 0, impressions: row.impressions || 0, clicks: row.clicks || 0,
-      engagementRate: Number(row.engagement_rate) || 0,
-      syncedAt: row.synced_at ? new Date(row.synced_at).getTime() : Date.now(),
-    }),
-  },
-  "pipeline:bufferTopPosts": {
-    // Written server-side by sync-buffer-stats — one row per model+platform, always
-    // reflecting the best-performing (by impressions) post from the last 7 days.
-    table: "buffer_top_posts", mode: "list", idKey: "id",
-    toDb: (r) => r,
-    fromDb: (row) => ({
-      id: row.id, model: row.model, platform: row.platform,
-      text: row.text || "", thumbnailUrl: row.thumbnail_url || "", sourceUrl: row.source_url || "",
-      externalLink: row.external_link || "", impressions: row.impressions || 0, reactions: row.reactions || 0,
-      comments: row.comments || 0, reposts: row.reposts || 0,
-      sentAt: row.sent_at ? new Date(row.sent_at).getTime() : null,
-      syncedAt: row.synced_at ? new Date(row.synced_at).getTime() : Date.now(),
-    }),
-  },
-  "pipeline:settings": {
-    table: "settings", mode: "singleton",
-    toDb: (s) => ({ id: 1, admin_pin_cz: s.adminPinCZ || "", admin_pin_us: s.adminPinUS || "", infloww_api_key: s.inflowwApiKey || "" }),
-    fromDb: (r) => ({ adminPinCZ: r.admin_pin_cz || "", adminPinUS: r.admin_pin_us || "", inflowwApiKey: r.infloww_api_key || "" }),
-  },
-};
-
-if (!window.storage) {
-  window.storage = {
-    async get(key) {
-      const cfg = TABLES[key];
-      if (!cfg) return null;
-      try {
-        if (cfg.mode === "singleton") {
-          const { data, error } = await supabaseClient.from(cfg.table).select("*").eq("id", 1).maybeSingle();
-          if (error || !data) return null;
-          return { key, value: JSON.stringify(cfg.fromDb(data)) };
-        }
-        const { data, error } = await supabaseClient.from(cfg.table).select("*");
-        if (error) { console.error("storage.get", key, error); return null; }
-        return { key, value: JSON.stringify((data || []).map(cfg.fromDb)) };
-      } catch (e) { console.error("storage.get threw", key, e); return null; }
-    },
-    async set(key, value) {
-      const cfg = TABLES[key];
-      if (!cfg) return null;
-      try {
-        const parsed = JSON.parse(value);
-        if (cfg.mode === "singleton") {
-          const { error } = await supabaseClient.from(cfg.table).upsert(cfg.toDb(parsed));
-          if (error) { console.error("storage.set", key, error); return null; }
-          return { key, value };
-        }
-        const rows = parsed.map(cfg.toDb);
-        if (rows.length) {
-          const { error } = await supabaseClient.from(cfg.table).upsert(rows);
-          if (error) { console.error("storage.set upsert", key, error); return null; }
-        }
-        // Remove rows that are no longer present in the current array (handles deletes).
-        const { data: existing } = await supabaseClient.from(cfg.table).select(cfg.idKey);
-        const currentIds = new Set(rows.map((r) => r[cfg.idKey]));
-        const toDelete = (existing || []).map((r) => r[cfg.idKey]).filter((id) => !currentIds.has(id));
-        if (toDelete.length) {
-          await supabaseClient.from(cfg.table).delete().in(cfg.idKey, toDelete);
-        }
-        return { key, value };
-      } catch (e) { console.error("storage.set threw", key, e); return null; }
-    },
-    async delete(key) {
-      const cfg = TABLES[key];
-      if (!cfg) return null;
-      try {
-        if (cfg.mode === "singleton") await supabaseClient.from(cfg.table).delete().eq("id", 1);
-        else await supabaseClient.from(cfg.table).delete().neq(cfg.idKey, "__none__");
-        return { key, deleted: true };
-      } catch { return null; }
-    },
-    async list() { return { keys: Object.keys(TABLES) }; },
-  };
-}
-
 // ---------------------------------------------------------------------------
 // App code (from agency-os.jsx)
 // ---------------------------------------------------------------------------
@@ -817,7 +635,7 @@ canvas { display: block; }
 // upserts every row in `next` and deletes whatever existed before but isn't
 // in `next` anymore — so the UI's "replace the whole array" style keeps
 // working exactly like it did with the old (broken) storage.
-function useSupaTable(table, idField, fallback, toJS, toDB) {
+function useSupaTable(table, idField, fallback, toJS, toDB, columns = "*") {
   const [value, setValue] = useState(fallback);
   const [loading, setLoading] = useState(true);
   const prevIdsRef = useRef(new Set());
@@ -825,7 +643,7 @@ function useSupaTable(table, idField, fallback, toJS, toDB) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabaseClient.from(table).select("*");
+      const { data, error } = await supabaseClient.from(table).select(columns);
       if (error) throw error;
       const mapped = (data || []).map(toJS);
       prevIdsRef.current = new Set(mapped.map((r) => r[idField]));
@@ -894,6 +712,17 @@ function useSupaAppState(key, fallback) {
   return { value, loading, persist };
 }
 
+// admin_pin_cz/us and infloww_api_key are deliberately never selected here —
+// those columns are readable via the public anon key (this app has no real
+// per-user Postgres role to scope RLS by), so fetching them client-side put
+// the live admin PINs and the real Infloww API key in the network response
+// of every single page load, before anyone logged in. Login now verifies
+// PINs server-side via the auth-verify Edge Function (which uses the
+// service-role key and never returns the values), and those two fields are
+// column-privilege-revoked from anon SELECT at the database level too — see
+// the note in the auth-verify function. adminPinCZ/adminPinUS/inflowwApiKey
+// stay in the returned shape as write-only fields (always empty on load) so
+// SettingsPanel's "set a new PIN" flow keeps working unchanged.
 function useSupaSettings(fallback) {
   const [value, setValue] = useState(fallback);
   const [loading, setLoading] = useState(true);
@@ -901,9 +730,9 @@ function useSupaSettings(fallback) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabaseClient.from("settings").select("*").eq("id", 1).maybeSingle();
+      const { data, error } = await supabaseClient.from("settings").select("id, monthly_revenue_goal, neo_orb_layout").eq("id", 1).maybeSingle();
       if (error) throw error;
-      setValue(data ? { adminPinCZ: data.admin_pin_cz || fallback.adminPinCZ, adminPinUS: data.admin_pin_us || fallback.adminPinUS, inflowwApiKey: data.infloww_api_key || "", monthlyRevenueGoal: data.monthly_revenue_goal != null ? Number(data.monthly_revenue_goal) : (fallback.monthlyRevenueGoal || 20000), neoOrbLayout: data.neo_orb_layout ? JSON.parse(data.neo_orb_layout) : (fallback.neoOrbLayout || null) } : fallback);
+      setValue(data ? { adminPinCZ: "", adminPinUS: "", inflowwApiKey: "", monthlyRevenueGoal: data.monthly_revenue_goal != null ? Number(data.monthly_revenue_goal) : (fallback.monthlyRevenueGoal || 20000), neoOrbLayout: data.neo_orb_layout ? JSON.parse(data.neo_orb_layout) : (fallback.neoOrbLayout || null) } : fallback);
     } catch (e) {
       console.error("load failed for settings", e);
       setValue(fallback);
@@ -916,7 +745,16 @@ function useSupaSettings(fallback) {
   const persist = async (next) => {
     setValue(next);
     try {
-      const { error } = await supabaseClient.from("settings").upsert({ id: 1, admin_pin_cz: next.adminPinCZ, admin_pin_us: next.adminPinUS, infloww_api_key: next.inflowwApiKey || "", monthly_revenue_goal: next.monthlyRevenueGoal || 20000, neo_orb_layout: next.neoOrbLayout ? JSON.stringify(next.neoOrbLayout) : null });
+      // Only include the PIN/key columns when the caller actually typed a
+      // new value — omitting a key from the upsert payload leaves the
+      // existing DB value untouched, whereas sending "" would blank it out.
+      // Since these are never fetched (see above), an unrelated save (e.g.
+      // just the revenue goal) must not silently wipe the real PINs.
+      const patch = { id: 1, monthly_revenue_goal: next.monthlyRevenueGoal || 20000, neo_orb_layout: next.neoOrbLayout ? JSON.stringify(next.neoOrbLayout) : null };
+      if (next.adminPinCZ) patch.admin_pin_cz = next.adminPinCZ;
+      if (next.adminPinUS) patch.admin_pin_us = next.adminPinUS;
+      if (next.inflowwApiKey) patch.infloww_api_key = next.inflowwApiKey;
+      const { error } = await supabaseClient.from("settings").upsert(patch);
       if (error) throw error;
     } catch (e) {
       console.error("save failed for settings", e);
@@ -984,7 +822,7 @@ function useSupaBufferTopPosts() {
 // ---- per-table field mapping (JS camelCase <-> Postgres snake_case) ----
 
 const modelsToJS = (r) => ({
-  name: r.name, note: r.note || "", pin: r.pin || "", onboarded: !!r.onboarded,
+  name: r.name, note: r.note || "", onboarded: !!r.onboarded,
   agency: r.agency || "CZ", addedAt: r.added_at ? new Date(r.added_at).getTime() : Date.now(),
   igHandle: r.ig_handle || "", xHandle: r.x_handle || "", tiktokHandle: r.tiktok_handle || "",
   ofUrl: r.of_url || "", driveUrl: r.drive_url || "", bio: r.bio || "",
@@ -998,10 +836,10 @@ const modelsToJS = (r) => ({
   notifLastSeen: r.notif_last_seen ? new Date(r.notif_last_seen).getTime() : 0,
   inspoProfiles: Array.isArray(r.inspo_profiles) ? r.inspo_profiles : (r.inspo_profiles ? JSON.parse(r.inspo_profiles) : []),
   monthlyGoal: r.monthly_goal != null ? Number(r.monthly_goal) : null,
-  igAccessToken: r.ig_access_token || "", igConnectedAt: r.ig_connected_at ? new Date(r.ig_connected_at).getTime() : null,
+  igConnectedAt: r.ig_connected_at ? new Date(r.ig_connected_at).getTime() : null,
 });
 const modelsToDB = (m) => ({
-  name: m.name, note: m.note || "", pin: m.pin || "", onboarded: !!m.onboarded,
+  name: m.name, note: m.note || "", onboarded: !!m.onboarded,
   agency: m.agency || "CZ", added_at: m.addedAt ? new Date(m.addedAt).toISOString() : new Date().toISOString(),
   ig_handle: m.igHandle || "", x_handle: m.xHandle || "", tiktok_handle: m.tiktokHandle || "",
   of_url: m.ofUrl || "", drive_url: m.driveUrl || "", bio: m.bio || "",
@@ -1015,7 +853,6 @@ const modelsToDB = (m) => ({
   notif_last_seen: m.notifLastSeen ? new Date(m.notifLastSeen).toISOString() : null,
   inspo_profiles: m.inspoProfiles || [],
   monthly_goal: m.monthlyGoal != null && m.monthlyGoal !== "" ? Number(m.monthlyGoal) : null,
-  ig_access_token: m.igAccessToken || "", ig_connected_at: m.igConnectedAt ? new Date(m.igConnectedAt).toISOString() : null,
 });
 
 const cardsToJS = (r) => ({
@@ -4423,7 +4260,7 @@ function TikTokContentHub({ models, cards, selectedModelName, onBackToModels }) 
                     <span>·</span>
                     <span>{p.values.retestCount} retests</span>
                   </div>
-                  <button onClick={() => setPresetByModel((pm) => ({ ...pm, [selectedModel]: p.id }))}
+                  <button onClick={() => { setPresetByModel((pm) => ({ ...pm, [selectedModel]: p.id })); setRules((r) => ({ ...r, ...p.values })); }}
                     disabled={!selectedModel}
                     className="fs-10 font-mono uppercase px-3 py-2 rounded-full font-semibold transition-colors disabled:opacity-40"
                     style={{ background: p.color + "22", color: p.color, border: `1px solid ${p.color}55` }}>
@@ -4600,17 +4437,31 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
 
   const addModel = async () => {
     if (!name.trim()) return;
+    const trimmedName = name.trim();
     await persistModels([...models, {
-      name: name.trim(), note, pin: pin.trim(), onboarded: false, addedAt: Date.now(), agency: agency || "CZ",
+      name: trimmedName, note, onboarded: false, addedAt: Date.now(), agency: agency || "CZ",
       igHandle: "", xHandle: "", tiktokHandle: "", ofUrl: "", driveUrl: "", bio: "",
     }]);
+    // pin is a separate, targeted column write (not part of modelsToDB) so a
+    // save elsewhere in the app can never accidentally blank someone's
+    // password — see setModelPin below for why.
+    if (pin.trim()) await supabaseClient.from("models").update({ pin: pin.trim() }).eq("name", trimmedName);
     setName(""); setNote(""); setPin(""); setAdding(false);
   };
   const removeModel = async (n) => {
     await persistModels(models.filter((m) => m.name !== n));
   };
+  // Deliberately NOT routed through persistModels/modelsToDB: those cover
+  // every field EXCEPT pin, precisely so that saving an unrelated edit (a
+  // note, a handle) on ANY model can never blank someone else's password —
+  // modelsToJS/modelsToDB stopped reading/writing pin entirely once the
+  // client stopped being able to fetch it (see the models column allowlist
+  // in App() and auth-verify, which now owns all real pin reads/writes for
+  // login). This is the one legitimate client-side write of the column,
+  // scoped to exactly the row being changed.
   const setModelPin = async (n, newPin) => {
-    await persistModels(models.map((m) => (m.name === n ? { ...m, pin: newPin } : m)));
+    const { error } = await supabaseClient.from("models").update({ pin: newPin }).eq("name", n);
+    if (error) console.error("setModelPin failed", error);
   };
   const toggleAlwaysOnboard = async (n) => {
     await persistModels(models.map((m) => (m.name === n ? { ...m, alwaysOnboard: !m.alwaysOnboard } : m)));
@@ -5181,10 +5032,10 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, 
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
               <div className="fs-10 uppercase tracking-wide c-faint font-mono mb-1">Instagram connection</div>
-              {model.igAccessToken ? (
+              {model.igConnectedAt ? (
                 <div className="fs-11 font-mono c-accent flex items-center gap-1.5">
                   <CheckCircle2 size={12} /> Connected
-                  {model.igConnectedAt && <span className="c-faint">· since {new Date(model.igConnectedAt).toLocaleDateString()}</span>}
+                  <span className="c-faint">· since {new Date(model.igConnectedAt).toLocaleDateString()}</span>
                 </div>
               ) : (
                 <div className="fs-11 font-mono c-faint">Not connected yet</div>
@@ -5198,7 +5049,7 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, 
               }}
               className="flex items-center gap-1.5 fs-11 font-mono uppercase tracking-wide px-3 py-1.5 rounded-full font-semibold flex-shrink-0 transition-colors"
               style={{ background: "rgba(57,230,115,0.08)", color: "#39e673", border: "1px solid rgba(57,230,115,0.3)" }}>
-              <Instagram size={13} /> {model.igAccessToken ? "Reconnect" : "Connect Instagram"}
+              <Instagram size={13} /> {model.igConnectedAt ? "Reconnect" : "Connect Instagram"}
             </button>
           </div>
           <p className="fs-9 c-faint mt-2">Opens Instagram in a new tab — she needs to be logged into {model.name}'s account there, or you approve on her behalf if you have the login.</p>
@@ -8000,7 +7851,7 @@ function ZionMark({ size = 22, gradId = "zionMarkGrad" }) {
   );
 }
 
-function LoginScreen({ models, settings, onLogin, onRegisterPassword }) {
+function LoginScreen({ models, onLogin }) {
   const [tab, setTab] = useState("team");
   const [teamAgency, setTeamAgency] = useState(null);
   const [teamPin, setTeamPin] = useState("");
@@ -8009,29 +7860,64 @@ function LoginScreen({ models, settings, onLogin, onRegisterPassword }) {
   const [error, setError] = useState("");
   const [errorKey, setErrorKey] = useState(0);
   const [legalModal, setLegalModal] = useState(null); // null | "privacy" | "terms"
+  const [submitting, setSubmitting] = useState(false);
   const flagError = (msg) => { setError(msg); setErrorKey((k) => k + 1); };
 
-  const submitTeam = () => {
-    const required = (teamAgency === "US" ? settings.adminPinUS : settings.adminPinCZ) || "";
-    if (required && teamPin !== required) { flagError("Wrong PIN."); return; }
-    onLogin({ role: "admin", name: "Team", agency: teamAgency });
+  // Real PINs/passwords are never fetched into the browser anymore (see
+  // auth-verify) — verification is a round-trip to that Edge Function
+  // instead of a local comparison against models/settings.
+  const submitTeam = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const { data, error } = await supabaseClient.functions.invoke("auth-verify", { body: { type: "team", agency: teamAgency, pin: teamPin } });
+      if (error || !data?.ok) { flagError("Wrong PIN."); return; }
+      onLogin({ role: "admin", name: "Team", agency: teamAgency });
+    } catch (e) {
+      flagError("Couldn't reach the server — try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const matchedModel = models.find((mm) => mm.name.trim().toLowerCase() === creatorName.trim().toLowerCase());
-  const needsRegistration = creatorName.trim() && matchedModel && !matchedModel.pin;
+  // Whether this name already has a password set is looked up server-side
+  // (debounced) purely to drive the "choose a password"/"password" label —
+  // the client never gets to see whether a password exists by inspecting
+  // model data directly, since that column isn't fetched at all anymore.
+  const [creatorHasPassword, setCreatorHasPassword] = useState(null);
+  useEffect(() => {
+    if (!matchedModel) { setCreatorHasPassword(null); return; }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const { data } = await supabaseClient.functions.invoke("auth-verify", { body: { type: "creator-status", name: matchedModel.name } });
+        if (!cancelled) setCreatorHasPassword(!!data?.hasPassword);
+      } catch (e) { if (!cancelled) setCreatorHasPassword(null); }
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [matchedModel?.name]);
+  const needsRegistration = !!matchedModel && creatorHasPassword === false;
 
   const submitCreator = async () => {
-    const typed = creatorName.trim().toLowerCase();
-    const m = models.find((mm) => mm.name.trim().toLowerCase() === typed);
-    if (!m) { flagError("No account with that name. Ask your manager to add you first."); return; }
-    if (!m.pin) {
-      if (!creatorPassword) { flagError("Choose a password to finish setting up your account."); return; }
-      await onRegisterPassword(m.name, creatorPassword);
-      onLogin({ role: "creator", name: m.name, agency: m.agency || "CZ" });
+    if (submitting) return;
+    const typed = creatorName.trim();
+    if (!models.find((mm) => mm.name.trim().toLowerCase() === typed.toLowerCase())) {
+      flagError("No account with that name. Ask your manager to add you first.");
       return;
     }
-    if (creatorPassword !== m.pin) { flagError("Wrong name or password."); return; }
-    onLogin({ role: "creator", name: m.name, agency: m.agency || "CZ" });
+    setSubmitting(true);
+    try {
+      const { data, error } = await supabaseClient.functions.invoke("auth-verify", { body: { type: "creator-login", name: typed, password: creatorPassword } });
+      if (error) { flagError("Couldn't reach the server — try again."); return; }
+      if (!data?.ok) {
+        flagError(data?.reason === "needs-password" ? "Choose a password to finish setting up your account." : "Wrong name or password.");
+        return;
+      }
+      onLogin({ role: "creator", name: matchedModel?.name || typed, agency: data.agency || "CZ" });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -8094,9 +7980,9 @@ function LoginScreen({ models, settings, onLogin, onRegisterPassword }) {
                 <input type="password" value={teamPin} onChange={(e) => setTeamPin(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && submitTeam()} autoFocus
                   className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2.5 text-sm c-text mb-4 outline-none focus-border-accent transition-colors duration-150" />
-                <button onClick={submitTeam}
-                  className="tap w-full py-2.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold hover-bg-accent2 transition-colors duration-150">
-                  Enter dashboard
+                <button onClick={submitTeam} disabled={submitting}
+                  className="tap w-full py-2.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold hover-bg-accent2 transition-colors duration-150 disabled:opacity-60">
+                  {submitting ? "Checking…" : "Enter dashboard"}
                 </button>
               </div>
             )
@@ -8115,9 +8001,9 @@ function LoginScreen({ models, settings, onLogin, onRegisterPassword }) {
               {needsRegistration && (
                 <p className="fs-10 c-accent font-mono mb-3 anim-view">First time here — this sets your password for next time.</p>
               )}
-              <button onClick={submitCreator}
-                className="tap w-full py-2.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold hover-bg-accent2 transition-colors duration-150 mt-3">
-                {needsRegistration ? "Create password & enter" : "Enter"}
+              <button onClick={submitCreator} disabled={submitting}
+                className="tap w-full py-2.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold hover-bg-accent2 transition-colors duration-150 mt-3 disabled:opacity-60">
+                {submitting ? "Checking…" : needsRegistration ? "Create password & enter" : "Enter"}
               </button>
             </div>
           )}
@@ -10437,7 +10323,11 @@ function StatsManager({ stats, persistStats, models, reels, persistReels }) {
 function DeltaTag({ current, previous }) {
   if (previous === undefined || previous === null) return null;
   const diff = current - previous;
-  const pct = previous !== 0 ? (diff / previous) * 100 : 0;
+  if (previous === 0) {
+    if (current === 0) return <span className="flex items-center gap-0.5 fs-10 font-mono c-muted"><Minus size={10} />0%</span>;
+    return <span className="flex items-center gap-0.5 fs-10 font-mono c-success"><TrendingUp size={10} />New</span>;
+  }
+  const pct = (diff / previous) * 100;
   if (diff === 0) return <span className="flex items-center gap-0.5 fs-10 font-mono c-muted"><Minus size={10} />0%</span>;
   const up = diff > 0;
   return (
@@ -11881,7 +11771,8 @@ function clearSavedSession() {
 
 function App() {
   const { value: cards, loading: cardsLoading, persist: persistCards } = useSupaTable("cards", "id", [], cardsToJS, cardsToDB);
-  const { value: models, loading: modelsLoading, persist: persistModels } = useSupaTable("models", "name", [], modelsToJS, modelsToDB);
+  const { value: models, loading: modelsLoading, persist: persistModels } = useSupaTable("models", "name", [], modelsToJS, modelsToDB,
+    "name, note, onboarded, added_at, ig_handle, x_handle, tiktok_handle, of_url, drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank");
   const { value: tasks, loading: tasksLoading, persist: persistTasks } = useSupaTable("tasks", "id", [], tasksToJS, tasksToDB);
   const { value: stats, loading: statsLoading, persist: persistStats } = useSupaTable("stats", "id", [], statsToJS, statsToDB);
   const { value: reels, loading: reelsLoading, persist: persistReels } = useSupaTable("reels", "id", [], reelsToJS, reelsToDB);
@@ -11947,11 +11838,7 @@ function App() {
     return (
       <LoginScreen
         models={models}
-        settings={settings}
         onLogin={(s) => { saveSession(s); setSession(s); setView("dashboard"); setOnboardingDismissed(false); }}
-        onRegisterPassword={async (name, password) => {
-          await persistModels(models.map((m) => (m.name === name ? { ...m, pin: password } : m)));
-        }}
       />
     );
   }
@@ -12037,7 +11924,9 @@ function App() {
           </div>
         </button>
         <div className="flex items-center gap-1.5 px-4 py-3 flex-1 justify-end min-w-0">
-          <GlobalSearch cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks}
+          <GlobalSearch
+            cards={isAdmin ? scopedCards : (restrictModel ? cards.filter((c) => c.model === restrictModel) : cards)}
+            tasks={isAdmin ? scopedTasks : (restrictModel ? tasks.filter((t) => t.model === restrictModel) : tasks)}
             models={isAdmin ? agencyModels : models} trends={weeklyTrendReels} onNavigate={setView}
             trendsNavId="weeklytrends" showModels={isAdmin} showTrends={isAdmin} navItems={NAV} />
           {session.role === "admin" && (
