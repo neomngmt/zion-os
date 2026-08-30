@@ -3551,12 +3551,35 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
   const [variationDays, setVariationDays] = useState(6);
   const [referenceReelId, setReferenceReelId] = useState(null);
   const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState("");
+  const [genLang, setGenLang] = useState("cs"); // "cs" or "en" — same toggle pattern as the Title Generator
   const [justGenerated, setJustGenerated] = useState(null);
-  const justGeneratedTimerRef = useRef(null);
-  const flashJustGenerated = (payload) => {
-    if (justGeneratedTimerRef.current) clearTimeout(justGeneratedTimerRef.current);
-    setJustGenerated(payload);
-    justGeneratedTimerRef.current = setTimeout(() => setJustGenerated(null), 5000);
+  const [exportCopied, setExportCopied] = useState(false);
+  // No auto-dismiss timer — this panel now carries the actual export
+  // buttons (copy/download the generated plan as .txt), so it has to stay
+  // up until she's actually had a chance to use them, not vanish after 5s.
+  const flashJustGenerated = (payload) => setJustGenerated(payload);
+
+  // "Reel 1: title / Scénář: notes / Odkaz: link (igsh stripped)" — the flat
+  // .txt format asked for, so the whole batch can be copied/downloaded and
+  // handed straight to whoever's filming, no need to open the board.
+  const exportPlanText = (justGenerated?.cards || [])
+    .map((c, i) => `Reel ${i + 1}: ${c.title}\nScénář: ${c.notes || "—"}\nOdkaz: ${c.scriptLink ? cleanIgUrl(c.scriptLink) : "—"}`)
+    .join("\n\n");
+  const copyExportPlan = async () => {
+    try {
+      await navigator.clipboard.writeText(exportPlanText);
+      setExportCopied(true);
+      setTimeout(() => setExportCopied(false), 2000);
+    } catch {}
+  };
+  const downloadExportPlan = () => {
+    const blob = new Blob([exportPlanText], { type: "text/plain" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${modelName.toLowerCase()}-content-plan.txt`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   };
   const [reelAdding, setReelAdding] = useState(false);
   const [reelTitle, setReelTitle] = useState("");
@@ -3576,29 +3599,66 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
   };
   const nextSeq = () => (cards.reduce((m, c) => Math.max(m, c.seq || 0), 0) + 1);
 
+  // Calls the real scene generator (Claude, reading this model's persona +
+  // real scraped viral trend reels from weekly_trend_reels) instead of the
+  // old placeholder titles ("New Generations #3"). Returns [] on failure —
+  // callers fall back to the generic IG_MIX_TYPES description so a broken
+  // call still produces usable (if generic) cards instead of nothing.
+  const callSceneGenerate = async (items) => {
+    try {
+      const { data, error } = await supabaseClient.functions.invoke("ig-scene-generate", { body: { modelName, items, lang: genLang } });
+      if (error) {
+        let detail = error.message || "failed";
+        try {
+          if (error.context && typeof error.context.json === "function") {
+            const body = await error.context.json();
+            if (body?.error) detail = body.error;
+          }
+        } catch {}
+        throw new Error(detail);
+      }
+      if (data?.error) throw new Error(data.error);
+      return Array.isArray(data?.scenes) ? data.scenes : [];
+    } catch (e) {
+      setGenerateError(e.message || "Scene generation failed — used generic placeholders instead.");
+      return [];
+    }
+  };
+
+  const buildCard = (t, n, deadline, scene) => ({
+    id: uid(), title: scene?.title || `${t.label} #${n + 1}`, model: modelName, sceneType: t.label,
+    platform: "ig", location: "", deadline, assignee: "", scriptLink: scene?.referenceUrl || "",
+    notes: scene?.notes || t.desc,
+    stage: "idea", source: "team", createdAt: Date.now(),
+  });
+
   const generatePlan = async (only) => {
     const types = only ? IG_MIX_TYPES.filter((t) => t.id === only) : IG_MIX_TYPES;
+    const items = types.map((t) => ({ mixType: t.id, count: mix[t.id] || 0 })).filter((i) => i.count > 0);
+    if (!items.length) return;
+    const topReel = sortedReels[0];
+    const itemsForApi = items.map((i) =>
+      i.mixType === "variation" && topReel ? { ...i, referenceReel: { title: topReel.title, link: topReel.link } } : i
+    );
+    setGenerating(true);
+    setGenerateError("");
+    const scenes = await callSceneGenerate(itemsForApi);
     let seq = nextSeq();
     const newCards = [];
     let i = 0;
     types.forEach((t) => {
       const count = mix[t.id] || 0;
+      const sceneQueue = scenes.filter((s) => s.mixType === t.id);
       for (let n = 0; n < count; n++) {
         const dayOffset = acrossDays > 0 ? i % acrossDays : 0;
         const deadline = new Date(Date.now() + dayOffset * 86400000).toISOString().slice(0, 10);
-        newCards.push({
-          id: uid(), seq: seq++, title: `${t.label} #${n + 1}`, model: modelName, sceneType: t.label,
-          platform: "ig", location: "", deadline, assignee: "", scriptLink: "", notes: t.desc,
-          stage: "idea", source: "team", createdAt: Date.now(),
-        });
+        newCards.push({ ...buildCard(t, n, deadline, sceneQueue[n]), seq: seq++ });
         i++;
       }
     });
-    if (!newCards.length) return;
-    setGenerating(true);
     await persistCards([...cards, ...newCards]);
     setGenerating(false);
-    flashJustGenerated({ count: newCards.length, days: acrossDays });
+    flashJustGenerated({ count: newCards.length, cards: newCards, days: acrossDays });
   };
 
   const addReel = async () => {
@@ -3613,43 +3673,39 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
 
   const generateBatch = async () => {
     if (!batchCount) return;
+    const generationType = IG_MIX_TYPES.find((t) => t.id === "generation");
+    setGenerating(true);
+    setGenerateError("");
+    const scenes = await callSceneGenerate([{ mixType: "generation", count: batchCount }]);
     let seq = nextSeq();
     const newCards = [];
     for (let n = 0; n < batchCount; n++) {
       const dayOffset = batchDays > 0 ? n % batchDays : 0;
       const deadline = new Date(Date.now() + dayOffset * 86400000).toISOString().slice(0, 10);
-      newCards.push({
-        id: uid(), seq: seq++, title: `New Generations #${n + 1}`, model: modelName, sceneType: "New Generations",
-        platform: "ig", location: "", deadline, assignee: "", scriptLink: "",
-        notes: "From scratch — maximum creativity, her patterns as reference.",
-        stage: "idea", source: "team", createdAt: Date.now(),
-      });
+      newCards.push({ ...buildCard(generationType, n, deadline, scenes[n]), seq: seq++ });
     }
-    setGenerating(true);
     await persistCards([...cards, ...newCards]);
     setGenerating(false);
-    flashJustGenerated({ count: newCards.length, days: batchDays });
+    flashJustGenerated({ count: newCards.length, cards: newCards, days: batchDays });
   };
 
   const generateVariations = async () => {
     const ref = sortedReels.find((r) => r.id === referenceReelId);
     if (!variationCount || !ref) return;
+    const variationType = IG_MIX_TYPES.find((t) => t.id === "variation");
+    setGenerating(true);
+    setGenerateError("");
+    const scenes = await callSceneGenerate([{ mixType: "variation", count: variationCount, referenceReel: { title: ref.title, link: ref.link } }]);
     let seq = nextSeq();
     const newCards = [];
     for (let n = 0; n < variationCount; n++) {
       const dayOffset = variationDays > 0 ? n % variationDays : 0;
       const deadline = new Date(Date.now() + dayOffset * 86400000).toISOString().slice(0, 10);
-      newCards.push({
-        id: uid(), seq: seq++, title: `Variation of "${ref.title}" #${n + 1}`, model: modelName, sceneType: "Variations",
-        platform: "ig", location: "", deadline, assignee: "", scriptLink: ref.link || "",
-        notes: `Varies a winner a little more — keeps the engine, moves the execution. Reference: ${ref.title}`,
-        stage: "idea", source: "team", createdAt: Date.now(),
-      });
+      newCards.push({ ...buildCard(variationType, n, deadline, scenes[n]), seq: seq++ });
     }
-    setGenerating(true);
     await persistCards([...cards, ...newCards]);
     setGenerating(false);
-    flashJustGenerated({ count: newCards.length, days: variationDays });
+    flashJustGenerated({ count: newCards.length, cards: newCards, days: variationDays });
   };
 
   const sortedReels = [...myReels].sort((a, b) => (b.views || 0) - (a.views || 0));
@@ -3758,15 +3814,39 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
             </div>
           </div>
 
+          <div className="flex items-center gap-2 mb-3">
+            <span className="fs-10 uppercase tracking-wide c-faint font-mono">Script language</span>
+            <div className="flex rounded-lg border c-border overflow-hidden">
+              {[["cs", "Česky"], ["en", "English"]].map(([val, label]) => (
+                <button key={val} onClick={() => setGenLang(val)}
+                  className={`tap px-3 py-1.5 fs-11 font-mono uppercase transition-colors ${genLang === val ? "c-bg-accent c-onaccent" : "c-muted hover-bg-surface"}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           <button onClick={generateBatch} disabled={generating || !batchCount}
             className="flex items-center gap-2 fs-12 font-mono uppercase tracking-wide c-bg-accent c-onaccent px-5 py-3 rounded-full font-semibold hover-bg-accent2 disabled:opacity-40"
             style={{ boxShadow: "0 0 24px rgba(57,230,115,0.25)" }}>
             {generating ? <><Loader2 size={14} className="animate-spin" /> Generating...</> : <><Sparkles size={14} /> Generate {batchCount} new scripts</>}
           </button>
           {justGenerated && (
-            <div className="mt-3 fs-11 font-mono c-accent">
-              ✓ {justGenerated.count} scenes added to her board, spread across {justGenerated.days} days.
+            <div className="mt-3">
+              <div className="fs-11 font-mono c-accent">
+                ✓ {justGenerated.count} scenes added to her board, spread across {justGenerated.days} days.
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <button onClick={copyExportPlan} className="tap px-3 py-1.5 rounded-lg border c-border fs-10 font-mono uppercase c-muted hover-bg-surface">
+                  {exportCopied ? "Zkopírováno!" : "Kopírovat jako text"}
+                </button>
+                <button onClick={downloadExportPlan} className="tap px-3 py-1.5 rounded-lg border c-border fs-10 font-mono uppercase c-muted hover-bg-surface">
+                  Stáhnout .txt
+                </button>
+              </div>
             </div>
+          )}
+          {generateError && (
+            <div className="mt-2 fs-10 font-mono italic" style={{ color: "#e07a5f" }}>{generateError}</div>
           )}
         </div>
       )}
@@ -3822,6 +3902,17 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
             </div>
           </div>
 
+          <div className="flex items-center gap-2 mb-3">
+            <span className="fs-10 uppercase tracking-wide c-faint font-mono">Script language</span>
+            <div className="flex rounded-lg border c-border overflow-hidden">
+              {[["cs", "Česky"], ["en", "English"]].map(([val, label]) => (
+                <button key={val} onClick={() => setGenLang(val)}
+                  className={`tap px-3 py-1.5 fs-11 font-mono uppercase transition-colors ${genLang === val ? "c-bg-accent c-onaccent" : "c-muted hover-bg-surface"}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           <button onClick={generateVariations} disabled={generating || !variationCount || !referenceReelId}
             className="flex items-center gap-2 fs-12 font-mono uppercase tracking-wide c-bg-accent c-onaccent px-5 py-3 rounded-full font-semibold hover-bg-accent2 disabled:opacity-40"
             style={{ boxShadow: "0 0 24px rgba(57,230,115,0.25)" }}>
@@ -3829,9 +3920,22 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
           </button>
           {!referenceReelId && sortedReels.length > 0 && <div className="mt-2 fs-10 font-mono c-faint">Pick a reel above first.</div>}
           {justGenerated && (
-            <div className="mt-3 fs-11 font-mono c-accent">
-              ✓ {justGenerated.count} scenes added to her board, spread across {justGenerated.days} days.
+            <div className="mt-3">
+              <div className="fs-11 font-mono c-accent">
+                ✓ {justGenerated.count} scenes added to her board, spread across {justGenerated.days} days.
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <button onClick={copyExportPlan} className="tap px-3 py-1.5 rounded-lg border c-border fs-10 font-mono uppercase c-muted hover-bg-surface">
+                  {exportCopied ? "Zkopírováno!" : "Kopírovat jako text"}
+                </button>
+                <button onClick={downloadExportPlan} className="tap px-3 py-1.5 rounded-lg border c-border fs-10 font-mono uppercase c-muted hover-bg-surface">
+                  Stáhnout .txt
+                </button>
+              </div>
             </div>
+          )}
+          {generateError && (
+            <div className="mt-2 fs-10 font-mono italic" style={{ color: "#e07a5f" }}>{generateError}</div>
           )}
         </div>
       )}
@@ -3897,15 +4001,39 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
             })}
           </div>
 
+          <div className="flex items-center gap-2 mb-3 mt-6">
+            <span className="fs-10 uppercase tracking-wide c-faint font-mono">Script language</span>
+            <div className="flex rounded-lg border c-border overflow-hidden">
+              {[["cs", "Česky"], ["en", "English"]].map(([val, label]) => (
+                <button key={val} onClick={() => setGenLang(val)}
+                  className={`tap px-3 py-1.5 fs-11 font-mono uppercase transition-colors ${genLang === val ? "c-bg-accent c-onaccent" : "c-muted hover-bg-surface"}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           <button onClick={() => generatePlan(null)} disabled={generating || !mixTotal}
-            className="mt-6 flex items-center gap-2 fs-12 font-mono uppercase tracking-wide c-bg-accent c-onaccent px-5 py-3 rounded-full font-semibold hover-bg-accent2 disabled:opacity-40"
+            className="flex items-center gap-2 fs-12 font-mono uppercase tracking-wide c-bg-accent c-onaccent px-5 py-3 rounded-full font-semibold hover-bg-accent2 disabled:opacity-40"
             style={{ boxShadow: "0 0 24px rgba(57,230,115,0.25)" }}>
             {generating ? <><Loader2 size={14} className="animate-spin" /> Generating...</> : <><Zap size={14} /> Generate full week ({mixTotal})</>}
           </button>
           {justGenerated && (
-            <div className="mt-3 fs-11 font-mono c-accent">
-              ✓ {justGenerated.count} scenes added to her board, spread across {justGenerated.days} days.
+            <div className="mt-3">
+              <div className="fs-11 font-mono c-accent">
+                ✓ {justGenerated.count} scenes added to her board, spread across {justGenerated.days} days.
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <button onClick={copyExportPlan} className="tap px-3 py-1.5 rounded-lg border c-border fs-10 font-mono uppercase c-muted hover-bg-surface">
+                  {exportCopied ? "Zkopírováno!" : "Kopírovat jako text"}
+                </button>
+                <button onClick={downloadExportPlan} className="tap px-3 py-1.5 rounded-lg border c-border fs-10 font-mono uppercase c-muted hover-bg-surface">
+                  Stáhnout .txt
+                </button>
+              </div>
             </div>
+          )}
+          {generateError && (
+            <div className="mt-2 fs-10 font-mono italic" style={{ color: "#e07a5f" }}>{generateError}</div>
           )}
         </div>
       )}
