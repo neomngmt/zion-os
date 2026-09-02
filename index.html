@@ -1821,6 +1821,9 @@ function XCompetitorSettings({ competitors, persistCompetitors }) {
   const [open, setOpen] = React.useState(false);
   const [handle, setHandle] = React.useState("");
   const [note, setNote] = React.useState("");
+  const [scanning, setScanning] = React.useState(false);
+  const [scanResult, setScanResult] = React.useState(null);
+  const [scanError, setScanError] = React.useState("");
 
   const addCompetitor = async () => {
     const clean = handle.trim().replace(/^@/, "");
@@ -1830,6 +1833,31 @@ function XCompetitorSettings({ competitors, persistCompetitors }) {
   };
   const removeCompetitor = async (id) => {
     await persistCompetitors((competitors || []).filter((c) => c.id !== id));
+  };
+
+  const scanNow = async () => {
+    setScanning(true);
+    setScanError("");
+    setScanResult(null);
+    try {
+      const { data, error } = await supabaseClient.functions.invoke("weekly-x-trends-scrape", { body: {} });
+      if (error) {
+        let detail = error.message || "failed";
+        try {
+          if (error.context && typeof error.context.json === "function") {
+            const body = await error.context.json();
+            if (body?.error) detail = body.error;
+          }
+        } catch {}
+        throw new Error(detail);
+      }
+      if (data?.error) throw new Error(data.error);
+      setScanResult(data);
+    } catch (e) {
+      setScanError(e.message || "Scan failed");
+    } finally {
+      setScanning(false);
+    }
   };
 
   return (
@@ -1845,7 +1873,7 @@ function XCompetitorSettings({ competitors, persistCompetitors }) {
       {open && (
         <div className="mt-3 pt-3 border-t c-border">
           <p className="fs-11 c-muted font-mono mb-3 max-w-lg">
-            X accounts worth watching for inspiration/benchmarking. No tracking runs against these yet — this is just the list, wired up once there's something worth scraping.
+            X accounts worth watching for inspiration/benchmarking — real viral tweets from these feed straight into the caption generator alongside each model's own history.
           </p>
           <div className="flex flex-wrap gap-2 mb-3">
             <input value={handle} onChange={(e) => setHandle(e.target.value)} placeholder="@handle"
@@ -1874,6 +1902,20 @@ function XCompetitorSettings({ competitors, persistCompetitors }) {
               ))}
             </div>
           )}
+          <div className="mt-3 pt-3 border-t c-border">
+            <button onClick={scanNow} disabled={scanning || !(competitors || []).length}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg c-bg-accent c-onaccent fs-11 font-mono uppercase tracking-wide font-semibold hover-bg-accent2 disabled:opacity-40 tap">
+              {scanning ? <><Loader2 size={12} className="animate-spin" /> Scanning...</> : <><Flame size={12} /> Scan now</>}
+            </button>
+            {!(competitors || []).length && <p className="fs-10 c-faint font-mono mt-1.5">Add at least one account above first.</p>}
+            {scanResult && (
+              <p className="fs-11 font-mono c-accent mt-2">
+                ✓ Scanned {scanResult.profilesScanned} account{scanResult.profilesScanned === 1 ? "" : "s"}, found {scanResult.viralTweetsFound} viral tweet{scanResult.viralTweetsFound === 1 ? "" : "s"}.
+                {scanResult.errors?.length > 0 && ` (${scanResult.errors.length} account${scanResult.errors.length === 1 ? "" : "s"} failed to scan.)`}
+              </p>
+            )}
+            {scanError && <p className="fs-11 font-mono mt-2" style={{ color: "#e07a5f" }}>{scanError}</p>}
+          </div>
         </div>
       )}
     </div>
