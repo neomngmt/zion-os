@@ -1440,6 +1440,62 @@ function DateRangePicker({ start, end, onChange }) {
 // model — no account picker. A shared photo batch split across several
 // models never made sense (a photo belongs to one creator, not a pool), so
 // multi-account planning is gone; this always runs one model at a time.
+
+// Shows WHY the captions look the way they do — the real posts (her own and
+// tracked competitors') and their real numbers that actually informed them,
+// instead of captions just appearing with no visible reasoning behind them.
+function CaptionSourcesBreakdown({ sourcesByModel }) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <div className="mb-4 rounded-xl c-bg-app" style={{ border: "1px solid rgba(57,230,115,0.12)" }}>
+      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between px-4 py-3 tap">
+        <div className="flex items-center gap-2">
+          <Sparkles size={13} className="c-accent" />
+          <span className="fs-12 font-semibold c-text">What these captions are based on</span>
+        </div>
+        <ChevronDown size={14} className={`c-muted transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="px-4 pb-4 flex flex-col gap-4">
+          {Object.entries(sourcesByModel).map(([modelName, sources]) => (
+            <div key={modelName}>
+              <div className="fs-11 font-mono uppercase tracking-wide c-accent mb-1.5">{modelName}</div>
+              {sources.ownWinners?.length > 0 && (
+                <div className="mb-2">
+                  <div className="fs-9 c-faint font-mono uppercase mb-1">Her own real top posts</div>
+                  <div className="flex flex-col gap-1">
+                    {sources.ownWinners.slice(0, 5).map((w, i) => (
+                      <div key={i} className="fs-11 font-mono c-muted flex items-center gap-2">
+                        <span className="c-text truncate">"{w.text}"</span>
+                        <span className="c-faint flex-shrink-0">{w.engagementRate.toFixed(1)}% eng · {w.reach.toLocaleString()} reach</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {sources.competitorTrends?.length > 0 && (
+                <div>
+                  <div className="fs-9 c-faint font-mono uppercase mb-1">Real viral tweets from tracked accounts right now</div>
+                  <div className="flex flex-col gap-1">
+                    {sources.competitorTrends.slice(0, 5).map((t, i) => (
+                      <div key={i} className="fs-11 font-mono c-muted flex items-center gap-2">
+                        <span className="c-text truncate">"{t.text}"</span>
+                        <span className="c-faint flex-shrink-0">@{t.handle} · {t.likes.toLocaleString()} likes · {t.ratio.toFixed(1)}x avg</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {!sources.ownWinners?.length && !sources.competitorTrends?.length && (
+                <div className="fs-11 c-faint font-mono italic">No real historical data yet for her — captions used persona + general style only.</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
   const [open, setOpen] = React.useState(defaultOpen);
   const [selected, setSelected] = React.useState(lockedModel ? [lockedModel] : []);
@@ -1451,6 +1507,7 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
   const [planError, setPlanError] = React.useState("");
   const [itemStates, setItemStates] = React.useState({});
   const [runningAll, setRunningAll] = React.useState(false);
+  const [sourcesByModel, setSourcesByModel] = React.useState({});
 
   // Posting frequency: how many times a day the plan schedules for. The
   // actual clock hours come from computeBestHours (that model's own post
@@ -1509,6 +1566,7 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
     setPlanError("");
     setPlan(null);
     setItemStates({});
+    setSourcesByModel({});
     try {
       const groups = {};
       selected.forEach((n) => { groups[n] = []; });
@@ -1542,6 +1600,7 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
         }
         if (data?.error) throw new Error(`${modelName}: ${data.error}`);
         const captions = data.captions || [];
+        if (data.sources) setSourcesByModel((prev) => ({ ...prev, [modelName]: data.sources }));
         const slots = nextMassPlannerSlots(modelPhotos.length, activeHours, startAt);
         // One caption per photo, in the same order they were sent — no more
         // modulo-cycling a small caption pool, since each caption is now
@@ -1757,6 +1816,8 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
                   {allDone ? "All scheduled" : runningAll ? `Scheduling... ${doneCount}/${plan.length}` : "Schedule"}
                 </button>
               </div>
+
+              {Object.keys(sourcesByModel).length > 0 && <CaptionSourcesBreakdown sourcesByModel={sourcesByModel} />}
 
               <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(7, minmax(140px, 1fr))", overflowX: "auto" }}>
                 {weekDays.map((day) => {
