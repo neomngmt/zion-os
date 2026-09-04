@@ -4710,7 +4710,7 @@ function TikTokContentHub({ models, cards, selectedModelName, onBackToModels }) 
 
 // ---------- model manager ----------
 
-function ModelManager({ models, persistModels, cards, reels, agency, bufferDailyStats }) {
+function ModelManager({ models, persistModels, cards, reels, agency, bufferDailyStats, inflowwDailyStats }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [note, setNote] = useState("");
@@ -5046,6 +5046,7 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
       {detailModel && (
         <ModelProfileDashboard model={detailModel} cards={cards} reels={reels} maxViewsAcrossModels={maxViews}
           myViews7d={rows.find((r) => r.model.name === detailModel.name)?.views7d || 0}
+          bufferDailyStats={bufferDailyStats} inflowwDailyStats={inflowwDailyStats}
           onClose={() => setDetailName(null)} onEdit={() => { setDetailName(null); setEditName(detailModel.name); }} />
       )}
 
@@ -5057,12 +5058,40 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
   );
 }
 
-function ModelProfileDashboard({ model, cards, reels, maxViewsAcrossModels, myViews7d, onClose, onEdit }) {
+function ModelProfileDashboard({ model, cards, reels, maxViewsAcrossModels, myViews7d, bufferDailyStats, inflowwDailyStats, onClose, onEdit }) {
   const [tab, setTab] = useState("overview"); // overview | journey
   const clock = useLiveClock();
 
   const own = cards.filter((c) => c.model === model.name);
   const myReels = (reels || []).filter((r) => r.model === model.name);
+
+  // ---- IG views -> subs, day by day: real IG views (Publer/buffer_daily_stats)
+  // against real new subscribers that same day (Infloww Creator Report,
+  // subscriber-count endpoint) — a same-day 24h pairing, not a lagged/rolling
+  // attribution model. Noisy day to day (a sub can come from exposure days
+  // earlier, and IG isn't connected for every model yet) but the last-14-days
+  // total is a much steadier read than any single day.
+  const igViewsByDay = {};
+  (bufferDailyStats || []).forEach((r) => {
+    if (r.model !== model.name || r.platform !== "ig") return;
+    igViewsByDay[r.statDate] = (igViewsByDay[r.statDate] || 0) + (r.impressions || 0);
+  });
+  const newSubsByDay = {};
+  (inflowwDailyStats || []).forEach((r) => {
+    if (r.model !== model.name) return;
+    newSubsByDay[r.statDate] = (newSubsByDay[r.statDate] || 0) + (r.newSubscribers || 0);
+  });
+  const last14Dates = Array.from({ length: 14 }).map((_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (13 - i));
+    return toISO(d);
+  });
+  const viewsToSubsRows = last14Dates.map((date) => ({
+    date, views: igViewsByDay[date] || 0, newSubs: newSubsByDay[date] || 0,
+  }));
+  const vts14Views = viewsToSubsRows.reduce((s, r) => s + r.views, 0);
+  const vts14Subs = viewsToSubsRows.reduce((s, r) => s + r.newSubs, 0);
+  const subsPer1M = vts14Views > 0 ? (vts14Subs / (vts14Views / 1000000)) : null;
+  const hasIgConnected = Object.keys(igViewsByDay).length > 0;
 
   const weekMs = 7 * 86400000;
   // Same real-reach metric maxViewsAcrossModels is computed from (Publer
@@ -5213,6 +5242,45 @@ function ModelProfileDashboard({ model, cards, reels, maxViewsAcrossModels, myVi
                     strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />
                 ))}
               </svg>
+            </div>
+
+            {/* ---- IG views -> subs ---- */}
+            <div className="rounded-xl p-4 mb-6" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-1">IG views → subs</div>
+              <div className="fs-10 c-faint mb-3">Last 14 days · real IG views (Publer) paired with real new subs that same day (Infloww)</div>
+              {!hasIgConnected ? (
+                <div className="fs-11 c-faint font-mono italic py-3">
+                  No IG views synced yet for {model.name} — connect her IG account in Publer to start tracking this.
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-baseline gap-2 mb-3">
+                    <span className="fs-20 font-mono font-bold c-text">{subsPer1M != null ? subsPer1M.toFixed(1) : "—"}</span>
+                    <span className="fs-10 font-mono c-faint uppercase">subs per 1M views</span>
+                    <span className="fs-9 font-mono c-faint">({fmt(vts14Views)} views → {vts14Subs} subs, 14d)</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full fs-10 font-mono">
+                      <thead>
+                        <tr className="c-faint uppercase tracking-wide">
+                          <th className="text-left py-1 pr-3">Date</th>
+                          <th className="text-right py-1 pr-3">IG views</th>
+                          <th className="text-right py-1">New subs</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...viewsToSubsRows].reverse().map((r) => (
+                          <tr key={r.date} className="border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+                            <td className="py-1 pr-3 c-muted">{r.date}</td>
+                            <td className="py-1 pr-3 text-right c-text">{r.views ? fmt(r.views) : "—"}</td>
+                            <td className="py-1 text-right" style={{ color: r.newSubs ? "#39e673" : undefined }}>{r.newSubs || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* ---- recent posts ---- */}
@@ -12236,7 +12304,7 @@ function App() {
             {currentView === "titlegen" && isAdmin && <TitleGeneratorPage />}
             {currentView === "weeklytrends" && isAdmin && <TrendsPage weeklyTrendReels={weeklyTrendReels} onReload={reloadWeeklyTrendReels} loading={weeklyTrendReelsLoading} />}
             {currentView === "trending" && <CreatorTrending trends={trends} agency={session.agency} />}
-            {currentView === "models" && <ModelManager models={agencyModels} persistModels={scopedPersistModels} cards={scopedCards} reels={scopedReels} agency={session.agency} bufferDailyStats={bufferDailyStats} />}
+            {currentView === "models" && <ModelManager models={agencyModels} persistModels={scopedPersistModels} cards={scopedCards} reels={scopedReels} agency={session.agency} bufferDailyStats={bufferDailyStats} inflowwDailyStats={inflowwDailyStats} />}
             {currentView === "whatsnew" && <WhatsNewPage />}
             {currentView === "settings" && (isAdmin
               ? <SettingsPanel settings={settings} persistSettings={persistSettings} />
