@@ -2157,7 +2157,7 @@ function AreaTrendChart({ data, color, height = 160, valueFormat }) {
         onMouseMove={handleMove} onMouseLeave={() => setHoverIdx(null)}>
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+            <stop offset="0%" stopColor={color} stopOpacity="0.45" />
             <stop offset="100%" stopColor={color} stopOpacity="0" />
           </linearGradient>
         </defs>
@@ -2167,6 +2167,14 @@ function AreaTrendChart({ data, color, height = 160, valueFormat }) {
         ))}
         <path d={areaPath} fill={`url(#${gradId})`} />
         <path d={linePath} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        {/* Always-on end-point — the "where are we right now" anchor, not
+            just something you find by hovering. Same treatment as the
+            hover dot, just smaller/quieter so hovering still reads as the
+            more prominent state. */}
+        {n > 0 && hoverIdx == null && (
+          <circle cx={xAt(n - 1)} cy={yAt(values[n - 1])} r="3.5" fill={color} stroke="#0b0f0d" strokeWidth="1.5"
+            style={{ filter: `drop-shadow(0 0 4px ${color})` }} />
+        )}
         {hoverIdx != null && (
           <>
             <line x1={xAt(hoverIdx)} x2={xAt(hoverIdx)} y1={PAD_TOP} y2={H - PAD_BOTTOM} stroke={color} strokeOpacity="0.35" strokeWidth="1.5" />
@@ -2887,7 +2895,7 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
   const accountIds = igAccount === "all" ? accountRows.map((a) => a.id) : [igAccount];
   const modelNamesForSelection = [...new Set(accountIds.map((id) => accountById[id]?.model).filter(Boolean))];
 
-  const fmtK = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}K` : `${n}`);
+  const fmtK = (n) => (n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : `${n}`);
   const dateNDaysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
   const rangeDays = Array.from({ length: igRange }, (_, i) => dateNDaysAgo(igRange - 1 - i));
 
@@ -3261,6 +3269,26 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
                 <div className="fs-11 c-faint font-mono italic py-6 text-center">No IG views for this period yet.</div>
               ) : (
                 <>
+                  {/* Yesterday — the closest real proxy to "last 24h": account
+                      "views" only comes as a period total (no daily
+                      breakdown, a hard Meta API limit), but "reach" IS real
+                      daily data. Can't attribute a sub to one specific post
+                      (no per-post click tracking exists here or anywhere
+                      else without it) — cross-reference this against Top
+                      Posts below to eyeball which day's content likely drove
+                      it, rather than trusting an exact 1:1 link. */}
+                  <div className="rounded-2xl p-4 mb-4 flex items-center gap-6 flex-wrap" style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${C.accentA}33` }}>
+                    <div>
+                      <div className="fs-10 uppercase tracking-wide" style={{ color: C.sub }}>Yesterday's reach</div>
+                      <div className="text-xl font-extrabold" style={{ color: C.accentIcon }}>{fmtK(reachForDate(dateNDaysAgo(1)))}</div>
+                    </div>
+                    <div className="fs-16" style={{ color: C.sub }}>→</div>
+                    <div>
+                      <div className="fs-10 uppercase tracking-wide" style={{ color: C.sub }}>Yesterday's new subs</div>
+                      <div className="text-xl font-extrabold" style={{ color: "#38bdf8" }}>{subsByDay[dateNDaysAgo(1)] || 0}</div>
+                    </div>
+                    <div className="fs-9 c-faint ml-auto" style={{ maxWidth: 220 }}>Closest real proxy to "last 24h" — check Top Posts below for what she posted that day.</div>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                     <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
                       <div className="fs-10 uppercase tracking-wide" style={{ color: C.sub }}>Views · {igRange}d</div>
