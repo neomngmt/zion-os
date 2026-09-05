@@ -3284,7 +3284,7 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
                     </div>
                     <div className="fs-16" style={{ color: C.sub }}>→</div>
                     <div>
-                      <div className="fs-10 uppercase tracking-wide" style={{ color: C.sub }}>Yesterday's new subs</div>
+                      <div className="fs-10 uppercase tracking-wide" style={{ color: C.sub }}>Yesterday's new subs (not renewals)</div>
                       <div className="text-xl font-extrabold" style={{ color: "#38bdf8" }}>{subsByDay[dateNDaysAgo(1)] || 0}</div>
                     </div>
                     <div className="fs-9 c-faint ml-auto" style={{ maxWidth: 220 }}>Closest real proxy to "last 24h" — check Top Posts below for what she posted that day.</div>
@@ -3299,7 +3299,7 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
                       />
                     </div>
                     <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                      <div className="fs-10 uppercase tracking-wide" style={{ color: C.sub }}>New subs · {igRange}d</div>
+                      <div className="fs-10 uppercase tracking-wide" style={{ color: C.sub }}>New subs (not renewals) · {igRange}d</div>
                       <div className="text-2xl font-extrabold mb-2" style={{ color: "#38bdf8" }}>{totalNewSubs}</div>
                       <AreaTrendChart
                         data={subsDayBars.map((d) => ({ date: d.date, value: d.subs }))}
