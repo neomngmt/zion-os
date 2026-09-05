@@ -839,7 +839,7 @@ function useSupaIgGraphStats() {
     const t = setInterval(() => load(false), REFRESH_POLL_MS);
     return () => clearInterval(t);
   }, [load]);
-  return { value, loading };
+  return { value, loading, refresh: () => load(false) };
 }
 
 // ig_graph_media is populated hourly by ig-graph-sync alongside ig_graph_stats
@@ -867,7 +867,7 @@ function useSupaIgGraphMedia() {
     const t = setInterval(() => load(false), REFRESH_POLL_MS);
     return () => clearInterval(t);
   }, [load]);
-  return { value, loading };
+  return { value, loading, refresh: () => load(false) };
 }
 
 // buffer_top_posts is populated by the same Edge Function — one row per model+platform,
@@ -4752,7 +4752,7 @@ function TikTokContentHub({ models, cards, selectedModelName, onBackToModels }) 
 
 // ---------- model manager ----------
 
-function ModelManager({ models, persistModels, cards, reels, agency, bufferDailyStats, igGraphStats }) {
+function ModelManager({ models, persistModels, cards, reels, agency, bufferDailyStats, igGraphStats, onIgTokenSaved }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [note, setNote] = useState("");
@@ -4766,6 +4766,7 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
   const [syncCooldownUntil, setSyncCooldownUntil] = useState(0);
   const clock = useLiveClock(); // also drives the cooldown countdown re-rendering below
   const syncOnCooldown = Date.now() < syncCooldownUntil;
+  const [igTokenSyncStatus, setIgTokenSyncStatus] = useState("");
 
   const runSyncNow = async () => {
     if (syncOnCooldown) return;
@@ -4819,8 +4820,23 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
     await persistModels(models.map((m) => (m.name === n ? { ...m, alwaysOnboard: !m.alwaysOnboard } : m)));
   };
   const saveDetail = async (updated) => {
+    const prev = models.find((m) => m.name === updated.name);
+    const tokenChanged = (updated.igAccessToken || "") !== (prev?.igAccessToken || "") && !!updated.igAccessToken;
     await persistModels(models.map((m) => (m.name === updated.name ? updated : m)));
     setDetailName(null);
+    // A freshly pasted/changed token would otherwise sit until the next
+    // hourly cron run — from her side that looks exactly like "I pasted it
+    // and nothing happened," so kick off a real sync immediately instead.
+    if (tokenChanged && onIgTokenSaved) {
+      setIgTokenSyncStatus(`Syncing ${updated.name}'s Instagram stats…`);
+      try {
+        await onIgTokenSaved(updated.name);
+        setIgTokenSyncStatus(`${updated.name}'s Instagram stats synced — check the IG Dashboard.`);
+      } catch (e) {
+        setIgTokenSyncStatus(`${updated.name}'s Instagram sync failed: ${e.message}`);
+      }
+      setTimeout(() => setIgTokenSyncStatus(""), 8000);
+    }
   };
 
   const detailModel = models.find((m) => m.name === detailName);
@@ -4966,6 +4982,7 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
         </button>
       </div>
       {syncResult && <div className="fs-10 font-mono c-faint mt-1 mb-3">{syncResult}</div>}
+      {igTokenSyncStatus && <div className="fs-10 font-mono c-accent mt-1 mb-3">{igTokenSyncStatus}</div>}
 
       {mmTab === "accounts" ? (
         <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
@@ -11981,8 +11998,8 @@ function App() {
   const { value: reels, loading: reelsLoading, persist: persistReels } = useSupaTable("reels", "id", [], reelsToJS, reelsToDB);
   const { value: trends, loading: trendsLoading, persist: persistTrends } = useSupaTable("trends", "id", [], trendsToJS, trendsToDB);
   const { value: bufferDailyStats, loading: bufferDailyStatsLoading } = useSupaBufferStats();
-  const { value: igGraphStats, loading: igGraphStatsLoading } = useSupaIgGraphStats();
-  const { value: igGraphMedia, loading: igGraphMediaLoading } = useSupaIgGraphMedia();
+  const { value: igGraphStats, loading: igGraphStatsLoading, refresh: refreshIgGraphStats } = useSupaIgGraphStats();
+  const { value: igGraphMedia, loading: igGraphMediaLoading, refresh: refreshIgGraphMedia } = useSupaIgGraphMedia();
   const { value: bufferTopPosts, loading: bufferTopPostsLoading } = useSupaBufferTopPosts();
   const { value: ofDailyStats, loading: ofDailyStatsLoading } = useSupaOfDailyStats();
   const { value: inflowwDailyStats, loading: inflowwDailyStatsLoading, syncing: inflowwSyncing, refresh: refreshInfloww } = useSupaInflowwDailyStats();
@@ -12286,7 +12303,12 @@ function App() {
             {currentView === "titlegen" && isAdmin && <TitleGeneratorPage />}
             {currentView === "weeklytrends" && isAdmin && <TrendsPage weeklyTrendReels={weeklyTrendReels} onReload={reloadWeeklyTrendReels} loading={weeklyTrendReelsLoading} />}
             {currentView === "trending" && <CreatorTrending trends={trends} agency={session.agency} />}
-            {currentView === "models" && <ModelManager models={agencyModels} persistModels={scopedPersistModels} cards={scopedCards} reels={scopedReels} agency={session.agency} bufferDailyStats={bufferDailyStats} igGraphStats={igGraphStats} />}
+            {currentView === "models" && <ModelManager models={agencyModels} persistModels={scopedPersistModels} cards={scopedCards} reels={scopedReels} agency={session.agency} bufferDailyStats={bufferDailyStats} igGraphStats={igGraphStats} onIgTokenSaved={async (modelName) => {
+              const { data, error } = await supabaseClient.functions.invoke("ig-graph-sync", { body: { modelName } });
+              if (error) throw error;
+              if (data?.error) throw new Error(data.error);
+              await Promise.all([refreshIgGraphStats(), refreshIgGraphMedia()]);
+            }} />}
             {currentView === "whatsnew" && <WhatsNewPage />}
             {currentView === "settings" && (isAdmin
               ? <SettingsPanel settings={settings} persistSettings={persistSettings} />
