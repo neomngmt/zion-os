@@ -2774,6 +2774,14 @@ function AgeRangeBubbles({ ages, colors }) {
               background: `${color}29`, border: `1.5px solid ${color}77`,
               boxShadow: `0 0 24px ${color}40`, zIndex: 4 - i,
               animation: `${anim.name} ${anim.duration} ease-in-out ${anim.delay} infinite`,
+              // Forces its own GPU compositing layer — without this, Safari/
+              // WebKit can leave a stale copy of the bold percentage text
+              // behind on repaint while this circle's transform animation is
+              // running, showing up as ghosted/doubled digits (reported live,
+              // isolated repro attempts outside the full page didn't
+              // reproduce it, but this is the standard fix for exactly this
+              // class of animated-layer text-ghosting bug).
+              transform: "translateZ(0)", WebkitBackfaceVisibility: "hidden", backfaceVisibility: "hidden",
             }}>
             <span className="font-extrabold leading-none" style={{ color, fontSize: Math.max(12, size * 0.22) }}>{a.pct}%</span>
             {size >= 60 && <span className="fs-9 font-mono c-faint mt-1 text-center px-1" style={{ lineHeight: 1.1 }}>{a.label}</span>}
@@ -2955,19 +2963,27 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
   let donutOffset = 0;
 
   // Demographics (age range, top countries) come straight from ig_graph_stats
-  // as real follower counts (not just percentages like Publer gave) —
-  // converted to % here for display. "All accounts" falls back to whichever
-  // connected account is first, same as before.
-  const demoGraph = accountById[demoAccountId];
-  const ageTotal = (demoGraph?.ageDemographics || []).reduce((s, a) => s + (a.value || 0), 0);
-  const ages = (demoGraph?.ageDemographics || [])
+  // as real follower counts (not just percentages like Publer gave). Single
+  // account selected -> just hers. "All accounts" -> real combined counts
+  // across every connected account (summed before converting to %, not
+  // just whichever account happens to load first).
+  const demoAccounts = igAccount === "all" ? accountRows : (accountById[demoAccountId] ? [accountById[demoAccountId]] : []);
+  const combineDemo = (field) => {
+    const totals = {};
+    demoAccounts.forEach((a) => (a[field] || []).forEach((d) => { totals[d.label] = (totals[d.label] || 0) + (d.value || 0); }));
+    return Object.entries(totals).map(([label, value]) => ({ label, value }));
+  };
+  const ageDemoCombined = combineDemo("ageDemographics");
+  const countryDemoCombined = combineDemo("countryDemographics");
+  const ageTotal = ageDemoCombined.reduce((s, a) => s + a.value, 0);
+  const ages = ageDemoCombined
     .map((a) => ({ label: `${a.label} years`, pct: ageTotal > 0 ? Math.round((a.value / ageTotal) * 100) : 0 }))
     .sort((a, b) => b.pct - a.pct);
-  const countryTotal = (demoGraph?.countryDemographics || []).reduce((s, c) => s + (c.value || 0), 0);
-  const countries = (demoGraph?.countryDemographics || [])
+  const countryTotal = countryDemoCombined.reduce((s, c) => s + c.value, 0);
+  const countries = countryDemoCombined
     .map((c) => ({ code: c.label, value: countryTotal > 0 ? Math.round((c.value / countryTotal) * 1000) / 10 : 0 }))
     .sort((a, b) => b.value - a.value).slice(0, 5);
-  const demographics = demoGraph ? { ages, countries, unit: "%" } : null;
+  const demographics = demoAccounts.length ? { ages, countries, unit: "%" } : null;
 
   const topPosts = mediaInRange
     .map((m) => ({ model: m.model, text: m.caption, thumbnailUrl: m.thumbnail_url, externalLink: m.permalink, impressions: m.views }))
@@ -3199,12 +3215,8 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
               </div>
             </div>
 
-            {/* Audience demographics — real Publer chart_data when it has
-                collected any (Business-tier plan, forward-only — not
-                retroactive), zero-filled placeholders in the same shape
-                otherwise so the widgets are never just missing. */}
-            {igAccount === "all" && demoAccountId && (
-              <div className="fs-10 font-mono mb-2" style={{ color: C.sub }}>Demographics below are for {accountDisplayName(accountById[demoAccountId])} — pick an account above to see hers instead.</div>
+            {igAccount === "all" && demoAccounts.length > 1 && (
+              <div className="fs-10 font-mono mb-2" style={{ color: C.sub }}>Demographics below are combined across all {demoAccounts.length} connected accounts — pick one above to see just hers.</div>
             )}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
               <div className="lg:col-span-4 rounded-3xl p-5 flex flex-col" style={{ background: C.card, border: C.cardBorder }}>
