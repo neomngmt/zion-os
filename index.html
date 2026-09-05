@@ -919,6 +919,7 @@ const modelsToJS = (r) => ({
   inspoProfiles: Array.isArray(r.inspo_profiles) ? r.inspo_profiles : (r.inspo_profiles ? JSON.parse(r.inspo_profiles) : []),
   monthlyGoal: r.monthly_goal != null ? Number(r.monthly_goal) : null,
   igConnectedAt: r.ig_connected_at ? new Date(r.ig_connected_at).getTime() : null,
+  igAccessToken: r.ig_access_token || "", igUserId: r.ig_user_id || "",
 });
 const modelsToDB = (m) => ({
   name: m.name, note: m.note || "", onboarded: !!m.onboarded,
@@ -935,6 +936,7 @@ const modelsToDB = (m) => ({
   notif_last_seen: m.notifLastSeen ? new Date(m.notifLastSeen).toISOString() : null,
   inspo_profiles: m.inspoProfiles || [],
   monthly_goal: m.monthlyGoal != null && m.monthlyGoal !== "" ? Number(m.monthlyGoal) : null,
+  ig_access_token: m.igAccessToken || "",
 });
 
 const cardsToJS = (r) => ({
@@ -5381,30 +5383,27 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, 
         </div>
 
         <div className="rounded-xl p-3 mb-4" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)" }}>
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div>
-              <div className="fs-10 uppercase tracking-wide c-faint font-mono mb-1">Instagram connection</div>
-              {model.igConnectedAt ? (
-                <div className="fs-11 font-mono c-accent flex items-center gap-1.5">
-                  <CheckCircle2 size={12} /> Connected
-                  <span className="c-faint">· since {new Date(model.igConnectedAt).toLocaleDateString()}</span>
-                </div>
-              ) : (
-                <div className="fs-11 font-mono c-faint">Not connected yet</div>
-              )}
-            </div>
-            <button
-              onClick={() => {
-                const redirectUri = "https://kvwwjyvkoiqsvpyzbcmn.supabase.co/functions/v1/ig-oauth-callback";
-                const authUrl = `https://www.instagram.com/oauth/authorize?client_id=1455803663270663&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=instagram_business_basic,instagram_business_manage_insights&state=${encodeURIComponent(model.name)}`;
-                window.open(authUrl, "_blank", "noopener,noreferrer");
-              }}
-              className="flex items-center gap-1.5 fs-11 font-mono uppercase tracking-wide px-3 py-1.5 rounded-full font-semibold flex-shrink-0 transition-colors"
-              style={{ background: "rgba(57,230,115,0.08)", color: "#39e673", border: "1px solid rgba(57,230,115,0.3)" }}>
-              <Instagram size={13} /> {model.igConnectedAt ? "Reconnect" : "Connect Instagram"}
-            </button>
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
+            <div className="fs-10 uppercase tracking-wide c-faint font-mono">Instagram Graph API (real stats, direct from Meta)</div>
+            {form.igAccessToken ? (
+              <div className="fs-11 font-mono c-accent flex items-center gap-1.5">
+                <CheckCircle2 size={12} /> Token saved{form.igUserId ? ` · IG user ${form.igUserId}` : ""}
+              </div>
+            ) : (
+              <div className="fs-11 font-mono c-faint">Not connected</div>
+            )}
           </div>
-          <p className="fs-9 c-faint mt-2">Opens Instagram in a new tab — she needs to be logged into {model.name}'s account there, or you approve on her behalf if you have the login.</p>
+          <p className="fs-9 c-faint mb-2">
+            All models share the one "connect igs" Meta app (developers.facebook.com) — never connect a
+            Business Portfolio to it, that's the part that actually risks a cascading ban, not app-sharing itself.
+            To add her: developers.facebook.com → "connect igs" → App Roles → Add People → her account → role
+            "Instagram Tester" → Add. She accepts at instagram.com/accounts/manage_access/ → Tester Invites
+            (use a browser, not always visible in the phone app). Then App Dashboard → Instagram API → API setup
+            with Instagram login → find her account → Generate token → paste it below.
+          </p>
+          <input type="password" value={form.igAccessToken || ""} onChange={(e) => set("igAccessToken", e.target.value)}
+            placeholder="Paste her Instagram Graph API access token"
+            className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
         </div>
 
         <div className="flex gap-3 mb-4 fs-11 font-mono">
@@ -11967,7 +11966,7 @@ function clearSavedSession() {
 function App() {
   const { value: cards, loading: cardsLoading, persist: persistCards } = useSupaTable("cards", "id", [], cardsToJS, cardsToDB);
   const { value: models, loading: modelsLoading, persist: persistModels } = useSupaTable("models", "name", [], modelsToJS, modelsToDB,
-    "name, note, onboarded, added_at, ig_handle, x_handle, tiktok_handle, of_url, drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank");
+    "name, note, onboarded, added_at, ig_handle, x_handle, tiktok_handle, of_url, drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank, ig_access_token");
   const { value: tasks, loading: tasksLoading, persist: persistTasks } = useSupaTable("tasks", "id", [], tasksToJS, tasksToDB);
   const { value: stats, loading: statsLoading, persist: persistStats } = useSupaTable("stats", "id", [], statsToJS, statsToDB);
   const { value: reels, loading: reelsLoading, persist: persistReels } = useSupaTable("reels", "id", [], reelsToJS, reelsToDB);
