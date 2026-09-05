@@ -807,6 +807,40 @@ function useSupaBufferStats() {
   return { value, loading };
 }
 
+// ig_graph_stats is populated hourly by ig-graph-sync — a direct Instagram
+// Graph API connection (per model, her own separate Meta app/token) that
+// bypasses Publer entirely for view/reach counts, since Publer's own numbers
+// ran 5-8x below Instagram's native Insights for the same account/days.
+// Not every model has this connected yet (each one needs her own one-time
+// Meta app + token setup) — callers should fall back to bufferDailyStats for
+// any model missing from this list.
+function useSupaIgGraphStats() {
+  const [value, setValue] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const load = useCallback(async (isFirst) => {
+    if (isFirst) setLoading(true);
+    try {
+      const { data, error } = await supabaseClient.from("ig_graph_stats").select("*");
+      if (error) throw error;
+      setValue((data || []).map((r) => ({
+        model: r.model, igUserId: r.ig_user_id, igUsername: r.ig_username, mediaCount: r.media_count,
+        views7d: r.views_7d, views30d: r.views_30d, reach7d: r.reach_7d, reach30d: r.reach_30d,
+        syncedAt: r.synced_at,
+      })));
+    } catch (e) {
+      console.error("load failed for ig_graph_stats", e);
+      if (isFirst) setValue([]);
+    }
+    if (isFirst) setLoading(false);
+  }, []);
+  useEffect(() => {
+    load(true);
+    const t = setInterval(() => load(false), REFRESH_POLL_MS);
+    return () => clearInterval(t);
+  }, [load]);
+  return { value, loading };
+}
+
 // buffer_top_posts is populated by the same Edge Function — one row per model+platform,
 // always the best-performing post (by impressions) from the last 7 days.
 function useSupaBufferTopPosts() {
@@ -2735,7 +2769,7 @@ function TopCountriesCard({ countries, unit = "" }) {
 // buffer_daily_stats/buffer_top_posts, plus an audience-demographics section
 // backed by Publer's account-level chart_data endpoint (separate from
 // post_insights — see publer-demographics).
-function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, inflowwDailyStats, onPlanPosts, onMakeContentPlan }) {
+function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, inflowwDailyStats, igGraphStats, onPlanPosts, onMakeContentPlan }) {
   const C = {
     page: "radial-gradient(ellipse 130% 100% at 10% 0%, rgba(57,230,115,0.14), transparent 55%), radial-gradient(ellipse 100% 80% at 100% 0%, rgba(56,189,248,0.10), transparent 55%), #0b0f0d",
     card: "rgba(255,255,255,0.035)", cardBorder: "1px solid rgba(255,255,255,0.08)",
@@ -2871,7 +2905,26 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, infloww
   });
   const subsDayBars = rangeDays.map((date) => ({ date, subs: subsByDay[date] || 0 }));
   const totalNewSubs = subsDayBars.reduce((s, d) => s + d.subs, 0);
-  const subsPer10k = weekTotals.reach > 0 ? (totalNewSubs / (weekTotals.reach / 10000)) : null;
+
+  // Real views per model, direct-from-Meta when she has her own Graph API
+  // token connected (ig_graph_stats, hourly-synced — see ig-graph-sync),
+  // falling back to Publer's numbers for any model who doesn't yet. Direct
+  // numbers only come as period totals (7d/30d), not a daily breakdown —
+  // Instagram's own API doesn't support day-by-day for the "views" metric —
+  // so this only affects the period TOTAL used here, not the daily sparkline
+  // below, which still traces Publer's daily shape either way.
+  const graphByModel = {};
+  (igGraphStats || []).forEach((g) => { graphByModel[g.model] = g; });
+  const viewsForModel = (name) => {
+    const g = graphByModel[name];
+    if (g) return igRange === 7 ? (g.views7d || 0) : (g.views30d || 0);
+    return rangeDays.reduce((s, d) => s + allRows.filter((r) => r.model === name && r.statDate === d).reduce((s2, r) => s2 + (r.impressions || 0), 0), 0);
+  };
+  const realViewsTotal = igAccount === "all"
+    ? connectedModels.reduce((s, m) => s + viewsForModel(m.name), 0)
+    : viewsForModel(igAccount);
+  const usingDirectGraph = igAccount !== "all" && !!graphByModel[igAccount];
+  const subsPer10k = realViewsTotal > 0 ? (totalNewSubs / (realViewsTotal / 10000)) : null;
 
   const accountShares = connectedModels.map((m) => {
     const r = weekRows.filter((row) => row.model === m.name).reduce((s, row) => s + (row.impressions || 0), 0);
@@ -3080,25 +3133,6 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, infloww
                     ))}
                   </div>
                 </div>
-
-                <div className="pt-3 mt-3" style={{ borderTop: `1px solid ${C.ringTrack}` }}>
-                  <div className="flex items-baseline gap-1.5 mb-1.5">
-                    <span className="fs-11 font-semibold">Link clicks</span>
-                    <span className="fs-9 c-faint font-mono">· {igRange}d</span>
-                  </div>
-                  <div className="text-xl font-extrabold c-text mb-1.5">{(demographics?.linkClicks?.total || 0).toLocaleString()}</div>
-                  {demoLoading ? (
-                    <div className="fs-10 c-faint font-mono italic py-2">Loading...</div>
-                  ) : (
-                    <AreaTrendChart
-                      data={(demographics?.linkClicks?.series?.length
-                        ? demographics.linkClicks.series
-                        : rangeDays.map((d) => ({ date: d, value: 0 }))
-                      )}
-                      color={C.accentA} height={40}
-                    />
-                  )}
-                </div>
               </div>
 
               {/* Right column: two mini stat cards */}
@@ -3200,15 +3234,18 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, infloww
                 <div className="fs-13 font-semibold">Views → Subs</div>
                 <MoreDotsIG dark />
               </div>
-              <div className="fs-10 c-faint font-mono mb-4">Real IG views paired with real new subs, day by day · {igRange}d</div>
-              {weekTotals.reach === 0 ? (
+              <div className="fs-10 c-faint font-mono mb-4">
+                Real IG views paired with real new subs · {igRange}d
+                {usingDirectGraph && <span style={{ color: C.accentIcon }}> · direct from Meta, not Publer</span>}
+              </div>
+              {realViewsTotal === 0 ? (
                 <div className="fs-11 c-faint font-mono italic py-6 text-center">No IG views for this period yet.</div>
               ) : (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                     <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
                       <div className="fs-10 uppercase tracking-wide" style={{ color: C.sub }}>Views · {igRange}d</div>
-                      <div className="text-2xl font-extrabold mb-2" style={{ color: C.accentIcon }}>{fmtK(weekTotals.reach)}</div>
+                      <div className="text-2xl font-extrabold mb-2" style={{ color: C.accentIcon }}>{fmtK(realViewsTotal)}</div>
                       <AreaTrendChart
                         data={rangeDays.map((d) => ({ date: d, value: rows.filter((r) => r.statDate === d).reduce((s, r) => s + (r.impressions || 0), 0) }))}
                         color={C.accentA} height={56} valueFormat={fmtK}
@@ -3288,7 +3325,7 @@ function MoreDotsIG({ dark }) {
   );
 }
 
-function ContentDirector({ cards, persistCards, models, restrictModel, forcedNetwork, reels, persistReels, xCompetitors, persistXCompetitors, bufferDailyStats, bufferTopPosts, inflowwDailyStats }) {
+function ContentDirector({ cards, persistCards, models, restrictModel, forcedNetwork, reels, persistReels, xCompetitors, persistXCompetitors, bufferDailyStats, bufferTopPosts, inflowwDailyStats, igGraphStats }) {
   const [detail, setDetail] = useState(null);
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -3366,7 +3403,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
     if (!igPlanningMode) {
       return (
         <IGOverviewDashboard
-          models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} inflowwDailyStats={inflowwDailyStats}
+          models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} inflowwDailyStats={inflowwDailyStats} igGraphStats={igGraphStats}
           onPlanPosts={() => { setIgEntryScreen("menu"); setIgPlanningMode(true); }}
           onMakeContentPlan={() => { setIgEntryScreen("plan"); setIgPlanningMode(true); }}
         />
@@ -11986,6 +12023,7 @@ function App() {
   const { value: reels, loading: reelsLoading, persist: persistReels } = useSupaTable("reels", "id", [], reelsToJS, reelsToDB);
   const { value: trends, loading: trendsLoading, persist: persistTrends } = useSupaTable("trends", "id", [], trendsToJS, trendsToDB);
   const { value: bufferDailyStats, loading: bufferDailyStatsLoading } = useSupaBufferStats();
+  const { value: igGraphStats, loading: igGraphStatsLoading } = useSupaIgGraphStats();
   const { value: bufferTopPosts, loading: bufferTopPostsLoading } = useSupaBufferTopPosts();
   const { value: ofDailyStats, loading: ofDailyStatsLoading } = useSupaOfDailyStats();
   const { value: inflowwDailyStats, loading: inflowwDailyStatsLoading, syncing: inflowwSyncing, refresh: refreshInfloww } = useSupaInflowwDailyStats();
@@ -12281,7 +12319,7 @@ function App() {
             {currentView === "dashboard" && (session.role === "admin"
               ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} inflowwDailyStats={inflowwDailyStats} inflowwSyncing={inflowwSyncing} refreshInfloww={refreshInfloww} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} settings={settings} />
               : <CreatorDashboard stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} ofDailyStats={ofDailyStats} inflowwDailyStats={inflowwDailyStats} />)}
-            {currentView === "content" && <ContentDirector cards={isAdmin ? scopedCards : cards} persistCards={isAdmin ? scopedPersistCards : persistCards} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} forcedNetwork={contentPlatform} reels={isAdmin ? scopedReels : reels} persistReels={isAdmin ? scopedPersistReels : persistReels} xCompetitors={xCompetitors} persistXCompetitors={persistXCompetitors} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} inflowwDailyStats={inflowwDailyStats} />}
+            {currentView === "content" && <ContentDirector cards={isAdmin ? scopedCards : cards} persistCards={isAdmin ? scopedPersistCards : persistCards} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} forcedNetwork={contentPlatform} reels={isAdmin ? scopedReels : reels} persistReels={isAdmin ? scopedPersistReels : persistReels} xCompetitors={xCompetitors} persistXCompetitors={persistXCompetitors} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} inflowwDailyStats={inflowwDailyStats} igGraphStats={igGraphStats} />}
             {currentView === "calendar" && <CalendarView cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks} onNavigate={setView} restrictModel={restrictModel} />}
             {currentView === "tasks" && <TaskManager tasks={isAdmin ? scopedTasks : tasks} persistTasks={isAdmin ? scopedPersistTasks : persistTasks} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} />}
             {currentView === "stats" && <StatsManager stats={scopedStats} persistStats={scopedPersistStats} models={agencyModels} reels={scopedReels} persistReels={scopedPersistReels} />}
