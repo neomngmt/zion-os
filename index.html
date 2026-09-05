@@ -3177,15 +3177,10 @@ function IGOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, infloww
                 )}
               </div>
               <div className="lg:col-span-3 rounded-3xl p-5" style={{ background: C.card, border: C.cardBorder }}>
-                <div className="flex items-center justify-between mb-1">
-                  {demographics?.unit === "%" ? (
-                    <div className="text-lg font-extrabold c-text">Audience</div>
-                  ) : (
-                    <div className="text-2xl font-extrabold c-text">{(demographics?.totalImpressions || 0).toLocaleString()}</div>
-                  )}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="fs-13 font-semibold">Top countries</div>
                   <MoreDotsIG dark />
                 </div>
-                <div className="fs-10 c-faint font-mono mb-3">{demographics?.unit === "%" ? "by country" : "Impressions worldwide"}</div>
                 {demoLoading ? (
                   <div className="fs-11 c-faint font-mono italic py-8 text-center">Loading...</div>
                 ) : (
