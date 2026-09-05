@@ -2131,9 +2131,17 @@ function AreaTrendChart({ data, color, height = 160, valueFormat }) {
   const plotH = H - PAD_TOP - PAD_BOTTOM;
   const values = data.map((d) => d.value);
   const max = Math.max(1, ...values);
+  // Zoomed to the series' own min-max range, not a fixed 0 floor — a
+  // standard sparkline convention (this is a compact trend shape, not an
+  // axis-labeled analytical chart; the real total already lives in the
+  // headline number next to it). One dominant spike day used to crush every
+  // other day flat against the bottom against a 0 floor; zooming to the
+  // real min makes the day-to-day wiggle actually visible.
+  const min = Math.min(...values, max);
+  const range = Math.max(max - min, 1);
   const n = data.length;
   const xAt = (i) => (n <= 1 ? W / 2 : (i / (n - 1)) * W);
-  const yAt = (v) => PAD_TOP + plotH - (v / max) * plotH;
+  const yAt = (v) => PAD_TOP + plotH - ((v - min) / range) * plotH;
 
   const linePath = data.map((d, i) => `${i === 0 ? "M" : "L"} ${xAt(i)},${yAt(d.value)}`).join(" ");
   const areaPath = `${linePath} L ${xAt(n - 1)},${H - PAD_BOTTOM} L ${xAt(0)},${H - PAD_BOTTOM} Z`;
