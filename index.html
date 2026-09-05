@@ -3125,17 +3125,19 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
                     color="#ffffff" height={64} valueFormat={fmtK}
                   />
                 </div>
-                <div className="flex items-center gap-2 pt-3 mt-1 relative flex-wrap" style={{ borderTop: "1px solid rgba(255,255,255,0.22)" }}>
-                  {accountShares.length ? accountShares.map((a) => (
-                    <div key={a.name} className="flex items-center gap-1.5 rounded-full pl-1 pr-2.5 py-1" style={{ background: "rgba(0,0,0,0.16)" }}>
-                      <span className="rounded-full flex items-center justify-center fs-9 font-bold" style={{ width: 18, height: 18, background: "rgba(255,255,255,0.9)", color: C.accentA }}>
-                        {a.name.slice(0, 1).toUpperCase()}
-                      </span>
-                      <span className="fs-10 font-mono" style={{ color: "rgba(255,255,255,0.85)" }}>{a.name}</span>
-                      <span className="fs-11 font-bold text-white">{a.pct}%</span>
-                    </div>
-                  )) : <div className="fs-11" style={{ color: "rgba(255,255,255,0.75)" }}>No breakdown yet</div>}
-                </div>
+                {igAccount === "all" && (
+                  <div className="flex items-center gap-2 pt-3 mt-1 relative flex-wrap" style={{ borderTop: "1px solid rgba(255,255,255,0.22)" }}>
+                    {accountShares.length ? accountShares.map((a) => (
+                      <div key={a.name} className="flex items-center gap-1.5 rounded-full pl-1 pr-2.5 py-1" style={{ background: "rgba(0,0,0,0.16)" }}>
+                        <span className="rounded-full flex items-center justify-center fs-9 font-bold" style={{ width: 18, height: 18, background: "rgba(255,255,255,0.9)", color: C.accentA }}>
+                          {a.name.slice(0, 1).toUpperCase()}
+                        </span>
+                        <span className="fs-10 font-mono" style={{ color: "rgba(255,255,255,0.85)" }}>{a.name}</span>
+                        <span className="fs-11 font-bold text-white">{a.pct}%</span>
+                      </div>
+                    )) : <div className="fs-11" style={{ color: "rgba(255,255,255,0.75)" }}>No breakdown yet</div>}
+                  </div>
+                )}
               </div>
 
               {/* Engagement mix ring, "pending messages"-style card */}
