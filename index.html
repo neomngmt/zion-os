@@ -2971,7 +2971,7 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
             </div>
             <div>
               <div className="text-2xl font-extrabold tracking-tight" style={{ color: C.ink, textShadow: `0 0 12px ${C.accentA}33` }}>Instagram Dashboard</div>
-              <p className="text-sm mt-0.5" style={{ color: C.sub }}>{connectedModels.length} account{connectedModels.length !== 1 ? "s" : ""} connected via Publer</p>
+              <p className="text-sm mt-0.5" style={{ color: C.sub }}>{connectedModels.length} account{connectedModels.length !== 1 ? "s" : ""} connected via direct Meta API</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -4752,7 +4752,7 @@ function TikTokContentHub({ models, cards, selectedModelName, onBackToModels }) 
 
 // ---------- model manager ----------
 
-function ModelManager({ models, persistModels, cards, reels, agency, bufferDailyStats }) {
+function ModelManager({ models, persistModels, cards, reels, agency, bufferDailyStats, igGraphStats }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [note, setNote] = useState("");
@@ -4988,18 +4988,27 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
                 { key: "x", handle: m.xHandle },
                 { key: "tiktok", handle: m.tiktokHandle },
               ].map(({ key, handle }) => {
-                const platRows = (bufferDailyStats || []).filter((r) => r.model === m.name && r.platform === key);
-                const connected = platRows.length > 0;
+                // IG is off Publer entirely now — connection status comes
+                // from ig_graph_stats (her own Meta Graph API token in
+                // Model Manager), not buffer_daily_stats. X/TikTok still
+                // sync via Publer.
+                const graphRow = key === "ig" ? (igGraphStats || []).find((g) => g.model === m.name) : null;
+                const platRows = key === "ig" ? [] : (bufferDailyStats || []).filter((r) => r.model === m.name && r.platform === key);
+                const connected = key === "ig" ? !!graphRow : platRows.length > 0;
                 const lastDate = platRows.map((r) => r.statDate).sort().pop();
-                const lastLabel = lastDate ? timeAgo(new Date(lastDate + "T12:00:00").getTime()) : null;
-                const imp7d = platRows.filter((r) => r.statDate >= cutoff7dStr).reduce((s, r) => s + (r.impressions || 0), 0);
+                const lastLabel = key === "ig"
+                  ? (graphRow?.syncedAt ? timeAgo(new Date(graphRow.syncedAt).getTime()) : null)
+                  : (lastDate ? timeAgo(new Date(lastDate + "T12:00:00").getTime()) : null);
+                const imp7d = key === "ig" ? (graphRow?.views7d || 0) : platRows.filter((r) => r.statDate >= cutoff7dStr).reduce((s, r) => s + (r.impressions || 0), 0);
                 return (
                   <div key={key} className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: connected ? "#39e673" : "rgba(255,255,255,0.15)" }} />
                     <div className="min-w-0">
                       <div className="fs-10 font-mono c-faint truncate">{handle ? `@${handle}` : "no handle set"}</div>
                       <div className="fs-9 font-mono" style={{ color: connected ? "#39e673" : "#5c6e65" }}>
-                        {connected ? `${imp7d.toLocaleString()} · 7d · synced ${lastLabel}` : "not synced via Publer"}
+                        {connected
+                          ? `${imp7d.toLocaleString()} · 7d · synced ${lastLabel}`
+                          : key === "ig" ? "no Meta API token" : "not synced via Publer"}
                       </div>
                     </div>
                   </div>
@@ -12277,7 +12286,7 @@ function App() {
             {currentView === "titlegen" && isAdmin && <TitleGeneratorPage />}
             {currentView === "weeklytrends" && isAdmin && <TrendsPage weeklyTrendReels={weeklyTrendReels} onReload={reloadWeeklyTrendReels} loading={weeklyTrendReelsLoading} />}
             {currentView === "trending" && <CreatorTrending trends={trends} agency={session.agency} />}
-            {currentView === "models" && <ModelManager models={agencyModels} persistModels={scopedPersistModels} cards={scopedCards} reels={scopedReels} agency={session.agency} bufferDailyStats={bufferDailyStats} />}
+            {currentView === "models" && <ModelManager models={agencyModels} persistModels={scopedPersistModels} cards={scopedCards} reels={scopedReels} agency={session.agency} bufferDailyStats={bufferDailyStats} igGraphStats={igGraphStats} />}
             {currentView === "whatsnew" && <WhatsNewPage />}
             {currentView === "settings" && (isAdmin
               ? <SettingsPanel settings={settings} persistSettings={persistSettings} />
