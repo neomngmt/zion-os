@@ -1789,13 +1789,22 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
   // the grid entirely (the items still existed in `plan`, they just never
   // matched any day in this hardcoded window). Falls back to "today" only
   // when there's no plan yet, matching the original empty-state preview.
+  // Local calendar-date string (YYYY-MM-DD in the VIEWER's own timezone) —
+  // deliberately NOT `.toISOString().slice(0,10)`, which converts to UTC
+  // first and silently shifts the date back a day for anyone west of UTC
+  // during... no, EAST of UTC (e.g. Prague, UTC+2): local midnight of the
+  // 7th becomes 22:00 UTC on the 6th, so toISOString() reports "the 6th".
+  // That's exactly what caused the picked 7.9-13.9 range to render as
+  // 6.9-12.9 with the 13th silently missing.
+  const localDateStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
   const weekDays = React.useMemo(() => {
     const anchor = plan && plan.length ? new Date(rangeStart + "T00:00:00") : new Date();
     anchor.setHours(0, 0, 0, 0);
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(anchor);
       d.setDate(d.getDate() + i);
-      return d.toISOString().slice(0, 10);
+      return localDateStr(d);
     });
   }, [plan, rangeStart]);
 
@@ -1939,8 +1948,8 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
 
               <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(7, minmax(140px, 1fr))", overflowX: "auto" }}>
                 {weekDays.map((day) => {
-                  const dayItems = plan.filter((it) => it.scheduledAt.slice(0, 10) === day);
-                  const isToday = day === new Date().toISOString().slice(0, 10);
+                  const dayItems = plan.filter((it) => localDateStr(new Date(it.scheduledAt)) === day);
+                  const isToday = day === localDateStr(new Date());
                   const dayName = new Date(day + "T12:00:00").toLocaleDateString(undefined, { weekday: "short" });
                   const dateNum = new Date(day + "T12:00:00").getDate();
                   return (
