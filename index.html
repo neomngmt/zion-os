@@ -3132,8 +3132,8 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
           <>
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
               {/* Hero: total views, gradient card */}
-              <div className="lg:col-span-5 rounded-3xl p-5 relative overflow-hidden flex flex-col justify-between"
-                style={{ background: `linear-gradient(150deg, ${C.accentA}, ${C.accentB} 85%)`, minHeight: 220, boxShadow: `0 24px 48px ${C.accentA}2e, inset 0 1px 0 rgba(255,255,255,0.25)` }}>
+              <div className="lg:col-span-5 rounded-3xl p-5 relative overflow-hidden flex flex-col"
+                style={{ background: `linear-gradient(150deg, ${C.accentA}, ${C.accentB} 85%)`, minHeight: 260, boxShadow: `0 24px 48px ${C.accentA}2e, inset 0 1px 0 rgba(255,255,255,0.25)` }}>
                 {/* Decorative glow blobs — pure depth, no data encoded */}
                 <div className="absolute pointer-events-none" style={{ top: -60, right: -60, width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, rgba(255,255,255,0.35), transparent 70%)", filter: "blur(10px)" }} />
                 <div className="absolute pointer-events-none" style={{ bottom: -80, left: -40, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(0,0,0,0.18), transparent 70%)", filter: "blur(20px)" }} />
@@ -3142,11 +3142,18 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
                   <div className="fs-13 font-semibold" style={{ color: "rgba(255,255,255,0.9)" }}>Total Views · {igRange}d</div>
                   <MoreDotsIG />
                 </div>
-                <div className="relative">
+                {/* flex-1 + justify-center vertically centers the number+chart
+                    in whatever space is left between the header and the
+                    optional account-shares footer below — previously this
+                    block just sat wherever justify-between on the OUTER flex
+                    put it, which pushed it low with a big empty gap under
+                    the header whenever the footer wasn't rendered (single
+                    account selected, not "All accounts"). */}
+                <div className="relative flex-1 flex flex-col justify-center">
                   <div className="text-4xl font-extrabold text-white leading-none mb-4" style={{ textShadow: "0 2px 16px rgba(0,0,0,0.15)" }}>{fmtK(realViewsTotal)}</div>
                   <AreaTrendChart
                     data={rangeDays.map((d) => ({ date: d, value: reachForDate(d) }))}
-                    color="#ffffff" height={64} valueFormat={fmtK}
+                    color="#ffffff" height={100} valueFormat={fmtK}
                   />
                 </div>
                 {igAccount === "all" && (
