@@ -2177,7 +2177,14 @@ function AreaTrendChart({ data, color, height = 160, valueFormat }) {
 
   return (
     <div className="relative">
-      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ display: "block" }}
+      {/* Explicit CSS height, not just the viewBox's H — without it, a
+          plain replaced <svg> with no width/height attribute sitting
+          inside a flex column (like the hero card's centered content
+          block) collapses toward a near-zero intrinsic height instead of
+          scaling to the viewBox aspect ratio. Confirmed live: the chart
+          rendered at ~4px tall regardless of the `height` prop, which is
+          why bumping it from 64 to 100 looked like it did nothing. */}
+      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ display: "block", height: H }}
         onMouseMove={handleMove} onMouseLeave={() => setHoverIdx(null)}>
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
