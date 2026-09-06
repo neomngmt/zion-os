@@ -1779,18 +1779,25 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
   const allDone = plan && plan.length > 0 && plan.every((it) => itemStates[it.id]?.status === "done");
   const doneCount = plan ? plan.filter((it) => itemStates[it.id]?.status === "done").length : 0;
 
-  // Always render a full Mon–Sun-from-today 7-day strip so the shape of the
-  // week is visible even on days with nothing scheduled, not just the days
-  // that happen to have a post.
+  // Always render a full 7-day strip so the shape of the week is visible
+  // even on days with nothing scheduled, not just the days that happen to
+  // have a post. Anchored to the PLANNED range's own start (rangeStart)
+  // once a plan exists — anchoring to "today" instead (the old behavior)
+  // silently cut off the tail of the strip whenever the picked range didn't
+  // start today, e.g. picking 7.9-13.9 while today was 5.9 or 6.9 showed
+  // only up to day 11/12 and dropped the actually-scheduled 12th/13th off
+  // the grid entirely (the items still existed in `plan`, they just never
+  // matched any day in this hardcoded window). Falls back to "today" only
+  // when there's no plan yet, matching the original empty-state preview.
   const weekDays = React.useMemo(() => {
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
+    const anchor = plan && plan.length ? new Date(rangeStart + "T00:00:00") : new Date();
+    anchor.setHours(0, 0, 0, 0);
     return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(start);
+      const d = new Date(anchor);
       d.setDate(d.getDate() + i);
       return d.toISOString().slice(0, 10);
     });
-  }, [plan]);
+  }, [plan, rangeStart]);
 
   const renderAvatar = (name, size = 28) => (
     <span className="rounded-full flex items-center justify-center font-bold flex-shrink-0"
