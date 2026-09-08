@@ -233,6 +233,9 @@ const ICON_DATA = {
   TikTokLogo: [
     ["path", { d: "M16.6 5.82s.51.5 0 0A4.278 4.278 0 0 1 15.54 3h-3.09v12.4a2.592 2.592 0 0 1-2.59 2.5c-1.42 0-2.6-1.16-2.6-2.6c0-1.72 1.66-3.01 3.37-2.48V9.66c-3.45-.46-6.47 2.22-6.47 5.64c0 3.33 2.76 5.7 5.69 5.7c3.14 0 5.69-2.55 5.69-5.7V9.01a7.35 7.35 0 0 0 4.31 1.38V7.3s-1.88.09-3.24-1.48z", fill: "currentColor", stroke: "none" }],
   ],
+  ThreadsLogo: [
+    ["path", { d: "M18.263 11.097c-.03-3.486-1.92-5.586-5.111-5.586-2.13 0-3.922.963-4.863 2.499l2.062 1.438c.535-.843 1.272-1.543 2.628-1.543 1.528 0 2.318.85 2.544 2.431a15 15 0 0 0-2.236-.173c-4.125 0-6.068 1.867-6.068 4.336s1.943 3.99 4.804 3.99c3.139 0 5.013-2.115 5.781-4.735.798.361 1.348 1.204 1.348 2.47 0 3.387-3.907 5.232-7.22 5.232-4.885 0-8.077-3.207-8.077-8.424 0-6.392 4.223-10.487 9.9-10.487 3.808 0 5.69 1.671 6.97 3.914l2.108-1.475C21.44 2.078 18.331 0 13.663 0 6.227 0 1.168 5.277 1.168 12.934c0 7 4.953 11.066 10.856 11.066 4.878 0 9.809-2.846 9.809-7.716 0-2.545-1.46-4.231-3.569-5.187m-6.33 4.855c-1.077 0-2.026-.512-2.026-1.453 0-1.483 1.822-1.934 3.606-1.934.678 0 1.34.045 1.927.173-.422 1.927-1.671 3.215-3.508 3.214Z", fill: "currentColor", stroke: "none" }],
+  ],
   Settings: [
     ["path", { d: "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" }],
     ["circle", { cx: "12", cy: "12", r: "3" }],
@@ -301,7 +304,7 @@ const {
   Plus, X, Clapperboard, Users, ChevronRight, ChevronDown, MapPin, Calendar, User,
   Trash2, Loader2, LayoutGrid, Film, UserCircle2, Send, Circle,
   CheckCircle2, Repeat, ChevronLeft, CheckSquare, Lock, LogOut, ShieldCheck,
-  TrendingUp, TrendingDown, DollarSign, Instagram, Eye, Minus, Flame, Sparkles, Mic, Bell, Settings, Search, XLogo, TikTokLogo, Menu, Zap, Megaphone,
+  TrendingUp, TrendingDown, DollarSign, Instagram, Eye, Minus, Flame, Sparkles, Mic, Bell, Settings, Search, XLogo, TikTokLogo, ThreadsLogo, Menu, Zap, Megaphone,
   Play, Copy, Heart, FileText, BarChart3, Shuffle, ExternalLink, Link2,
 } = Icons;
 
@@ -335,6 +338,7 @@ const PLATFORMS = [
   { id: "ig", label: "Instagram", icon: "Instagram", color: "#E1306C" },
   { id: "x", label: "X", icon: "XLogo", color: "#8B93A1" },
   { id: "tiktok", label: "TikTok", icon: "TikTokLogo", color: "#5B8FA8" },
+  { id: "threads", label: "Threads", icon: "ThreadsLogo", color: "#E4E4E4" },
 ];
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -1255,7 +1259,7 @@ function CardDetail({ card, models, restrictModel, onClose, onSave, onDelete }) 
 
 // ---------- X bulk upload & auto-caption studio ----------
 
-function XCaptionStudio({ models, restrictModel, filterModel, onBackToModels }) {
+function XCaptionStudio({ models, restrictModel, filterModel, onBackToModels, platform = "x", platformLabel = "X", PlatformLogo = XLogo }) {
   const scopedModels = restrictModel ? models.filter((m) => m.name === restrictModel) : models;
   const [selectedModel, setSelectedModel] = React.useState(
     restrictModel || (filterModel && filterModel !== "all" ? filterModel : scopedModels[0]?.name || "")
@@ -1285,7 +1289,7 @@ function XCaptionStudio({ models, restrictModel, filterModel, onBackToModels }) 
         ))}
       </div>
     )}
-    {model && <XMassPlanner models={models} lockedModel={model.name} defaultOpen={true} />}
+    {model && <XMassPlanner models={models} lockedModel={model.name} defaultOpen={true} platform={platform} platformLabel={platformLabel} PlatformLogo={PlatformLogo} />}
     </>
   );
 }
@@ -1328,15 +1332,16 @@ function nextMassPlannerSlots(n, hours, startFrom) {
   return slots;
 }
 
-// Data-driven "best hours to post" for one model: pulls her recent X post
-// history from Publer, buckets posts by the hour they went out, and ranks
-// hours by average reach — an hour only counts once it has at least 2 posts
-// behind it, so a single lucky 3am post can't crown 3am as the best time.
-// Falls back to null (caller uses DEFAULT_SLOT_HOURS) when there isn't
-// enough history yet.
-async function computeBestHours(modelName) {
+// Data-driven "best hours to post" for one model: pulls her recent post
+// history for the given platform from Publer, buckets posts by the hour
+// they went out, and ranks hours by average reach — an hour only counts
+// once it has at least 2 posts behind it, so a single lucky 3am post can't
+// crown 3am as the best time. Falls back to null (caller uses
+// DEFAULT_SLOT_HOURS) when there isn't enough history yet — always true for
+// a freshly-connected platform like a brand new Threads account.
+async function computeBestHours(modelName, platform = "x") {
   const { data, error } = await supabaseClient.functions.invoke("publer-posts", {
-    body: { modelName, platform: "x", days: 90 },
+    body: { modelName, platform, days: 90 },
   });
   if (error || !data?.posts?.length) return null;
   const buckets = {};
@@ -1607,7 +1612,7 @@ function CaptionSourcesBreakdown({ sourcesByModel }) {
     </div>
   );
 }
-function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
+function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x", platformLabel = "X", PlatformLogo = XLogo }) {
   const [open, setOpen] = React.useState(defaultOpen);
   const [selected, setSelected] = React.useState(lockedModel ? [lockedModel] : []);
   React.useEffect(() => { if (lockedModel) setSelected([lockedModel]); }, [lockedModel]);
@@ -1632,12 +1637,12 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
     if (!lockedModel) { setBestHours(null); return; }
     let cancelled = false;
     setBestHoursLoading(true);
-    computeBestHours(lockedModel)
+    computeBestHours(lockedModel, platform)
       .then((ranked) => { if (!cancelled) setBestHours(ranked); })
       .catch(() => { if (!cancelled) setBestHours(null); })
       .finally(() => { if (!cancelled) setBestHoursLoading(false); });
     return () => { cancelled = true; };
-  }, [lockedModel]);
+  }, [lockedModel, platform]);
 
   const usingStats = bestHours && bestHours.length >= frequency;
   const activeHours = usingStats
@@ -1703,7 +1708,7 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
         if (!modelPhotos.length) continue;
         const images = await Promise.all(modelPhotos.map((p) => fileToVisionImage(p.file)));
         const { data, error } = await supabaseClient.functions.invoke("x-caption-generate", {
-          body: { modelName, images },
+          body: { modelName, images, platform },
         });
         if (error) {
           const body = await error.context?.json?.().catch(() => null);
@@ -1752,7 +1757,7 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
           body: JSON.stringify({
-            modelName: item.model, platform: "x", text: item.caption,
+            modelName: item.model, platform, text: item.caption,
             mediaId: uploadJson.id, scheduledAt: item.scheduledAt,
           }),
         });
@@ -1834,10 +1839,10 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true }) {
           <div className="text-left">
             <div className="flex items-center gap-2">
               <span className="text-base font-extrabold tracking-tight c-text">Week Planner</span>
-              <XLogo size={11} className="c-muted" />
+              <PlatformLogo size={11} className="c-muted" />
             </div>
             <p className="fs-11 c-muted mt-0.5">
-              {lockedModel ? `Plan ${lockedModel}'s week — captions, photos, and scheduling in one go` : "Plan a week across every X account at once"}
+              {lockedModel ? `Plan ${lockedModel}'s week — captions, photos, and scheduling in one go` : `Plan a week across every ${platformLabel} account at once`}
             </p>
           </div>
         </div>
@@ -2751,6 +2756,18 @@ function TikTokOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onP
   );
 }
 
+function ThreadsOverviewDashboard({ models, bufferDailyStats, bufferTopPosts, onPlanPosts }) {
+  return (
+    <PlatformOverviewDashboard
+      platform="threads" label="Threads" icon={<ThreadsLogo size={18} className="c-accent" />} glowRgb="#39e673" metricLabel="Impressions"
+      bgGradient="radial-gradient(ellipse 130% 100% at 10% 0%, rgba(57,230,115,0.12), transparent 55%), radial-gradient(ellipse 100% 80% at 100% 0%, rgba(56,189,248,0.08), transparent 55%), #0b0f0d"
+      models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts}
+      onPlanPosts={onPlanPosts}
+      noAccountsHint="No Threads accounts connected yet — connect one in Publer, then sync will pick it up automatically."
+    />
+  );
+}
+
 // A tiny decorative sine-ish squiggle — purely ornamental (no axis, no
 // legend needed), matching the reference dashboard's wavy line-under-hero
 // motif. Derived loosely from real values so it's not pure noise, but it's
@@ -3420,6 +3437,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
   const [filter, setFilter] = useState(restrictModel || "all");
   const [network, setNetwork] = useState(forcedNetwork || "all");
   const [xPlanningMode, setXPlanningMode] = useState(false);
+  const [threadsPlanningMode, setThreadsPlanningMode] = useState(false);
   const [igPlanningMode, setIgPlanningMode] = useState(false);
   // Which screen InstagramContentHub should open on once a model is picked —
   // "menu" (the normal "Plan content" entry) or "plan" (the "Make content
@@ -3567,6 +3585,36 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
     );
   }
 
+  // Threads mirrors X exactly — same XCaptionStudio/XMassPlanner shell,
+  // just pointed at the "threads" platform (see project_zion_os_location
+  // memory / feature_idea_threads_planner for why: Publer treats Threads as
+  // its own first-class platform the same way it does X, so there was no
+  // need to build a parallel component tree from scratch).
+  const threadsModelName = restrictModel || (filter !== "all" ? filter : null);
+  const threadsMode = network === "threads" && !restrictModel;
+  if (threadsMode) {
+    if (threadsModelName) {
+      return <XCaptionStudio key={threadsModelName} models={models} restrictModel={threadsModelName} filterModel={threadsModelName} onBackToModels={!restrictModel ? () => setFilter("all") : undefined} platform="threads" platformLabel="Threads" PlatformLogo={ThreadsLogo} />;
+    }
+    if (!threadsPlanningMode) {
+      return (
+        <ThreadsOverviewDashboard
+          models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts}
+          onPlanPosts={() => setThreadsPlanningMode(true)}
+        />
+      );
+    }
+    return (
+      <>
+        <button onClick={() => setThreadsPlanningMode(false)}
+          className="flex items-center gap-1 fs-10 font-mono uppercase c-faint hover-accent-text mb-3 transition-colors">
+          <ChevronLeft size={12} /> Threads Dashboard
+        </button>
+        <IGModelPicker models={models} onPick={setFilter} subtitle="Opens her Threads dashboard — stats, captions, and the mass planner." handleKey="threadsHandle" handleLabel="Threads" bufferDailyStats={bufferDailyStats} platform="threads" />
+      </>
+    );
+  }
+
   return (
     <div className="flex gap-5">
       <div className="minw-140 w-140 flex-shrink-0 hidden md:block">
@@ -3577,7 +3625,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
             <span>All</span><span className="fs-10 c-faint">{countFor("all")}</span>
           </button>
           {PLATFORMS.map((p) => {
-            const Icon = p.icon === "Instagram" ? Instagram : p.icon === "TikTokLogo" ? TikTokLogo : XLogo;
+            const Icon = p.icon === "Instagram" ? Instagram : p.icon === "TikTokLogo" ? TikTokLogo : p.icon === "ThreadsLogo" ? ThreadsLogo : XLogo;
             return (
               <button key={p.id} onClick={() => setNetwork(p.id)}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-lg fs-12 font-mono transition-colors ${network === p.id ? "c-bg-accent-a2 c-accent font-semibold" : "c-muted hover-bg-surface"}`}>
@@ -12424,7 +12472,7 @@ function App() {
                     {contentNavOpen && (
                       <div className={`ml-6 mt-1 space-y-0.5 border-l c-border pl-2 ${mobileNavOpen ? "" : "hidden sm:block"}`}>
                         {PLATFORMS.map((p) => {
-                          const PIcon = p.icon === "Instagram" ? Instagram : p.icon === "TikTokLogo" ? TikTokLogo : XLogo;
+                          const PIcon = p.icon === "Instagram" ? Instagram : p.icon === "TikTokLogo" ? TikTokLogo : p.icon === "ThreadsLogo" ? ThreadsLogo : XLogo;
                           const platformActive = activeNav && contentPlatform === p.id;
                           return (
                             <button key={p.id}
