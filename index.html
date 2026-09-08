@@ -1707,8 +1707,12 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
         const modelPhotos = groups[modelName];
         if (!modelPhotos.length) continue;
         const images = await Promise.all(modelPhotos.map((p) => fileToVisionImage(p.file)));
-        const { data, error } = await supabaseClient.functions.invoke("x-caption-generate", {
-          body: { modelName, images, platform },
+        // Threads has its own dedicated caption generator (deliberately
+        // separate from x-caption-generate — different voice/style, see
+        // threads-caption-generate.ts), not a platform param on the X one.
+        const captionFn = platform === "threads" ? "threads-caption-generate" : "x-caption-generate";
+        const { data, error } = await supabaseClient.functions.invoke(captionFn, {
+          body: { modelName, images },
         });
         if (error) {
           const body = await error.context?.json?.().catch(() => null);
