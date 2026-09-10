@@ -9635,16 +9635,25 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
               return rows.length ? { model: m.name, last7Days: Math.round(sum(7)), last30Days: Math.round(sum(30)) } : null;
             }).filter(Boolean),
 
-            // Day-by-day earnings, last 14 calendar days — lets Neo answer
-            // "how much did X earn yesterday/on Tuesday" precisely instead
-            // of only knowing rolled-up totals.
+            // Day-by-day earnings AND new subscribers, last 14 calendar days —
+            // lets Neo answer "how much did X earn yesterday/on Tuesday" or
+            // "how many new subs did X get yesterday" precisely instead of
+            // only knowing rolled-up totals. newSubscribers was missing here
+            // until a live bug report: asked "how many new subscribers
+            // yesterday", Neo had no such field anywhere in its context and
+            // answered with yesterday's EARNINGS instead — the closest
+            // number it could find, but a completely different question.
             dailyEarningsByModel: heroModels.map((m) => {
               const rows = (inflowwDailyStats || []).filter((r) => r.model === m.name);
-              const byDate = new Map();
-              rows.forEach((r) => byDate.set(r.statDate, (byDate.get(r.statDate) || 0) + (r.earningsNet || 0)));
+              const earningsByDate = new Map();
+              const subsByDate = new Map();
+              rows.forEach((r) => {
+                earningsByDate.set(r.statDate, (earningsByDate.get(r.statDate) || 0) + (r.earningsNet || 0));
+                subsByDate.set(r.statDate, (subsByDate.get(r.statDate) || 0) + (r.newSubscribers || 0));
+              });
               const days = Array.from({ length: 14 }, (_, i) => {
                 const dateStr = nDaysAgoStr(13 - i);
-                return { date: dateStr, earnings: Math.round(byDate.get(dateStr) || 0) };
+                return { date: dateStr, earnings: Math.round(earningsByDate.get(dateStr) || 0), newSubscribers: subsByDate.get(dateStr) || 0 };
               });
               return rows.length ? { model: m.name, days } : null;
             }).filter(Boolean),
@@ -9933,7 +9942,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
               ish backdrop so the circuit-board background's randomly-placed
               traces (regenerated fresh each mount) can never visibly cut
               through the text sitting on top of them. */}
-          <div className="hidden sm:flex sm:flex-col items-center sm:items-start text-center sm:text-left" style={{ width: 280, flexShrink: 0, background: "rgba(3,7,5,0.55)", backdropFilter: "blur(4px)", borderRadius: "10px", padding: "10px 12px", margin: "-10px -12px" }}>
+          <div className="hidden sm:flex sm:flex-col items-center sm:items-start text-center sm:text-left" style={{ width: 280, flexShrink: 0, overflow: "hidden", background: "rgba(3,7,5,0.55)", backdropFilter: "blur(4px)", borderRadius: "10px", padding: "10px 12px", margin: "-10px -12px" }}>
             <div style={{ transform: isDesktopViewport ? `translate(12px, -12px)` : "none" }}>
               <div className="flex items-baseline gap-2 neo-fade-in" style={{ animationDelay: "0.15s" }}>
                 <span style={{
@@ -9958,8 +9967,8 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
               {/* Desktop previously had no equivalent of the mobile block below —
                   a denied mic or a failed TTS call just silently reverted to idle
                   with zero feedback here. */}
-              {heard && <div className="fs-10 italic mt-1" style={{ color: neoGreen, opacity: 0.4 }}>heard: "{heard}"</div>}
-              {voiceError && <div className="fs-10 italic mt-1" style={{ color: "#e07a5f" }}>voice error: {voiceError}</div>}
+              {heard && <div className="fs-10 italic mt-1" style={{ color: neoGreen, opacity: 0.4, overflowWrap: "break-word" }}>heard: "{heard}"</div>}
+              {voiceError && <div className="fs-10 italic mt-1" style={{ color: "#e07a5f", overflowWrap: "break-word" }}>voice error: {voiceError}</div>}
             </div>
           </div>
 
