@@ -3864,7 +3864,15 @@ function IGModelPicker({ models, onPick, subtitle = "Opens her dedicated Instagr
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {models.map((m, i) => {
           const color = MASS_PLANNER_COLORS[i % MASS_PLANNER_COLORS.length];
-          const stats = m[handleKey] ? modelStats(m.name) : null;
+          // Connected status is judged by whether real synced data exists
+          // for her on this platform, not just by a handle field — several
+          // platforms (Threads included) have no per-model handle column in
+          // the DB at all yet, which used to make every model show "no
+          // handle set" even once Publer was actually syncing real stats
+          // for her (confirmed live: Jarka's Threads account was connected
+          // and syncing, but still showed as unconnected here).
+          const stats = modelStats(m.name);
+          const connected = !!(m[handleKey] || stats);
           return (
             <button key={m.name} onClick={() => onPick(m.name)}
               className="text-left rounded-2xl p-4 flex items-center gap-3 transition-all hover:-translate-y-0.5"
@@ -3877,7 +3885,7 @@ function IGModelPicker({ models, onPick, subtitle = "Opens her dedicated Instagr
               </div>
               <div className="min-w-0 flex-1">
                 <div className="c-text font-semibold text-sm truncate">{m.name}</div>
-                <div className="fs-11 c-muted font-mono truncate">{m[handleKey] ? `@${m[handleKey]}` : `no ${handleLabel} handle set`}</div>
+                <div className="fs-11 c-muted font-mono truncate">{m[handleKey] ? `@${m[handleKey]}` : connected ? "Connected" : `no ${handleLabel} handle set`}</div>
                 {stats ? (
                   <div className="fs-9 font-mono c-faint uppercase tracking-wide mt-1 flex items-center gap-2">
                     <span style={{ color }}>{stats.reach7d.toLocaleString()}</span> reach · 7d
