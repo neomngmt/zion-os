@@ -667,6 +667,12 @@ function useSupaTable(table, idField, fallback, toJS, toDB, columns = "*") {
   useEffect(() => { load(); }, [load]);
 
   const persist = async (next) => {
+    // Optimistic update, but rolled back on failure — without this, a
+    // failed upsert/delete left the UI showing `next` as if it had saved
+    // (console.error only, nothing reverted, no user-facing signal), so
+    // an edit could look successful and then simply vanish on next reload
+    // with no indication anything went wrong.
+    const prev = value;
     setValue(next);
     try {
       const nextIds = new Set(next.map((r) => r[idField]));
@@ -682,6 +688,7 @@ function useSupaTable(table, idField, fallback, toJS, toDB, columns = "*") {
       prevIdsRef.current = nextIds;
     } catch (e) {
       console.error("save failed for " + table, e);
+      setValue(prev);
     }
   };
 
@@ -709,12 +716,14 @@ function useSupaAppState(key, fallback) {
   useEffect(() => { load(); }, [load]);
 
   const persist = async (next) => {
+    const prev = value;
     setValue(next);
     try {
       const { error } = await supabaseClient.from("app_state").upsert({ key, value: next, updated_at: new Date().toISOString() });
       if (error) throw error;
     } catch (e) {
       console.error("save failed for app_state:" + key, e);
+      setValue(prev);
     }
   };
 
@@ -752,6 +761,7 @@ function useSupaSettings(fallback) {
   useEffect(() => { load(); }, [load]);
 
   const persist = async (next) => {
+    const prev = value;
     setValue(next);
     try {
       // Only include the PIN/key columns when the caller actually typed a
@@ -767,6 +777,7 @@ function useSupaSettings(fallback) {
       if (error) throw error;
     } catch (e) {
       console.error("save failed for settings", e);
+      setValue(prev);
     }
   };
 
@@ -1703,9 +1714,17 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
       }
 
       const items = [];
-      for (const modelName of selected) {
+      // Each model's caption call is independent (its own vision request to
+      // Claude) — running them via Promise.all instead of a sequential
+      // for-loop turns a 4-5 model batch from 4-5x the per-call latency
+      // into roughly one call's worth of wall-clock time. Any one model
+      // failing still rejects the whole batch (Promise.all's behavior
+      // matches the old for-loop's throw-and-abort semantics exactly), and
+      // the final `items.sort` below already reorders everything by
+      // scheduledAt regardless of which model's promise resolves first.
+      await Promise.all(selected.map(async (modelName) => {
         const modelPhotos = groups[modelName];
-        if (!modelPhotos.length) continue;
+        if (!modelPhotos.length) return;
         const images = await Promise.all(modelPhotos.map((p) => fileToVisionImage(p.file)));
         // Threads has its own dedicated caption generator (deliberately
         // separate from x-caption-generate — different voice/style, see
@@ -1728,7 +1747,7 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
         modelPhotos.forEach((photo, i) => {
           items.push({ id: uid(), model: modelName, photo, caption: captions[i] || "", scheduledAt: slots[i].toISOString() });
         });
-      }
+      }));
       items.sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
       setPlan(items);
     } catch (e) {
@@ -2461,7 +2480,7 @@ function PlatformOverviewDashboard({
   const connectedModels = models.filter((m) => connectedNames.has(m.name));
   const rows = account === "all" ? allRows : allRows.filter((r) => r.model === account);
 
-  const dateNDaysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+  const dateNDaysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return toISO(d); };
   const rangeAgoStr = dateNDaysAgo(range - 1);
   const weekRows = rows.filter((r) => r.statDate >= rangeAgoStr);
   const weekTotals = {
@@ -2879,10 +2898,14 @@ const MANUAL_IG_DEMOGRAPHICS = {
 // Dot-fill world silhouette — the real country outlines (flekschas/simple-world-map,
 // CC BY-SA), filled with a repeating dot pattern instead of a solid color so
 // it reads as the "hex/dot map" style from the reference, not a flat blob.
-function WorldDotMap({ color = "#a78bfa" }) {
+function WorldDotMap({ color = "#a78bfa", height = 220 }) {
   const patId = React.useMemo(() => `worldDots${Math.random().toString(36).slice(2)}`, []);
   return (
-    <svg viewBox={WORLD_MAP_VIEWBOX} className="w-full" style={{ display: "block" }}>
+    // Explicit CSS height, not just the viewBox — a replaced <svg> with a
+    // viewBox but no width/height attribute or CSS height collapses toward
+    // a near-zero intrinsic height instead of scaling to the viewBox aspect
+    // ratio (same bug already found and fixed once in AreaTrendChart).
+    <svg viewBox={WORLD_MAP_VIEWBOX} className="w-full" style={{ display: "block", height }}>
       <defs>
         <pattern id={patId} width="7" height="7" patternUnits="userSpaceOnUse">
           <circle cx="3.5" cy="3.5" r="1.7" fill={color} />
@@ -2947,8 +2970,12 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
   const accountIds = igAccount === "all" ? accountRows.map((a) => a.id) : [igAccount];
   const modelNamesForSelection = [...new Set(accountIds.map((id) => accountById[id]?.model).filter(Boolean))];
 
-  const fmtK = (n) => (n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : `${n}`);
-  const dateNDaysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+  // fmtK: uses the shared top-level helper (defined once, below
+  // XStatsSection) instead of a local re-definition — this local copy used
+  // to render a real 0/null value as the literal string "0"/"null"
+  // (template-literal `${n}` with no falsy guard) while the shared/other
+  // copies correctly show "—" for no data, an inconsistency across screens.
+  const dateNDaysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return toISO(d); };
   const rangeDays = Array.from({ length: igRange }, (_, i) => dateNDaysAgo(igRange - 1 - i));
 
   const mediaInRange = (igGraphMedia || []).filter((m) => {
@@ -3982,7 +4009,7 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
       const sceneQueue = scenes.filter((s) => s.mixType === t.id);
       for (let n = 0; n < count; n++) {
         const dayOffset = acrossDays > 0 ? i % acrossDays : 0;
-        const deadline = new Date(Date.now() + dayOffset * 86400000).toISOString().slice(0, 10);
+        const deadline = toISO(new Date(Date.now() + dayOffset * 86400000));
         newCards.push({ ...buildCard(t, n, deadline, sceneQueue[n]), seq: seq++ });
         i++;
       }
@@ -4012,7 +4039,7 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
     const newCards = [];
     for (let n = 0; n < batchCount; n++) {
       const dayOffset = batchDays > 0 ? n % batchDays : 0;
-      const deadline = new Date(Date.now() + dayOffset * 86400000).toISOString().slice(0, 10);
+      const deadline = toISO(new Date(Date.now() + dayOffset * 86400000));
       newCards.push({ ...buildCard(generationType, n, deadline, scenes[n]), seq: seq++ });
     }
     await persistCards([...cards, ...newCards]);
@@ -4031,7 +4058,7 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
     const newCards = [];
     for (let n = 0; n < variationCount; n++) {
       const dayOffset = variationDays > 0 ? n % variationDays : 0;
-      const deadline = new Date(Date.now() + dayOffset * 86400000).toISOString().slice(0, 10);
+      const deadline = toISO(new Date(Date.now() + dayOffset * 86400000));
       newCards.push({ ...buildCard(variationType, n, deadline, scenes[n]), seq: seq++ });
     }
     await persistCards([...cards, ...newCards]);
@@ -4089,7 +4116,7 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
             All systems online
           </div>
           <div className="fs-13 font-mono c-muted mt-1">{clock.toLocaleTimeString("en-GB")}</div>
-          <div className="fs-10 font-mono c-faint">{clock.toISOString().slice(0, 10)}</div>
+          <div className="fs-10 font-mono c-faint">{toISO(clock)}</div>
         </div>
       </div>
 
@@ -5517,7 +5544,11 @@ function ModelProfileDashboard({ model, cards, reels, maxViewsAcrossModels, myVi
 function ModelIgAccounts({ model, igAccounts, onSynced }) {
   const accounts = (igAccounts?.value || []).filter((a) => a.model === model);
   const [tokenDrafts, setTokenDrafts] = useState({});
-  const [savingId, setSavingId] = useState(null);
+  // A Set of in-flight ids, not a single scalar — a model can have more
+  // than one IG account, and a single `savingId` meant saving Backup while
+  // Main's sync was still in flight cleared MAIN's spinner/disabled state
+  // too (whichever request's finally-block ran last won, for both rows).
+  const [savingIds, setSavingIds] = useState(() => new Set());
   const [statusById, setStatusById] = useState({});
   const [adding, setAdding] = useState(false);
   const [addingLabel, setAddingLabel] = useState("");
@@ -5530,7 +5561,7 @@ function ModelIgAccounts({ model, igAccounts, onSynced }) {
 
   const saveAndSync = async (a) => {
     const token = draftFor(a);
-    setSavingId(a.id);
+    setSavingIds((s) => new Set(s).add(a.id));
     setStatus(a.id, "Saving & syncing…");
     try {
       await igAccounts.persist(a.id, { ig_access_token: token });
@@ -5542,7 +5573,7 @@ function ModelIgAccounts({ model, igAccounts, onSynced }) {
     } catch (e) {
       setStatus(a.id, `Failed: ${e.message}`);
     }
-    setSavingId(null);
+    setSavingIds((s) => { const next = new Set(s); next.delete(a.id); return next; });
   };
 
   const addAccount = async () => {
@@ -5579,9 +5610,9 @@ function ModelIgAccounts({ model, igAccounts, onSynced }) {
               <input type="password" value={draftFor(a)} onChange={(e) => setTokenDrafts((d) => ({ ...d, [a.id]: e.target.value }))}
                 placeholder="Paste her Instagram Graph API access token"
                 className="flex-1 c-bg-app border c-border rounded-lg px-2.5 py-1.5 fs-11 c-text outline-none focus-border-accent font-mono" />
-              <button onClick={() => saveAndSync(a)} disabled={savingId === a.id || !draftFor(a)}
+              <button onClick={() => saveAndSync(a)} disabled={savingIds.has(a.id) || !draftFor(a)}
                 className="px-3 py-1.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase font-semibold disabled:opacity-50 flex-shrink-0">
-                {savingId === a.id ? "…" : "Save & sync"}
+                {savingIds.has(a.id) ? "…" : "Save & sync"}
               </button>
             </div>
             {statusById[a.id] && <div className="fs-9 font-mono c-faint mt-1">{statusById[a.id]}</div>}
@@ -6016,11 +6047,11 @@ function XStatsSection({ models, bufferDailyStats, bufferTopPosts, restrictModel
 
   const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 6);
   const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(weekAgo); d.setDate(weekAgo.getDate() + i); return d.toISOString().slice(0, 10);
+    const d = new Date(weekAgo); d.setDate(weekAgo.getDate() + i); return toISO(d);
   });
   const prevWeekAgo = new Date(weekAgo); prevWeekAgo.setDate(weekAgo.getDate() - 7);
   const prevDays = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(prevWeekAgo); d.setDate(prevWeekAgo.getDate() + i); return d.toISOString().slice(0, 10);
+    const d = new Date(prevWeekAgo); d.setDate(prevWeekAgo.getDate() + i); return toISO(d);
   });
   const rows = (bufferDailyStats || []).filter((r) => r.model === selected && r.platform === "x" && days.includes(r.statDate));
   const prevRows = (bufferDailyStats || []).filter((r) => r.model === selected && r.platform === "x" && prevDays.includes(r.statDate));
@@ -9283,7 +9314,7 @@ function NeoBootSequence({ onDone }) {
   );
 }
 
-function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models, stats, reels, trends, bufferDailyStats, bufferTopPosts, inflowwDailyStats, settings, persistSettings }) {
+function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models, stats, reels, trends, bufferDailyStats, bufferTopPosts, inflowwDailyStats, igGraphStats, settings, persistSettings }) {
   const [messages, setMessages] = useState([]);
   // messages was tracked but never actually shown anywhere — if TTS fails
   // or the viewer has sound off, there was no way to read what Neo said.
@@ -9344,6 +9375,14 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
   useEffect(() => {
     if (greetedRef.current) return;
     greetedRef.current = true;
+    // `cancelled`/`timeoutId` guard against the greeting audibly playing
+    // after this page has already been left — confirmed live: a user who
+    // navigates away within ORB_FADE_IN_MS of arriving used to still hear
+    // "Hi Boss! How can I help you today?" fire on the persistent <audio>
+    // element, since neither the setTimeout below nor the async
+    // prefetchedGreetingUrl.then(...) callback were ever cancelled.
+    let cancelled = false;
+    let timeoutId = null;
     unlockAudio();
     const name = session.role === "admin" ? "Boss" : (session.name || "there");
     const greeting = `Hi ${name}! How can I help you today?`;
@@ -9356,7 +9395,10 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
     // network fetch above keeps running in the background either way), so
     // the voice never starts ahead of the thing that's supposed to be
     // speaking.
-    const play = (url) => setTimeout(() => speakText(greeting, url), ORB_FADE_IN_MS);
+    const play = (url) => {
+      if (cancelled) return;
+      timeoutId = setTimeout(() => { if (!cancelled) speakText(greeting, url); }, ORB_FADE_IN_MS);
+    };
     // If the nav click already kicked off a prefetch, wait for that instead
     // of starting a brand new (slower) fetch — this is what keeps the delay
     // between the original tap and actual audio.play() short enough for
@@ -9366,6 +9408,10 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
     } else {
       play();
     }
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, []);
   const [voiceError, setVoiceError] = useState("");
   const [speaking, setSpeaking] = useState(false);
@@ -9541,6 +9587,27 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
       return withValue.length ? withValue[0][field] : null;
     };
 
+    // Grouped once up front instead of re-filtering the full
+    // inflowwDailyStats array by model separately in each of the three
+    // blocks below (inflowwEarningsByModel/dailyEarningsByModel/
+    // creatorPerformanceByModel all used to do their own independent
+    // `.filter(r => r.model === m.name)` pass over the same array on every
+    // single message sent to Neo).
+    const inflowwByModel = new Map();
+    (inflowwDailyStats || []).forEach((r) => {
+      if (!inflowwByModel.has(r.model)) inflowwByModel.set(r.model, []);
+      inflowwByModel.get(r.model).push(r);
+    });
+    // Same idea for bufferDailyStats, keyed by model+platform — used by
+    // socialStatsByModel's x/tiktok loop below (was 2 filters over the
+    // full array per model, for every model, every message).
+    const bufferByModelPlatform = new Map();
+    (bufferDailyStats || []).forEach((r) => {
+      const key = `${r.model}|${r.platform}`;
+      if (!bufferByModelPlatform.has(key)) bufferByModelPlatform.set(key, []);
+      bufferByModelPlatform.get(key).push(r);
+    });
+
     try {
       const { data, error } = await supabaseClient.functions.invoke("clever-service", {
         body: {
@@ -9604,20 +9671,36 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
             // 7d/30d totals (posts, reach, likes, replies, reposts, avg
             // engagement) plus the last 7 real days broken out day-by-day
             // for pattern/timing questions ("does she do better posting at
-            // night").
-            socialStatsByModel: heroModels.flatMap((m) => ["ig", "x", "tiktok"].map((platform) => {
-              const rows = (bufferDailyStats || []).filter((r) => r.model === m.name && r.platform === platform);
-              if (!rows.length) return null;
-              const sumSince = (n, field) => rows.filter((r) => r.statDate >= nDaysAgoStr(n)).reduce((t, r) => t + (r[field] || 0), 0);
-              const last7 = rows.filter((r) => r.statDate >= nDaysAgoStr(7));
-              const avgEr7 = (() => { const withEr = last7.filter((r) => r.engagementRate != null); return withEr.length ? withEr.reduce((s, r) => s + r.engagementRate, 0) / withEr.length : null; })();
-              return {
-                model: m.name, platform,
-                last7Days: { posts: sumSince(7, "postCount"), impressions: sumSince(7, "impressions"), likes: sumSince(7, "reactions"), replies: sumSince(7, "comments"), reposts: sumSince(7, "reposts"), avgEngagementRate: avgEr7 != null ? Number(avgEr7.toFixed(2)) : null },
-                last30Days: { posts: sumSince(30, "postCount"), impressions: sumSince(30, "impressions") },
-                dailyLast7: last7.sort((a, b) => a.statDate.localeCompare(b.statDate)).map((r) => ({ date: r.statDate, posts: r.postCount || 0, impressions: r.impressions || 0, likes: r.reactions || 0 })),
-              };
-            })).filter(Boolean),
+            // night"). IG is deliberately NOT in this Publer-sourced loop —
+            // IG was fully migrated off Publer to the direct Graph API
+            // (igGraphStats, see ig-graph-sync) earlier this session, so
+            // bufferDailyStats never has platform "ig" rows anymore. This
+            // silently dropped IG out of Neo's own knowledge entirely
+            // (rows.length was always 0, filtered out by .filter(Boolean))
+            // until the separate igGraphStats block below was added back.
+            socialStatsByModel: [
+              ...heroModels.flatMap((m) => ["x", "tiktok"].map((platform) => {
+                const rows = bufferByModelPlatform.get(`${m.name}|${platform}`) || [];
+                if (!rows.length) return null;
+                const sumSince = (n, field) => rows.filter((r) => r.statDate >= nDaysAgoStr(n)).reduce((t, r) => t + (r[field] || 0), 0);
+                const last7 = rows.filter((r) => r.statDate >= nDaysAgoStr(7));
+                const avgEr7 = (() => { const withEr = last7.filter((r) => r.engagementRate != null); return withEr.length ? withEr.reduce((s, r) => s + r.engagementRate, 0) / withEr.length : null; })();
+                return {
+                  model: m.name, platform,
+                  last7Days: { posts: sumSince(7, "postCount"), impressions: sumSince(7, "impressions"), likes: sumSince(7, "reactions"), replies: sumSince(7, "comments"), reposts: sumSince(7, "reposts"), avgEngagementRate: avgEr7 != null ? Number(avgEr7.toFixed(2)) : null },
+                  last30Days: { posts: sumSince(30, "postCount"), impressions: sumSince(30, "impressions") },
+                  dailyLast7: last7.sort((a, b) => a.statDate.localeCompare(b.statDate)).map((r) => ({ date: r.statDate, posts: r.postCount || 0, impressions: r.impressions || 0, likes: r.reactions || 0 })),
+                };
+              })).filter(Boolean),
+              // Real IG numbers straight from ig_graph_stats (direct Meta API) —
+              // a model can have more than one connected IG account, so each
+              // account is its own entry here (label distinguishes them).
+              ...heroModels.flatMap((m) => (igGraphStats || []).filter((r) => r.model === m.name).map((r) => ({
+                model: m.name, platform: "ig", label: r.label || null,
+                last7Days: { impressions: r.views7d || 0, reach: r.reach7d || 0 },
+                last30Days: { impressions: r.views30d || 0, reach: r.reach30d || 0 },
+              }))),
+            ],
 
             // Real best-performing post per model per platform (actual
             // caption text, not just a number) — this table only ever holds
@@ -9630,7 +9713,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
             // accounts combined) — this is the current, authoritative
             // source for "how much did X earn."
             inflowwEarningsByModel: heroModels.map((m) => {
-              const rows = (inflowwDailyStats || []).filter((r) => r.model === m.name);
+              const rows = inflowwByModel.get(m.name) || [];
               const sum = (days) => rows.filter((r) => r.statDate >= nDaysAgoStr(days)).reduce((t, r) => t + (r.earningsNet || 0), 0);
               return rows.length ? { model: m.name, last7Days: Math.round(sum(7)), last30Days: Math.round(sum(30)) } : null;
             }).filter(Boolean),
@@ -9644,7 +9727,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
             // answered with yesterday's EARNINGS instead — the closest
             // number it could find, but a completely different question.
             dailyEarningsByModel: heroModels.map((m) => {
-              const rows = (inflowwDailyStats || []).filter((r) => r.model === m.name);
+              const rows = inflowwByModel.get(m.name) || [];
               const earningsByDate = new Map();
               const subsByDate = new Map();
               rows.forEach((r) => {
@@ -9665,7 +9748,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
             // chat-vs-subscription revenue ratio. Latest-available snapshot
             // per field (these aren't meaningful to sum across days).
             creatorPerformanceByModel: heroModels.map((m) => {
-              const rows = (inflowwDailyStats || []).filter((r) => r.model === m.name);
+              const rows = inflowwByModel.get(m.name) || [];
               if (!rows.length) return null;
               const weekRows = rows.filter((r) => r.statDate >= nDaysAgoStr(7));
               const replyMs = latestField(rows, "replyTimeMs");
@@ -9873,7 +9956,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
   // Creator-facing replacements for the two agency-wide tiles (active model count,
   // trends shared) that a model should never see about the rest of the roster —
   // her own Infloww numbers instead, from data already synced for her account(s).
-  const last7Str = (() => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); })();
+  const last7Str = (() => { const d = new Date(); d.setDate(d.getDate() - 7); return toISO(d); })();
   const heroInflowwRows7d = (inflowwDailyStats || []).filter((r) => agencyModelNames.has(r.model) && r.statDate >= last7Str);
   const messages7d = heroInflowwRows7d.reduce((s, r) => s + (r.messagesCount || 0), 0);
   const tips7d = heroInflowwRows7d.reduce((s, r) => s + (r.tipsCount || 0), 0);
@@ -9881,7 +9964,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
   // last-7-days revenue series, for a small sparkline in the HUD panel
   const last7Series = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i));
-    const dayStr = d.toISOString().slice(0, 10);
+    const dayStr = toISO(d);
     return (inflowwDailyStats || []).filter((r) => agencyModelNames.has(r.model) && r.statDate === dayStr).reduce((s, r) => s + (r.earningsNet || 0), 0);
   });
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -9893,17 +9976,23 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
   const prevSubs = prevPerModel.reduce((a, s) => a + (s.ofSubs || 0), 0);
   const newSubs7d = activeSubs - prevSubs;
   const topReel = [...(reels || [])].filter((r) => heroModels.some((m) => m.name === r.model)).sort((a, b) => (b.views || 0) - (a.views || 0))[0];
-  const revLastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 10);
+  const revLastMonthStart = toISO(new Date(now.getFullYear(), now.getMonth() - 1, 1));
   const revThisMonthPrior = stats.filter((s) => (s.weekOf || "") >= revLastMonthStart && (s.weekOf || "") < monthStart).reduce((a, s) => a + (s.ofEarnings || 0), 0);
   const revMomPct = revThisMonthPrior > 0 ? Math.round(((monthRevenue - revThisMonthPrior) / revThisMonthPrior) * 100) : null;
 
   // ---- model table: revenue / subs / IG impressions / X impressions ----
   const bufWeekAgo = new Date(); bufWeekAgo.setDate(bufWeekAgo.getDate() - 7);
-  const bufWeekAgoStr = bufWeekAgo.toISOString().slice(0, 10);
-  const impressionsFor = (modelName, platform) => (bufferDailyStats || [])
-    .filter((r) => r.model === modelName && r.platform === platform && r.statDate >= bufWeekAgoStr)
-    .reduce((a, r) => a + (r.impressions || 0), 0);
-  const fmtK = (n) => (n >= 1000000 ? (n / 1000000).toFixed(1) + "M" : n >= 1000 ? (n / 1000).toFixed(1) + "K" : n ? String(n) : "—");
+  const bufWeekAgoStr = toISO(bufWeekAgo);
+  // IG reads from igGraphStats (direct Graph API), never bufferDailyStats —
+  // IG has had no Publer rows since the migration to direct IG stats, so
+  // this always came back 0 for "ig" until this branch was added.
+  const impressionsFor = (modelName, platform) => platform === "ig"
+    ? (igGraphStats || []).filter((r) => r.model === modelName).reduce((a, r) => a + (r.views7d || 0), 0)
+    : (bufferDailyStats || [])
+        .filter((r) => r.model === modelName && r.platform === platform && r.statDate >= bufWeekAgoStr)
+        .reduce((a, r) => a + (r.impressions || 0), 0);
+  // fmtK: shared top-level helper (defined once, below XStatsSection) —
+  // this was a duplicate identical copy, now removed.
 
   // ---- ambient/real log feed ----
   const logLines = [];
@@ -12386,7 +12475,7 @@ function App() {
             {!neoBooting && (
               <NeoPage agency={session.agency} session={session} onNavigate={setView}
                 onSignOut={() => { clearSavedSession(); setSession(null); setView(null); setOnboardingDismissed(false); }}
-                cards={scopedCards} tasks={scopedTasks} models={agencyModels} stats={scopedStats} reels={scopedReels} trends={trends} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} inflowwDailyStats={inflowwDailyStats} settings={settings} persistSettings={persistSettings} />
+                cards={scopedCards} tasks={scopedTasks} models={agencyModels} stats={scopedStats} reels={scopedReels} trends={trends} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} inflowwDailyStats={inflowwDailyStats} igGraphStats={igGraphStats} settings={settings} persistSettings={persistSettings} />
             )}
           </div>
         </div>
