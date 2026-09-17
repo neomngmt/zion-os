@@ -3515,7 +3515,7 @@ function ViralVariationsPanel({ variations }) {
   }, [variations]);
 
   return (
-    <div className="rounded-3xl p-5 mb-4" style={{ background: C.card, border: C.cardBorder }}>
+    <div className="rounded-3xl p-5 mb-4" style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.08)" }}>
       <div className="flex items-center justify-between mb-1">
         <div className="fs-13 font-semibold">Viral variations</div>
         <MoreDotsIG dark />
@@ -3530,7 +3530,7 @@ function ViralVariationsPanel({ variations }) {
       ) : (
         <div className="flex flex-col gap-3">
           {groups.map(({ rows, first }) => (
-            <div key={first.sourceMediaId} className="rounded-xl p-3" style={{ background: C.ringTrack, border: "1px solid rgba(255,255,255,0.06)" }}>
+            <div key={first.sourceMediaId} className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.06)" }}>
               <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
                 <div className="fs-11 font-semibold">
                   {first.model} · {(first.sourceViews || 0).toLocaleString()} views
