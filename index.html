@@ -3478,7 +3478,7 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
               </div>
             )}
 
-            <ViralVariationsPanel variations={igViralVariations} />
+            <ViralVariationsPanel variations={igViralVariations} igGraphMedia={igGraphMedia} />
           </>
         )}
       </div>
@@ -3502,7 +3502,9 @@ const VARIATION_STATUS_STYLE = {
 // identical reels reads as duplicate/linked content), each published as an
 // Instagram Trial Reel via ig-viral-render. This panel is read-only — it
 // just shows what the pipeline already decided and did/is doing.
-function ViralVariationsPanel({ variations }) {
+function ViralVariationsPanel({ variations, igGraphMedia }) {
+  const mediaById = React.useMemo(() => new Map((igGraphMedia || []).map((m) => [m.id, m])), [igGraphMedia]);
+
   const groups = React.useMemo(() => {
     const byMedia = new Map();
     (variations || []).forEach((v) => {
@@ -3515,9 +3517,14 @@ function ViralVariationsPanel({ variations }) {
   }, [variations]);
 
   return (
-    <div className="rounded-3xl p-5 mb-4" style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.08)" }}>
-      <div className="flex items-center justify-between mb-1">
-        <div className="fs-13 font-semibold">Viral variations</div>
+    <div className="rounded-3xl p-5 mb-4 relative overflow-hidden" style={{ background: "radial-gradient(ellipse 120% 100% at 10% 0%, rgba(167,139,250,0.12), transparent 60%), rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.08)" }}>
+      <div className="flex items-center justify-between mb-1 relative">
+        <div className="flex items-center gap-2">
+          <div className="rounded-xl flex items-center justify-center flex-shrink-0" style={{ width: 30, height: 30, background: "rgba(167,139,250,0.16)", border: "1px solid rgba(167,139,250,0.4)" }}>
+            <Flame size={14} color="#a78bfa" />
+          </div>
+          <div className="fs-13 font-semibold">Viral variations</div>
+        </div>
         <MoreDotsIG dark />
       </div>
       <div className="fs-10 c-faint font-mono mb-4">
@@ -3529,29 +3536,55 @@ function ViralVariationsPanel({ variations }) {
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          {groups.map(({ rows, first }) => (
-            <div key={first.sourceMediaId} className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.06)" }}>
-              <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
-                <div className="fs-11 font-semibold">
-                  {first.model} · {(first.sourceViews || 0).toLocaleString()} views
-                  <span className="fs-10 c-faint font-mono ml-1.5">({first.sourceRatio}x her average)</span>
-                </div>
-                <div className="fs-9 c-faint font-mono">detected {new Date(first.detectedAt).toLocaleDateString()}</div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {rows.map((v) => {
-                  const st = VARIATION_STATUS_STYLE[v.renderStatus] || VARIATION_STATUS_STYLE.pending;
-                  return (
-                    <div key={v.id} title={v.error || ""} className="rounded-lg px-2.5 py-1.5 fs-9 font-mono" style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${st.color}44` }}>
-                      <div className="c-faint">{new Date(v.scheduledFor + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}</div>
-                      <div className="c-text">{VARIATION_STYLE_LABELS[v.variationStyle] || v.variationStyle}</div>
-                      <div style={{ color: st.color }}>{st.label}</div>
+          {groups.map(({ rows, first }) => {
+            const media = mediaById.get(first.sourceMediaId);
+            return (
+              <div key={first.sourceMediaId} className="rounded-2xl p-3.5 flex gap-3.5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <a href={media?.permalink || undefined} target="_blank" rel="noreferrer"
+                  className="flex-shrink-0 rounded-xl overflow-hidden relative" style={{ width: 84, height: 149, background: "#15181a" }}>
+                  {media?.thumbnail_url ? (
+                    <img src={media.thumbnail_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center"><Flame size={20} color="rgba(167,139,250,0.5)" /></div>
+                  )}
+                  {media?.permalink && (
+                    <div className="absolute bottom-1 right-1 rounded-md p-0.5" style={{ background: "rgba(0,0,0,0.6)" }}>
+                      <ExternalLink size={9} color="#fff" />
                     </div>
-                  );
-                })}
+                  )}
+                </a>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between flex-wrap gap-1 mb-1">
+                    <div className="fs-12 font-bold flex items-center gap-1.5">
+                      {first.model}
+                      <span className="fs-10 font-mono px-2 py-0.5 rounded-full" style={{ background: "rgba(167,139,250,0.18)", color: "#a78bfa" }}>
+                        {(first.sourceViews || 0).toLocaleString()} views · {first.sourceRatio}x avg
+                      </span>
+                    </div>
+                    <div className="fs-9 c-faint font-mono">detected {new Date(first.detectedAt).toLocaleDateString()}</div>
+                  </div>
+                  {media?.caption && (
+                    <div className="fs-10 c-muted mb-2 truncate">{media.caption}</div>
+                  )}
+                  <div className="flex flex-wrap gap-1.5">
+                    {rows.map((v) => {
+                      const st = VARIATION_STATUS_STYLE[v.renderStatus] || VARIATION_STATUS_STYLE.pending;
+                      return (
+                        <div key={v.id} title={v.error || ""} className="rounded-lg px-2 py-1.5 fs-9 font-mono" style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${st.color}44`, minWidth: 76 }}>
+                          <div className="c-faint">{new Date(v.scheduledFor + "T12:00:00").toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}</div>
+                          <div className="c-text font-semibold">{VARIATION_STYLE_LABELS[v.variationStyle] || v.variationStyle}</div>
+                          <div className="flex items-center gap-1" style={{ color: st.color }}>
+                            <span className="rounded-full flex-shrink-0" style={{ width: 5, height: 5, background: st.color }} />
+                            {st.label}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
