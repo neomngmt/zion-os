@@ -3344,6 +3344,8 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
               </div>
             </div>
 
+            <ViralVariationsPanel variations={igViralVariations} igGraphMedia={igGraphMedia} />
+
             {igAccount === "all" && demoAccounts.length > 1 && (
               <div className="fs-10 font-mono mb-2" style={{ color: C.sub }}>Demographics below are combined across all {demoAccounts.length} connected accounts — pick one above to see just hers.</div>
             )}
@@ -3477,8 +3479,6 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
                 </div>
               </div>
             )}
-
-            <ViralVariationsPanel variations={igViralVariations} igGraphMedia={igGraphMedia} />
           </>
         )}
       </div>
