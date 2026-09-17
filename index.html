@@ -857,6 +857,39 @@ function useSupaIgGraphStats() {
   return { value, loading, refresh: () => load(false) };
 }
 
+// ig_viral_variations: one row per PLANNED variation (5 per detected viral
+// post, one per day) from the viral-detection pipeline (ig-viral-detect
+// plans them, ig-viral-render actually renders+publishes each on its
+// scheduled_for day). See project memory for the full pipeline.
+function useSupaIgViralVariations() {
+  const [value, setValue] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const load = useCallback(async (isFirst) => {
+    if (isFirst) setLoading(true);
+    try {
+      const { data, error } = await supabaseClient.from("ig_viral_variations").select("*").order("scheduled_for", { ascending: true });
+      if (error) throw error;
+      setValue((data || []).map((r) => ({
+        id: r.id, model: r.model, accountId: r.account_id, sourceMediaId: r.source_media_id,
+        sourceViews: r.source_views, sourceRatio: r.source_ratio, detectedAt: r.detected_at,
+        variationIndex: r.variation_index, variationStyle: r.variation_style,
+        videoUrl: r.video_url, renderStatus: r.render_status, scheduledFor: r.scheduled_for,
+        igMediaId: r.ig_media_id, publishState: r.publish_state, error: r.error,
+      })));
+    } catch (e) {
+      console.error("load failed for ig_viral_variations", e);
+      if (isFirst) setValue([]);
+    }
+    if (isFirst) setLoading(false);
+  }, []);
+  useEffect(() => {
+    load(true);
+    const t = setInterval(() => load(false), REFRESH_POLL_MS);
+    return () => clearInterval(t);
+  }, [load]);
+  return { value, loading, refresh: () => load(false) };
+}
+
 // ig_accounts holds one row per Instagram account a model has connected —
 // most models have exactly one ("Main"), some have a second (e.g. a backup
 // account), each with her own Graph API token, synced and shown separately
@@ -2937,7 +2970,7 @@ function TopCountriesCard({ countries, unit = "" }) {
 // buffer_daily_stats/buffer_top_posts, plus an audience-demographics section
 // backed by Publer's account-level chart_data endpoint (separate from
 // post_insights — see publer-demographics).
-function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphMedia, onPlanPosts, onMakeContentPlan }) {
+function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphMedia, igViralVariations, onPlanPosts, onMakeContentPlan }) {
   const C = {
     page: "radial-gradient(ellipse 130% 100% at 10% 0%, rgba(57,230,115,0.14), transparent 55%), radial-gradient(ellipse 100% 80% at 100% 0%, rgba(56,189,248,0.10), transparent 55%), #0b0f0d",
     card: "rgba(255,255,255,0.035)", cardBorder: "1px solid rgba(255,255,255,0.08)",
@@ -3444,9 +3477,83 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
                 </div>
               </div>
             )}
+
+            <ViralVariationsPanel variations={igViralVariations} />
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+const VARIATION_STYLE_LABELS = {
+  trim_tighter: "Tighter trim", zoom_in: "Zoomed in", speed_up: "Sped up",
+  speed_down: "Slowed down", trim_crop_combo: "Trim + crop",
+};
+const VARIATION_STATUS_STYLE = {
+  pending: { label: "Scheduled", color: "#9d9b95" },
+  published: { label: "Live (trial)", color: "#39e673" },
+  error: { label: "Failed", color: "#e07a5f" },
+};
+
+// Growth-experiment panel: when ig-viral-detect notices a post doing far
+// better than that account's own average, it plans 5 edited variations,
+// one per day (never bunched into one day — a same-day burst of near-
+// identical reels reads as duplicate/linked content), each published as an
+// Instagram Trial Reel via ig-viral-render. This panel is read-only — it
+// just shows what the pipeline already decided and did/is doing.
+function ViralVariationsPanel({ variations }) {
+  const groups = React.useMemo(() => {
+    const byMedia = new Map();
+    (variations || []).forEach((v) => {
+      if (!byMedia.has(v.sourceMediaId)) byMedia.set(v.sourceMediaId, []);
+      byMedia.get(v.sourceMediaId).push(v);
+    });
+    return [...byMedia.values()]
+      .map((rows) => ({ rows: rows.sort((a, b) => a.variationIndex - b.variationIndex), first: rows[0] }))
+      .sort((a, b) => new Date(b.first.detectedAt) - new Date(a.first.detectedAt));
+  }, [variations]);
+
+  return (
+    <div className="rounded-3xl p-5 mb-4" style={{ background: C.card, border: C.cardBorder }}>
+      <div className="flex items-center justify-between mb-1">
+        <div className="fs-13 font-semibold">Viral variations</div>
+        <MoreDotsIG dark />
+      </div>
+      <div className="fs-10 c-faint font-mono mb-4">
+        Auto-detected viral posts get 5 edited variations, one published per day as an Instagram Trial Reel
+      </div>
+      {groups.length === 0 ? (
+        <div className="fs-12 c-faint font-mono italic py-6 text-center rounded-xl" style={{ border: "1px dashed rgba(255,255,255,0.12)" }}>
+          No viral posts detected yet — this fills in automatically once a post outperforms that account's own average.
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {groups.map(({ rows, first }) => (
+            <div key={first.sourceMediaId} className="rounded-xl p-3" style={{ background: C.ringTrack, border: "1px solid rgba(255,255,255,0.06)" }}>
+              <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
+                <div className="fs-11 font-semibold">
+                  {first.model} · {(first.sourceViews || 0).toLocaleString()} views
+                  <span className="fs-10 c-faint font-mono ml-1.5">({first.sourceRatio}x her average)</span>
+                </div>
+                <div className="fs-9 c-faint font-mono">detected {new Date(first.detectedAt).toLocaleDateString()}</div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {rows.map((v) => {
+                  const st = VARIATION_STATUS_STYLE[v.renderStatus] || VARIATION_STATUS_STYLE.pending;
+                  return (
+                    <div key={v.id} title={v.error || ""} className="rounded-lg px-2.5 py-1.5 fs-9 font-mono" style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${st.color}44` }}>
+                      <div className="c-faint">{new Date(v.scheduledFor + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}</div>
+                      <div className="c-text">{VARIATION_STYLE_LABELS[v.variationStyle] || v.variationStyle}</div>
+                      <div style={{ color: st.color }}>{st.label}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -3459,7 +3566,7 @@ function MoreDotsIG({ dark }) {
   );
 }
 
-function ContentDirector({ cards, persistCards, models, restrictModel, forcedNetwork, reels, persistReels, xCompetitors, persistXCompetitors, bufferDailyStats, bufferTopPosts, inflowwDailyStats, igGraphStats, igGraphMedia }) {
+function ContentDirector({ cards, persistCards, models, restrictModel, forcedNetwork, reels, persistReels, xCompetitors, persistXCompetitors, bufferDailyStats, bufferTopPosts, inflowwDailyStats, igGraphStats, igGraphMedia, igViralVariations }) {
   const [detail, setDetail] = useState(null);
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -3538,7 +3645,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
     if (!igPlanningMode) {
       return (
         <IGOverviewDashboard
-          models={models} inflowwDailyStats={inflowwDailyStats} igGraphStats={igGraphStats} igGraphMedia={igGraphMedia}
+          models={models} inflowwDailyStats={inflowwDailyStats} igGraphStats={igGraphStats} igGraphMedia={igGraphMedia} igViralVariations={igViralVariations}
           onPlanPosts={() => { setIgEntryScreen("menu"); setIgPlanningMode(true); }}
           onMakeContentPlan={() => { setIgEntryScreen("plan"); setIgPlanningMode(true); }}
         />
@@ -12353,6 +12460,7 @@ function App() {
   const { value: igGraphStats, loading: igGraphStatsLoading, refresh: refreshIgGraphStats } = useSupaIgGraphStats();
   const igAccountsHook = useSupaIgAccounts();
   const { value: igGraphMedia, loading: igGraphMediaLoading, refresh: refreshIgGraphMedia } = useSupaIgGraphMedia();
+  const { value: igViralVariations, refresh: refreshIgViralVariations } = useSupaIgViralVariations();
   const { value: bufferTopPosts, loading: bufferTopPostsLoading } = useSupaBufferTopPosts();
   const { value: ofDailyStats, loading: ofDailyStatsLoading } = useSupaOfDailyStats();
   const { value: inflowwDailyStats, loading: inflowwDailyStatsLoading, syncing: inflowwSyncing, refresh: refreshInfloww } = useSupaInflowwDailyStats();
@@ -12648,7 +12756,7 @@ function App() {
             {currentView === "dashboard" && (session.role === "admin"
               ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} inflowwDailyStats={inflowwDailyStats} inflowwSyncing={inflowwSyncing} refreshInfloww={refreshInfloww} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} settings={settings} />
               : <CreatorDashboard stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} ofDailyStats={ofDailyStats} inflowwDailyStats={inflowwDailyStats} />)}
-            {currentView === "content" && <ContentDirector cards={isAdmin ? scopedCards : cards} persistCards={isAdmin ? scopedPersistCards : persistCards} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} forcedNetwork={contentPlatform} reels={isAdmin ? scopedReels : reels} persistReels={isAdmin ? scopedPersistReels : persistReels} xCompetitors={xCompetitors} persistXCompetitors={persistXCompetitors} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} inflowwDailyStats={inflowwDailyStats} igGraphStats={igGraphStats} igGraphMedia={igGraphMedia} />}
+            {currentView === "content" && <ContentDirector cards={isAdmin ? scopedCards : cards} persistCards={isAdmin ? scopedPersistCards : persistCards} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} forcedNetwork={contentPlatform} reels={isAdmin ? scopedReels : reels} persistReels={isAdmin ? scopedPersistReels : persistReels} xCompetitors={xCompetitors} persistXCompetitors={persistXCompetitors} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} inflowwDailyStats={inflowwDailyStats} igGraphStats={igGraphStats} igGraphMedia={igGraphMedia} igViralVariations={igViralVariations} />}
             {currentView === "calendar" && <CalendarView cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks} onNavigate={setView} restrictModel={restrictModel} />}
             {currentView === "tasks" && <TaskManager tasks={isAdmin ? scopedTasks : tasks} persistTasks={isAdmin ? scopedPersistTasks : persistTasks} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} />}
             {currentView === "stats" && <StatsManager stats={scopedStats} persistStats={scopedPersistStats} models={agencyModels} reels={scopedReels} persistReels={scopedPersistReels} />}
