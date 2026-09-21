@@ -5392,7 +5392,7 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
                       <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "rgba(255,255,255,0.15)" }} />
                       <div className="min-w-0 flex-1">
                         <div className="fs-10 font-mono c-faint">account removed</div>
-                        <button onClick={() => addPlatformAccount(m, key)} className="fs-9 font-mono uppercase c-accent hover-accent-text">+ Add account</button>
+                        <button onClick={() => addPlatformAccount(m, key)} className="mt-1 fs-9 font-mono uppercase px-2 py-0.5 rounded-md c-accent" style={{ border: "1px solid rgba(57,230,115,0.45)", background: "rgba(57,230,115,0.08)" }}>+ Add account</button>
                       </div>
                     </div>
                   );
@@ -5408,7 +5408,7 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
                           : key === "ig" ? "no Meta API token" : "not synced via Publer"}
                       </div>
                       {key !== "ig" && (
-                        <button onClick={() => removePlatformAccount(m, key)} className="fs-9 font-mono uppercase c-faint hover:text-red-400 transition-colors">Remove account</button>
+                        <button onClick={() => removePlatformAccount(m, key)} className="mt-1 fs-9 font-mono uppercase px-2 py-0.5 rounded-md transition-colors" style={{ color: "#e07a5f", border: "1px solid rgba(224,122,95,0.45)", background: "rgba(224,122,95,0.08)" }}>Remove account</button>
                       )}
                     </div>
                   </div>
