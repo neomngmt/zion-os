@@ -1015,6 +1015,7 @@ const modelsToJS = (r) => ({
   inspoProfiles: Array.isArray(r.inspo_profiles) ? r.inspo_profiles : (r.inspo_profiles ? JSON.parse(r.inspo_profiles) : []),
   monthlyGoal: r.monthly_goal != null ? Number(r.monthly_goal) : null,
   igConnectedAt: r.ig_connected_at ? new Date(r.ig_connected_at).getTime() : null,
+  disabledPlatforms: Array.isArray(r.disabled_platforms) ? r.disabled_platforms : [],
 });
 const modelsToDB = (m) => ({
   name: m.name, note: m.note || "", onboarded: !!m.onboarded,
@@ -1031,6 +1032,7 @@ const modelsToDB = (m) => ({
   notif_last_seen: m.notifLastSeen ? new Date(m.notifLastSeen).toISOString() : null,
   inspo_profiles: m.inspoProfiles || [],
   monthly_goal: m.monthlyGoal != null && m.monthlyGoal !== "" ? Number(m.monthlyGoal) : null,
+  disabled_platforms: m.disabledPlatforms || [],
 });
 
 const cardsToJS = (r) => ({
@@ -3696,6 +3698,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
   }
 
   // TikTok gets the same automation-console treatment — team/admin only for now.
+  const modelsFor = (platform) => models.filter((m) => !(m.disabledPlatforms || []).includes(platform));
   const ttModelName = restrictModel || (filter !== "all" ? filter : null);
   const ttMode = network === "tiktok" && !restrictModel;
   if (ttMode) {
@@ -3713,7 +3716,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
     if (!ttPlanningMode) {
       return (
         <TikTokOverviewDashboard
-          models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts}
+          models={modelsFor("tiktok")} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts}
           onPlanPosts={() => setTtPlanningMode(true)}
         />
       );
@@ -3724,7 +3727,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
           className="flex items-center gap-1 fs-10 font-mono uppercase c-faint hover-accent-text mb-3 transition-colors">
           <ChevronLeft size={12} /> TikTok Dashboard
         </button>
-        <IGModelPicker models={models} onPick={setFilter} subtitle="Opens her dedicated TikTok automation console." handleKey="tiktokHandle" handleLabel="TikTok" bufferDailyStats={bufferDailyStats} platform="tiktok" />
+        <IGModelPicker models={modelsFor("tiktok")} onPick={setFilter} subtitle="Opens her dedicated TikTok automation console." handleKey="tiktokHandle" handleLabel="TikTok" bufferDailyStats={bufferDailyStats} platform="tiktok" />
       </>
     );
   }
@@ -3739,7 +3742,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
     if (!xPlanningMode) {
       return (
         <XOverviewDashboard
-          models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts}
+          models={modelsFor("x")} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts}
           competitors={xCompetitors} persistCompetitors={persistXCompetitors}
           onPlanPosts={() => setXPlanningMode(true)}
         />
@@ -3751,7 +3754,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
           className="flex items-center gap-1 fs-10 font-mono uppercase c-faint hover-accent-text mb-3 transition-colors">
           <ChevronLeft size={12} /> X Dashboard
         </button>
-        <IGModelPicker models={models} onPick={setFilter} subtitle="Opens her X dashboard — stats, captions, and the mass planner." handleKey="xHandle" handleLabel="X" bufferDailyStats={bufferDailyStats} platform="x" />
+        <IGModelPicker models={modelsFor("x")} onPick={setFilter} subtitle="Opens her X dashboard — stats, captions, and the mass planner." handleKey="xHandle" handleLabel="X" bufferDailyStats={bufferDailyStats} platform="x" />
       </>
     );
   }
@@ -3770,7 +3773,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
     if (!threadsPlanningMode) {
       return (
         <ThreadsOverviewDashboard
-          models={models} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts}
+          models={modelsFor("threads")} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts}
           onPlanPosts={() => setThreadsPlanningMode(true)}
         />
       );
@@ -3781,7 +3784,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
           className="flex items-center gap-1 fs-10 font-mono uppercase c-faint hover-accent-text mb-3 transition-colors">
           <ChevronLeft size={12} /> Threads Dashboard
         </button>
-        <IGModelPicker models={models} onPick={setFilter} subtitle="Opens her Threads dashboard — stats, captions, and the mass planner." handleKey="threadsHandle" handleLabel="Threads" bufferDailyStats={bufferDailyStats} platform="threads" />
+        <IGModelPicker models={modelsFor("threads")} onPick={setFilter} subtitle="Opens her Threads dashboard — stats, captions, and the mass planner." handleKey="threadsHandle" handleLabel="Threads" bufferDailyStats={bufferDailyStats} platform="threads" />
       </>
     );
   }
@@ -5128,6 +5131,26 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
   const clock = useLiveClock(); // also drives the cooldown countdown re-rendering below
   const syncOnCooldown = Date.now() < syncCooldownUntil;
 
+  const PLATFORM_LABELS = { x: "X", tiktok: "TikTok", threads: "Threads" };
+  const removePlatformAccount = async (m, key) => {
+    const label = PLATFORM_LABELS[key];
+    if (!window.confirm(`Remove ${m.name}'s ${label} account? This deletes her synced ${label} stats and hides her from the ${label} tools until you add it back.`)) return;
+    const a = await supabaseClient.from("buffer_daily_stats").delete().eq("model", m.name).eq("platform", key);
+    const b = await supabaseClient.from("buffer_top_posts").delete().eq("model", m.name).eq("platform", key);
+    if (a.error || b.error) { setSyncResult(`Could not clear ${label} stats: ${(a.error || b.error).message}`); return; }
+    const handleReset = key === "x" ? { xHandle: "" } : key === "tiktok" ? { tiktokHandle: "" } : {};
+    await persistModels(models.map((x) => (x.name === m.name
+      ? { ...x, ...handleReset, disabledPlatforms: [...new Set([...(x.disabledPlatforms || []), key])] }
+      : x)));
+    setSyncResult(`${m.name}'s ${label} account removed.`);
+  };
+  const addPlatformAccount = async (m, key) => {
+    await persistModels(models.map((x) => (x.name === m.name
+      ? { ...x, disabledPlatforms: (x.disabledPlatforms || []).filter((k) => k !== key) }
+      : x)));
+    setSyncResult(`${m.name}'s ${PLATFORM_LABELS[key]} is active again. Connect the new account in Publer and the next sync picks it up.`);
+  };
+
   const runSyncNow = async () => {
     if (syncOnCooldown) return;
     setSyncingNow(true);
@@ -5330,15 +5353,15 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
 
       {mmTab === "accounts" ? (
         <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
-          <div className="hidden md:grid md:grid-cols-[1.3fr_1fr_1fr_1fr] gap-2 px-4 py-2 fs-9 font-mono uppercase c-faint tracking-wide"
+          <div className="hidden md:grid md:grid-cols-[1.3fr_1fr_1fr_1fr_1fr] gap-2 px-4 py-2 fs-9 font-mono uppercase c-faint tracking-wide"
             style={{ background: "rgba(255,255,255,0.02)" }}>
-            <span>Model</span><span>Instagram</span><span>X</span><span>TikTok</span>
+            <span>Model</span><span>Instagram</span><span>X</span><span>TikTok</span><span>Threads</span>
           </div>
           {models.length === 0 && (
             <div className="fs-12 c-faint font-mono italic py-8 text-center">no models yet — add your first one</div>
           )}
           {models.map((m, i) => (
-            <div key={m.name} className="grid grid-cols-1 md:grid-cols-[1.3fr_1fr_1fr_1fr] gap-2 px-4 py-3 items-center"
+            <div key={m.name} className="grid grid-cols-1 md:grid-cols-[1.3fr_1fr_1fr_1fr_1fr] gap-2 px-4 py-3 items-center"
               style={{ borderTop: i === 0 ? "none" : "1px solid rgba(255,255,255,0.06)" }}>
               <div className="flex items-center gap-2 min-w-0">
                 <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: colorFor(m.name) }} />
@@ -5348,7 +5371,9 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
                 { key: "ig", handle: m.igHandle },
                 { key: "x", handle: m.xHandle },
                 { key: "tiktok", handle: m.tiktokHandle },
+                { key: "threads", handle: "" },
               ].map(({ key, handle }) => {
+                const removed = key !== "ig" && (m.disabledPlatforms || []).includes(key);
                 // IG is off Publer entirely now — connection status comes
                 // from ig_graph_stats (her own Meta Graph API token in
                 // Model Manager), not buffer_daily_stats. X/TikTok still
@@ -5361,6 +5386,17 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
                   ? (graphRow?.syncedAt ? timeAgo(new Date(graphRow.syncedAt).getTime()) : null)
                   : (lastDate ? timeAgo(new Date(lastDate + "T12:00:00").getTime()) : null);
                 const imp7d = key === "ig" ? (graphRow?.views7d || 0) : platRows.filter((r) => r.statDate >= cutoff7dStr).reduce((s, r) => s + (r.impressions || 0), 0);
+                if (removed) {
+                  return (
+                    <div key={key} className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "rgba(255,255,255,0.15)" }} />
+                      <div className="min-w-0 flex-1">
+                        <div className="fs-10 font-mono c-faint">account removed</div>
+                        <button onClick={() => addPlatformAccount(m, key)} className="fs-9 font-mono uppercase c-accent hover-accent-text">+ Add account</button>
+                      </div>
+                    </div>
+                  );
+                }
                 return (
                   <div key={key} className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: connected ? "#39e673" : "rgba(255,255,255,0.15)" }} />
@@ -5371,6 +5407,9 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
                           ? `${imp7d.toLocaleString()} · 7d · synced ${lastLabel}`
                           : key === "ig" ? "no Meta API token" : "not synced via Publer"}
                       </div>
+                      {key !== "ig" && (
+                        <button onClick={() => removePlatformAccount(m, key)} className="fs-9 font-mono uppercase c-faint hover:text-red-400 transition-colors">Remove account</button>
+                      )}
                     </div>
                   </div>
                 );
