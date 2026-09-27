@@ -1423,12 +1423,8 @@ async function computeBestHours(modelName, platform = "x") {
 // though the real posted photo is fine). createImageBitmap with
 // imageOrientation:"from-image" decodes it already corrected; the manual
 // <img> fallback is only for environments where that option isn't supported.
-async function fileToVisionImage(file, maxDim = 1024) {
-  const drawToJpeg = (source, width, height) => new Promise((resolve, reject) => {
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    canvas.getContext("2d").drawImage(source, 0, 0, width, height);
+function canvasToJpeg(canvas) {
+  return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (!blob) { reject(new Error("Failed to encode image")); return; }
       const reader = new FileReader();
@@ -1437,6 +1433,16 @@ async function fileToVisionImage(file, maxDim = 1024) {
       reader.readAsDataURL(blob);
     }, "image/jpeg", 0.82);
   });
+}
+
+async function fileToVisionImage(file, maxDim = 1024) {
+  const drawToJpeg = (source, width, height) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext("2d").drawImage(source, 0, 0, width, height);
+    return canvasToJpeg(canvas);
+  };
 
   if (typeof createImageBitmap === "function") {
     let bitmap;
@@ -1474,6 +1480,45 @@ async function fileToVisionImage(file, maxDim = 1024) {
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Failed to load image")); };
     img.src = url;
+  });
+}
+
+// Same idea as fileToVisionImage but for a video file — grabs one
+// representative frame (a bit past the start, so it's not just a black/logo
+// intro frame) and encodes it the same way, so the caption AI still gets
+// grounded in the actual clip's content instead of writing blind for video
+// posts.
+async function videoFrameToVisionImage(file, maxDim = 1024) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "auto";
+    video.src = url;
+    const cleanup = () => URL.revokeObjectURL(url);
+    video.onerror = () => { cleanup(); reject(new Error("Failed to load video")); };
+    video.onloadedmetadata = () => {
+      video.currentTime = Math.min(1, (video.duration || 2) / 2);
+    };
+    video.onseeked = () => {
+      try {
+        let { videoWidth: width, videoHeight: height } = video;
+        if (width > maxDim || height > maxDim) {
+          const scale = maxDim / Math.max(width, height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(video, 0, 0, width, height);
+        canvasToJpeg(canvas).then((img) => { cleanup(); resolve(img); }, (e) => { cleanup(); reject(e); });
+      } catch (e) {
+        cleanup();
+        reject(e);
+      }
+    };
   });
 }
 
@@ -1706,9 +1751,12 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
 
 
   const addPhotos = (fileList) => {
-    const files = Array.from(fileList || []).filter((f) => f.type.startsWith("image/"));
+    const files = Array.from(fileList || []).filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"));
     if (!files.length) return;
-    setPhotos((prev) => [...prev, ...files.map((file) => ({ id: uid(), file, name: file.name, previewUrl: URL.createObjectURL(file) }))]);
+    setPhotos((prev) => [...prev, ...files.map((file) => ({
+      id: uid(), file, name: file.name, previewUrl: URL.createObjectURL(file),
+      kind: file.type.startsWith("video/") ? "video" : "photo",
+    }))]);
     setPlan(null);
   };
   const removePhoto = (id) => {
@@ -1760,7 +1808,7 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
       await Promise.all(selected.map(async (modelName) => {
         const modelPhotos = groups[modelName];
         if (!modelPhotos.length) return;
-        const images = await Promise.all(modelPhotos.map((p) => fileToVisionImage(p.file)));
+        const images = await Promise.all(modelPhotos.map((p) => (p.kind === "video" ? videoFrameToVisionImage(p.file) : fileToVisionImage(p.file))));
         // Threads has its own dedicated caption generator (deliberately
         // separate from x-caption-generate — different voice/style, see
         // threads-caption-generate.ts), not a platform param on the X one.
@@ -1780,7 +1828,7 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
         // modulo-cycling a small caption pool, since each caption is now
         // written to match that specific photo.
         modelPhotos.forEach((photo, i) => {
-          items.push({ id: uid(), model: modelName, photo, caption: captions[i] || "", scheduledAt: slots[i].toISOString() });
+          items.push({ id: uid(), model: modelName, photo, mediaKind: photo.kind, caption: captions[i] || "", scheduledAt: slots[i].toISOString() });
         });
       }));
       items.sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
@@ -1816,7 +1864,7 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
           body: JSON.stringify({
             modelName: item.model, platform, text: item.caption,
-            mediaId: uploadJson.id, scheduledAt: item.scheduledAt,
+            mediaId: uploadJson.id, mediaType: item.mediaKind === "video" ? "video" : "photo", scheduledAt: item.scheduledAt,
           }),
         });
         const scheduleJson = await scheduleResp.json();
@@ -1950,9 +1998,9 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
           </div>
 
           <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2.5">
-            {lockedModel ? `${lockedModel}'s photos` : "Shared photo batch"}
+            {lockedModel ? `${lockedModel}'s photos & videos` : "Shared media batch"}
           </div>
-          <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden"
+          <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden"
             onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
           {photos.length === 0 ? (
             <button onClick={() => fileInputRef.current?.click()}
@@ -1960,7 +2008,7 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
               <div className="w-9 h-9 rounded-full flex items-center justify-center mb-1" style={{ background: "rgba(255,255,255,0.06)" }}>
                 <Plus size={16} className="c-muted" />
               </div>
-              <span className="fs-12 c-muted font-mono">Upload photos</span>
+              <span className="fs-12 c-muted font-mono">Upload photos or videos</span>
               <span className="fs-10 c-faint font-mono">{lockedModel ? "gets scheduled across the coming week" : "drops get split evenly across the accounts above"}</span>
             </button>
           ) : (
@@ -1968,7 +2016,16 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
               <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-2 mb-2">
                 {photos.map((p) => (
                   <div key={p.id} className="relative rounded-xl overflow-hidden group" style={{ paddingTop: "100%", boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
-                    <img src={p.previewUrl} alt={p.name} className="absolute inset-0 w-full h-full object-cover" />
+                    {p.kind === "video" ? (
+                      <video src={p.previewUrl} muted playsInline className="absolute inset-0 w-full h-full object-cover" />
+                    ) : (
+                      <img src={p.previewUrl} alt={p.name} className="absolute inset-0 w-full h-full object-cover" />
+                    )}
+                    {p.kind === "video" && (
+                      <div className="absolute bottom-1 left-1 rounded-md p-0.5 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)" }}>
+                        <Play size={9} className="text-white" />
+                      </div>
+                    )}
                     <button onClick={() => removePhoto(p.id)} aria-label="Remove photo"
                       className="absolute top-1 right-1 rounded-full p-1 opacity-60 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
                       style={{ background: "rgba(0,0,0,0.6)" }}>
@@ -1981,7 +2038,9 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
                   <Plus size={16} className="c-muted absolute" />
                 </button>
               </div>
-              <span className="fs-10 c-faint font-mono">{photos.length} photos queued</span>
+              <span className="fs-10 c-faint font-mono">
+                {photos.length} queued{photos.some((p) => p.kind === "video") ? ` · ${photos.filter((p) => p.kind === "video").length} video${photos.filter((p) => p.kind === "video").length !== 1 ? "s" : ""}` : ""}
+              </span>
             </div>
           )}
 
@@ -2030,9 +2089,18 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
                             const st = itemStates[it.id]?.status;
                             return (
                               <div key={it.id} className="relative rounded-lg overflow-hidden" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.35)" }}>
-                                <img src={it.photo.previewUrl} alt="" className="w-full object-cover" style={{ aspectRatio: "1/1" }} />
+                                {it.mediaKind === "video" ? (
+                                  <video src={it.photo.previewUrl} muted playsInline className="w-full object-cover" style={{ aspectRatio: "1/1" }} />
+                                ) : (
+                                  <img src={it.photo.previewUrl} alt="" className="w-full object-cover" style={{ aspectRatio: "1/1" }} />
+                                )}
                                 <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.85) 100%)" }} />
                                 <div className="absolute top-1 left-1">{renderAvatar(it.model, 20)}</div>
+                                {it.mediaKind === "video" && (
+                                  <div className="absolute top-1.5 left-6 rounded-md p-0.5" style={{ background: "rgba(0,0,0,0.55)" }}>
+                                    <Play size={8} className="text-white" />
+                                  </div>
+                                )}
                                 <div className="absolute top-1.5 right-1.5 fs-9 font-mono px-1 rounded" style={{ background: "rgba(0,0,0,0.55)", color: "#fff" }}>
                                   {new Date(it.scheduledAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                                 </div>
