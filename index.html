@@ -5186,9 +5186,13 @@ function TikTokContentHub({ models, cards, selectedModelName, onBackToModels }) 
 
 function ModelManager({ models, persistModels, cards, reels, agency, bufferDailyStats, igGraphStats, igAccounts, onIgAccountSynced }) {
   const [adding, setAdding] = useState(false);
-  const [name, setName] = useState("");
-  const [note, setNote] = useState("");
-  const [pin, setPin] = useState("");
+  const NEW_MODEL_DEFAULTS = {
+    name: "", note: "", pin: "", igHandle: "", xHandle: "", tiktokHandle: "",
+    ofUrl: "", driveUrl: "", inflowwCreatorIdFree: "", inflowwCreatorIdPaid: "", monthlyGoal: "",
+  };
+  const [newModel, setNewModel] = useState(NEW_MODEL_DEFAULTS);
+  const setNewField = (k, v) => setNewModel((f) => ({ ...f, [k]: v }));
+  const [addError, setAddError] = useState("");
   const [detailName, setDetailName] = useState(null);
   const [editName, setEditName] = useState(null);
   const [mmTab, setMmTab] = useState("models"); // models | accounts
@@ -5240,17 +5244,25 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
   };
 
   const addModel = async () => {
-    if (!name.trim()) return;
-    const trimmedName = name.trim();
+    const trimmedName = newModel.name.trim();
+    if (!trimmedName) { setAddError("Name is required"); return; }
+    if (models.some((m) => m.name.toLowerCase() === trimmedName.toLowerCase())) {
+      setAddError(`"${trimmedName}" already exists`);
+      return;
+    }
+    setAddError("");
     await persistModels([...models, {
-      name: trimmedName, note, onboarded: false, addedAt: Date.now(), agency: agency || "CZ",
-      igHandle: "", xHandle: "", tiktokHandle: "", ofUrl: "", driveUrl: "", bio: "",
+      name: trimmedName, note: newModel.note.trim(), onboarded: false, addedAt: Date.now(), agency: agency || "CZ",
+      igHandle: newModel.igHandle.trim().replace(/^@/, ""), xHandle: newModel.xHandle.trim().replace(/^@/, ""),
+      tiktokHandle: newModel.tiktokHandle.trim().replace(/^@/, ""), ofUrl: newModel.ofUrl.trim(), driveUrl: newModel.driveUrl.trim(), bio: "",
+      inflowwCreatorIdFree: newModel.inflowwCreatorIdFree.trim(), inflowwCreatorIdPaid: newModel.inflowwCreatorIdPaid.trim(),
+      monthlyGoal: newModel.monthlyGoal !== "" ? Number(newModel.monthlyGoal) : null,
     }]);
     // pin is a separate, targeted column write (not part of modelsToDB) so a
     // save elsewhere in the app can never accidentally blank someone's
     // password — see setModelPin below for why.
-    if (pin.trim()) await supabaseClient.from("models").update({ pin: pin.trim() }).eq("name", trimmedName);
-    setName(""); setNote(""); setPin(""); setAdding(false);
+    if (newModel.pin.trim()) await supabaseClient.from("models").update({ pin: newModel.pin.trim() }).eq("name", trimmedName);
+    setNewModel(NEW_MODEL_DEFAULTS); setAdding(false);
   };
   const removeModel = async (n) => {
     await persistModels(models.filter((m) => m.name !== n));
@@ -5388,15 +5400,91 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
       </div>
 
       {adding && (
-        <div className="mb-5 rounded-xl p-3 flex gap-2 flex-wrap" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)" }}>
-          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Name"
-            className="flex-1 minw-120 c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
-          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Niche / persona note"
-            className="flex-1 minw-160 c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
-          <input value={pin} onChange={(e) => setPin(e.target.value)} placeholder="Leave blank — she'll set her own password"
-            className="w-56 c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
-          <button onClick={addModel} className="px-3 py-2 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase font-semibold">Add</button>
-          <button onClick={() => setAdding(false)} className="px-3 py-2 rounded-lg border c-border c-muted text-xs font-mono uppercase">Cancel</button>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+          onClick={() => { setAdding(false); setNewModel(NEW_MODEL_DEFAULTS); setAddError(""); }}>
+          <div className="c-bg-surface border c-border rounded-2xl w-full max-w-lg p-5 maxh-85vh overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Plus size={18} className="c-accent" />
+                <span className="text-lg font-extrabold tracking-tight c-text">Add model</span>
+              </div>
+              <button onClick={() => { setAdding(false); setNewModel(NEW_MODEL_DEFAULTS); setAddError(""); }} className="c-muted hover-text-primary"><X size={18} /></button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Name</label>
+                <input autoFocus value={newModel.name} onChange={(e) => setNewField("name", e.target.value)} placeholder="e.g. Nellinka"
+                  className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+              </div>
+              <div>
+                <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Niche / persona note</label>
+                <input value={newModel.note} onChange={(e) => setNewField("note", e.target.value)} placeholder="optional"
+                  className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+              </div>
+            </div>
+
+            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Monthly revenue goal ($) — shown to her on the Neo page instead of the agency-wide default</label>
+            <input type="number" value={newModel.monthlyGoal} onChange={(e) => setNewField("monthlyGoal", e.target.value)} placeholder="leave blank to use the agency default"
+              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text mb-3 outline-none focus-border-accent" />
+
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Google Drive folder</label>
+                <input value={newModel.driveUrl} onChange={(e) => setNewField("driveUrl", e.target.value)} placeholder="https://drive.google.com/..."
+                  className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
+              </div>
+              <div>
+                <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Instagram handle</label>
+                <input value={newModel.igHandle} onChange={(e) => setNewField("igHandle", e.target.value.replace(/^@/, ""))} placeholder="username, no @"
+                  className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
+              </div>
+              <div>
+                <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">X handle</label>
+                <input value={newModel.xHandle} onChange={(e) => setNewField("xHandle", e.target.value.replace(/^@/, ""))} placeholder="username, no @"
+                  className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
+              </div>
+              <div>
+                <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">TikTok handle</label>
+                <input value={newModel.tiktokHandle} onChange={(e) => setNewField("tiktokHandle", e.target.value.replace(/^@/, ""))} placeholder="username, no @"
+                  className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
+              </div>
+              <div>
+                <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">OnlyFans URL</label>
+                <input value={newModel.ofUrl} onChange={(e) => setNewField("ofUrl", e.target.value)} placeholder="https://onlyfans.com/..."
+                  className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
+              </div>
+              <div>
+                <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Infloww Creator ID (Free OF)</label>
+                <input value={newModel.inflowwCreatorIdFree} onChange={(e) => setNewField("inflowwCreatorIdFree", e.target.value)} placeholder="id from /v1/creators, free profile"
+                  className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
+              </div>
+              <div>
+                <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Infloww Creator ID (Paid OF)</label>
+                <input value={newModel.inflowwCreatorIdPaid} onChange={(e) => setNewField("inflowwCreatorIdPaid", e.target.value)} placeholder="id from /v1/creators, paid profile"
+                  className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
+              </div>
+            </div>
+
+            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Password</label>
+            <input value={newModel.pin} onChange={(e) => setNewField("pin", e.target.value)} placeholder="leave blank — she'll set her own"
+              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text mb-1 outline-none focus-border-accent" />
+
+            <p className="fs-10 font-mono c-faint italic mt-2 mb-3">
+              Handles/URLs/Infloww IDs above are all optional and can be filled in later — everything else (connecting her Instagram Graph API token, adding her account in Publer for X/TikTok/Threads) still happens after she's added, from Edit on her row.
+            </p>
+
+            {addError && <p className="fs-11 font-mono mb-3" style={{ color: "#e07a5f" }}>{addError}</p>}
+
+            <div className="flex gap-2">
+              <button onClick={addModel} disabled={!newModel.name.trim()}
+                className="flex-1 py-2.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold hover-bg-accent2 disabled:opacity-40">
+                Add model
+              </button>
+              <button onClick={() => { setAdding(false); setNewModel(NEW_MODEL_DEFAULTS); setAddError(""); }}
+                className="px-4 py-2.5 rounded-lg border c-border c-muted text-xs font-mono uppercase">Cancel</button>
+            </div>
+          </div>
         </div>
       )}
 
