@@ -14,6 +14,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script type="module">
+  import { startOnlyFansAuthentication } from "https://esm.sh/@onlyfansapi/auth@2.1.0";
+  window.startOnlyFansAuthentication = startOnlyFansAuthentication;
+</script>
 <style>
 html,body{margin:0;padding:0;overflow-x:hidden;max-width:100vw;}
 body{ background-color:#07090a; }
@@ -5979,6 +5983,69 @@ function ModelIgAccounts({ model, igAccounts, onSynced }) {
   );
 }
 
+// Direct-to-OnlyFans stats, separate from Infloww — for a model whose Infloww
+// creator ID we don't have (not yet reporting-enabled there, or not on
+// Infloww at all). Uses OnlyFansAPI.com's own official login widget so
+// neither Zion OS nor Infloww ever sees her real OF password — she (or
+// whoever has her login) completes the OTP/selfie step inside that widget's
+// own popup, not in this app. of-client-session mints a short-lived client
+// token server-side; the widget trades it for an account id we then store.
+function ModelOfAccount({ modelName, accountId, username, onConnected }) {
+  const [connecting, setConnecting] = useState(false);
+  const [error, setError] = useState("");
+
+  const connect = async () => {
+    setConnecting(true);
+    setError("");
+    try {
+      const { data, error: fnError } = await supabaseClient.functions.invoke("of-client-session", { body: { modelName } });
+      if (fnError) throw fnError;
+      if (data?.error) throw new Error(data.error);
+      if (typeof window.startOnlyFansAuthentication !== "function") {
+        throw new Error("OnlyFans connect widget hasn't loaded yet — refresh the page and try again");
+      }
+      window.startOnlyFansAuthentication(data.clientSecret, {
+        onSuccess: async (result) => {
+          const { error: updateErr } = await supabaseClient.from("models")
+            .update({ onlyfansapi_account_id: result.accountId, onlyfansapi_username: result.username || "" })
+            .eq("name", modelName);
+          setConnecting(false);
+          if (updateErr) { setError(updateErr.message); return; }
+          onConnected(result.accountId, result.username || "");
+        },
+        onError: (err) => { setConnecting(false); setError(err?.message || "Connection failed"); },
+      });
+    } catch (e) {
+      setConnecting(false);
+      setError(e.message || "Failed to start connection");
+    }
+  };
+
+  return (
+    <div className="rounded-xl p-3 mb-4" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)" }}>
+      <div className="fs-10 uppercase tracking-wide c-faint font-mono mb-2">OnlyFans (real stats, direct from OF — no Infloww needed)</div>
+      <p className="fs-9 c-faint mb-3">
+        Opens OnlyFansAPI.com's own login popup — she logs in there, not here, so her password never touches
+        this app. Use this when her Infloww creator ID isn't available.
+      </p>
+      {accountId ? (
+        <div className="flex items-center justify-between gap-2">
+          <span className="fs-11 font-mono c-accent flex items-center gap-1"><CheckCircle2 size={11} /> {username ? `@${username}` : "Connected"}</span>
+          <button onClick={connect} disabled={connecting} className="fs-10 font-mono uppercase c-faint hover-accent-text disabled:opacity-50">
+            {connecting ? "Reconnecting…" : "Reconnect"}
+          </button>
+        </div>
+      ) : (
+        <button onClick={connect} disabled={connecting}
+          className="w-full py-2 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold hover-bg-accent2 disabled:opacity-50">
+          {connecting ? "Opening OnlyFans login…" : "Connect her OnlyFans"}
+        </button>
+      )}
+      {error && <p className="fs-10 font-mono mt-2" style={{ color: "#e07a5f" }}>{error}</p>}
+    </div>
+  );
+}
+
 function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, models, persistModels, igAccounts, onIgAccountSynced }) {
   const [form, setForm] = useState(model);
   useEffect(() => setForm(model), [model]);
@@ -6051,6 +6118,9 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, 
         </div>
 
         <ModelIgAccounts model={model.name} igAccounts={igAccounts} onSynced={onIgAccountSynced} />
+
+        <ModelOfAccount modelName={model.name} accountId={form.onlyfansAccountId} username={form.onlyfansUsername}
+          onConnected={(accId, uname) => { set("onlyfansAccountId", accId); set("onlyfansUsername", uname); }} />
 
         <div className="flex gap-3 mb-4 fs-11 font-mono">
           {form.driveUrl && <a href={form.driveUrl} target="_blank" rel="noopener noreferrer" className="c-accent hover-accent-text">Open Drive →</a>}
