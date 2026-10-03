@@ -6895,7 +6895,7 @@ function CreatorInsightsSection({ models, inflowwDailyStats, embedded, days = 30
               </div>
               <div className="flex flex-col gap-1 mb-2">
                 <div className="flex justify-between fs-10 font-mono c-faint">
-                  <span>OF rank</span><span className="c-muted">{a.performanceRank != null ? `#${a.performanceRank}` : "—"}</span>
+                  <span>OF rank</span><span className="c-muted">{a.performanceRank != null ? `Top ${Number(a.performanceRank)}%` : "—"}</span>
                 </div>
                 <div className="flex justify-between fs-10 font-mono c-faint">
                   <span>Reply time</span><span className="c-muted">{a.replyMin != null ? `${a.replyMin} min` : "—"}</span>
@@ -10172,7 +10172,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
                 replyTimeMinutes: replyMs != null ? Math.round(replyMs / 60000) : null,
                 activeFans, expiredFans: latestField(rows, "expiredFans"),
                 renewOnPercent: (renewOn != null && activeFans) ? Number(((renewOn / activeFans) * 100).toFixed(1)) : null,
-                performanceRank: latestField(rows, "performanceRank"),
+                onlyfansTopPercent: latestField(rows, "performanceRank"),
                 profileVisitors7d: weekRows.reduce((t, r) => t + (r.profileVisitors || 0), 0),
                 avgSubscriptionLengthDays: latestField(rows, "avgSubscriptionLengthDays"),
                 refundsThisWeek: Math.round(weekRows.reduce((t, r) => t + (r.refundsNet || 0), 0)),
