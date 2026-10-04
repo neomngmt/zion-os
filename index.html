@@ -1671,14 +1671,37 @@ function CaptionSourcesBreakdown({ sourcesByModel }) {
           {Object.entries(sourcesByModel).map(([modelName, sources]) => (
             <div key={modelName}>
               <div className="fs-11 font-mono uppercase tracking-wide c-accent mb-1.5">{modelName}</div>
-              {sources.ownWinners?.length > 0 && (
+              {sources.ownWinners?.length > 0 && (() => {
+                const recent = sources.ownWinners.filter((w) => w.recent);
+                const proven = sources.ownWinners.filter((w) => !w.recent);
+                const renderList = (title, list) => list.length > 0 && (
+                  <div className="mb-2">
+                    <div className="fs-9 c-faint font-mono uppercase mb-1">{title}</div>
+                    <div className="flex flex-col gap-1">
+                      {list.map((w, i) => (
+                        <div key={i} className="fs-11 font-mono c-muted flex items-center gap-2">
+                          <span className="c-text truncate">"{w.text}"</span>
+                          <span className="c-faint flex-shrink-0">{w.engagementRate.toFixed(1)}% eng · {w.reach.toLocaleString()} reach</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+                return (
+                  <>
+                    {renderList("Her best posts of the last 14 days (working right now)", recent)}
+                    {renderList(recent.length ? "Her all-time proven winners (worked for us)" : "Her own real top posts", proven)}
+                  </>
+                );
+              })()}
+              {sources.otherModelWinners?.length > 0 && (
                 <div className="mb-2">
-                  <div className="fs-9 c-faint font-mono uppercase mb-1">Her own real top posts</div>
+                  <div className="fs-9 c-faint font-mono uppercase mb-1">What is landing on other models right now</div>
                   <div className="flex flex-col gap-1">
-                    {sources.ownWinners.slice(0, 5).map((w, i) => (
+                    {sources.otherModelWinners.map((w, i) => (
                       <div key={i} className="fs-11 font-mono c-muted flex items-center gap-2">
                         <span className="c-text truncate">"{w.text}"</span>
-                        <span className="c-faint flex-shrink-0">{w.engagementRate.toFixed(1)}% eng · {w.reach.toLocaleString()} reach</span>
+                        <span className="c-faint flex-shrink-0">{w.model} · {w.ratio.toFixed(1)}x her avg</span>
                       </div>
                     ))}
                   </div>
