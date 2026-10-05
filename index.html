@@ -7068,6 +7068,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
     }));
   };
   const [showAllWeeksModal, setShowAllWeeksModal] = useState(false);
+  const [expandedWeekKey, setExpandedWeekKey] = useState(null); // "month:<start>" | "all:<start>"
   useEffect(() => {
     if (!showAllWeeksModal) return;
     const onKey = (e) => { if (e.key === "Escape") setShowAllWeeksModal(false); };
@@ -7104,6 +7105,35 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
     const s = new Date(startISO + "T00:00:00"), e = new Date(endISO + "T00:00:00");
     const fmt = (d, withYear) => d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: withYear ? "numeric" : undefined });
     return `${fmt(s, s.getFullYear() !== e.getFullYear())} – ${fmt(e, true)}`;
+  };
+  // Per-model earnings inside one Monday-Sunday week (Anna's free + paid
+  // accounts roll up into one line, same as everywhere else a model is shown).
+  const modelsForWeek = (startISO, endISO) => {
+    const byModel = {};
+    myInflowwRows.forEach((r) => {
+      if (r.statDate < startISO || r.statDate > endISO) return;
+      byModel[r.model] = (byModel[r.model] || 0) + (r.earningsNet || 0);
+    });
+    return Object.entries(byModel).map(([model, total]) => ({ model, total })).filter((m) => m.total > 0).sort((a, b) => b.total - a.total);
+  };
+  const renderWeekModels = (w) => {
+    const list = modelsForWeek(w.startISO, w.endISO);
+    const top = Math.max(1, ...list.map((m) => m.total));
+    return (
+      <div className="mt-2 mb-1 ml-1 pl-3 flex flex-col gap-1.5" style={{ borderLeft: "1px solid rgba(57,230,115,0.25)" }}>
+        {list.length === 0 && <div className="fs-10 font-mono c-faint italic">No revenue that week.</div>}
+        {list.map((m) => (
+          <div key={m.model} className="flex items-center gap-3">
+            <div className="fs-11 font-mono c-text truncate" style={{ width: 90, flexShrink: 0 }}>{m.model}</div>
+            <div className="flex-1 rounded-full overflow-hidden" style={{ height: 4, background: "rgba(255,255,255,0.06)" }}>
+              <div className="h-full rounded-full" style={{ width: `${(m.total / top) * 100}%`, background: "rgba(57,230,115,0.55)" }} />
+            </div>
+            <div className="fs-10 font-mono c-faint text-right" style={{ width: 34, flexShrink: 0 }}>{w.total > 0 ? Math.round((m.total / w.total) * 100) : 0}%</div>
+            <div className="fs-11 font-mono c-text text-right" style={{ width: 62, flexShrink: 0 }}>${Math.round(m.total).toLocaleString()}</div>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   useEffect(() => {
@@ -7216,18 +7246,25 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
                   return weeksThisMonth.map((w, i) => ({ w, i })).reverse().map(({ w, i }) => {
                     const pct = (w.total / weeksMax) * 100;
                     const isCurrent = todayISO0 >= w.startISO && todayISO0 <= w.endISO;
+                    const wkKey = `month:${w.startISO}`;
+                    const isOpen = expandedWeekKey === wkKey;
                     return (
-                      <div key={w.startISO} className="flex items-center gap-3">
-                        <div className={`fs-11 font-mono truncate flex items-center gap-1.5 ${isCurrent ? "c-accent" : "c-muted"}`} style={{ width: 110, flexShrink: 0 }}>
-                          {isCurrent && <Circle size={5} fill="#39e673" color="#39e673" className="anim-pulse-dot" />}
-                          {ORDINAL_WEEK_LABELS[i] || `Week ${i + 1}`}
-                        </div>
-                        <div className="flex-1 rounded-full overflow-hidden" style={{ height: 6, background: "rgba(255,255,255,0.06)" }}>
-                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isCurrent ? "#39e673" : "rgba(57,230,115,0.55)", boxShadow: isCurrent ? "0 0 8px rgba(57,230,115,0.5)" : "none" }} />
-                        </div>
-                        <div className={`fs-11 font-mono font-semibold text-right ${isCurrent ? "c-accent" : "c-text"}`} style={{ width: 70, flexShrink: 0 }}>
-                          ${Math.round(w.total).toLocaleString()}
-                        </div>
+                      <div key={w.startISO}>
+                        <button onClick={() => setExpandedWeekKey(isOpen ? null : wkKey)} aria-expanded={isOpen}
+                          className="w-full flex items-center gap-3 text-left tap">
+                          <div className={`fs-11 font-mono truncate flex items-center gap-1.5 ${isCurrent ? "c-accent" : "c-muted"}`} style={{ width: 110, flexShrink: 0 }}>
+                            {isCurrent && <Circle size={5} fill="#39e673" color="#39e673" className="anim-pulse-dot" />}
+                            {ORDINAL_WEEK_LABELS[i] || `Week ${i + 1}`}
+                          </div>
+                          <div className="flex-1 rounded-full overflow-hidden" style={{ height: 6, background: "rgba(255,255,255,0.06)" }}>
+                            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isCurrent ? "#39e673" : "rgba(57,230,115,0.55)", boxShadow: isCurrent ? "0 0 8px rgba(57,230,115,0.5)" : "none" }} />
+                          </div>
+                          <div className={`fs-11 font-mono font-semibold text-right ${isCurrent ? "c-accent" : "c-text"}`} style={{ width: 70, flexShrink: 0 }}>
+                            ${Math.round(w.total).toLocaleString()}
+                          </div>
+                          <ChevronDown size={12} className={`c-faint flex-shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                        </button>
+                        {isOpen && renderWeekModels(w)}
                       </div>
                     );
                   });
@@ -7319,18 +7356,25 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
                           {g.weeks.map((w) => {
                             const pct = (w.total / groupMax) * 100;
                             const isCurrent = todayISO0 >= w.startISO && todayISO0 <= w.endISO;
+                            const wkKey = `all:${w.startISO}`;
+                            const isOpen = expandedWeekKey === wkKey;
                             return (
-                              <div key={w.startISO} className="flex items-center gap-3">
-                                <div className={`fs-11 font-mono whitespace-nowrap flex items-center gap-1.5 ${isCurrent ? "c-accent" : "c-muted"}`} style={{ width: 150, flexShrink: 0 }}>
-                                  {isCurrent && <Circle size={5} fill="#39e673" color="#39e673" className="anim-pulse-dot" />}
-                                  {fmtWeekRange(w.startISO, w.endISO)}
-                                </div>
-                                <div className="flex-1 rounded-full overflow-hidden" style={{ height: 6, background: "rgba(255,255,255,0.06)" }}>
-                                  <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isCurrent ? "#39e673" : "rgba(57,230,115,0.55)", boxShadow: isCurrent ? "0 0 8px rgba(57,230,115,0.5)" : "none" }} />
-                                </div>
-                                <div className={`fs-11 font-mono text-right ${isCurrent ? "c-accent" : "c-text"}`} style={{ width: 70, flexShrink: 0 }}>
-                                  ${Math.round(w.total).toLocaleString()}
-                                </div>
+                              <div key={w.startISO}>
+                                <button onClick={() => setExpandedWeekKey(isOpen ? null : wkKey)} aria-expanded={isOpen}
+                                  className="w-full flex items-center gap-3 text-left tap">
+                                  <div className={`fs-11 font-mono whitespace-nowrap flex items-center gap-1.5 ${isCurrent ? "c-accent" : "c-muted"}`} style={{ width: 150, flexShrink: 0 }}>
+                                    {isCurrent && <Circle size={5} fill="#39e673" color="#39e673" className="anim-pulse-dot" />}
+                                    {fmtWeekRange(w.startISO, w.endISO)}
+                                  </div>
+                                  <div className="flex-1 rounded-full overflow-hidden" style={{ height: 6, background: "rgba(255,255,255,0.06)" }}>
+                                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isCurrent ? "#39e673" : "rgba(57,230,115,0.55)", boxShadow: isCurrent ? "0 0 8px rgba(57,230,115,0.5)" : "none" }} />
+                                  </div>
+                                  <div className={`fs-11 font-mono text-right ${isCurrent ? "c-accent" : "c-text"}`} style={{ width: 70, flexShrink: 0 }}>
+                                    ${Math.round(w.total).toLocaleString()}
+                                  </div>
+                                  <ChevronDown size={12} className={`c-faint flex-shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                                </button>
+                                {isOpen && renderWeekModels(w)}
                               </div>
                             );
                           })}
