@@ -7069,6 +7069,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
   };
   const [showAllWeeksModal, setShowAllWeeksModal] = useState(false);
   const [expandedWeekKey, setExpandedWeekKey] = useState(null); // "month:<start>" | "all:<start>"
+  const [weekMode, setWeekMode] = useState("net"); // "net" | "pure" — only affects the weekly views
   useEffect(() => {
     if (!showAllWeeksModal) return;
     const onKey = (e) => { if (e.key === "Escape") setShowAllWeeksModal(false); };
@@ -7106,32 +7107,86 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
     const fmt = (d, withYear) => d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: withYear ? "numeric" : undefined });
     return `${fmt(s, s.getFullYear() !== e.getFullYear())} – ${fmt(e, true)}`;
   };
-  // Per-model earnings inside one Monday-Sunday week (Anna's free + paid
-  // accounts roll up into one line, same as everywhere else a model is shown).
-  const modelsForWeek = (startISO, endISO) => {
-    const byModel = {};
+  // ---- "Pure profit" for the weekly views only: net earnings minus the 12.5%
+  // chatting cut minus Infloww's per-creator-profile subscription. Infloww bills
+  // monthly by tier of that profile's monthly earnings (net), so each profile's
+  // fee is picked from its own calendar-month total and spread over that
+  // month's days — a week only carries the share for the days it covers (a week
+  // straddling two months takes each month's share). Anna's free + paid
+  // profiles are billed separately and roll up into one "Anna" line. Tiers above
+  // $15,000 aren't known yet and are priced like the $10-15k tier.
+  const CHATTING_RATE = 0.125;
+  const INFLOWW_TIERS = [[500, 40], [1000, 50], [2000, 65], [5000, 70], [7500, 90], [10000, 125], [15000, 175]];
+  const inflowwFee = (monthNet) => (INFLOWW_TIERS.find(([max]) => monthNet <= max) || INFLOWW_TIERS[INFLOWW_TIERS.length - 1])[1];
+  const profileMonthNet = (() => {
+    const m = {};
     myInflowwRows.forEach((r) => {
-      if (r.statDate < startISO || r.statDate > endISO) return;
-      byModel[r.model] = (byModel[r.model] || 0) + (r.earningsNet || 0);
+      const k = `${r.model}|${r.accountType}|${r.statDate.slice(0, 7)}`;
+      m[k] = (m[k] || 0) + (r.earningsNet || 0);
     });
-    return Object.entries(byModel).map(([model, total]) => ({ model, total })).filter((m) => m.total > 0).sort((a, b) => b.total - a.total);
+    return m;
+  })();
+  const weekBreakdown = (startISO, endISO) => {
+    const daysPerMonth = {};
+    for (const d = new Date(startISO + "T00:00:00"); toISO(d) <= endISO; d.setDate(d.getDate() + 1)) {
+      const mk = toISO(d).slice(0, 7);
+      daysPerMonth[mk] = (daysPerMonth[mk] || 0) + 1;
+    }
+    const byModel = {};
+    const slot = (model) => (byModel[model] || (byModel[model] = { net: 0, fee: 0 }));
+    myInflowwRows.forEach((r) => {
+      if (r.statDate >= startISO && r.statDate <= endISO) slot(r.model).net += r.earningsNet || 0;
+    });
+    Object.entries(profileMonthNet).forEach(([key, monthNet]) => {
+      const [model, , mk] = key.split("|");
+      const n = daysPerMonth[mk];
+      if (!n) return;
+      const [y, mo] = mk.split("-").map(Number);
+      slot(model).fee += (inflowwFee(monthNet) * n) / new Date(y, mo, 0).getDate();
+    });
+    const list = Object.entries(byModel)
+      .map(([model, v]) => ({ model, net: v.net, pure: v.net * (1 - CHATTING_RATE) - v.fee }))
+      .filter((m) => m.net > 0 || m.pure < 0)
+      .sort((a, b) => (weekMode === "pure" ? b.pure - a.pure : b.net - a.net));
+    return { list, pureTotal: Object.values(byModel).reduce((t, v) => t + v.net * (1 - CHATTING_RATE) - v.fee, 0) };
   };
+  const weekValue = (w) => (weekMode === "pure" ? weekBreakdown(w.startISO, w.endISO).pureTotal : w.total);
+  const fmtMoney = (v) => `${v < 0 ? "-" : ""}$${Math.abs(Math.round(v)).toLocaleString()}`;
+  const weekModeToggle = (
+    <div className="flex rounded-full overflow-hidden border" style={{ borderColor: "rgba(255,255,255,0.12)" }}>
+      {[["net", "Net"], ["pure", "Pure profit"]].map(([key, label]) => (
+        <button key={key} onClick={() => setWeekMode(key)}
+          className="fs-9 font-mono uppercase px-2.5 py-1 transition-colors"
+          style={weekMode === key ? { background: "rgba(57,230,115,0.16)", color: "#39e673" } : { color: "#8B93A1" }}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
   const renderWeekModels = (w) => {
-    const list = modelsForWeek(w.startISO, w.endISO);
-    const top = Math.max(1, ...list.map((m) => m.total));
+    const { list } = weekBreakdown(w.startISO, w.endISO);
+    const valueOf = (m) => (weekMode === "pure" ? m.pure : m.net);
+    const total = weekValue(w);
+    const top = Math.max(1, ...list.map((m) => Math.max(0, valueOf(m))));
     return (
       <div className="mt-2 mb-1 ml-1 pl-3 flex flex-col gap-1.5" style={{ borderLeft: "1px solid rgba(57,230,115,0.25)" }}>
         {list.length === 0 && <div className="fs-10 font-mono c-faint italic">No revenue that week.</div>}
-        {list.map((m) => (
-          <div key={m.model} className="flex items-center gap-3">
-            <div className="fs-11 font-mono c-text truncate" style={{ width: 90, flexShrink: 0 }}>{m.model}</div>
-            <div className="flex-1 rounded-full overflow-hidden" style={{ height: 4, background: "rgba(255,255,255,0.06)" }}>
-              <div className="h-full rounded-full" style={{ width: `${(m.total / top) * 100}%`, background: "rgba(57,230,115,0.55)" }} />
+        {list.map((m) => {
+          const v = valueOf(m);
+          return (
+            <div key={m.model} className="flex items-center gap-3">
+              <div className="fs-11 font-mono c-text truncate" style={{ width: 90, flexShrink: 0 }}>{m.model}</div>
+              <div className="flex-1 rounded-full overflow-hidden" style={{ height: 4, background: "rgba(255,255,255,0.06)" }}>
+                <div className="h-full rounded-full" style={{ width: `${(Math.max(0, v) / top) * 100}%`, background: "rgba(57,230,115,0.55)" }} />
+              </div>
+              <div className="fs-10 font-mono c-faint text-right" style={{ width: 34, flexShrink: 0 }}>{total > 0 ? Math.round((v / total) * 100) : 0}%</div>
+              <div className="fs-11 font-mono text-right" style={{ width: 62, flexShrink: 0, color: v < 0 ? "#e07a5f" : undefined }}>{fmtMoney(v)}</div>
             </div>
-            <div className="fs-10 font-mono c-faint text-right" style={{ width: 34, flexShrink: 0 }}>{w.total > 0 ? Math.round((m.total / w.total) * 100) : 0}%</div>
-            <div className="fs-11 font-mono c-text text-right" style={{ width: 62, flexShrink: 0 }}>${Math.round(m.total).toLocaleString()}</div>
-          </div>
-        ))}
+          );
+        })}
+        {weekMode === "pure" && (
+          <div className="fs-9 font-mono c-faint mt-0.5">net − 12.5 % chatting − Infloww fee (monthly fee spread over the days)</div>
+        )}
       </div>
     );
   };
@@ -7230,21 +7285,24 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
             <div className="mt-5 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
               <div className="flex items-center justify-between mb-3">
                 <span className="fs-10 uppercase tracking-widest c-muted font-mono">Weeks this month</span>
-                <button onClick={() => setShowAllWeeksModal(true)}
-                  className="tap fs-10 font-mono uppercase c-accent hover-accent-text transition-colors flex items-center gap-1">
-                  See all weeks <ChevronRight size={12} />
-                </button>
+                <div className="flex items-center gap-3">
+                  {weekModeToggle}
+                  <button onClick={() => setShowAllWeeksModal(true)}
+                    className="tap fs-10 font-mono uppercase c-accent hover-accent-text transition-colors flex items-center gap-1">
+                    See all weeks <ChevronRight size={12} />
+                  </button>
+                </div>
               </div>
               <div className="flex flex-col gap-2.5">
                 {(() => {
-                  const weeksMax = Math.max(1, ...weeksThisMonth.map((w) => w.total));
+                  const weeksMax = Math.max(1, ...weeksThisMonth.map((w) => Math.max(0, weekValue(w))));
                   const todayISO0 = toISO(new Date());
                   // Newest week first (top), oldest at the bottom. Bucketing comes from
                   // the same real-history buckets as "See all weeks" (so the count and
                   // totals always agree), but the label here is the ordinal position
                   // within the month rather than the modal's date range.
                   return weeksThisMonth.map((w, i) => ({ w, i })).reverse().map(({ w, i }) => {
-                    const pct = (w.total / weeksMax) * 100;
+                    const pct = (Math.max(0, weekValue(w)) / weeksMax) * 100;
                     const isCurrent = todayISO0 >= w.startISO && todayISO0 <= w.endISO;
                     const wkKey = `month:${w.startISO}`;
                     const isOpen = expandedWeekKey === wkKey;
@@ -7260,7 +7318,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
                             <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isCurrent ? "#39e673" : "rgba(57,230,115,0.55)", boxShadow: isCurrent ? "0 0 8px rgba(57,230,115,0.5)" : "none" }} />
                           </div>
                           <div className={`fs-11 font-mono font-semibold text-right ${isCurrent ? "c-accent" : "c-text"}`} style={{ width: 70, flexShrink: 0 }}>
-                            ${Math.round(w.total).toLocaleString()}
+                            {fmtMoney(weekValue(w))}
                           </div>
                           <ChevronDown size={12} className={`c-faint flex-shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                         </button>
@@ -7323,7 +7381,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
           let g = groups.find((g) => g.monthKey === monthKey);
           if (!g) { g = { monthKey, weeks: [], total: 0 }; groups.push(g); }
           g.weeks.push(w);
-          g.total += w.total;
+          g.total += weekValue(w);
         });
         const todayISO0 = toISO(new Date());
         return (
@@ -7338,23 +7396,26 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
                   <TrendingUp size={15} className="c-accent" />
                   <span className="fs-11 uppercase tracking-widest c-accent font-mono">All weeks</span>
                 </div>
-                <button onClick={() => setShowAllWeeksModal(false)} className="tap c-muted hover-text-primary"><X size={18} /></button>
+                <div className="flex items-center gap-3">
+                  {weekModeToggle}
+                  <button onClick={() => setShowAllWeeksModal(false)} className="tap c-muted hover-text-primary"><X size={18} /></button>
+                </div>
               </div>
               {groups.length === 0 ? (
                 <div className="fs-12 c-faint font-mono italic py-6 text-center">No revenue history yet.</div>
               ) : (
                 <div className="space-y-6">
                   {groups.map((g, gi) => {
-                    const groupMax = Math.max(1, ...g.weeks.map((w) => w.total));
+                    const groupMax = Math.max(1, ...g.weeks.map((w) => Math.max(0, weekValue(w))));
                     return (
                       <div key={g.monthKey} className={gi > 0 ? "pt-5" : ""} style={gi > 0 ? { borderTop: "1px solid rgba(255,255,255,0.08)" } : undefined}>
                         <div className="flex items-center justify-between mb-3">
                           <span className="fs-10 uppercase tracking-widest c-text font-mono font-semibold">{g.monthKey}</span>
-                          <span className="fs-10 font-mono c-faint">${Math.round(g.total).toLocaleString()} total</span>
+                          <span className="fs-10 font-mono c-faint">{fmtMoney(g.total)} total</span>
                         </div>
                         <div className="flex flex-col gap-2.5">
                           {g.weeks.map((w) => {
-                            const pct = (w.total / groupMax) * 100;
+                            const pct = (Math.max(0, weekValue(w)) / groupMax) * 100;
                             const isCurrent = todayISO0 >= w.startISO && todayISO0 <= w.endISO;
                             const wkKey = `all:${w.startISO}`;
                             const isOpen = expandedWeekKey === wkKey;
@@ -7370,7 +7431,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
                                     <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isCurrent ? "#39e673" : "rgba(57,230,115,0.55)", boxShadow: isCurrent ? "0 0 8px rgba(57,230,115,0.5)" : "none" }} />
                                   </div>
                                   <div className={`fs-11 font-mono text-right ${isCurrent ? "c-accent" : "c-text"}`} style={{ width: 70, flexShrink: 0 }}>
-                                    ${Math.round(w.total).toLocaleString()}
+                                    {fmtMoney(weekValue(w))}
                                   </div>
                                   <ChevronDown size={12} className={`c-faint flex-shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                                 </button>
