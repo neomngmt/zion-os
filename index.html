@@ -1020,6 +1020,7 @@ const modelsToJS = (r) => ({
   monthlyGoal: r.monthly_goal != null ? Number(r.monthly_goal) : null,
   igConnectedAt: r.ig_connected_at ? new Date(r.ig_connected_at).getTime() : null,
   disabledPlatforms: Array.isArray(r.disabled_platforms) ? r.disabled_platforms : [],
+  agencyCutPct: r.agency_cut_pct != null ? Number(r.agency_cut_pct) : null,
 });
 const modelsToDB = (m) => ({
   name: m.name, note: m.note || "", onboarded: !!m.onboarded,
@@ -1037,6 +1038,7 @@ const modelsToDB = (m) => ({
   inspo_profiles: m.inspoProfiles || [],
   monthly_goal: m.monthlyGoal != null && m.monthlyGoal !== "" ? Number(m.monthlyGoal) : null,
   disabled_platforms: m.disabledPlatforms || [],
+  agency_cut_pct: m.agencyCutPct != null && m.agencyCutPct !== "" ? Number(m.agencyCutPct) : null,
 });
 
 const cardsToJS = (r) => ({
@@ -5215,7 +5217,7 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
   const [adding, setAdding] = useState(false);
   const NEW_MODEL_DEFAULTS = {
     name: "", note: "", pin: "", igHandle: "", xHandle: "", tiktokHandle: "",
-    ofUrl: "", driveUrl: "", inflowwCreatorIdFree: "", inflowwCreatorIdPaid: "", monthlyGoal: "",
+    ofUrl: "", driveUrl: "", inflowwCreatorIdFree: "", inflowwCreatorIdPaid: "", monthlyGoal: "", agencyCutPct: "",
   };
   const [newModel, setNewModel] = useState(NEW_MODEL_DEFAULTS);
   const setNewField = (k, v) => setNewModel((f) => ({ ...f, [k]: v }));
@@ -5284,6 +5286,7 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
       tiktokHandle: newModel.tiktokHandle.trim().replace(/^@/, ""), ofUrl: newModel.ofUrl.trim(), driveUrl: newModel.driveUrl.trim(), bio: "",
       inflowwCreatorIdFree: newModel.inflowwCreatorIdFree.trim(), inflowwCreatorIdPaid: newModel.inflowwCreatorIdPaid.trim(),
       monthlyGoal: newModel.monthlyGoal !== "" ? Number(newModel.monthlyGoal) : null,
+      agencyCutPct: newModel.agencyCutPct !== "" ? Number(newModel.agencyCutPct) : null,
     }]);
     // pin is a separate, targeted column write (not part of modelsToDB) so a
     // save elsewhere in the app can never accidentally blank someone's
@@ -5453,6 +5456,10 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
 
             <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Monthly revenue goal ($) — shown to her on the Neo page instead of the agency-wide default</label>
             <input type="number" value={newModel.monthlyGoal} onChange={(e) => setNewField("monthlyGoal", e.target.value)} placeholder="leave blank to use the agency default"
+              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text mb-3 outline-none focus-border-accent" />
+
+            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Agency cut (%) — your share of her net, used for Pure profit</label>
+            <input type="number" min="0" max="100" value={newModel.agencyCutPct} onChange={(e) => setNewField("agencyCutPct", e.target.value)} placeholder="e.g. 50"
               className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text mb-3 outline-none focus-border-accent" />
 
             <div className="grid grid-cols-2 gap-3 mb-3">
@@ -6100,6 +6107,10 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, 
 
         <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Monthly revenue goal ($) — shown to her on the Neo page instead of the agency-wide default</label>
         <input type="number" value={form.monthlyGoal ?? ""} onChange={(e) => set("monthlyGoal", e.target.value === "" ? null : e.target.value)} placeholder="leave blank to use the agency default"
+          className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text mb-3 outline-none focus-border-accent" />
+
+        <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Agency cut (%) — your share of her net, used for Pure profit in the weekly views</label>
+        <input type="number" min="0" max="100" value={form.agencyCutPct ?? ""} onChange={(e) => set("agencyCutPct", e.target.value === "" ? null : e.target.value)} placeholder="e.g. 50"
           className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text mb-3 outline-none focus-border-accent" />
 
         <div className="grid grid-cols-2 gap-3 mb-3">
@@ -7107,8 +7118,10 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
     const fmt = (d, withYear) => d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: withYear ? "numeric" : undefined });
     return `${fmt(s, s.getFullYear() !== e.getFullYear())} – ${fmt(e, true)}`;
   };
-  // ---- "Pure profit" for the weekly views only: net earnings minus the 12.5%
-  // chatting cut minus Infloww's per-creator-profile subscription. Infloww bills
+  // ---- "Pure profit" for the weekly views only: the agency's own cut of her net
+  // (models.agency_cut_pct, set per model in Model Manager) minus the 12.5%
+  // chatting cost (of her net) minus Infloww's per-creator-profile subscription.
+  // A model with no cut set yet is shown as "set cut" and left out of totals. Infloww bills
   // monthly by tier of that profile's monthly earnings (net), so each profile's
   // fee is picked from its own calendar-month total and spread over that
   // month's days — a week only carries the share for the days it covers (a week
@@ -7126,6 +7139,8 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
     });
     return m;
   })();
+  const cutByModel = Object.fromEntries(models.map((m) => [m.name, m.agencyCutPct]));
+  const pureOf = (model, net, fee) => (cutByModel[model] == null ? null : net * (cutByModel[model] / 100 - CHATTING_RATE) - fee);
   const weekBreakdown = (startISO, endISO) => {
     const daysPerMonth = {};
     for (const d = new Date(startISO + "T00:00:00"); toISO(d) <= endISO; d.setDate(d.getDate() + 1)) {
@@ -7145,10 +7160,10 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
       slot(model).fee += (inflowwFee(monthNet) * n) / new Date(y, mo, 0).getDate();
     });
     const list = Object.entries(byModel)
-      .map(([model, v]) => ({ model, net: v.net, pure: v.net * (1 - CHATTING_RATE) - v.fee }))
-      .filter((m) => m.net > 0 || m.pure < 0)
-      .sort((a, b) => (weekMode === "pure" ? b.pure - a.pure : b.net - a.net));
-    return { list, pureTotal: Object.values(byModel).reduce((t, v) => t + v.net * (1 - CHATTING_RATE) - v.fee, 0) };
+      .map(([model, v]) => ({ model, net: v.net, pure: pureOf(model, v.net, v.fee) }))
+      .filter((m) => m.net > 0 || (m.pure != null && m.pure < 0))
+      .sort((a, b) => (weekMode === "pure" ? (b.pure ?? -Infinity) - (a.pure ?? -Infinity) : b.net - a.net));
+    return { list, pureTotal: list.reduce((t, m) => t + (m.pure || 0), 0) };
   };
   const weekValue = (w) => (weekMode === "pure" ? weekBreakdown(w.startISO, w.endISO).pureTotal : w.total);
   const fmtMoney = (v) => `${v < 0 ? "-" : ""}$${Math.abs(Math.round(v)).toLocaleString()}`;
@@ -7165,7 +7180,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
   );
   const renderWeekModels = (w) => {
     const { list } = weekBreakdown(w.startISO, w.endISO);
-    const valueOf = (m) => (weekMode === "pure" ? m.pure : m.net);
+    const valueOf = (m) => (weekMode === "pure" ? (m.pure ?? 0) : m.net);
     const total = weekValue(w);
     const top = Math.max(1, ...list.map((m) => Math.max(0, valueOf(m))));
     return (
@@ -7180,12 +7195,14 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
                 <div className="h-full rounded-full" style={{ width: `${(Math.max(0, v) / top) * 100}%`, background: "rgba(57,230,115,0.55)" }} />
               </div>
               <div className="fs-10 font-mono c-faint text-right" style={{ width: 34, flexShrink: 0 }}>{total > 0 ? Math.round((v / total) * 100) : 0}%</div>
-              <div className="fs-11 font-mono text-right" style={{ width: 62, flexShrink: 0, color: v < 0 ? "#e07a5f" : undefined }}>{fmtMoney(v)}</div>
+              <div className="fs-11 font-mono text-right" style={{ width: 62, flexShrink: 0, color: v < 0 ? "#e07a5f" : undefined }}>
+                {weekMode === "pure" && m.pure == null ? <span className="c-faint" title="No agency cut set for this model yet (Model Manager, Edit)">set cut</span> : fmtMoney(v)}
+              </div>
             </div>
           );
         })}
         {weekMode === "pure" && (
-          <div className="fs-9 font-mono c-faint mt-0.5">net − 12.5 % chatting − Infloww fee (monthly fee spread over the days)</div>
+          <div className="fs-9 font-mono c-faint mt-0.5">your cut % of net − 12.5 % chatting − Infloww fee (monthly fee spread over the days)</div>
         )}
       </div>
     );
@@ -12877,7 +12894,7 @@ function clearSavedSession() {
 function App() {
   const { value: cards, loading: cardsLoading, persist: persistCards } = useSupaTable("cards", "id", [], cardsToJS, cardsToDB);
   const { value: models, loading: modelsLoading, persist: persistModels } = useSupaTable("models", "name", [], modelsToJS, modelsToDB,
-    "name, note, onboarded, added_at, ig_handle, x_handle, tiktok_handle, of_url, drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank, disabled_platforms");
+    "name, note, onboarded, added_at, ig_handle, x_handle, tiktok_handle, of_url, drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank, disabled_platforms, agency_cut_pct");
   const { value: tasks, loading: tasksLoading, persist: persistTasks } = useSupaTable("tasks", "id", [], tasksToJS, tasksToDB);
   const { value: stats, loading: statsLoading, persist: persistStats } = useSupaTable("stats", "id", [], statsToJS, statsToDB);
   const { value: reels, loading: reelsLoading, persist: persistReels } = useSupaTable("reels", "id", [], reelsToJS, reelsToDB);
