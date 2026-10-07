@@ -4324,18 +4324,12 @@ function EditorJobDetail({ job, worker, patch, remove, onClosed }) {
   );
 }
 
-function EditorPage({ models, focus, onFocusDone }) {
+function EditorPage({ models }) {
   const { jobs, loading, patch, remove } = useEditJobs();
   const worker = useEditWorker();
   const [selectedId, setSelectedId] = useState(null);
   const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    if (!focus) return;
-    if (focus.newJob) { setCreating(true); setSelectedId(null); }
-    if (focus.jobId) { setSelectedId(focus.jobId); setCreating(false); }
-    if (onFocusDone) onFocusDone();
-  }, [focus]);
   useEffect(() => {
     if (!selectedId && !creating && jobs.length) setSelectedId(jobs[0].id);
   }, [jobs.length]);
@@ -4386,63 +4380,7 @@ function EditorPage({ models, focus, onFocusDone }) {
   );
 }
 
-// Small entry point inside Content Director: queue at a glance, jump into the Editor.
-function StriznaPanel({ onOpen }) {
-  const { jobs, loading } = useEditJobs();
-  const worker = useEditWorker();
-  const count = (pred) => jobs.filter(pred).length;
-  const stats = [
-    ["Zpracovává se", count((j) => ["uploading", "queued", "processing", "revising", "approved", "rendering_final"].includes(j.status)), "#39e673"],
-    ["Čeká na tebe", count((j) => j.status === "awaiting_review"), "#D9B45B"],
-    ["Hotovo", count((j) => j.status === "done"), "#39e673"],
-    ["Chyba", count((j) => j.status === "error"), "#e07a5f"],
-  ];
-  return (
-    <div className="rounded-2xl p-5" style={{ background: "radial-gradient(ellipse 120% 100% at 10% 0%, rgba(18,179,76,0.09), transparent 60%), #0b0f0d", border: "1px solid rgba(57,230,115,0.16)" }}>
-      <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Clapperboard size={16} className="c-accent" />
-            <span className="text-base font-extrabold tracking-tight c-text">Editor</span>
-          </div>
-          <p className="fs-11 c-muted">Nahraj raw video, Mac ho ostříhá a ty ve stránce Editor schválíš nebo vrátíš s připomínkami.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => onOpen({ newJob: true })}
-            className="flex items-center gap-1.5 fs-11 font-mono uppercase tracking-wide c-bg-accent c-onaccent px-3 py-1.5 rounded-lg font-semibold hover-bg-accent2">
-            <Plus size={13} /> Nahrát raw
-          </button>
-          <button onClick={() => onOpen({})} className="fs-11 font-mono uppercase px-3 py-1.5 rounded-lg border c-border-accent c-accent">Otevřít Editor</button>
-        </div>
-      </div>
-      <div className="mb-4"><EditWorkerChip worker={worker} /></div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
-        {stats.map(([label, n, color]) => (
-          <div key={label} className="rounded-xl px-3 py-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
-            <div className="text-xl font-mono font-bold" style={{ color: n ? color : "#5c6e65" }}>{n}</div>
-            <div className="fs-9 font-mono uppercase c-faint">{label}</div>
-          </div>
-        ))}
-      </div>
-      <div className="flex flex-col gap-1.5">
-        {loading && <div className="fs-11 c-faint font-mono">Načítám…</div>}
-        {!loading && jobs.length === 0 && <div className="fs-11 c-faint font-mono italic">Zatím žádné zakázky.</div>}
-        {jobs.slice(0, 6).map((j) => (
-          <button key={j.id} onClick={() => onOpen({ jobId: j.id })} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 tap text-left"
-            style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)" }}>
-            <span className="fs-12 c-text truncate">{j.title}</span>
-            <span className="flex items-center gap-2 flex-shrink-0">
-              <span className="fs-9 font-mono c-faint hidden sm:inline">{j.model}</span>
-              <EditStatusChip status={j.status} />
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ContentDirector({ cards, persistCards, models, restrictModel, forcedNetwork, reels, persistReels, xCompetitors, persistXCompetitors, bufferDailyStats, bufferTopPosts, inflowwDailyStats, igGraphStats, igGraphMedia, igViralVariations, onOpenEditor }) {
+function ContentDirector({ cards, persistCards, models, restrictModel, forcedNetwork, reels, persistReels, xCompetitors, persistXCompetitors, bufferDailyStats, bufferTopPosts, inflowwDailyStats, igGraphStats, igGraphMedia, igViralVariations }) {
   const [detail, setDetail] = useState(null);
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -4648,12 +4586,6 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
               </button>
             );
           })}
-          {!restrictModel && (
-            <button onClick={() => setNetwork("strizna")}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg fs-12 font-mono transition-colors mt-2 ${network === "strizna" ? "c-bg-accent-a2 c-accent font-semibold" : "c-muted hover-bg-surface"}`}>
-              <span className="flex items-center gap-1.5"><Clapperboard size={12} />Editor</span>
-            </button>
-          )}
         </div>
       </div>
   );
@@ -4671,27 +4603,9 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
             {p.label}
           </button>
         ))}
-        {!restrictModel && (
-          <button onClick={() => setNetwork("strizna")}
-            className={`fs-10 font-mono uppercase px-2.5 py-1 rounded-lg border flex-shrink-0 ${network === "strizna" ? "c-border-accent c-accent" : "c-border c-muted"}`}>
-            Editor
-          </button>
-        )}
       </div>
     </>
   );
-
-  if (network === "strizna" && !restrictModel) {
-    return (
-      <div className="flex gap-5">
-        {networkSidebar}
-        <div className="flex-1 min-w-0">
-          {mobileNetworkSelector}
-          <StriznaPanel onOpen={(focus) => onOpenEditor && onOpenEditor(focus)} />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex gap-5">
@@ -13694,7 +13608,6 @@ function App() {
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
   const [contentNavOpen, setContentNavOpen] = useState(false);
   const [contentPlatform, setContentPlatform] = useState(null);
-  const [editorFocus, setEditorFocus] = useState(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [neoBooting, setNeoBooting] = useState(false);
   const prevViewRef = useRef(null);
@@ -13922,13 +13835,6 @@ function App() {
                             </button>
                           );
                         })}
-                        {isAdmin && (
-                          <button
-                            onClick={() => { setView("content"); setContentPlatform("strizna"); setMobileNavOpen(false); }}
-                            className={`tap w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg fs-12 font-mono transition-colors ${activeNav && contentPlatform === "strizna" ? "c-bg-accent-a2 c-accent font-semibold" : "c-muted hover-bg-surface"}`}>
-                            <Clapperboard size={16} />Editor
-                          </button>
-                        )}
                       </div>
                     )}
                   </div>
@@ -13985,8 +13891,8 @@ function App() {
             {currentView === "dashboard" && (session.role === "admin"
               ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} inflowwDailyStats={inflowwDailyStats} inflowwSyncing={inflowwSyncing} refreshInfloww={refreshInfloww} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} settings={settings} />
               : <CreatorDashboard stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} ofDailyStats={ofDailyStats} inflowwDailyStats={inflowwDailyStats} />)}
-            {currentView === "content" && <ContentDirector cards={isAdmin ? scopedCards : cards} persistCards={isAdmin ? scopedPersistCards : persistCards} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} forcedNetwork={contentPlatform} reels={isAdmin ? scopedReels : reels} persistReels={isAdmin ? scopedPersistReels : persistReels} xCompetitors={xCompetitors} persistXCompetitors={persistXCompetitors} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} inflowwDailyStats={inflowwDailyStats} igGraphStats={igGraphStats} igGraphMedia={igGraphMedia} igViralVariations={igViralVariations} onOpenEditor={(focus) => { setEditorFocus(focus || null); setView("editor"); }} />}
-            {currentView === "editor" && isAdmin && <EditorPage models={agencyModels} focus={editorFocus} onFocusDone={() => setEditorFocus(null)} />}
+            {currentView === "content" && <ContentDirector cards={isAdmin ? scopedCards : cards} persistCards={isAdmin ? scopedPersistCards : persistCards} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} forcedNetwork={contentPlatform} reels={isAdmin ? scopedReels : reels} persistReels={isAdmin ? scopedPersistReels : persistReels} xCompetitors={xCompetitors} persistXCompetitors={persistXCompetitors} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} inflowwDailyStats={inflowwDailyStats} igGraphStats={igGraphStats} igGraphMedia={igGraphMedia} igViralVariations={igViralVariations} />}
+            {currentView === "editor" && isAdmin && <EditorPage models={agencyModels} />}
             {currentView === "calendar" && <CalendarView cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks} onNavigate={setView} restrictModel={restrictModel} />}
             {currentView === "tasks" && <TaskManager tasks={isAdmin ? scopedTasks : tasks} persistTasks={isAdmin ? scopedPersistTasks : persistTasks} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} />}
             {currentView === "stats" && <StatsManager stats={scopedStats} persistStats={scopedPersistStats} models={agencyModels} reels={scopedReels} persistReels={scopedPersistReels} />}
