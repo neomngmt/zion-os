@@ -3730,7 +3730,7 @@ const editJobToJS = (r) => ({
   error: r.error || "", version: r.version || 0, versions: r.versions || [], segments: r.segments || [],
   sourceDuration: r.source_duration != null ? Number(r.source_duration) : null,
   questions: r.questions || [], checker: r.checker || {}, comments: r.comments || [], summary: r.summary || "",
-  finalFile: r.final_file || "", createdAt: r.created_at, updatedAt: r.updated_at,
+  finalFile: r.final_file || "", rawState: r.raw_state || "", createdAt: r.created_at, updatedAt: r.updated_at,
 });
 const EDIT_DB_KEYS = {
   sourceName: "source_name", sourceDuration: "source_duration", finalFile: "final_file",
@@ -3890,6 +3890,31 @@ function EditorUploadForm({ models, worker, onCreated, onCancel }) {
   };
 
   const input = "w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent";
+  if (worker.checked && !worker.localOk) {
+    return (
+      <div className="rounded-2xl p-5" style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.08)" }}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-base font-extrabold tracking-tight c-text">Nová zakázka</div>
+          {onCancel && <button onClick={onCancel} className="c-muted hover-text-primary"><X size={16} /></button>}
+        </div>
+        {worker.online ? (
+          <>
+            <p className="fs-12 c-muted mb-4">
+              Tenhle prohlížeč nesmí ze stránky mluvit s pracantem na Macu (ochrana místní sítě), proto se video nahrává na malé stránce přímo z Macu.
+              Video zůstane na Macu, zakázka se pak sama objeví tady.
+            </p>
+            <a href={`${EDIT_WORKER_URL}/new`} target="_blank" rel="noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold hover-bg-accent2">
+              <ExternalLink size={13} /> Otevřít nahrávání na Macu
+            </a>
+            <p className="fs-10 font-mono c-faint mt-3">Funguje jen v prohlížeči na tom Macu, kde běží pracant.</p>
+          </>
+        ) : (
+          <p className="fs-12" style={{ color: "#e07a5f" }}>Mac je offline, pracant neběží. Zapni Mac a zkus to znovu.</p>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="rounded-2xl p-5" style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.08)" }}>
       <div className="flex items-center justify-between mb-4">
@@ -4008,22 +4033,36 @@ function EditorJobDetail({ job, worker, patch, remove, onClosed }) {
       setComposer(v ? Math.round(v.currentTime * 10) / 10 : 0);
     } else setComposer(null);
   };
+  // Without the in-page player (browser can't reach the Mac) the time is typed in: "7.3" or "0:07".
+  const parseEditTime = (str) => {
+    const t = String(str).trim().replace(",", ".");
+    if (t.includes(":")) { const [m, sec] = t.split(":"); const v = Number(m) * 60 + Number(sec); return isNaN(v) ? null : v; }
+    const v = Number(t);
+    return t === "" || isNaN(v) ? null : v;
+  };
   const pending = job.comments.filter((c) => !c.handled).length + job.questions.filter((q) => q.answer).length;
   const stepIdx = EDIT_STEPS.reduce((acc, s, i) => (job.stage && job.stage.indexOf(s.key) >= 0 ? i : acc), -1);
 
   const sendFeedback = () => patch(job.id, { status: "revising", stage: "Čeká na pracanta", error: "" });
   const approve = () => {
-    if (!window.confirm(`Schválit verzi ${job.version} a vyrenderovat finál? Render trvá pár minut.`)) return;
+    if (!window.confirm(`Schválit verzi ${job.version} a vyrenderovat finál? Render trvá pár minut. Po úspěšném finále se raw video přesune do koše na Macu (3 dny na vrácení) a pak smaže.`)) return;
     patch(job.id, { status: "approved", stage: "Čeká na pracanta", error: "" });
   };
   const retry = () => patch(job.id, { status: job.version > 0 ? "revising" : "queued", stage: "Ve frontě", error: "" });
   const reveal = (file) => fetch(`${EDIT_WORKER_URL}/reveal?project=${encodeURIComponent(job.project)}&file=${encodeURIComponent(file)}`, { method: "POST" }).catch(() => {});
 
   const card = { background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.08)" };
-  const noVideo = (
-    <div className="flex items-center justify-center text-center px-4 fs-11 font-mono c-faint rounded-xl"
+  const noVideoFor = (file) => (
+    <div className="flex flex-col items-center justify-center text-center gap-3 px-4 fs-11 font-mono c-faint rounded-xl"
       style={{ aspectRatio: "9/16", maxHeight: 520, background: "#0a0d0c", border: "1px dashed rgba(255,255,255,0.14)" }}>
-      Video je jen na Macu. Otevři Zion OS v Chrome na tom Macu, kde běží pracant.
+      <span>Video je jen na Macu a tenhle prohlížeč na něj ze stránky nesmí.</span>
+      {worker.online && job.project && file ? (
+        <a href={`${EDIT_WORKER_URL}/play/${job.project}/${file}`} target="_blank" rel="noreferrer"
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg c-bg-accent c-onaccent fs-10 uppercase font-semibold">
+          <Play size={11} /> Otevřít přehrávač na Macu
+        </a>
+      ) : <span>Mac je offline.</span>}
+      <span className="fs-9">Funguje jen v prohlížeči na tom Macu.</span>
     </div>
   );
 
@@ -4086,12 +4125,23 @@ function EditorJobDetail({ job, worker, patch, remove, onClosed }) {
                 <div className="fs-9 font-mono uppercase c-accent mb-2">Finální video</div>
                 {worker.localOk
                   ? <video key={finalSrc} src={`${finalSrc}#t=0.1`} controls playsInline className="w-full rounded-xl bg-black" style={{ aspectRatio: "9/16", maxHeight: 520 }} ref={videoRef} />
-                  : noVideo}
+                  : noVideoFor(finalName)}
                 <div className="flex gap-2 mt-3">
                   <button onClick={() => reveal(finalName)} disabled={!worker.localOk}
                     className="flex-1 px-3 py-1.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase font-semibold disabled:opacity-40">Ukázat ve Finderu</button>
                 </div>
                 <div className="fs-9 font-mono c-faint mt-2 break-all">projects/{job.project}/{job.finalFile}</div>
+                {job.rawState && (
+                  <div className="fs-10 font-mono mt-2" style={{ color: job.rawState === "trashed" || job.rawState === "deleted" ? "#39e673" : "#D9B45B" }}>
+                    {{
+                      trashed: "Raw video je v koši na Macu (raw/_smazano), za 3 dny se smaže natrvalo.",
+                      deleted: "Raw video je smazané.",
+                      kept_in_use: "Raw video nechané, používá ho ještě jiná zakázka nebo projekt.",
+                      kept_unverified: "Raw video nechané, finální render se nepodařilo ověřit.",
+                      missing: "Raw video už na Macu nebylo.",
+                    }[job.rawState] || ""}
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -4106,7 +4156,7 @@ function EditorJobDetail({ job, worker, patch, remove, onClosed }) {
                 </div>
                 {src && worker.localOk
                   ? <video key={src} src={`${src}#t=0.1`} controls playsInline className="w-full rounded-xl bg-black" style={{ aspectRatio: "9/16", maxHeight: 520 }} ref={videoRef} />
-                  : noVideo}
+                  : noVideoFor(versionInfo && versionInfo.file)}
               </>
             )}
           </div>
@@ -4208,14 +4258,20 @@ function EditorJobDetail({ job, worker, patch, remove, onClosed }) {
                 </div>
                 {composer === undefined ? (
                   <div className="flex gap-2 flex-wrap">
-                    <button onClick={() => openComposer(true)} disabled={!worker.localOk}
-                      className="fs-10 font-mono uppercase px-3 py-1.5 rounded-lg border c-border c-text disabled:opacity-40">Komentář k tomuhle místu ve videu</button>
+                    <button onClick={() => openComposer(true)}
+                      className="fs-10 font-mono uppercase px-3 py-1.5 rounded-lg border c-border c-text">{worker.localOk ? "Komentář k tomuhle místu ve videu" : "Komentář k času ve videu"}</button>
                     <button onClick={() => openComposer(false)}
                       className="fs-10 font-mono uppercase px-3 py-1.5 rounded-lg border c-border c-muted">Obecný komentář</button>
                   </div>
                 ) : (
                   <div>
-                    <div className="fs-10 font-mono c-accent mb-1">{composer != null ? `Komentář v ${fmtEditTime(composer)} (v${curV})` : "Obecný komentář"}</div>
+                    <div className="fs-10 font-mono c-accent mb-1 flex items-center gap-2 flex-wrap">
+                      {composer != null ? `Komentář v ${fmtEditTime(composer)} (v${curV})` : "Obecný komentář"}
+                      {composer != null && !worker.localOk && (
+                        <input defaultValue={String(composer)} onChange={(e) => { const v = parseEditTime(e.target.value); if (v != null) setComposer(v); }}
+                          placeholder="čas, např. 7.3 nebo 0:07" className="w-40 c-bg-app border c-border rounded-lg px-2 py-0.5 fs-11 c-text outline-none focus-border-accent" />
+                      )}
+                    </div>
                     <textarea autoFocus value={commentText} onChange={(e) => setCommentText(e.target.value)} rows={2}
                       onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) addComment(); }}
                       placeholder="co s tím? (Cmd+Enter přidá)"
