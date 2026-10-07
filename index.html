@@ -3698,7 +3698,7 @@ function MoreDotsIG({ dark }) {
   );
 }
 
-// ---------- Střižna / Editor (reel editing studio on the Mac) ----------
+// ---------- Editor (reel editing studio on the Mac) ----------
 // The web page never touches video itself. Jobs live in Supabase (edit_jobs); a worker on
 // the Mac (video-studio/tools/worker.mjs) does the cutting with FFmpeg + Claude Code and
 // serves raw uploads / previews only on 127.0.0.1, so media never leaves the Mac. That is
@@ -3962,7 +3962,7 @@ function EditorUploadForm({ models, worker, onCreated, onCancel }) {
 
       <label className="flex items-start gap-2 fs-11 c-muted mb-4 cursor-pointer">
         <input type="checkbox" checked={sfw} onChange={(e) => setSfw(e.target.checked)} className="mt-0.5" />
-        <span>Video je SFW (bez nahoty). Střižna posílá snímky a přepis do Claude, proto jen bezpečný obsah.</span>
+        <span>Video je SFW (bez nahoty). Editor posílá snímky a přepis do Claude, proto jen bezpečný obsah.</span>
       </label>
 
       {!worker.localOk && (
@@ -4403,7 +4403,7 @@ function StriznaPanel({ onOpen }) {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Clapperboard size={16} className="c-accent" />
-            <span className="text-base font-extrabold tracking-tight c-text">Střižna</span>
+            <span className="text-base font-extrabold tracking-tight c-text">Editor</span>
           </div>
           <p className="fs-11 c-muted">Nahraj raw video, Mac ho ostříhá a ty ve stránce Editor schválíš nebo vrátíš s připomínkami.</p>
         </div>
@@ -4651,7 +4651,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
           {!restrictModel && (
             <button onClick={() => setNetwork("strizna")}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg fs-12 font-mono transition-colors mt-2 ${network === "strizna" ? "c-bg-accent-a2 c-accent font-semibold" : "c-muted hover-bg-surface"}`}>
-              <span className="flex items-center gap-1.5"><Clapperboard size={12} />Střižna</span>
+              <span className="flex items-center gap-1.5"><Clapperboard size={12} />Editor</span>
             </button>
           )}
         </div>
@@ -4674,7 +4674,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
         {!restrictModel && (
           <button onClick={() => setNetwork("strizna")}
             className={`fs-10 font-mono uppercase px-2.5 py-1 rounded-lg border flex-shrink-0 ${network === "strizna" ? "c-border-accent c-accent" : "c-border c-muted"}`}>
-            Střižna
+            Editor
           </button>
         )}
       </div>
@@ -13926,7 +13926,7 @@ function App() {
                           <button
                             onClick={() => { setView("content"); setContentPlatform("strizna"); setMobileNavOpen(false); }}
                             className={`tap w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg fs-12 font-mono transition-colors ${activeNav && contentPlatform === "strizna" ? "c-bg-accent-a2 c-accent font-semibold" : "c-muted hover-bg-surface"}`}>
-                            <Clapperboard size={16} />Střižna
+                            <Clapperboard size={16} />Editor
                           </button>
                         )}
                       </div>
