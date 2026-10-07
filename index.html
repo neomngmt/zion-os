@@ -3842,10 +3842,10 @@ function EditStatusChip({ status }) {
 
 function EditWorkerChip({ worker }) {
   const lowDisk = worker.freeGb != null && worker.freeGb < 10;
-  let text, color;
+  let text, color, viaLinks = false;
   if (!worker.checked) { text = "Zjišťuju stav Macu"; color = "#8B93A1"; }
   else if (worker.localOk) { text = "Mac online"; color = "#39e673"; }
-  else if (worker.online) { text = "Mac online, ale tenhle prohlížeč na něj nevidí"; color = "#D9B45B"; }
+  else if (worker.online) { text = "Mac online"; color = "#39e673"; viaLinks = true; }
   else { text = "Mac offline (pracant neběží)"; color = "#e07a5f"; }
   return (
     <div className="flex items-center gap-2 flex-wrap">
@@ -3853,6 +3853,9 @@ function EditWorkerChip({ worker }) {
         style={{ color, background: `${color}1a`, border: `1px solid ${color}55` }}>
         <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />{text}
       </span>
+      {viaLinks && (
+        <span className="fs-10 font-mono c-faint">tenhle prohlížeč nemá přímý přístup, nahrávání a přehrávač se otevírají odkazem v okně na Macu</span>
+      )}
       {worker.online && worker.claudeOk === false && (
         <span className="fs-10 font-mono px-2.5 py-1 rounded-full" style={{ color: "#e07a5f", background: "rgba(224,122,95,0.12)", border: "1px solid rgba(224,122,95,0.45)" }}>
           Claude Code na Macu není přihlášený: v Terminálu spusť claude a dej /login
