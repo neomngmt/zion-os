@@ -3698,11 +3698,10 @@ function MoreDotsIG({ dark }) {
   );
 }
 
-// ---------- Editor (reel editing studio on the Mac) ----------
-// The web page never touches video itself. Jobs live in Supabase (edit_jobs); a worker on
-// the Mac (video-studio/tools/worker.mjs) does the cutting with FFmpeg + Claude Code and
-// serves raw uploads / previews only on 127.0.0.1, so media never leaves the Mac. That is
-// why the player only works in a browser on that Mac while the worker runs.
+// ---------- Editor launcher ----------
+// The editor itself (player, timeline, uploads, libraries) is an app served by the worker on the Mac
+// at http://127.0.0.1:4799/app, because a web page cannot reach video files on the Mac. This page is
+// just the way in: Mac status, one button, and a list of recent cuts that open the editor on that cut.
 const EDIT_WORKER_URL = "http://127.0.0.1:4799";
 const EDIT_STATUS = {
   uploading: { label: "Nahrává se", color: "#8B93A1", busy: true },
@@ -3715,133 +3714,42 @@ const EDIT_STATUS = {
   done: { label: "Hotovo", color: "#39e673", busy: false },
   error: { label: "Chyba", color: "#e07a5f", busy: false },
 };
-const EDIT_STEPS = [
-  { key: "Přepis", label: "Přepis" },
-  { key: "Vybírám", label: "Výběr záběrů" },
-  { key: "Stříhám", label: "Střih" },
-  { key: "titulky", label: "Titulky a zoomy" },
-  { key: "renderuju", label: "Render náhledu" },
-  { key: "Kontrola", label: "Kontrola" },
-];
-
-const editJobToJS = (r) => ({
-  id: r.id, title: r.title || "", model: r.model || "", lang: r.lang || "cs", brief: r.brief || "",
-  sourceName: r.source_name || "", project: r.project || "", status: r.status || "queued", stage: r.stage || "",
-  error: r.error || "", version: r.version || 0, versions: r.versions || [], segments: r.segments || [],
-  sourceDuration: r.source_duration != null ? Number(r.source_duration) : null,
-  questions: r.questions || [], checker: r.checker || {}, comments: r.comments || [], summary: r.summary || "",
-  finalFile: r.final_file || "", rawState: r.raw_state || "", referenceName: r.reference_name || "", createdAt: r.created_at, updatedAt: r.updated_at,
-});
-const EDIT_DB_KEYS = {
-  sourceName: "source_name", sourceDuration: "source_duration", finalFile: "final_file",
-};
-const editFieldsToDB = (fields) => {
-  const out = {};
-  Object.entries(fields).forEach(([k, v]) => { out[EDIT_DB_KEYS[k] || k] = v; });
-  return out;
-};
 
 function useEditJobs() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const load = useCallback(async () => {
-    const { data, error } = await supabaseClient.from("edit_jobs").select("*").order("created_at", { ascending: false });
-    if (!error) setJobs((data || []).map(editJobToJS));
-    setLoading(false);
-  }, []);
   useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const { data, error } = await supabaseClient.from("edit_jobs").select("id, title, model, status, stage, updated_at").order("created_at", { ascending: false }).limit(12);
+      if (!cancelled && !error) setJobs(data || []);
+      if (!cancelled) setLoading(false);
+    };
     load();
-    const t = setInterval(() => { if (!document.hidden) load(); }, 4000);
-    return () => clearInterval(t);
-  }, [load]);
-  const patch = useCallback(async (id, fields) => {
-    setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...fields } : j)));
-    await supabaseClient.from("edit_jobs").update({ ...editFieldsToDB(fields), updated_at: new Date().toISOString() }).eq("id", id);
-    load();
-  }, [load]);
-  const remove = useCallback(async (id) => {
-    setJobs((prev) => prev.filter((j) => j.id !== id));
-    await supabaseClient.from("edit_jobs").delete().eq("id", id);
+    const t = setInterval(() => { if (!document.hidden) load(); }, 5000);
+    return () => { cancelled = true; clearInterval(t); };
   }, []);
-  return { jobs, loading, patch, remove, reload: load };
+  return { jobs, loading };
 }
 
 function useEditWorker() {
-  const [state, setState] = useState({ online: false, busy: null, freeGb: null, localOk: false, claudeOk: null, checked: false });
+  const [state, setState] = useState({ checked: false, online: false, claudeOk: null, freeGb: null, busy: null });
   useEffect(() => {
     let cancelled = false;
     const check = async () => {
-      let online = false, busy = null, freeGb = null, localOk = false, claudeOk = null;
+      let next = { checked: true, online: false, claudeOk: null, freeGb: null, busy: null };
       try {
         const { data } = await supabaseClient.from("app_state").select("value").eq("key", "edit_worker").maybeSingle();
         const v = data && data.value;
-        if (v && v.lastSeen && Date.now() - new Date(v.lastSeen).getTime() < 45000) { online = true; busy = v.busy || null; freeGb = v.freeGb ?? null; claudeOk = v.claudeOk ?? null; }
+        if (v && v.lastSeen && Date.now() - new Date(v.lastSeen).getTime() < 45000) next = { checked: true, online: true, claudeOk: v.claudeOk ?? null, freeGb: v.freeGb ?? null, busy: v.busy || null };
       } catch {}
-      try {
-        const ctl = new AbortController();
-        const to = setTimeout(() => ctl.abort(), 1500);
-        const r = await fetch(`${EDIT_WORKER_URL}/status`, { signal: ctl.signal });
-        clearTimeout(to);
-        if (r.ok) { const j = await r.json(); localOk = true; online = true; busy = j.busy || null; freeGb = j.freeGb ?? freeGb; claudeOk = j.claudeOk ?? claudeOk; }
-      } catch {}
-      if (!cancelled) setState({ online, busy, freeGb, localOk, claudeOk, checked: true });
+      if (!cancelled) setState(next);
     };
     check();
-    const t = setInterval(check, 5000);
+    const t = setInterval(check, 8000);
     return () => { cancelled = true; clearInterval(t); };
   }, []);
   return state;
-}
-
-const fmtEditTime = (s) => {
-  if (s == null || isNaN(s)) return "";
-  const m = Math.floor(s / 60);
-  return `${m}:${(s % 60).toFixed(1).padStart(4, "0")}`;
-};
-
-// POSTs one file to the worker on this Mac. kind: raw | reference | broll (broll takes a note).
-function editUpload(file, kind, note, onProgress) {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${EDIT_WORKER_URL}/upload?kind=${kind}&name=${encodeURIComponent(file.name)}${note ? `&note=${encodeURIComponent(note)}` : ""}`);
-    if (onProgress) xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
-    xhr.onload = () => {
-      let j = null;
-      try { j = JSON.parse(xhr.responseText); } catch {}
-      if (xhr.status === 200 && j && j.file) resolve(j);
-      else reject(new Error((j && j.error) || `Nahrání selhalo (${xhr.status})`));
-    };
-    xhr.onerror = () => reject(new Error("Pracant na Macu neodpovídá. Je spuštěný a otevíráš Zion OS na tom Macu?"));
-    xhr.send(file);
-  });
-}
-
-function useEditBroll() {
-  const [items, setItems] = useState([]);
-  const load = useCallback(async () => {
-    const { data, error } = await supabaseClient.from("edit_broll").select("*").order("created_at", { ascending: false });
-    if (!error) setItems(data || []);
-  }, []);
-  useEffect(() => {
-    load();
-    const t = setInterval(() => { if (!document.hidden) load(); }, 6000);
-    return () => clearInterval(t);
-  }, [load]);
-  return { items, reload: load };
-}
-
-function useEditRefs() {
-  const [items, setItems] = useState([]);
-  const load = useCallback(async () => {
-    const { data, error } = await supabaseClient.from("edit_refs").select("*").order("created_at", { ascending: true });
-    if (!error) setItems(data || []);
-  }, []);
-  useEffect(() => {
-    load();
-    const t = setInterval(() => { if (!document.hidden) load(); }, 6000);
-    return () => clearInterval(t);
-  }, [load]);
-  return { items, reload: load };
 }
 
 function EditStatusChip({ status }) {
@@ -3854,859 +3762,72 @@ function EditStatusChip({ status }) {
   );
 }
 
-function EditWorkerChip({ worker }) {
+function EditorPage() {
+  const worker = useEditWorker();
+  const { jobs, loading } = useEditJobs();
+  const offline = worker.checked && !worker.online;
+  const waiting = jobs.filter((j) => j.status === "awaiting_review").length;
   const lowDisk = worker.freeGb != null && worker.freeGb < 10;
-  let text, color, viaLinks = false;
-  if (!worker.checked) { text = "Zjišťuju stav Macu"; color = "#8B93A1"; }
-  else if (worker.localOk) { text = "Mac online"; color = "#39e673"; }
-  else if (worker.online) { text = "Mac online"; color = "#39e673"; viaLinks = true; }
-  else { text = "Mac offline (pracant neběží)"; color = "#e07a5f"; }
-  return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <span className="fs-10 font-mono uppercase px-2.5 py-1 rounded-full flex items-center gap-1.5"
-        style={{ color, background: `${color}1a`, border: `1px solid ${color}55` }}>
-        <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />{text}
-      </span>
-      {viaLinks && (
-        <span className="fs-10 font-mono c-faint">tenhle prohlížeč nemá přímý přístup, nahrávání a přehrávač se otevírají odkazem v okně na Macu</span>
-      )}
-      {worker.online && worker.claudeOk === false && (
-        <span className="fs-10 font-mono px-2.5 py-1 rounded-full" style={{ color: "#e07a5f", background: "rgba(224,122,95,0.12)", border: "1px solid rgba(224,122,95,0.45)" }}>
-          Claude Code na Macu není přihlášený: v Terminálu spusť claude a dej /login
-        </span>
-      )}
-      {worker.freeGb != null && (
-        <span className="fs-10 font-mono" style={{ color: lowDisk ? "#e07a5f" : "#8B93A1" }}>
-          disk volno {worker.freeGb} GB{lowDisk ? ", uvolni místo" : ""}
-        </span>
-      )}
-    </div>
+  const chip = (text, color) => (
+    <span className="fs-10 font-mono uppercase px-2.5 py-1 rounded-full flex items-center gap-1.5" style={{ color, background: `${color}1a`, border: `1px solid ${color}55` }}>
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />{text}
+    </span>
   );
-}
-
-function EditorUploadForm({ models, worker, onCreated, onCancel }) {
-  const [file, setFile] = useState(null);
-  const { items: refs } = useEditRefs();
-  const [refId, setRefId] = useState(() => { try { return localStorage.getItem("edit_last_ref") || ""; } catch { return ""; } });
-  const [title, setTitle] = useState("");
-  const [model, setModel] = useState("");
-  const [lang, setLang] = useState("cs");
-  const [brief, setBrief] = useState("");
-  const [sfw, setSfw] = useState(false);
-  const [progress, setProgress] = useState(null);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [drag, setDrag] = useState(false);
-  const inputRef = useRef(null);
-
-  const pick = (f) => {
-    if (!f) return;
-    setFile(f);
-    if (!title) setTitle(f.name.replace(/\.[^.]+$/, ""));
-  };
-
-  const submit = async () => {
-    if (!file || !sfw || busy) return;
-    setBusy(true); setError(""); setProgress(0);
-    const id = uid();
-    try {
-      const { error: insErr } = await supabaseClient.from("edit_jobs").insert({
-        id, title: title.trim() || file.name, model: model || null, lang, brief: brief.trim(),
-        status: "uploading", stage: "Nahrávám na Mac", sfw_confirmed: true,
-      });
-      if (insErr) throw insErr;
-      const stored = await editUpload(file, "raw", "", setProgress).catch(async (e) => {
-        await supabaseClient.from("edit_jobs").update({ status: "error", stage: "Chyba", error: e.message, updated_at: new Date().toISOString() }).eq("id", id);
-        throw e;
-      });
-      const refPath = (refs.find((r) => r.id === refId) || {}).path || "";
-      await supabaseClient.from("edit_jobs").update({ source_name: stored.file, reference_name: refPath, status: "queued", stage: "Ve frontě", updated_at: new Date().toISOString() }).eq("id", id);
-      onCreated(id);
-    } catch (e) {
-      setError((e && e.message) || "Nahrání selhalo");
-    }
-    setBusy(false);
-  };
-
-  const input = "w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent";
-  if (worker.checked && !worker.localOk) {
-    return (
-      <div className="rounded-2xl p-5" style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.08)" }}>
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-base font-extrabold tracking-tight c-text">Nový střih</div>
-          {onCancel && <button onClick={onCancel} className="c-muted hover-text-primary"><X size={16} /></button>}
+  return (
+    <div className="flex flex-col gap-4" style={{ maxWidth: 760 }}>
+      <div className="rounded-3xl p-6 md:p-8 relative overflow-hidden"
+        style={{ background: "radial-gradient(ellipse 120% 100% at 10% 0%, rgba(18,179,76,0.12), transparent 60%), #0b0f0d", border: "1px solid rgba(57,230,115,0.18)" }}>
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(57,230,115,0.12)", border: "1px solid rgba(57,230,115,0.3)" }}>
+            <Clapperboard size={20} className="c-accent" />
+          </div>
+          <div>
+            <div className="text-xl font-extrabold tracking-tight c-text">Editor</div>
+            <div className="fs-12 c-muted">Nahraj raw video, Mac ho ostříhá a v Editoru ho schválíš, nebo vrátíš s připomínkami.</div>
+          </div>
         </div>
-        {worker.online ? (
-          <>
-            <p className="fs-12 c-muted mb-4">
-              Tenhle prohlížeč nesmí ze stránky mluvit s pracantem na Macu (ochrana místní sítě), proto se video nahrává na malé stránce přímo z Macu.
-              Video zůstane na Macu, střih se pak sám objeví tady.
-            </p>
-            <a href={`${EDIT_WORKER_URL}/new`} target="_blank" rel="noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold hover-bg-accent2">
-              <ExternalLink size={13} /> Otevřít nahrávání na Macu
-            </a>
-            <p className="fs-10 font-mono c-faint mt-3">Funguje jen v prohlížeči na tom Macu, kde běží pracant.</p>
-          </>
+        <div className="flex items-center gap-2 flex-wrap my-4">
+          {!worker.checked ? chip("Zjišťuju stav Macu", "#8B93A1") : offline ? chip("Mac je offline", "#e07a5f") : chip("Mac online", "#39e673")}
+          {worker.online && worker.claudeOk === false && chip("Claude Code není přihlášený", "#e07a5f")}
+          {worker.online && worker.busy && chip("Mac právě střihá", "#39e673")}
+          {worker.freeGb != null && <span className="fs-10 font-mono" style={{ color: lowDisk ? "#e07a5f" : "#8B93A1" }}>disk volno {worker.freeGb} GB{lowDisk ? ", uvolni místo" : ""}</span>}
+        </div>
+        {worker.online && worker.claudeOk === false && (
+          <div className="fs-11 font-mono mb-4" style={{ color: "#e07a5f" }}>Střih bez Claude nejde. V Terminálu na Macu spusť <b>claude auth login</b> a přihlas se.</div>
+        )}
+        {offline ? (
+          <div className="fs-12" style={{ color: "#e07a5f" }}>Pracant na Macu neběží. Zapni Mac a přihlas se, spustí se sám.</div>
         ) : (
-          <p className="fs-12" style={{ color: "#e07a5f" }}>Mac je offline, pracant neběží. Zapni Mac a zkus to znovu.</p>
-        )}
-      </div>
-    );
-  }
-  return (
-    <div className="rounded-2xl p-5" style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.08)" }}>
-      <div className="flex items-center justify-between mb-4">
-        <div className="text-base font-extrabold tracking-tight c-text">Nový střih</div>
-        {onCancel && <button onClick={onCancel} className="c-muted hover-text-primary"><X size={16} /></button>}
-      </div>
-
-      <input ref={inputRef} type="file" accept="video/*,.mov,.mp4,.m4v,.mkv,.webm" className="hidden"
-        onChange={(e) => { pick(e.target.files && e.target.files[0]); e.target.value = ""; }} />
-      <button onClick={() => inputRef.current && inputRef.current.click()}
-        onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
-        onDrop={(e) => { e.preventDefault(); setDrag(false); pick(e.dataTransfer.files && e.dataTransfer.files[0]); }}
-        className="w-full flex flex-col items-center justify-center gap-1 border border-dashed rounded-2xl py-7 mb-4 tap transition-colors"
-        style={{ borderColor: drag ? "rgba(57,230,115,0.7)" : "rgba(255,255,255,0.16)", background: drag ? "rgba(57,230,115,0.05)" : "transparent" }}>
-        <Film size={20} className="c-muted" />
-        <span className="fs-12 c-text font-mono">{file ? file.name : "Přetáhni sem raw video nebo klikni"}</span>
-        <span className="fs-10 c-faint font-mono">{file ? `${(file.size / 1e6).toFixed(0)} MB` : "mov, mp4, m4v, mkv, webm"}</span>
-      </button>
-
-      <div className="mb-4 rounded-xl px-3 py-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-        <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Reference (uložené reely, podle kterých se střihá)</label>
-        <select value={refs.some((r) => r.id === refId) ? refId : ""}
-          onChange={(e) => { setRefId(e.target.value); try { localStorage.setItem("edit_last_ref", e.target.value); } catch {} }}
-          className={input}>
-          <option value="">bez reference (styl studia)</option>
-          {refs.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-        </select>
-        <div className="fs-10 c-faint">Nové reference přidáš v sekci Reference níž na stránce.</div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-        <div className="sm:col-span-1">
-          <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Název</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} className={input} placeholder="např. Proč je banned IG" />
-        </div>
-        <div>
-          <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Modelka</label>
-          <select value={model} onChange={(e) => setModel(e.target.value)} className={input}>
-            <option value="">bez modelky</option>
-            {models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Jazyk videa</label>
-          <select value={lang} onChange={(e) => setLang(e.target.value)} className={input}>
-            <option value="cs">Čeština</option>
-            <option value="sk">Slovenčina</option>
-            <option value="en">Angličtina</option>
-          </select>
-        </div>
-      </div>
-
-      <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Brief (cíl, délka, na co dát pozor)</label>
-      <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={3} className={`${input} mb-3 resize-none`}
-        placeholder="např. 20 s, hook hned na začátku, vulgarismy nech" />
-
-      <label className="flex items-start gap-2 fs-11 c-muted mb-4 cursor-pointer">
-        <input type="checkbox" checked={sfw} onChange={(e) => setSfw(e.target.checked)} className="mt-0.5" />
-        <span>Video je SFW (bez nahoty). Editor posílá snímky a přepis do Claude, proto jen bezpečný obsah.</span>
-      </label>
-
-      {!worker.localOk && (
-        <div className="fs-11 font-mono mb-3" style={{ color: "#D9B45B" }}>
-          Nahrávání jde jen z prohlížeče na Macu, kde běží pracant (v Chrome). Teď na něj tenhle prohlížeč nevidí.
-        </div>
-      )}
-      {progress != null && busy && (
-        <div className="mb-3">
-          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
-            <div className="h-full" style={{ width: `${Math.round(progress * 100)}%`, background: "#39e673" }} />
-          </div>
-          <div className="fs-10 font-mono c-faint mt-1">Nahrávám na Mac, {Math.round(progress * 100)} %</div>
-        </div>
-      )}
-      {error && <div className="fs-11 font-mono mb-3" style={{ color: "#e07a5f" }}>{error}</div>}
-      <button onClick={submit} disabled={!file || !sfw || busy || !worker.localOk}
-        className="w-full py-2.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold hover-bg-accent2 disabled:opacity-40">
-        {busy ? "Nahrávám…" : "Nahrát a zpracovat"}
-      </button>
-    </div>
-  );
-}
-
-function EditorJobDetail({ job, worker, patch, remove, onClosed }) {
-  const videoRef = useRef(null);
-  const [viewV, setViewV] = useState(null);
-  const [composer, setComposer] = useState(undefined); // undefined closed, null general, number = seconds
-  const [commentText, setCommentText] = useState("");
-  const [customAnswer, setCustomAnswer] = useState({});
-  const [checkerOpen, setCheckerOpen] = useState(false);
-  useEffect(() => { setViewV(null); setComposer(undefined); }, [job.id, job.version]);
-
-  const curV = viewV || job.version;
-  const versionInfo = job.versions.find((v) => v.v === curV);
-  const src = job.project && versionInfo ? `${EDIT_WORKER_URL}/media/${job.project}/${versionInfo.file}` : null;
-  const finalName = job.finalFile ? job.finalFile.split("/").pop() : "";
-  const finalSrc = job.project && finalName ? `${EDIT_WORKER_URL}/media/${job.project}/${finalName}` : null;
-  const reviewable = ["awaiting_review", "done"].includes(job.status);
-  const busyJob = EDIT_STATUS[job.status] ? EDIT_STATUS[job.status].busy : false;
-
-  const seek = (t) => {
-    const v = videoRef.current;
-    if (v && t != null) { v.currentTime = Math.max(0, t); v.play().catch(() => {}); }
-  };
-
-  // Cut list: kept segments + the gaps between them (what got cut out of the raw)
-  const segs = [...job.segments].sort((a, b) => a.srcStart - b.srcStart);
-  const total = job.sourceDuration || (segs.length ? segs[segs.length - 1].srcEnd : 0);
-  const gaps = [];
-  let cursor = 0;
-  segs.forEach((s) => { if (s.srcStart - cursor > 0.05) gaps.push([cursor, s.srcStart]); cursor = s.srcEnd; });
-  if (total - cursor > 0.05) gaps.push([cursor, total]);
-  const kept = segs.reduce((t, s) => t + (s.srcEnd - s.srcStart), 0);
-
-  const answerQuestion = (qid, answer) =>
-    patch(job.id, { questions: job.questions.map((q) => (q.id === qid ? { ...q, answer } : q)) });
-  const addComment = () => {
-    const text = commentText.trim();
-    if (!text) return;
-    patch(job.id, { comments: [...job.comments, { id: uid(), v: curV, at: composer, text, createdAt: new Date().toISOString(), handled: false }] });
-    setCommentText(""); setComposer(undefined);
-  };
-  const openComposer = (timed) => {
-    if (timed) {
-      const v = videoRef.current;
-      if (v) v.pause();
-      setComposer(v ? Math.round(v.currentTime * 10) / 10 : 0);
-    } else setComposer(null);
-  };
-  // Without the in-page player (browser can't reach the Mac) the time is typed in: "7.3" or "0:07".
-  const parseEditTime = (str) => {
-    const t = String(str).trim().replace(",", ".");
-    if (t.includes(":")) { const [m, sec] = t.split(":"); const v = Number(m) * 60 + Number(sec); return isNaN(v) ? null : v; }
-    const v = Number(t);
-    return t === "" || isNaN(v) ? null : v;
-  };
-  const pending = job.comments.filter((c) => !c.handled).length + job.questions.filter((q) => q.answer).length;
-  const stepIdx = EDIT_STEPS.reduce((acc, s, i) => (job.stage && job.stage.indexOf(s.key) >= 0 ? i : acc), -1);
-
-  const sendFeedback = () => patch(job.id, { status: "revising", stage: "Čeká na pracanta", error: "" });
-  const approve = () => {
-    if (!window.confirm(`Schválit verzi ${job.version} a vyrenderovat finál? Render trvá pár minut. Po úspěšném finále se raw video přesune do koše na Macu (3 dny na vrácení) a pak smaže.`)) return;
-    patch(job.id, { status: "approved", stage: "Čeká na pracanta", error: "" });
-  };
-  const retry = () => patch(job.id, { status: job.version > 0 ? "revising" : "queued", stage: "Ve frontě", error: "" });
-  const reveal = (file) => fetch(`${EDIT_WORKER_URL}/reveal?project=${encodeURIComponent(job.project)}&file=${encodeURIComponent(file)}`, { method: "POST" }).catch(() => {});
-
-  const card = { background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.08)" };
-  const noVideoFor = (file) => (
-    <div className="flex flex-col items-center justify-center text-center gap-3 px-4 fs-11 font-mono c-faint rounded-xl"
-      style={{ aspectRatio: "9/16", maxHeight: 520, background: "#0a0d0c", border: "1px dashed rgba(255,255,255,0.14)" }}>
-      <span>Video je jen na Macu a tenhle prohlížeč na něj ze stránky nesmí.</span>
-      {worker.online && job.project && file ? (
-        <a href={`${EDIT_WORKER_URL}/play/${job.project}/${file}`} target="_blank" rel="noreferrer"
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg c-bg-accent c-onaccent fs-10 uppercase font-semibold">
-          <Play size={11} /> Otevřít přehrávač na Macu
-        </a>
-      ) : <span>Mac je offline.</span>}
-      <span className="fs-9">Funguje jen v prohlížeči na tom Macu.</span>
-    </div>
-  );
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="rounded-2xl p-4" style={card}>
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="min-w-0">
-            <div className="text-lg font-extrabold tracking-tight c-text truncate">{job.title}</div>
-            <div className="fs-10 font-mono c-faint mt-0.5">
-              {job.model || "bez modelky"} · {job.lang} · {job.sourceName || "nahrává se"}{job.sourceDuration ? ` · raw ${fmtEditTime(job.sourceDuration)}` : ""}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <EditStatusChip status={job.status} />
-            {!busyJob && (
-              <button onClick={() => { if (window.confirm("Odstranit střih ze seznamu? Soubory na Macu zůstanou.")) { remove(job.id); onClosed(); } }}
-                className="c-muted hover-warn" title="Odstranit ze seznamu"><Trash2 size={14} /></button>
-            )}
-          </div>
-        </div>
-        {job.brief && <div className="fs-11 c-muted mt-2 italic">Brief: {job.brief}</div>}
-        {job.referenceName && <div className="fs-10 font-mono c-faint mt-1">Reference: {job.referenceName.split("/").pop()}</div>}
-      </div>
-
-      {busyJob && (
-        <div className="rounded-2xl p-4" style={card}>
-          <div className="flex items-center gap-2 mb-3">
-            <Loader2 size={14} className="animate-spin c-accent" />
-            <span className="fs-12 font-semibold c-text">{job.stage || "Pracuje se"}</span>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {EDIT_STEPS.map((s, i) => (
-              <span key={s.key} className="fs-9 font-mono uppercase px-2 py-1 rounded-full"
-                style={i < stepIdx ? { color: "#39e673", background: "rgba(57,230,115,0.1)" }
-                  : i === stepIdx ? { color: "#050705", background: "#39e673" }
-                  : { color: "#6b7a72", background: "rgba(255,255,255,0.04)" }}>{s.label}</span>
-            ))}
-          </div>
-          <div className="fs-10 font-mono c-faint mt-3">
-            {worker.online ? "Pracant na Macu běží, stránku můžeš zavřít, výsledek tu bude." : "Pracant na Macu teď neběží, střih počká."}
-          </div>
-        </div>
-      )}
-
-      {job.status === "error" && (
-        <div className="rounded-2xl p-4" style={{ background: "rgba(224,122,95,0.08)", border: "1px solid rgba(224,122,95,0.4)" }}>
-          <div className="fs-12 font-semibold mb-1" style={{ color: "#e07a5f" }}>Něco se nepovedlo</div>
-          <pre className="fs-10 font-mono c-muted whitespace-pre-wrap mb-3" style={{ maxHeight: 180, overflow: "auto" }}>{job.error || "bez detailu"}</pre>
-          {job.sourceName && (
-            <button onClick={retry} className="px-3 py-1.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase font-semibold">Zkusit znovu</button>
-          )}
-        </div>
-      )}
-
-      {reviewable && (
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,300px)_1fr] gap-4 items-start">
-          <div className="rounded-2xl p-3" style={card}>
-            {job.status === "done" && finalSrc ? (
-              <>
-                <div className="fs-9 font-mono uppercase c-accent mb-2">Finální video</div>
-                {worker.localOk
-                  ? <video key={finalSrc} src={`${finalSrc}#t=0.1`} controls playsInline className="w-full rounded-xl bg-black" style={{ aspectRatio: "9/16", maxHeight: 520 }} ref={videoRef} />
-                  : noVideoFor(finalName)}
-                <a href={`${EDIT_WORKER_URL}/download/${job.project}/${finalName}?name=${encodeURIComponent((job.title || "reel").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "reel")}`}
-                  target="_blank" rel="noreferrer"
-                  className="mt-3 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold hover-bg-accent2">
-                  <ExternalLink size={13} /> Stáhnout reel
-                </a>
-                <div className="flex gap-2 mt-2">
-                  <button onClick={() => reveal(finalName)} disabled={!worker.localOk}
-                    className="flex-1 px-3 py-1.5 rounded-lg border c-border text-xs font-mono uppercase c-muted disabled:opacity-40">Ukázat ve Finderu</button>
-                </div>
-                <div className="fs-9 font-mono c-faint mt-2 break-all">projects/{job.project}/{job.finalFile}</div>
-                {job.rawState && (
-                  <div className="fs-10 font-mono mt-2" style={{ color: job.rawState === "trashed" || job.rawState === "deleted" ? "#39e673" : "#D9B45B" }}>
-                    {{
-                      trashed: "Raw video je v koši na Macu (raw/_smazano), za 3 dny se smaže natrvalo.",
-                      deleted: "Raw video je smazané.",
-                      kept_in_use: "Raw video nechané, používá ho ještě jiný střih nebo projekt.",
-                      kept_unverified: "Raw video nechané, finální render se nepodařilo ověřit.",
-                      missing: "Raw video už na Macu nebylo.",
-                    }[job.rawState] || ""}
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-1.5 flex-wrap mb-2">
-                  {job.versions.map((v) => (
-                    <button key={v.v} onClick={() => setViewV(v.v)}
-                      className="fs-10 font-mono uppercase px-2 py-0.5 rounded-full border"
-                      style={v.v === curV ? { color: "#39e673", borderColor: "rgba(57,230,115,0.6)" } : { color: "#8B93A1", borderColor: "rgba(255,255,255,0.12)" }}>
-                      v{v.v}{v.duration ? ` · ${v.duration.toFixed(0)} s` : ""}
-                    </button>
-                  ))}
-                </div>
-                {src && worker.localOk
-                  ? <video key={src} src={`${src}#t=0.1`} controls playsInline className="w-full rounded-xl bg-black" style={{ aspectRatio: "9/16", maxHeight: 520 }} ref={videoRef} />
-                  : noVideoFor(versionInfo && versionInfo.file)}
-              </>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-4 min-w-0">
-            {job.summary && (
-              <div className="rounded-2xl p-4" style={card}>
-                <div className="fs-9 font-mono uppercase c-faint mb-1">Shrnutí od střižny</div>
-                <div className="fs-12 c-text">{job.summary}</div>
-              </div>
-            )}
-
-            {job.status === "awaiting_review" && job.questions.length > 0 && (
-              <div className="rounded-2xl p-4" style={{ ...card, border: "1px solid rgba(217,180,91,0.35)" }}>
-                <div className="fs-9 font-mono uppercase mb-2" style={{ color: "#D9B45B" }}>Potřebuju od tebe ({job.questions.length})</div>
-                <div className="flex flex-col gap-3">
-                  {job.questions.map((q) => (
-                    <div key={q.id}>
-                      <div className="fs-12 c-text mb-1.5">
-                        {q.at != null && (
-                          <button onClick={() => seek(q.at)} className="fs-10 font-mono c-accent mr-2 hover-accent-text">▶ {fmtEditTime(q.at)}</button>
-                        )}
-                        {q.note}
-                      </div>
-                      <div className="flex gap-1.5 flex-wrap items-center">
-                        {["Nechat jak je", "Vystřihnout", "Pípnout"].map((a) => (
-                          <button key={a} onClick={() => answerQuestion(q.id, q.answer === a ? null : a)}
-                            className="fs-10 font-mono uppercase px-2.5 py-1 rounded-lg border"
-                            style={q.answer === a ? { color: "#050705", background: "#39e673", borderColor: "#39e673" } : { color: "#9d9b95", borderColor: "rgba(255,255,255,0.14)" }}>{a}</button>
-                        ))}
-                        <input value={customAnswer[q.id] ?? (q.answer && !["Nechat jak je", "Vystřihnout", "Pípnout"].includes(q.answer) ? q.answer : "")}
-                          onChange={(e) => setCustomAnswer((c) => ({ ...c, [q.id]: e.target.value }))}
-                          onBlur={(e) => { const v = e.target.value.trim(); if (v) answerQuestion(q.id, v); }}
-                          onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
-                          placeholder="vlastní odpověď"
-                          className="flex-1 minw-120 c-bg-app border c-border rounded-lg px-2 py-1 fs-11 c-text outline-none focus-border-accent" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="rounded-2xl p-4" style={card}>
-              <div className="flex items-center justify-between mb-2">
-                <div className="fs-9 font-mono uppercase c-faint">Co se vystřihlo</div>
-                <div className="fs-10 font-mono c-muted">
-                  {total ? `zůstalo ${kept.toFixed(1)} s z ${total.toFixed(1)} s (vystřiženo ${(total - kept).toFixed(1)} s)` : ""}
-                </div>
-              </div>
-              {total > 0 && (
-                <div className="relative rounded-full overflow-hidden mb-3" style={{ height: 12, background: "rgba(224,122,95,0.22)" }}>
-                  {segs.map((s, i) => (
-                    <div key={i} className="absolute top-0 bottom-0" title={`${fmtEditTime(s.srcStart)} do ${fmtEditTime(s.srcEnd)}`}
-                      style={{ left: `${(s.srcStart / total) * 100}%`, width: `${((s.srcEnd - s.srcStart) / total) * 100}%`, background: "#39e673", opacity: 0.85, borderRight: "1px solid #0b0f0d" }} />
-                  ))}
-                </div>
-              )}
-              <div className="flex flex-col gap-2">
-                {segs.map((s, i) => (
-                  <button key={i} onClick={() => reviewable && seek(s.start)} className="text-left rounded-lg p-2 tap"
-                    style={{ background: "rgba(57,230,115,0.05)", border: "1px solid rgba(57,230,115,0.18)" }}>
-                    <div className="flex items-center justify-between gap-2 fs-10 font-mono">
-                      <span style={{ color: "#39e673" }}>ZŮSTALO {fmtEditTime(s.srcStart)} do {fmtEditTime(s.srcEnd)}</span>
-                      <span className="c-faint">{s.confidence != null ? `jistota ${Math.round(s.confidence * 100)} %` : ""}{s.start != null ? ` · ve videu ${fmtEditTime(s.start)}` : ""}</span>
-                    </div>
-                    {s.reason && <div className="fs-11 c-muted mt-1">{s.reason}</div>}
-                  </button>
-                ))}
-                {gaps.length > 0 && (
-                  <div className="rounded-lg p-2" style={{ background: "rgba(224,122,95,0.06)", border: "1px solid rgba(224,122,95,0.22)" }}>
-                    <div className="fs-10 font-mono mb-1" style={{ color: "#e07a5f" }}>VYSTŘIŽENO</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {gaps.map(([a, b], i) => (
-                        <span key={i} className="fs-10 font-mono c-muted px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.05)" }}>
-                          {fmtEditTime(a)} do {fmtEditTime(b)} ({(b - a).toFixed(1)} s)
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {job.status === "awaiting_review" && (
-              <div className="rounded-2xl p-4" style={card}>
-                <div className="fs-9 font-mono uppercase c-faint mb-2">Zpětná vazba k v{curV}</div>
-                <div className="flex flex-col gap-1.5 mb-3">
-                  {job.comments.length === 0 && <div className="fs-11 c-faint font-mono italic">Zatím žádné komentáře.</div>}
-                  {job.comments.map((c) => (
-                    <div key={c.id} className="flex items-start gap-2 rounded-lg px-2.5 py-1.5" style={{ background: "rgba(255,255,255,0.04)", opacity: c.handled ? 0.5 : 1 }}>
-                      {c.at != null && c.v === curV
-                        ? <button onClick={() => seek(c.at)} className="fs-10 font-mono c-accent flex-shrink-0 mt-0.5">▶ {fmtEditTime(c.at)}</button>
-                        : <span className="fs-10 font-mono c-faint flex-shrink-0 mt-0.5">v{c.v}{c.at != null ? ` ${fmtEditTime(c.at)}` : ""}</span>}
-                      <span className="fs-12 c-text flex-1">{c.text}{c.handled ? " (zapracováno)" : ""}</span>
-                      {!c.handled && <button onClick={() => patch(job.id, { comments: job.comments.filter((x) => x.id !== c.id) })} className="c-muted hover-warn"><X size={12} /></button>}
-                    </div>
-                  ))}
-                </div>
-                {composer === undefined ? (
-                  <div className="flex gap-2 flex-wrap">
-                    <button onClick={() => openComposer(true)}
-                      className="fs-10 font-mono uppercase px-3 py-1.5 rounded-lg border c-border c-text">{worker.localOk ? "Komentář k tomuhle místu ve videu" : "Komentář k času ve videu"}</button>
-                    <button onClick={() => openComposer(false)}
-                      className="fs-10 font-mono uppercase px-3 py-1.5 rounded-lg border c-border c-muted">Obecný komentář</button>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="fs-10 font-mono c-accent mb-1 flex items-center gap-2 flex-wrap">
-                      {composer != null ? `Komentář v ${fmtEditTime(composer)} (v${curV})` : "Obecný komentář"}
-                      {composer != null && !worker.localOk && (
-                        <input defaultValue={String(composer)} onChange={(e) => { const v = parseEditTime(e.target.value); if (v != null) setComposer(v); }}
-                          placeholder="čas, např. 7.3 nebo 0:07" className="w-40 c-bg-app border c-border rounded-lg px-2 py-0.5 fs-11 c-text outline-none focus-border-accent" />
-                      )}
-                    </div>
-                    <textarea autoFocus value={commentText} onChange={(e) => setCommentText(e.target.value)} rows={2}
-                      onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) addComment(); }}
-                      placeholder="co s tím? (Cmd+Enter přidá)"
-                      className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent resize-none mb-2" />
-                    <div className="flex gap-2">
-                      <button onClick={addComment} disabled={!commentText.trim()} className="px-3 py-1.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase font-semibold disabled:opacity-40">Přidat</button>
-                      <button onClick={() => { setComposer(undefined); setCommentText(""); }} className="px-3 py-1.5 rounded-lg border c-border c-muted text-xs font-mono uppercase">Zrušit</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {(job.checker.faults?.length > 0 || job.checker.human?.length > 0 || job.checker.taste?.length > 0) && (
-              <div className="rounded-2xl p-4" style={card}>
-                <button onClick={() => setCheckerOpen((o) => !o)} className="w-full flex items-center justify-between">
-                  <span className="fs-9 font-mono uppercase c-faint">Kontrola kvality (checker)</span>
-                  <ChevronDown size={13} className={`c-muted transition-transform ${checkerOpen ? "rotate-180" : ""}`} />
-                </button>
-                {checkerOpen && (
-                  <div className="mt-2 flex flex-col gap-2">
-                    {[["faults", "Zbývající chyby", "#e07a5f"], ["human", "Posoudit člověkem", "#D9B45B"], ["taste", "Vkus", "#8B93A1"]].map(([k, label, color]) =>
-                      (job.checker[k] || []).length > 0 && (
-                        <div key={k}>
-                          <div className="fs-9 font-mono uppercase mb-0.5" style={{ color }}>{label}</div>
-                          {job.checker[k].map((t, i) => <div key={i} className="fs-11 c-muted">• {t}</div>)}
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {job.status === "awaiting_review" && (
-              <div className="rounded-2xl p-4 flex flex-col sm:flex-row gap-2" style={card}>
-                <button onClick={sendFeedback} disabled={pending === 0}
-                  className="flex-1 px-4 py-2.5 rounded-lg border c-border-accent c-accent text-xs font-mono uppercase tracking-wide font-semibold disabled:opacity-40 disabled:border-[rgba(255,255,255,0.12)]">
-                  Poslat zpětnou vazbu{pending ? ` (${pending})` : ""} a udělat v{job.version + 1}
-                </button>
-                <button onClick={approve}
-                  className="flex-1 px-4 py-2.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold hover-bg-accent2">
-                  Schválit v{job.version} a vyrenderovat finál
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Logos the Editor can drop into a video on its own (assets/icons in the studio; build.mjs BRAND colors).
-const EDITOR_LOGOS = [{"id": "onlyfans", "label": "OnlyFans", "bg": "#00AFF0", "dark": false, "d": "M24 4.003h-4.015c-3.45 0-5.3.197-6.748 1.957a7.996 7.996 0 1 0 2.103 9.211c3.182-.231 5.39-2.134 6.085-5.173 0 0-2.399.585-4.43 0 4.018-.777 6.333-3.037 7.005-5.995zM5.61 11.999A2.391 2.391 0 0 1 9.28 9.97a2.966 2.966 0 0 1 2.998-2.528h.008c-.92 1.778-1.407 3.352-1.998 5.263A2.392 2.392 0 0 1 5.61 12Zm2.386-7.996a7.996 7.996 0 1 0 7.996 7.996 7.996 7.996 0 0 0-7.996-7.996Zm0 10.394A2.399 2.399 0 1 1 10.395 12a2.396 2.396 0 0 1-2.399 2.398Z"}, {"id": "instagram", "label": "Instagram", "bg": "linear-gradient(45deg,#feda75 0%,#fa7e1e 25%,#d62976 50%,#962fbf 75%,#4f5bd5 100%)", "dark": false, "d": "M7.0301.084c-1.2768.0602-2.1487.264-2.911.5634-.7888.3075-1.4575.72-2.1228 1.3877-.6652.6677-1.075 1.3368-1.3802 2.127-.2954.7638-.4956 1.6365-.552 2.914-.0564 1.2775-.0689 1.6882-.0626 4.947.0062 3.2586.0206 3.6671.0825 4.9473.061 1.2765.264 2.1482.5635 2.9107.308.7889.72 1.4573 1.388 2.1228.6679.6655 1.3365 1.0743 2.1285 1.38.7632.295 1.6361.4961 2.9134.552 1.2773.056 1.6884.069 4.9462.0627 3.2578-.0062 3.668-.0207 4.9478-.0814 1.28-.0607 2.147-.2652 2.9098-.5633.7889-.3086 1.4578-.72 2.1228-1.3881.665-.6682 1.0745-1.3378 1.3795-2.1284.2957-.7632.4966-1.636.552-2.9124.056-1.2809.0692-1.6898.063-4.948-.0063-3.2583-.021-3.6668-.0817-4.9465-.0607-1.2797-.264-2.1487-.5633-2.9117-.3084-.7889-.72-1.4568-1.3876-2.1228C21.2982 1.33 20.628.9208 19.8378.6165 19.074.321 18.2017.1197 16.9244.0645 15.6471.0093 15.236-.005 11.977.0014 8.718.0076 8.31.0215 7.0301.0839m.1402 21.6932c-1.17-.0509-1.8053-.2453-2.2287-.408-.5606-.216-.96-.4771-1.3819-.895-.422-.4178-.6811-.8186-.9-1.378-.1644-.4234-.3624-1.058-.4171-2.228-.0595-1.2645-.072-1.6442-.079-4.848-.007-3.2037.0053-3.583.0607-4.848.05-1.169.2456-1.805.408-2.2282.216-.5613.4762-.96.895-1.3816.4188-.4217.8184-.6814 1.3783-.9003.423-.1651 1.0575-.3614 2.227-.4171 1.2655-.06 1.6447-.072 4.848-.079 3.2033-.007 3.5835.005 4.8495.0608 1.169.0508 1.8053.2445 2.228.408.5608.216.96.4754 1.3816.895.4217.4194.6816.8176.9005 1.3787.1653.4217.3617 1.056.4169 2.2263.0602 1.2655.0739 1.645.0796 4.848.0058 3.203-.0055 3.5834-.061 4.848-.051 1.17-.245 1.8055-.408 2.2294-.216.5604-.4763.96-.8954 1.3814-.419.4215-.8181.6811-1.3783.9-.4224.1649-1.0577.3617-2.2262.4174-1.2656.0595-1.6448.072-4.8493.079-3.2045.007-3.5825-.006-4.848-.0608M16.953 5.5864A1.44 1.44 0 1 0 18.39 4.144a1.44 1.44 0 0 0-1.437 1.4424M5.8385 12.012c.0067 3.4032 2.7706 6.1557 6.173 6.1493 3.4026-.0065 6.157-2.7701 6.1506-6.1733-.0065-3.4032-2.771-6.1565-6.174-6.1498-3.403.0067-6.156 2.771-6.1496 6.1738M8 12.0077a4 4 0 1 1 4.008 3.9921A3.9996 3.9996 0 0 1 8 12.0077"}, {"id": "x", "label": "X", "bg": "#000000", "dark": false, "d": "M14.234 10.162 22.977 0h-2.072l-7.591 8.824L7.251 0H.258l9.168 13.343L.258 24H2.33l8.016-9.318L16.749 24h6.993zm-2.837 3.299-.929-1.329L3.076 1.56h3.182l5.965 8.532.929 1.329 7.754 11.09h-3.182z"}, {"id": "tiktok", "label": "TikTok", "bg": "#000000", "dark": false, "d": "M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"}, {"id": "threads", "label": "Threads", "bg": "#000000", "dark": false, "d": "M18.263 11.097c-.03-3.486-1.92-5.586-5.111-5.586-2.13 0-3.922.963-4.863 2.499l2.062 1.438c.535-.843 1.272-1.543 2.628-1.543 1.528 0 2.318.85 2.544 2.431a15 15 0 0 0-2.236-.173c-4.125 0-6.068 1.867-6.068 4.336s1.943 3.99 4.804 3.99c3.139 0 5.013-2.115 5.781-4.735.798.361 1.348 1.204 1.348 2.47 0 3.387-3.907 5.232-7.22 5.232-4.885 0-8.077-3.207-8.077-8.424 0-6.392 4.223-10.487 9.9-10.487 3.808 0 5.69 1.671 6.97 3.914l2.108-1.475C21.44 2.078 18.331 0 13.663 0 6.227 0 1.168 5.277 1.168 12.934c0 7 4.953 11.066 10.856 11.066 4.878 0 9.809-2.846 9.809-7.716 0-2.545-1.46-4.231-3.569-5.187m-6.33 4.855c-1.077 0-2.026-.512-2.026-1.453 0-1.483 1.822-1.934 3.606-1.934.678 0 1.34.045 1.927.173-.422 1.927-1.671 3.215-3.508 3.214Z"}, {"id": "reddit", "label": "Reddit", "bg": "#FF4500", "dark": false, "d": "M12 0C5.373 0 0 5.373 0 12c0 3.314 1.343 6.314 3.515 8.485l-2.286 2.286C.775 23.225 1.097 24 1.738 24H12c6.627 0 12-5.373 12-12S18.627 0 12 0Zm4.388 3.199c1.104 0 1.999.895 1.999 1.999 0 1.105-.895 2-1.999 2-.946 0-1.739-.657-1.947-1.539v.002c-1.147.162-2.032 1.15-2.032 2.341v.007c1.776.067 3.4.567 4.686 1.363.473-.363 1.064-.58 1.707-.58 1.547 0 2.802 1.254 2.802 2.802 0 1.117-.655 2.081-1.601 2.531-.088 3.256-3.637 5.876-7.997 5.876-4.361 0-7.905-2.617-7.998-5.87-.954-.447-1.614-1.415-1.614-2.538 0-1.548 1.255-2.802 2.803-2.802.645 0 1.239.218 1.712.585 1.275-.79 2.881-1.291 4.64-1.365v-.01c0-1.663 1.263-3.034 2.88-3.207.188-.911.993-1.595 1.959-1.595Zm-8.085 8.376c-.784 0-1.459.78-1.506 1.797-.047 1.016.64 1.429 1.426 1.429.786 0 1.371-.369 1.418-1.385.047-1.017-.553-1.841-1.338-1.841Zm7.406 0c-.786 0-1.385.824-1.338 1.841.047 1.017.634 1.385 1.418 1.385.785 0 1.473-.413 1.426-1.429-.046-1.017-.721-1.797-1.506-1.797Zm-3.703 4.013c-.974 0-1.907.048-2.77.135-.147.015-.241.168-.183.305.483 1.154 1.622 1.964 2.953 1.964 1.33 0 2.47-.81 2.953-1.964.057-.137-.037-.29-.184-.305-.863-.087-1.795-.135-2.769-.135Z"}, {"id": "telegram", "label": "Telegram", "bg": "#26A5E4", "dark": false, "d": "M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"}, {"id": "youtube", "label": "YouTube", "bg": "#FF0000", "dark": false, "d": "M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"}, {"id": "snapchat", "label": "Snapchat", "bg": "#FFFC00", "dark": true, "d": "M12.206.793c.99 0 4.347.276 5.93 3.821.529 1.193.403 3.219.299 4.847l-.003.06c-.012.18-.022.345-.03.51.075.045.203.09.401.09.3-.016.659-.12 1.033-.301.165-.088.344-.104.464-.104.182 0 .359.029.509.09.45.149.734.479.734.838.015.449-.39.839-1.213 1.168-.089.029-.209.075-.344.119-.45.135-1.139.36-1.333.81-.09.224-.061.524.12.868l.015.015c.06.136 1.526 3.475 4.791 4.014.255.044.435.27.42.509 0 .075-.015.149-.045.225-.24.569-1.273.988-3.146 1.271-.059.091-.12.375-.164.57-.029.179-.074.36-.134.553-.076.271-.27.405-.555.405h-.03c-.135 0-.313-.031-.538-.074-.36-.075-.765-.135-1.273-.135-.3 0-.599.015-.913.074-.6.104-1.123.464-1.723.884-.853.599-1.826 1.288-3.294 1.288-.06 0-.119-.015-.18-.015h-.149c-1.468 0-2.427-.675-3.279-1.288-.599-.42-1.107-.779-1.707-.884-.314-.045-.629-.074-.928-.074-.54 0-.958.089-1.272.149-.211.043-.391.074-.54.074-.374 0-.523-.224-.583-.42-.061-.192-.09-.389-.135-.567-.046-.181-.105-.494-.166-.57-1.918-.222-2.95-.642-3.189-1.226-.031-.063-.052-.15-.055-.225-.015-.243.165-.465.42-.509 3.264-.54 4.73-3.879 4.791-4.02l.016-.029c.18-.345.224-.645.119-.869-.195-.434-.884-.658-1.332-.809-.121-.029-.24-.074-.346-.119-1.107-.435-1.257-.93-1.197-1.273.09-.479.674-.793 1.168-.793.146 0 .27.029.383.074.42.194.789.3 1.104.3.234 0 .384-.06.465-.105l-.046-.569c-.098-1.626-.225-3.651.307-4.837C7.392 1.077 10.739.807 11.727.807l.419-.015h.06z"}, {"id": "facebook", "label": "Facebook", "bg": "#0866FF", "dark": false, "d": "M9.101 23.691v-7.98H6.627v-3.667h2.474v-1.58c0-4.085 1.848-5.978 5.858-5.978.401 0 .955.042 1.468.103a8.68 8.68 0 0 1 1.141.195v3.325a8.623 8.623 0 0 0-.653-.036 26.805 26.805 0 0 0-.733-.009c-.707 0-1.259.096-1.675.309a1.686 1.686 0 0 0-.679.622c-.258.42-.374.995-.374 1.752v1.297h3.919l-.386 2.103-.287 1.564h-3.246v8.245C19.396 23.238 24 18.179 24 12.044c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.628 3.874 10.35 9.101 11.647Z"}, {"id": "whatsapp", "label": "WhatsApp", "bg": "#25D366", "dark": false, "d": "M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"}, {"id": "discord", "label": "Discord", "bg": "#5865F2", "dark": false, "d": "M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"}, {"id": "twitch", "label": "Twitch", "bg": "#9146FF", "dark": false, "d": "M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"}, {"id": "pinterest", "label": "Pinterest", "bg": "#E60023", "dark": false, "d": "M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.162-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.957 1.406-5.957s-.359-.72-.359-1.781c0-1.663.967-2.911 2.168-2.911 1.024 0 1.518.769 1.518 1.688 0 1.029-.653 2.567-.992 3.992-.285 1.193.6 2.165 1.775 2.165 2.128 0 3.768-2.245 3.768-5.487 0-2.861-2.063-4.869-5.008-4.869-3.41 0-5.409 2.562-5.409 5.199 0 1.033.394 2.143.889 2.741.099.12.112.225.085.345-.09.375-.293 1.199-.334 1.363-.053.225-.172.271-.401.165-1.495-.69-2.433-2.878-2.433-4.646 0-3.776 2.748-7.252 7.92-7.252 4.158 0 7.392 2.967 7.392 6.923 0 4.135-2.607 7.462-6.233 7.462-1.214 0-2.354-.629-2.758-1.379l-.749 2.848c-.269 1.045-1.004 2.352-1.498 3.146 1.123.345 2.306.535 3.55.535 6.607 0 11.985-5.365 11.985-11.987C23.97 5.39 18.592.026 11.985.026L12.017 0z"}, {"id": "linkedin", "label": "LinkedIn", "bg": "#0A66C2", "dark": false, "d": "M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"}, {"id": "bluesky", "label": "Bluesky", "bg": "#1185FE", "dark": false, "d": "M5.202 2.857C7.954 4.922 10.913 9.11 12 11.358c1.087-2.247 4.046-6.436 6.798-8.501C20.783 1.366 24 .213 24 3.883c0 .732-.42 6.156-.667 7.037-.856 3.061-3.978 3.842-6.755 3.37 4.854.826 6.089 3.562 3.422 6.299-5.065 5.196-7.28-1.304-7.847-2.97-.104-.305-.152-.448-.153-.327 0-.121-.05.022-.153.327-.568 1.666-2.782 8.166-7.847 2.97-2.667-2.737-1.432-5.473 3.422-6.3-2.777.473-5.899-.308-6.755-3.369C.42 10.04 0 4.615 0 3.883c0-3.67 3.217-2.517 5.202-1.026"}, {"id": "kick", "label": "Kick", "bg": "#53FC18", "dark": true, "d": "M1.333 0h8v5.333H12V2.667h2.667V0h8v8H20v2.667h-2.667v2.666H20V16h2.667v8h-8v-2.667H12v-2.666H9.333V24h-8Z"}, {"id": "linktree", "label": "Linktree", "bg": "#43E660", "dark": true, "d": "m13.73635 5.85251 4.00467-4.11665 2.3248 2.3808-4.20064 4.00466h5.9085v3.30473h-5.9365l4.22865 4.10766-2.3248 2.3338L12.0005 12.099l-5.74052 5.76852-2.3248-2.3248 4.22864-4.10766h-5.9375V8.12132h5.9085L3.93417 4.11666l2.3248-2.3808 4.00468 4.11665V0h3.4727zm-3.4727 10.30614h3.4727V24h-3.4727z"}, {"id": "patreon", "label": "Patreon", "bg": "#FF424D", "dark": false, "d": "M22.957 7.21c-.004-3.064-2.391-5.576-5.191-6.482-3.478-1.125-8.064-.962-11.384.604C2.357 3.231 1.093 7.391 1.046 11.54c-.039 3.411.302 12.396 5.369 12.46 3.765.047 4.326-4.804 6.068-7.141 1.24-1.662 2.836-2.132 4.801-2.618 3.376-.836 5.678-3.501 5.673-7.031Z"}, {"id": "spotify", "label": "Spotify", "bg": "#1DB954", "dark": false, "d": "M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"}, {"id": "signal", "label": "Signal", "bg": "#3A76F0", "dark": false, "d": "M12 0q-.934 0-1.83.139l.17 1.111a11 11 0 0 1 3.32 0l.172-1.111A12 12 0 0 0 12 0M9.152.34A12 12 0 0 0 5.77 1.742l.584.961a10.8 10.8 0 0 1 3.066-1.27zm5.696 0-.268 1.094a10.8 10.8 0 0 1 3.066 1.27l.584-.962A12 12 0 0 0 14.848.34M12 2.25a9.75 9.75 0 0 0-8.539 14.459c.074.134.1.292.064.441l-1.013 4.338 4.338-1.013a.62.62 0 0 1 .441.064A9.7 9.7 0 0 0 12 21.75c5.385 0 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25m-7.092.068a12 12 0 0 0-2.59 2.59l.909.664a11 11 0 0 1 2.345-2.345zm14.184 0-.664.909a11 11 0 0 1 2.345 2.345l.909-.664a12 12 0 0 0-2.59-2.59M1.742 5.77A12 12 0 0 0 .34 9.152l1.094.268a10.8 10.8 0 0 1 1.269-3.066zm20.516 0-.961.584a10.8 10.8 0 0 1 1.27 3.066l1.093-.268a12 12 0 0 0-1.402-3.383M.138 10.168A12 12 0 0 0 0 12q0 .934.139 1.83l1.111-.17A11 11 0 0 1 1.125 12q0-.848.125-1.66zm23.723.002-1.111.17q.125.812.125 1.66c0 .848-.042 1.12-.125 1.66l1.111.172a12.1 12.1 0 0 0 0-3.662M1.434 14.58l-1.094.268a12 12 0 0 0 .96 2.591l-.265 1.14 1.096.255.36-1.539-.188-.365a10.8 10.8 0 0 1-.87-2.35m21.133 0a10.8 10.8 0 0 1-1.27 3.067l.962.584a12 12 0 0 0 1.402-3.383zm-1.793 3.848a11 11 0 0 1-2.345 2.345l.664.909a12 12 0 0 0 2.59-2.59zm-19.959 1.1L.357 21.48a1.8 1.8 0 0 0 2.162 2.161l1.954-.455-.256-1.095-1.953.455a.675.675 0 0 1-.81-.81l.454-1.954zm16.832 1.769a10.8 10.8 0 0 1-3.066 1.27l.268 1.093a12 12 0 0 0 3.382-1.402zm-10.94.213-1.54.36.256 1.095 1.139-.266c.814.415 1.683.74 2.591.961l.268-1.094a10.8 10.8 0 0 1-2.35-.869zm3.634 1.24-.172 1.111a12.1 12.1 0 0 0 3.662 0l-.17-1.111q-.812.125-1.66.125a11 11 0 0 1-1.66-.125"}, {"id": "paypal", "label": "PayPal", "bg": "#003087", "dark": false, "d": "M15.607 4.653H8.941L6.645 19.251H1.82L4.862 0h7.995c3.754 0 6.375 2.294 6.473 5.513-.648-.478-2.105-.86-3.722-.86m6.57 5.546c0 3.41-3.01 6.853-6.958 6.853h-2.493L11.595 24H6.74l1.845-11.538h3.592c4.208 0 7.346-3.634 7.153-6.949a5.24 5.24 0 0 1 2.848 4.686M9.653 5.546h6.408c.907 0 1.942.222 2.363.541-.195 2.741-2.655 5.483-6.441 5.483H8.714Z"}, {"id": "cashapp", "label": "Cash App", "bg": "#00D632", "dark": false, "d": "M23.59 3.475a5.1 5.1 0 00-3.05-3.05c-1.31-.42-2.5-.42-4.92-.42H8.36c-2.4 0-3.61 0-4.9.4a5.1 5.1 0 00-3.05 3.06C0 4.765 0 5.965 0 8.365v7.27c0 2.41 0 3.6.4 4.9a5.1 5.1 0 003.05 3.05c1.3.41 2.5.41 4.9.41h7.28c2.41 0 3.61 0 4.9-.4a5.1 5.1 0 003.06-3.06c.41-1.3.41-2.5.41-4.9v-7.25c0-2.41 0-3.61-.41-4.91zm-6.17 4.63l-.93.93a.5.5 0 01-.67.01 5 5 0 00-3.22-1.18c-.97 0-1.94.32-1.94 1.21 0 .9 1.04 1.2 2.24 1.65 2.1.7 3.84 1.58 3.84 3.64 0 2.24-1.74 3.78-4.58 3.95l-.26 1.2a.49.49 0 01-.48.39H9.63l-.09-.01a.5.5 0 01-.38-.59l.28-1.27a6.54 6.54 0 01-2.88-1.57v-.01a.48.48 0 010-.68l1-.97a.49.49 0 01.67 0c.91.86 2.13 1.34 3.39 1.32 1.3 0 2.17-.55 2.17-1.42 0-.87-.88-1.1-2.54-1.72-1.76-.63-3.43-1.52-3.43-3.6 0-2.42 2.01-3.6 4.39-3.71l.25-1.23a.48.48 0 01.48-.38h1.78l.1.01c.26.06.43.31.37.57l-.27 1.37c.9.3 1.75.77 2.48 1.39l.02.02c.19.2.19.5 0 .68z"}];
-
-function EditorBroll({ worker }) {
-  const { items, reload } = useEditBroll();
-  const [open, setOpen] = useState(false);
-  const [files, setFiles] = useState([]);
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState("");
-  const [error, setError] = useState("");
-  const inputRef = useRef(null);
-
-  const add = async () => {
-    if (!files.length || !note.trim()) return;
-    setError("");
-    try {
-      for (let i = 0; i < files.length; i++) {
-        setBusy(`Nahrávám ${i + 1} / ${files.length}`);
-        await editUpload(files[i], "broll", note.trim());
-      }
-      setFiles([]); setNote("");
-      reload();
-    } catch (e) { setError(e.message || "Nahrání selhalo"); }
-    setBusy("");
-  };
-  const removeItem = async (it) => {
-    if (!window.confirm("Odebrat záběr z knihovny? Soubor na Macu se smaže.")) return;
-    await fetch(`${EDIT_WORKER_URL}/broll-delete?id=${encodeURIComponent(it.id)}`, { method: "POST" }).catch(() => {});
-    reload();
-  };
-  const card = { background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.08)" };
-  return (
-    <div className="rounded-2xl p-4" style={card}>
-      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between">
-        <span className="flex items-center gap-2">
-          <Film size={14} className="c-accent" />
-          <span className="fs-12 font-semibold c-text">B-roll knihovna</span>
-          <span className="fs-10 font-mono c-faint">{items.length} {items.length === 1 ? "záběr" : "záběrů"}</span>
-        </span>
-        <ChevronDown size={14} className={`c-muted transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && (
-        <div className="mt-3">
-          <p className="fs-11 c-muted mb-3">
-            Skutečné záběry a screenshoty, které Editor smí vložit do videa. Použije je jen tam, kde to sedí k řečenému, podle popisku. Nic si nevymýšlí.
-          </p>
-          <div className="mb-4">
-            <div className="fs-9 font-mono uppercase c-faint mb-1.5">Loga a ikony, které Editor umí sám ({EDITOR_LOGOS.length})</div>
-            <div className="flex flex-wrap gap-2">
-              {EDITOR_LOGOS.map((l) => (
-                <div key={l.id} className="flex flex-col items-center gap-1" style={{ width: 62 }} title={`ikona "${l.id}"`}>
-                  <span className="rounded-xl flex items-center justify-center" style={{ width: 40, height: 40, background: l.bg }}>
-                    <svg viewBox="0 0 24 24" width="24" height="24"><path fill={l.dark ? "#000" : "#fff"} d={l.d} /></svg>
-                  </span>
-                  <span className="fs-9 font-mono c-muted truncate w-full text-center">{l.label}</span>
-                </div>
-              ))}
-            </div>
-            <div className="fs-10 c-faint mt-1.5">Vloží je podle toho, co ve videu zazní (třeba "Instagram" nebo "OnlyFans"). Další logo, které tu chybí (např. Fansly), nahraj níž jako b-roll s popiskem.</div>
-          </div>
-          {worker.localOk ? (
-            <div className="rounded-xl p-3 mb-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-              <input ref={inputRef} type="file" multiple accept="image/*,video/*" className="hidden"
-                onChange={(e) => { setFiles(Array.from(e.target.files || [])); e.target.value = ""; }} />
-              <div className="flex gap-2 flex-wrap items-center mb-2">
-                <button onClick={() => inputRef.current && inputRef.current.click()}
-                  className="fs-10 font-mono uppercase px-3 py-1.5 rounded-lg border c-border c-text">{files.length ? `${files.length} souborů vybráno` : "Vybrat soubory"}</button>
-                <input value={note} onChange={(e) => setNote(e.target.value)} placeholder='popisek, např. "screenshot výplaty za říjen"'
-                  className="flex-1 minw-180 c-bg-app border c-border rounded-lg px-2.5 py-1.5 fs-12 c-text outline-none focus-border-accent" />
-                <button onClick={add} disabled={!files.length || !note.trim() || !!busy}
-                  className="px-3 py-1.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase font-semibold disabled:opacity-40">{busy || "Přidat"}</button>
-              </div>
-              {error && <div className="fs-11 font-mono" style={{ color: "#e07a5f" }}>{error}</div>}
-            </div>
-          ) : (
-            <a href={`${EDIT_WORKER_URL}/broll`} target="_blank" rel="noreferrer"
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg c-bg-accent c-onaccent fs-10 font-mono uppercase font-semibold mb-3">
-              <ExternalLink size={12} /> Spravovat b-roll na Macu
-            </a>
-          )}
-          {items.length === 0 ? (
-            <div className="fs-11 c-faint font-mono italic">Zatím nic.</div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
-              {items.map((it) => (
-                <div key={it.id} className="rounded-xl p-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                  {worker.localOk ? (
-                    it.kind === "video"
-                      ? <video src={`${EDIT_WORKER_URL}/broll-file/${encodeURIComponent(it.file)}#t=0.1`} muted playsInline preload="metadata" className="w-full rounded-lg bg-black object-cover" style={{ aspectRatio: "9/16" }} />
-                      : <img src={`${EDIT_WORKER_URL}/broll-file/${encodeURIComponent(it.file)}`} alt="" className="w-full rounded-lg object-cover" style={{ aspectRatio: "9/16" }} />
-                  ) : (
-                    <a href={`${EDIT_WORKER_URL}/broll-file/${encodeURIComponent(it.file)}`} target="_blank" rel="noreferrer"
-                      className="w-full rounded-lg flex flex-col items-center justify-center gap-2 fs-10 font-mono c-accent hover-accent-text"
-                      style={{ aspectRatio: "9/16", background: "#0a0d0c", border: "1px dashed rgba(57,230,115,0.35)" }}>
-                      {it.kind === "video" ? <Play size={20} /> : <ExternalLink size={18} />}Otevřít na Macu
-                    </a>
-                  )}
-                  <div className="fs-11 c-text mt-1.5 line-clamp-2">{it.note || "bez popisku"}</div>
-                  <div className="fs-9 font-mono c-faint truncate">{it.file}</div>
-                  {worker.localOk && <button onClick={() => removeItem(it)} className="fs-9 font-mono uppercase c-muted hover-warn mt-1">Odebrat</button>}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function EditorRefs({ worker }) {
-  const { items, reload } = useEditRefs();
-  const [open, setOpen] = useState(false);
-  const [file, setFile] = useState(null);
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const inputRef = useRef(null);
-  const add = async () => {
-    if (!file) return;
-    setBusy(true); setError("");
-    try {
-      await editUpload(file, "reference", name.trim() || file.name.replace(/\.[^.]+$/, ""));
-      setFile(null); setName("");
-      reload();
-    } catch (e) { setError(e.message || "Nahrání selhalo"); }
-    setBusy(false);
-  };
-  const removeItem = async (it) => {
-    if (!window.confirm("Odebrat referenci? Soubor na Macu se smaže.")) return;
-    await fetch(`${EDIT_WORKER_URL}/ref-delete?id=${encodeURIComponent(it.id)}`, { method: "POST" }).catch(() => {});
-    reload();
-  };
-  const card = { background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.08)" };
-  return (
-    <div className="rounded-2xl p-4" style={card}>
-      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between">
-        <span className="flex items-center gap-2">
-          <Play size={14} className="c-accent" />
-          <span className="fs-12 font-semibold c-text">Reference</span>
-          <span className="fs-10 font-mono c-faint">{items.length} uložených</span>
-        </span>
-        <ChevronDown size={14} className={`c-muted transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && (
-        <div className="mt-3">
-          <p className="fs-11 c-muted mb-3">
-            Reely, podle kterých se má střih řídit (tempo, zoomy, titulky, délka). Nahraješ je jednou, uloží se a u každého nového střihu jen vybereš, kterou použít.
-          </p>
-          {worker.localOk ? (
-            <div className="rounded-xl p-3 mb-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-              <input ref={inputRef} type="file" accept="video/*,.mov,.mp4,.m4v,.mkv,.webm" className="hidden"
-                onChange={(e) => { const f = (e.target.files && e.target.files[0]) || null; setFile(f); if (f && !name) setName(f.name.replace(/\.[^.]+$/, "")); e.target.value = ""; }} />
-              <div className="flex gap-2 flex-wrap items-center">
-                <button onClick={() => inputRef.current && inputRef.current.click()}
-                  className="fs-10 font-mono uppercase px-3 py-1.5 rounded-lg border c-border c-text">{file ? file.name : "Vybrat video"}</button>
-                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="název, např. Rychlý hook"
-                  className="flex-1 minw-180 c-bg-app border c-border rounded-lg px-2.5 py-1.5 fs-12 c-text outline-none focus-border-accent" />
-                <button onClick={add} disabled={!file || busy}
-                  className="px-3 py-1.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase font-semibold disabled:opacity-40">{busy ? "Nahrávám…" : "Uložit"}</button>
-              </div>
-              {error && <div className="fs-11 font-mono mt-2" style={{ color: "#e07a5f" }}>{error}</div>}
-            </div>
-          ) : (
-            <a href={`${EDIT_WORKER_URL}/refs`} target="_blank" rel="noreferrer"
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg c-bg-accent c-onaccent fs-10 font-mono uppercase font-semibold mb-3">
-              <ExternalLink size={12} /> Spravovat reference na Macu
-            </a>
-          )}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            {items.map((it) => (
-              <div key={it.id} className="rounded-xl p-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                {worker.localOk
-                  ? <video src={`${EDIT_WORKER_URL}/ref-file/${it.path}#t=0.1`} muted playsInline preload="metadata" controls className="w-full rounded-lg bg-black object-cover" style={{ aspectRatio: "9/16" }} />
-                  : (
-                    <a href={`${EDIT_WORKER_URL}/ref-file/${it.path}`} target="_blank" rel="noreferrer"
-                      className="w-full rounded-lg flex flex-col items-center justify-center gap-2 fs-10 font-mono c-accent hover-accent-text"
-                      style={{ aspectRatio: "9/16", background: "#0a0d0c", border: "1px dashed rgba(57,230,115,0.35)" }}>
-                      <Play size={22} />Přehrát na Macu
-                    </a>
-                  )}
-                <div className="fs-11 c-text mt-1.5 line-clamp-2">{it.name}</div>
-                {it.builtin
-                  ? <div className="fs-9 font-mono c-faint">základní</div>
-                  : worker.localOk && <button onClick={() => removeItem(it)} className="fs-9 font-mono uppercase c-muted hover-warn mt-1">Odebrat</button>}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// The full editor (player, timeline, inspector) is served by the worker on the Mac and embedded here,
-// so the video, uploads and timeline are same-origin there and never need cross-site access to the Mac.
-// Browsers that block an https page from embedding http://127.0.0.1 (Safari, locked-down Chrome) get
-// the lightweight page below plus a button that opens the same editor in its own window.
-function EditorPage({ models }) {
-  const worker = useEditWorker();
-  const [embed, setEmbed] = useState("loading"); // loading | ready | failed
-  // Two ways to name the same loopback server; some browsers treat one of them as safe to embed and not the other.
-  const HOSTS = [EDIT_WORKER_URL, "http://localhost:4799"];
-  const [hostIdx, setHostIdx] = useState(0);
-  useEffect(() => {
-    const onMsg = (e) => { if (HOSTS.includes(e.origin) && e.data && e.data.type === "strizna-ready") setEmbed("ready"); };
-    window.addEventListener("message", onMsg);
-    return () => window.removeEventListener("message", onMsg);
-  }, []);
-  useEffect(() => {
-    if (!worker.online || embed !== "loading") return;
-    const t = setTimeout(() => {
-      if (hostIdx < HOSTS.length - 1) setHostIdx(hostIdx + 1);
-      else setEmbed((s) => (s === "ready" ? s : "failed"));
-    }, 5000);
-    return () => clearTimeout(t);
-  }, [worker.online, embed, hostIdx]);
-  const browserName = (() => {
-    const ua = navigator.userAgent;
-    if (/Claude/i.test(ua)) return "prohlížeč v aplikaci Claude";
-    if (/Edg\//.test(ua)) return "Edge";
-    if (/Firefox\//.test(ua)) return "Firefox";
-    if (/Chrome\//.test(ua)) return "Chrome";
-    if (/Safari\//.test(ua)) return "Safari";
-    return "tenhle prohlížeč";
-  })();
-
-  const openBtn = (
-    <a href={`${EDIT_WORKER_URL}/app`} target="_blank" rel="noreferrer"
-      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg c-bg-accent c-onaccent fs-11 font-mono uppercase font-semibold hover-bg-accent2">
-      <ExternalLink size={13} /> Otevřít Editor v samostatném okně
-    </a>
-  );
-  if (!worker.checked) return <div className="fs-12 c-faint font-mono">Zjišťuju stav Macu…</div>;
-  if (!worker.online || embed === "failed") {
-    return (
-      <div className="flex flex-col gap-3">
-        {worker.online && (
-          <div className="rounded-2xl p-4 flex items-center justify-between gap-3 flex-wrap" style={{ background: "rgba(57,230,115,0.06)", border: "1px solid rgba(57,230,115,0.3)" }}>
-            <div className="fs-12 c-text" style={{ maxWidth: 560 }}>
-              Plný Editor (přehrávač, timeline) {browserName} do stránky vložit nedovolí. Otevři ho v samostatném okně na Macu, je to ten samý Editor.
-            </div>
-            {openBtn}
-          </div>
-        )}
-        <EditorFallback models={models} />
-      </div>
-    );
-  }
-  return (
-    <div className="flex flex-col gap-2">
-      {embed !== "ready" && <EditWorkerChip worker={worker} />}
-      <div className="relative rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(57,230,115,0.16)", height: "calc(100vh - 130px)", minHeight: 680, background: "#07090a" }}>
-        <iframe key={hostIdx} title="Editor" src={`${HOSTS[hostIdx]}/app`} allow="local-network-access *; fullscreen; autoplay; clipboard-write"
-          className="absolute inset-0 w-full h-full" style={{ border: 0 }} />
-        {embed === "loading" && (
-          <div className="absolute inset-0 flex items-center justify-center fs-12 font-mono c-faint pointer-events-none" style={{ background: "#07090a" }}>
-            <Loader2 size={14} className="animate-spin mr-2" /> Načítám Editor z Macu…
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function EditorFallback({ models }) {
-  const { jobs, loading, patch, remove } = useEditJobs();
-  const worker = useEditWorker();
-  const [selectedId, setSelectedId] = useState(null);
-  const [creating, setCreating] = useState(true); // always opens clean, ready for a new raw
-  const formRef = useRef(null);
-  const viaMacPage = worker.checked && worker.online && !worker.localOk;
-  const newCutBtn = "flex items-center gap-1.5 fs-11 font-mono uppercase tracking-wide c-bg-accent c-onaccent px-3 py-1.5 rounded-lg font-semibold hover-bg-accent2";
-
-  const selected = jobs.find((j) => j.id === selectedId);
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <EditWorkerChip worker={worker} />
-        {viaMacPage ? (
-          <a href={`${EDIT_WORKER_URL}/new`} target="_blank" rel="noreferrer" className={newCutBtn}>
-            <Plus size={13} /> Nový střih
+          <a href={`${EDIT_WORKER_URL}/app`} target="_blank" rel="noreferrer"
+            className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-xl c-bg-accent c-onaccent text-sm font-mono uppercase tracking-wide font-bold hover-bg-accent2"
+            style={{ boxShadow: "0 0 24px rgba(57,230,115,0.3)" }}>
+            <ExternalLink size={16} /> Otevřít Editor
           </a>
-        ) : (
-          <button onClick={() => {
-            setCreating(true); setSelectedId(null);
-            setTimeout(() => formRef.current && formRef.current.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
-          }} className={newCutBtn}>
-            <Plus size={13} /> Nový střih
-          </button>
         )}
+        <div className="fs-10 font-mono c-faint mt-3">Otevře se v novém okně. Funguje v prohlížeči na tom Macu, kde běží pracant, video nikdy neopustí Mac.</div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4 items-start">
+      <div className="rounded-3xl p-5" style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.08)" }}>
+        <div className="flex items-center justify-between mb-3">
+          <span className="fs-11 uppercase tracking-widest c-muted font-mono">Poslední střihy</span>
+          {waiting > 0 && <span className="fs-10 font-mono uppercase px-2 py-0.5 rounded-full" style={{ color: "#D9B45B", background: "rgba(217,180,91,0.12)", border: "1px solid rgba(217,180,91,0.4)" }}>{waiting} čeká na tebe</span>}
+        </div>
+        {loading && <div className="fs-11 c-faint font-mono">Načítám…</div>}
+        {!loading && jobs.length === 0 && <div className="fs-12 c-faint font-mono italic">Zatím žádný střih. Otevři Editor a nahraj první raw video.</div>}
         <div className="flex flex-col gap-1.5">
-          {loading && <div className="fs-11 c-faint font-mono">Načítám…</div>}
-          {!loading && jobs.length === 0 && !creating && <div className="fs-11 c-faint font-mono italic">Zatím žádné střihy. Nahraj první raw video.</div>}
           {jobs.map((j) => (
-            <button key={j.id} onClick={() => { setSelectedId(j.id); setCreating(false); }}
-              className="text-left rounded-xl p-3 tap transition-colors"
-              style={{ background: j.id === selectedId && !creating ? "rgba(57,230,115,0.08)" : "rgba(255,255,255,0.025)", border: `1px solid ${j.id === selectedId && !creating ? "rgba(57,230,115,0.4)" : "rgba(255,255,255,0.08)"}` }}>
-              <div className="fs-12 font-semibold c-text truncate mb-1">{j.title}</div>
-              <div className="flex items-center justify-between gap-2">
-                <EditStatusChip status={j.status} />
-                <span className="fs-9 font-mono c-faint truncate">{j.model || ""}</span>
-              </div>
-            </button>
+            <a key={j.id} href={offline ? undefined : `${EDIT_WORKER_URL}/app#job=${encodeURIComponent(j.id)}`} target="_blank" rel="noreferrer"
+              className="flex items-center justify-between gap-3 rounded-xl px-3.5 py-2.5 tap"
+              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+              <span className="min-w-0">
+                <span className="block fs-13 c-text truncate">{j.title}</span>
+                {j.model && <span className="block fs-10 font-mono c-faint">{j.model}</span>}
+              </span>
+              <span className="flex items-center gap-2 flex-shrink-0"><EditStatusChip status={j.status} /><ChevronRight size={14} className="c-faint" /></span>
+            </a>
           ))}
         </div>
-
-        <div className="min-w-0" ref={formRef}>
-          {creating ? (
-            <EditorUploadForm models={models} worker={worker}
-              onCreated={(id) => { setCreating(false); setSelectedId(id); }}
-              onCancel={null} />
-          ) : selected ? (
-            <EditorJobDetail key={selected.id} job={selected} worker={worker} patch={patch} remove={remove} onClosed={() => setSelectedId(null)} />
-          ) : (
-            <div className="fs-12 c-faint font-mono italic py-10 text-center rounded-xl" style={{ border: "1px dashed rgba(255,255,255,0.12)" }}>
-              Vyber střih vlevo nebo založ nový.
-            </div>
-          )}
-        </div>
       </div>
-
-      <EditorRefs worker={worker} />
-      <EditorBroll worker={worker} />
     </div>
   );
 }
@@ -14223,7 +13344,7 @@ function App() {
               ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} inflowwDailyStats={inflowwDailyStats} inflowwSyncing={inflowwSyncing} refreshInfloww={refreshInfloww} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} settings={settings} />
               : <CreatorDashboard stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} ofDailyStats={ofDailyStats} inflowwDailyStats={inflowwDailyStats} />)}
             {currentView === "content" && <ContentDirector cards={isAdmin ? scopedCards : cards} persistCards={isAdmin ? scopedPersistCards : persistCards} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} forcedNetwork={contentPlatform} reels={isAdmin ? scopedReels : reels} persistReels={isAdmin ? scopedPersistReels : persistReels} xCompetitors={xCompetitors} persistXCompetitors={persistXCompetitors} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} inflowwDailyStats={inflowwDailyStats} igGraphStats={igGraphStats} igGraphMedia={igGraphMedia} igViralVariations={igViralVariations} />}
-            {currentView === "editor" && isAdmin && <EditorPage models={agencyModels} />}
+            {currentView === "editor" && isAdmin && <EditorPage />}
             {currentView === "calendar" && <CalendarView cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks} onNavigate={setView} restrictModel={restrictModel} />}
             {currentView === "tasks" && <TaskManager tasks={isAdmin ? scopedTasks : tasks} persistTasks={isAdmin ? scopedPersistTasks : persistTasks} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} />}
             {currentView === "stats" && <StatsManager stats={scopedStats} persistStats={scopedPersistStats} models={agencyModels} reels={scopedReels} persistReels={scopedPersistReels} />}
