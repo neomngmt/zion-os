@@ -4471,7 +4471,11 @@ function EditorBroll({ worker }) {
                       ? <video src={`${EDIT_WORKER_URL}/broll-file/${encodeURIComponent(it.file)}#t=0.1`} muted playsInline preload="metadata" className="w-full rounded-lg bg-black object-cover" style={{ aspectRatio: "9/16" }} />
                       : <img src={`${EDIT_WORKER_URL}/broll-file/${encodeURIComponent(it.file)}`} alt="" className="w-full rounded-lg object-cover" style={{ aspectRatio: "9/16" }} />
                   ) : (
-                    <div className="w-full rounded-lg flex items-center justify-center fs-9 font-mono c-faint" style={{ aspectRatio: "9/16", background: "#0a0d0c" }}>{it.kind === "video" ? "video" : "obrázek"}</div>
+                    <a href={`${EDIT_WORKER_URL}/broll-file/${encodeURIComponent(it.file)}`} target="_blank" rel="noreferrer"
+                      className="w-full rounded-lg flex flex-col items-center justify-center gap-2 fs-10 font-mono c-accent hover-accent-text"
+                      style={{ aspectRatio: "9/16", background: "#0a0d0c", border: "1px dashed rgba(57,230,115,0.35)" }}>
+                      {it.kind === "video" ? <Play size={20} /> : <ExternalLink size={18} />}Otevřít na Macu
+                    </a>
                   )}
                   <div className="fs-11 c-text mt-1.5 line-clamp-2">{it.note || "bez popisku"}</div>
                   <div className="fs-9 font-mono c-faint truncate">{it.file}</div>
@@ -4550,7 +4554,13 @@ function EditorRefs({ worker }) {
               <div key={it.id} className="rounded-xl p-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
                 {worker.localOk
                   ? <video src={`${EDIT_WORKER_URL}/ref-file/${it.path}#t=0.1`} muted playsInline preload="metadata" controls className="w-full rounded-lg bg-black object-cover" style={{ aspectRatio: "9/16" }} />
-                  : <div className="w-full rounded-lg flex items-center justify-center fs-9 font-mono c-faint" style={{ aspectRatio: "9/16", background: "#0a0d0c" }}>video</div>}
+                  : (
+                    <a href={`${EDIT_WORKER_URL}/ref-file/${it.path}`} target="_blank" rel="noreferrer"
+                      className="w-full rounded-lg flex flex-col items-center justify-center gap-2 fs-10 font-mono c-accent hover-accent-text"
+                      style={{ aspectRatio: "9/16", background: "#0a0d0c", border: "1px dashed rgba(57,230,115,0.35)" }}>
+                      <Play size={22} />Přehrát na Macu
+                    </a>
+                  )}
                 <div className="fs-11 c-text mt-1.5 line-clamp-2">{it.name}</div>
                 {it.builtin
                   ? <div className="fs-9 font-mono c-faint">základní</div>
@@ -4569,16 +4579,27 @@ function EditorPage({ models }) {
   const worker = useEditWorker();
   const [selectedId, setSelectedId] = useState(null);
   const [creating, setCreating] = useState(true); // always opens clean, ready for a new raw
+  const formRef = useRef(null);
+  const viaMacPage = worker.checked && worker.online && !worker.localOk;
+  const newCutBtn = "flex items-center gap-1.5 fs-11 font-mono uppercase tracking-wide c-bg-accent c-onaccent px-3 py-1.5 rounded-lg font-semibold hover-bg-accent2";
 
   const selected = jobs.find((j) => j.id === selectedId);
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <EditWorkerChip worker={worker} />
-        <button onClick={() => { setCreating(true); setSelectedId(null); }}
-          className="flex items-center gap-1.5 fs-11 font-mono uppercase tracking-wide c-bg-accent c-onaccent px-3 py-1.5 rounded-lg font-semibold hover-bg-accent2">
-          <Plus size={13} /> Nový střih
-        </button>
+        {viaMacPage ? (
+          <a href={`${EDIT_WORKER_URL}/new`} target="_blank" rel="noreferrer" className={newCutBtn}>
+            <Plus size={13} /> Nový střih
+          </a>
+        ) : (
+          <button onClick={() => {
+            setCreating(true); setSelectedId(null);
+            setTimeout(() => formRef.current && formRef.current.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+          }} className={newCutBtn}>
+            <Plus size={13} /> Nový střih
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4 items-start">
@@ -4598,7 +4619,7 @@ function EditorPage({ models }) {
           ))}
         </div>
 
-        <div className="min-w-0">
+        <div className="min-w-0" ref={formRef}>
           {creating ? (
             <EditorUploadForm models={models} worker={worker}
               onCreated={(id) => { setCreating(false); setSelectedId(id); }}
