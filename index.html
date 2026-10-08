@@ -4581,16 +4581,31 @@ function EditorRefs({ worker }) {
 function EditorPage({ models }) {
   const worker = useEditWorker();
   const [embed, setEmbed] = useState("loading"); // loading | ready | failed
+  // Two ways to name the same loopback server; some browsers treat one of them as safe to embed and not the other.
+  const HOSTS = [EDIT_WORKER_URL, "http://localhost:4799"];
+  const [hostIdx, setHostIdx] = useState(0);
   useEffect(() => {
-    const onMsg = (e) => { if (e.origin === EDIT_WORKER_URL && e.data && e.data.type === "strizna-ready") setEmbed("ready"); };
+    const onMsg = (e) => { if (HOSTS.includes(e.origin) && e.data && e.data.type === "strizna-ready") setEmbed("ready"); };
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
   }, []);
   useEffect(() => {
     if (!worker.online || embed !== "loading") return;
-    const t = setTimeout(() => setEmbed((s) => (s === "ready" ? s : "failed")), 7000);
+    const t = setTimeout(() => {
+      if (hostIdx < HOSTS.length - 1) setHostIdx(hostIdx + 1);
+      else setEmbed((s) => (s === "ready" ? s : "failed"));
+    }, 5000);
     return () => clearTimeout(t);
-  }, [worker.online, embed]);
+  }, [worker.online, embed, hostIdx]);
+  const browserName = (() => {
+    const ua = navigator.userAgent;
+    if (/Claude/i.test(ua)) return "prohlížeč v aplikaci Claude";
+    if (/Edg\//.test(ua)) return "Edge";
+    if (/Firefox\//.test(ua)) return "Firefox";
+    if (/Chrome\//.test(ua)) return "Chrome";
+    if (/Safari\//.test(ua)) return "Safari";
+    return "tenhle prohlížeč";
+  })();
 
   const openBtn = (
     <a href={`${EDIT_WORKER_URL}/app`} target="_blank" rel="noreferrer"
@@ -4605,7 +4620,7 @@ function EditorPage({ models }) {
         {worker.online && (
           <div className="rounded-2xl p-4 flex items-center justify-between gap-3 flex-wrap" style={{ background: "rgba(57,230,115,0.06)", border: "1px solid rgba(57,230,115,0.3)" }}>
             <div className="fs-12 c-text" style={{ maxWidth: 560 }}>
-              Plný Editor (přehrávač, timeline) tenhle prohlížeč do stránky vložit nedovolí. Otevři ho v samostatném okně na Macu, je to ten samý Editor.
+              Plný Editor (přehrávač, timeline) {browserName} do stránky vložit nedovolí. Otevři ho v samostatném okně na Macu, je to ten samý Editor.
             </div>
             {openBtn}
           </div>
@@ -4618,7 +4633,7 @@ function EditorPage({ models }) {
     <div className="flex flex-col gap-2">
       {embed !== "ready" && <EditWorkerChip worker={worker} />}
       <div className="relative rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(57,230,115,0.16)", height: "calc(100vh - 130px)", minHeight: 680, background: "#07090a" }}>
-        <iframe title="Editor" src={`${EDIT_WORKER_URL}/app`} allow="local-network-access *; fullscreen; autoplay; clipboard-write"
+        <iframe key={hostIdx} title="Editor" src={`${HOSTS[hostIdx]}/app`} allow="local-network-access *; fullscreen; autoplay; clipboard-write"
           className="absolute inset-0 w-full h-full" style={{ border: 0 }} />
         {embed === "loading" && (
           <div className="absolute inset-0 flex items-center justify-center fs-12 font-mono c-faint pointer-events-none" style={{ background: "#07090a" }}>
