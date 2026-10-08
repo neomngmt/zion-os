@@ -3732,9 +3732,10 @@ function useEditJobs() {
   return { jobs, loading };
 }
 
-function useEditWorker() {
+function useEditWorker(enabled = true) {
   const [state, setState] = useState({ checked: false, online: false, claudeOk: null, freeGb: null, busy: null });
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
     const check = async () => {
       let next = { checked: true, online: false, claudeOk: null, freeGb: null, busy: null };
@@ -3748,7 +3749,7 @@ function useEditWorker() {
     check();
     const t = setInterval(check, 8000);
     return () => { cancelled = true; clearInterval(t); };
-  }, []);
+  }, [enabled]);
   return state;
 }
 
@@ -13055,6 +13056,7 @@ function App() {
   const { value: weeklyTrendReels, loading: weeklyTrendReelsLoading, reload: reloadWeeklyTrendReels } = useSupaTable("weekly_trend_reels", "id", [], weeklyTrendReelsToJS, weeklyTrendReelsToDB);
   const { value: xCompetitors, persist: persistXCompetitors } = useSupaTable("x_competitor_profiles", "id", [], xCompetitorProfilesToJS, xCompetitorProfilesToDB);
   const [session, setSession] = useState(() => loadSavedSession());
+  const editWorker = useEditWorker(!!session && session.role === "admin");
   const [showLanding, setShowLanding] = useState(true);
   const [view, setView] = useState(null);
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
@@ -13305,6 +13307,7 @@ function App() {
                     const gName = session.role === "admin" ? "Boss" : (session.name || "there");
                     prefetchNeoGreeting(`Hi ${gName}! How can I help you today?`);
                   }
+                  if (n.id === "editor" && editWorker.online) window.open(`${EDIT_WORKER_URL}/app`, "_blank", "noopener");
                   setView(n.id); setMobileNavOpen(false);
                 }}
                   className={`tap w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg fs-13 transition-colors ${activeNav ? "c-bg-accent-a1 c-accent" : "c-muted hover-bg-surface hover-text-primary"} ${n.id === "neo" ? "nav-neo-item" : ""}`}>
