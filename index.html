@@ -4574,7 +4574,63 @@ function EditorRefs({ worker }) {
   );
 }
 
+// The full editor (player, timeline, inspector) is served by the worker on the Mac and embedded here,
+// so the video, uploads and timeline are same-origin there and never need cross-site access to the Mac.
+// Browsers that block an https page from embedding http://127.0.0.1 (Safari, locked-down Chrome) get
+// the lightweight page below plus a button that opens the same editor in its own window.
 function EditorPage({ models }) {
+  const worker = useEditWorker();
+  const [embed, setEmbed] = useState("loading"); // loading | ready | failed
+  useEffect(() => {
+    const onMsg = (e) => { if (e.origin === EDIT_WORKER_URL && e.data && e.data.type === "strizna-ready") setEmbed("ready"); };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
+  useEffect(() => {
+    if (!worker.online || embed !== "loading") return;
+    const t = setTimeout(() => setEmbed((s) => (s === "ready" ? s : "failed")), 7000);
+    return () => clearTimeout(t);
+  }, [worker.online, embed]);
+
+  const openBtn = (
+    <a href={`${EDIT_WORKER_URL}/app`} target="_blank" rel="noreferrer"
+      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg c-bg-accent c-onaccent fs-11 font-mono uppercase font-semibold hover-bg-accent2">
+      <ExternalLink size={13} /> Otevřít Editor v samostatném okně
+    </a>
+  );
+  if (!worker.checked) return <div className="fs-12 c-faint font-mono">Zjišťuju stav Macu…</div>;
+  if (!worker.online || embed === "failed") {
+    return (
+      <div className="flex flex-col gap-3">
+        {worker.online && (
+          <div className="rounded-2xl p-4 flex items-center justify-between gap-3 flex-wrap" style={{ background: "rgba(57,230,115,0.06)", border: "1px solid rgba(57,230,115,0.3)" }}>
+            <div className="fs-12 c-text" style={{ maxWidth: 560 }}>
+              Plný Editor (přehrávač, timeline) tenhle prohlížeč do stránky vložit nedovolí. Otevři ho v samostatném okně na Macu, je to ten samý Editor.
+            </div>
+            {openBtn}
+          </div>
+        )}
+        <EditorFallback models={models} />
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      {embed !== "ready" && <EditWorkerChip worker={worker} />}
+      <div className="relative rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(57,230,115,0.16)", height: "calc(100vh - 130px)", minHeight: 680, background: "#07090a" }}>
+        <iframe title="Editor" src={`${EDIT_WORKER_URL}/app`} allow="local-network-access *; fullscreen; autoplay; clipboard-write"
+          className="absolute inset-0 w-full h-full" style={{ border: 0 }} />
+        {embed === "loading" && (
+          <div className="absolute inset-0 flex items-center justify-center fs-12 font-mono c-faint pointer-events-none" style={{ background: "#07090a" }}>
+            <Loader2 size={14} className="animate-spin mr-2" /> Načítám Editor z Macu…
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EditorFallback({ models }) {
   const { jobs, loading, patch, remove } = useEditJobs();
   const worker = useEditWorker();
   const [selectedId, setSelectedId] = useState(null);
