@@ -7339,7 +7339,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
                 <div className="h-full rounded-full" style={{ width: `${(Math.max(0, v) / top) * 100}%`, background: "rgba(57,230,115,0.55)" }} />
               </div>
               <div className="fs-10 font-mono c-faint text-right" style={{ width: 34, flexShrink: 0 }}>{total > 0 ? Math.round((v / total) * 100) : 0}%</div>
-              <div className="fs-11 font-mono text-right" style={{ width: 62, flexShrink: 0, color: v < 0 ? "#e07a5f" : undefined }}>
+              <div className="fs-11 font-mono text-right c-text" style={{ width: 62, flexShrink: 0, color: v < 0 ? "#e07a5f" : undefined }}>
                 {weekMode === "pure" && m.pure == null ? <span className="c-faint" title="No agency cut set for this model yet (Model Manager, Edit)">set cut</span> : fmtMoney(v)}
               </div>
             </div>
