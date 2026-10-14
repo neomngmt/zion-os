@@ -3011,21 +3011,7 @@ const COUNTRY_NAMES = { US: "USA", DE: "Germany", GB: "UK", ES: "Spain", FR: "Fr
 // it only starts collecting from whenever the Business plan kicked in. Swap
 // this out (or delete the model's entry) once Publer actually has data;
 // publer-demographics results always win over this when they're non-empty.
-const MANUAL_IG_DEMOGRAPHICS = {
-  Vivien: {
-    ages: [
-      { label: "25-34 years", pct: 42 },
-      { label: "18-24 years", pct: 23.8 },
-      { label: "35-44 years", pct: 23.5 },
-      { label: "45-54 years", pct: 9.3 },
-    ],
-    countries: [
-      { code: "CZ", value: 75.2 }, { code: "SK", value: 19.6 },
-      { code: "DE", value: 1.8 }, { code: "GB", value: 0.4 }, { code: "AU", value: 0.4 },
-    ],
-    unit: "%",
-  },
-};
+const MANUAL_IG_DEMOGRAPHICS = {};
 
 // Dot-fill world silhouette — the real country outlines (flekschas/simple-world-map,
 // CC BY-SA), filled with a repeating dot pattern instead of a solid color so
