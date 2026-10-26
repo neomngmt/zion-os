@@ -7440,7 +7440,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
                   </button>
                 </div>
               </div>
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col">
                 {(() => {
                   const weeksMax = Math.max(1, ...weeksThisMonth.map((w) => Math.max(0, weekValue(w))));
                   const todayISO0 = toISO(new Date());
@@ -7456,7 +7456,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
                     return (
                       <div key={w.startISO}>
                         <button onClick={() => setExpandedWeekKey(isOpen ? null : wkKey)} aria-expanded={isOpen}
-                          className="w-full flex items-center gap-3 text-left tap">
+                          className="w-full flex items-center gap-3 text-left tap py-2.5" style={{ touchAction: "manipulation" }}>
                           <div className={`fs-11 font-mono truncate flex items-center gap-1.5 ${isCurrent ? "c-accent" : "c-muted"}`} style={{ width: 110, flexShrink: 0 }}>
                             {isCurrent && <Circle size={5} fill="#39e673" color="#39e673" className="anim-pulse-dot" />}
                             {ORDINAL_WEEK_LABELS[i] || `Week ${i + 1}`}
@@ -7467,7 +7467,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
                           <div className={`fs-11 font-mono font-semibold text-right ${isCurrent ? "c-accent" : "c-text"}`} style={{ width: 70, flexShrink: 0 }}>
                             {fmtMoney(weekValue(w))}
                           </div>
-                          <ChevronDown size={12} className={`c-faint flex-shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                          <ChevronDown size={16} className={`c-faint flex-shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                         </button>
                         {isOpen && renderWeekModels(w)}
                       </div>
@@ -7560,7 +7560,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
                           <span className="fs-10 uppercase tracking-widest c-text font-mono font-semibold">{g.monthKey}</span>
                           <span className="fs-10 font-mono c-faint">{fmtMoney(g.total)} total</span>
                         </div>
-                        <div className="flex flex-col gap-2.5">
+                        <div className="flex flex-col">
                           {g.weeks.map((w) => {
                             const pct = (Math.max(0, weekValue(w)) / groupMax) * 100;
                             const isCurrent = todayISO0 >= w.startISO && todayISO0 <= w.endISO;
@@ -7569,7 +7569,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
                             return (
                               <div key={w.startISO}>
                                 <button onClick={() => setExpandedWeekKey(isOpen ? null : wkKey)} aria-expanded={isOpen}
-                                  className="w-full flex items-center gap-3 text-left tap">
+                                  className="w-full flex items-center gap-3 text-left tap py-2.5" style={{ touchAction: "manipulation" }}>
                                   <div className={`fs-11 font-mono whitespace-nowrap flex items-center gap-1.5 ${isCurrent ? "c-accent" : "c-muted"}`} style={{ width: 150, flexShrink: 0 }}>
                                     {isCurrent && <Circle size={5} fill="#39e673" color="#39e673" className="anim-pulse-dot" />}
                                     {fmtWeekRange(w.startISO, w.endISO)}
@@ -7580,7 +7580,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
                                   <div className={`fs-11 font-mono text-right ${isCurrent ? "c-accent" : "c-text"}`} style={{ width: 70, flexShrink: 0 }}>
                                     {fmtMoney(weekValue(w))}
                                   </div>
-                                  <ChevronDown size={12} className={`c-faint flex-shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                                  <ChevronDown size={16} className={`c-faint flex-shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                                 </button>
                                 {isOpen && renderWeekModels(w)}
                               </div>
