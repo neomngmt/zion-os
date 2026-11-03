@@ -7455,8 +7455,8 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
                     const isOpen = expandedWeekKey === wkKey;
                     return (
                       <div key={w.startISO}>
-                        <button onClick={() => setExpandedWeekKey(isOpen ? null : wkKey)} aria-expanded={isOpen}
-                          className="w-full flex items-center gap-3 text-left tap py-2.5" style={{ touchAction: "manipulation" }}>
+                        <button type="button" onClick={() => setExpandedWeekKey(isOpen ? null : wkKey)} aria-expanded={isOpen}
+                          className="w-full flex items-center gap-3 text-left py-2.5 rounded-md hover-bg-surface" style={{ touchAction: "manipulation" }}>
                           <div className={`fs-11 font-mono truncate flex items-center gap-1.5 ${isCurrent ? "c-accent" : "c-muted"}`} style={{ width: 110, flexShrink: 0 }}>
                             {isCurrent && <Circle size={5} fill="#39e673" color="#39e673" className="anim-pulse-dot" />}
                             {ORDINAL_WEEK_LABELS[i] || `Week ${i + 1}`}
@@ -7568,8 +7568,8 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
                             const isOpen = expandedWeekKey === wkKey;
                             return (
                               <div key={w.startISO}>
-                                <button onClick={() => setExpandedWeekKey(isOpen ? null : wkKey)} aria-expanded={isOpen}
-                                  className="w-full flex items-center gap-3 text-left tap py-2.5" style={{ touchAction: "manipulation" }}>
+                                <button type="button" onClick={() => setExpandedWeekKey(isOpen ? null : wkKey)} aria-expanded={isOpen}
+                                  className="w-full flex items-center gap-3 text-left py-2.5 rounded-md hover-bg-surface" style={{ touchAction: "manipulation" }}>
                                   <div className={`fs-11 font-mono whitespace-nowrap flex items-center gap-1.5 ${isCurrent ? "c-accent" : "c-muted"}`} style={{ width: 150, flexShrink: 0 }}>
                                     {isCurrent && <Circle size={5} fill="#39e673" color="#39e673" className="anim-pulse-dot" />}
                                     {fmtWeekRange(w.startISO, w.endISO)}
