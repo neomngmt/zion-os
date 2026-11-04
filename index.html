@@ -1755,6 +1755,8 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
   // DEFAULT_SLOT_HOURS otherwise — so "3x/day" means something different for
   // an account with 6 months of history vs a brand new one, on purpose.
   const [frequency, setFrequency] = React.useState(2);
+  // Snapchat only: post videos as Spotlight or as Story (photos are always Stories).
+  const [snapKind, setSnapKind] = React.useState("spotlight");
   const [bestHours, setBestHours] = React.useState(null);
   const [bestHoursLoading, setBestHoursLoading] = React.useState(false);
   React.useEffect(() => {
@@ -1893,6 +1895,7 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
           snapForm.append("text", item.caption);
           snapForm.append("scheduledAt", item.scheduledAt);
           snapForm.append("mediaKind", item.mediaKind === "video" ? "video" : "photo");
+          snapForm.append("spotlight", String(snapKind === "spotlight" && item.mediaKind === "video"));
           const snapResp = await fetch(`${SUPABASE_URL}/functions/v1/oneup-schedule`, {
             method: "POST", headers: { Authorization: `Bearer ${SUPABASE_ANON_KEY}` }, body: snapForm,
           });
@@ -2015,6 +2018,23 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
 
       {open && (
         <div className="mt-4 pt-4 border-t" style={{ borderColor: "rgba(57,230,115,0.14)" }}>
+          {platform === "snap" && (
+            <>
+              <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2.5">Post as</div>
+              <div className="flex items-center gap-3 flex-wrap mb-5">
+                <div className="flex rounded-full p-0.5" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  {[["spotlight", "Spotlight"], ["story", "Story"]].map(([id, label]) => (
+                    <button key={id} onClick={() => setSnapKind(id)}
+                      className="fs-11 font-mono uppercase px-3 py-1.5 rounded-full tap"
+                      style={snapKind === id ? { background: "#39e673", color: "#050705" } : { background: "transparent", color: "#9d9b95" }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <span className="fs-10 font-mono c-faint">{snapKind === "spotlight" ? "videos go to Spotlight, photos go to Story" : "everything goes to Story"}</span>
+              </div>
+            </>
+          )}
           <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-2.5">Posting frequency</div>
           <div className="flex items-center gap-3 flex-wrap mb-5">
             <div className="flex rounded-full p-0.5" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
