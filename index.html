@@ -1742,6 +1742,12 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
   React.useEffect(() => { if (lockedModel) setSelected([lockedModel]); }, [lockedModel]);
   const [photos, setPhotos] = React.useState([]);
   const fileInputRef = React.useRef(null);
+  const [dragOver, setDragOver] = React.useState(false);
+  const dropProps = {
+    onDragOver: (e) => { e.preventDefault(); setDragOver(true); },
+    onDragLeave: () => setDragOver(false),
+    onDrop: (e) => { e.preventDefault(); setDragOver(false); addPhotos(e.dataTransfer.files); },
+  };
   const [plan, setPlan] = React.useState(null);
   const [planning, setPlanning] = React.useState(false);
   const [planError, setPlanError] = React.useState("");
@@ -2074,16 +2080,16 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
           <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden"
             onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
           {photos.length === 0 ? (
-            <button onClick={() => fileInputRef.current?.click()}
-              className="w-full flex flex-col items-center justify-center gap-1.5 border border-dashed rounded-2xl py-8 mb-4 transition-colors tap border-[rgba(255,255,255,0.14)] hover:border-[rgba(57,230,115,0.5)] hover:bg-[rgba(57,230,115,0.03)]">
+            <button onClick={() => fileInputRef.current?.click()} {...dropProps}
+              className={`w-full flex flex-col items-center justify-center gap-1.5 border border-dashed rounded-2xl py-8 mb-4 transition-colors tap hover:border-[rgba(57,230,115,0.5)] hover:bg-[rgba(57,230,115,0.03)] ${dragOver ? "border-[rgba(57,230,115,0.8)] bg-[rgba(57,230,115,0.06)]" : "border-[rgba(255,255,255,0.14)]"}`}>
               <div className="w-9 h-9 rounded-full flex items-center justify-center mb-1" style={{ background: "rgba(255,255,255,0.06)" }}>
                 <Plus size={16} className="c-muted" />
               </div>
-              <span className="fs-12 c-muted font-mono">Upload photos or videos</span>
+              <span className="fs-12 c-muted font-mono">{dragOver ? "Drop to add" : "Drop photos or videos here, or click to choose"}</span>
               <span className="fs-10 c-faint font-mono">{lockedModel ? "gets scheduled across the coming week" : "drops get split evenly across the accounts above"}</span>
             </button>
           ) : (
-            <div className="mb-4">
+            <div className="mb-4 rounded-2xl transition-colors" {...dropProps} style={dragOver ? { outline: "1px dashed rgba(57,230,115,0.8)", outlineOffset: 4 } : undefined}>
               <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-2 mb-2">
                 {photos.map((p) => (
                   <div key={p.id} className="relative rounded-xl overflow-hidden group" style={{ paddingTop: "100%", boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
