@@ -1763,6 +1763,7 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
   const [frequency, setFrequency] = React.useState(2);
   // Snapchat only: post videos as Spotlight or as Story (photos are always Stories).
   const [snapKind, setSnapKind] = React.useState("story");
+  const [snapNow, setSnapNow] = React.useState(false);
   const [bestHours, setBestHours] = React.useState(null);
   const [bestHoursLoading, setBestHoursLoading] = React.useState(false);
   React.useEffect(() => {
@@ -1882,6 +1883,8 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
       }));
       items.sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
       setPlan(items);
+      // "Post now": OneUp only takes a future time, so go out 2 min from now, 1 min apart.
+      if (platform === "snap" && snapNow) items.forEach((it, i) => { it.scheduledAt = new Date(Date.now() + (2 + i) * 60000).toISOString(); });
       // Public Story has no captions to review, so it schedules straight away.
       if (platform === "snap" && snapKind === "story" && items.length) { setPlanning(false); await confirmAndScheduleAll(items); }
     } catch (e) {
@@ -2041,6 +2044,15 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
               <button key={id} onClick={() => setSnapKind(id)}
                 className="fs-11 font-mono uppercase px-3 py-1.5 rounded-full tap"
                 style={snapKind === id ? { background: "#39e673", color: "#050705" } : { background: "transparent", color: "#9d9b95" }}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="flex rounded-full p-0.5" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            {[[false, "Schedule"], [true, "Post now"]].map(([v, label]) => (
+              <button key={label} onClick={() => { setSnapNow(v); setPlan(null); }}
+                className="fs-11 font-mono uppercase px-3 py-1.5 rounded-full tap"
+                style={snapNow === v ? { background: "#39e673", color: "#050705" } : { background: "transparent", color: "#9d9b95" }}>
                 {label}
               </button>
             ))}
