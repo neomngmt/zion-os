@@ -1849,6 +1849,14 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
       await Promise.all(selected.map(async (modelName) => {
         const modelPhotos = groups[modelName];
         if (!modelPhotos.length) return;
+        // Snapchat Public Story posts carry no caption, so skip the AI call.
+        if (platform === "snap" && snapKind === "story") {
+          const storySlots = nextMassPlannerSlots(modelPhotos.length, activeHours, startAt);
+          modelPhotos.forEach((photo, i) => {
+            items.push({ id: uid(), model: modelName, photo, mediaKind: photo.kind, caption: "", scheduledAt: storySlots[i].toISOString() });
+          });
+          return;
+        }
         const images = await Promise.all(modelPhotos.map((p) => (p.kind === "video" ? videoFrameToVisionImage(p.file) : fileToVisionImage(p.file))));
         // Threads has its own dedicated caption generator (deliberately
         // separate from x-caption-generate — different voice/style, see
@@ -2034,7 +2042,7 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
               </button>
             ))}
           </div>
-          <span className="fs-10 font-mono c-faint">{snapKind === "spotlight" ? "videos go to Spotlight, photos go to Public Story" : "everything goes to her Public Story"}</span>
+          <span className="fs-10 font-mono c-faint">{snapKind === "spotlight" ? "videos go to Spotlight (with caption), photos go to Public Story" : "everything goes to her Public Story, no captions"}</span>
         </div>
       )}
 
@@ -2123,7 +2131,7 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
           <button onClick={generatePlan} disabled={!selected.length || !photos.length || planning}
             className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl c-bg-accent c-onaccent fs-12 font-mono uppercase tracking-wide font-semibold hover-bg-accent2 disabled:opacity-40 tap mb-1"
             style={{ boxShadow: selected.length && photos.length ? "0 0 20px rgba(57,230,115,0.25)" : "none" }}>
-            {planning ? <><Loader2 size={14} className="animate-spin" /> Generating captions...</> : <><Sparkles size={14} /> Generate captions</>}
+            {planning ? <><Loader2 size={14} className="animate-spin" /> {platform === "snap" && snapKind === "story" ? "Planning..." : "Generating captions..."}</> : <><Sparkles size={14} /> {platform === "snap" && snapKind === "story" ? "Plan posts" : "Generate captions"}</>}
           </button>
           {planError && <div className="fs-10 font-mono mt-1 c-warn">{planError}</div>}
 
