@@ -1882,6 +1882,8 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
       }));
       items.sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
       setPlan(items);
+      // Public Story has no captions to review, so it schedules straight away.
+      if (platform === "snap" && snapKind === "story" && items.length) { setPlanning(false); await confirmAndScheduleAll(items); }
     } catch (e) {
       setPlanError(e.message || "Failed to generate plan");
     } finally {
@@ -1891,11 +1893,12 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
 
   const setItemState = (id, patch) => setItemStates((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
 
-  const confirmAndScheduleAll = async () => {
-    if (!plan || !plan.length) return;
+  const confirmAndScheduleAll = async (itemsArg) => {
+    const list = Array.isArray(itemsArg) ? itemsArg : plan;
+    if (!list || !list.length) return;
     setRunningAll(true);
     let allSucceeded = true;
-    for (const item of plan) {
+    for (const item of list) {
       if (itemStates[item.id]?.status === "done") continue;
       setItemState(item.id, { status: "uploading", error: "" });
       try {
@@ -2131,7 +2134,7 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
           <button onClick={generatePlan} disabled={!selected.length || !photos.length || planning}
             className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl c-bg-accent c-onaccent fs-12 font-mono uppercase tracking-wide font-semibold hover-bg-accent2 disabled:opacity-40 tap mb-1"
             style={{ boxShadow: selected.length && photos.length ? "0 0 20px rgba(57,230,115,0.25)" : "none" }}>
-            {planning ? <><Loader2 size={14} className="animate-spin" /> {platform === "snap" && snapKind === "story" ? "Planning..." : "Generating captions..."}</> : <><Sparkles size={14} /> {platform === "snap" && snapKind === "story" ? "Plan posts" : "Generate captions"}</>}
+            {planning ? <><Loader2 size={14} className="animate-spin" /> {platform === "snap" && snapKind === "story" ? "Scheduling..." : "Generating captions..."}</> : <><Sparkles size={14} /> {platform === "snap" && snapKind === "story" ? "Schedule to Story" : "Generate captions"}</>}
           </button>
           {planError && <div className="fs-10 font-mono mt-1 c-warn">{planError}</div>}
 
