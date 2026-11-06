@@ -11816,7 +11816,8 @@ function useSupaInflowwDailyStats() {
 
   const load = useCallback(async () => {
     try {
-      const { data, error } = await supabaseClient.from("infloww_daily_stats").select("*");
+      // dashboard_stats = Famee rows for models connected there, Infloww rows for the rest.
+      const { data, error } = await supabaseClient.from("dashboard_stats").select("*");
       if (error) throw error;
       setValue((data || []).map((r) => ({
         id: r.id, model: r.model, accountType: r.account_type || "paid", statDate: r.stat_date,
@@ -11864,6 +11865,15 @@ function useSupaInflowwDailyStats() {
       if (!r.ok) throw new Error(`infloww-sync: HTTP ${r.status}`);
     } catch (e) {
       console.error("infloww-sync failed", e);
+    }
+    try {
+      await fetch(`${SUPABASE_URL}/functions/v1/famee-sync?days=3`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
+        body: "{}",
+      });
+    } catch (e) {
+      console.error("famee-sync failed", e);
     }
     await load();
     setSyncing(false);
