@@ -12853,6 +12853,133 @@ function TrendReelCard({ post, fmt }) {
   );
 }
 
+// ---------- Chatters: revenue per chatter from Famee ----------
+
+function ChattersPage() {
+  const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const shift = (days) => { const d = new Date(); d.setDate(d.getDate() + days); return d; };
+  const mondayOffset = () => (new Date().getDay() + 6) % 7;
+  const periods = {
+    thisweek: { label: "This week", range: () => [ymd(shift(-mondayOffset())), ymd(shift(1))] },
+    lastweek: { label: "Last week", range: () => [ymd(shift(-mondayOffset() - 7)), ymd(shift(-mondayOffset()))] },
+    d7: { label: "Last 7 days", range: () => [ymd(shift(-6)), ymd(shift(1))] },
+    month: { label: "This month", range: () => { const t = new Date(); return [ymd(new Date(t.getFullYear(), t.getMonth(), 1)), ymd(shift(1))]; } },
+    d30: { label: "Last 30 days", range: () => [ymd(shift(-29)), ymd(shift(1))] },
+  };
+  const [period, setPeriod] = React.useState("thisweek");
+  const [data, setData] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const [open, setOpen] = React.useState({});
+
+  const load = React.useCallback(async () => {
+    setLoading(true); setError("");
+    try {
+      const [from, to] = periods[period].range();
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/famee-chatters`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ from, to }),
+      });
+      const j = await r.json();
+      if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+      setData(j);
+    } catch (e) {
+      setError(e.message || "Failed to load");
+    }
+    setLoading(false);
+  }, [period]);
+  React.useEffect(() => { load(); }, [load]);
+
+  const money = (n) => `$${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const secs = (n) => (n == null ? "n/a" : n < 90 ? `${n}s` : n < 5400 ? `${Math.round(n / 60)} min` : `${(n / 3600).toFixed(1)} h`);
+  const chatters = data?.chatters || [];
+  const sum = (k) => chatters.reduce((t, c) => t + (Number(c[k]) || 0), 0);
+  const cardStyle = { background: "#0b0f0d", border: "1px solid rgba(57,230,115,0.16)" };
+
+  return (
+    <div className="max-w-5xl">
+      <div className="flex items-end justify-between flex-wrap gap-3 mb-5">
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight c-text">Chatters</h1>
+          <p className="fs-12 c-muted mt-1">Revenue credited to each chatter, from Famee (attribution rules from Famee Settings, Sales).</p>
+        </div>
+        <button onClick={load} disabled={loading} className="fs-11 font-mono uppercase px-3 py-1.5 rounded-full tap c-muted" style={{ border: "1px solid rgba(255,255,255,0.12)" }}>
+          {loading ? "loading..." : "refresh"}
+        </button>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-5">
+        {Object.entries(periods).map(([id, p]) => (
+          <button key={id} onClick={() => setPeriod(id)} className="fs-11 font-mono uppercase px-3 py-1.5 rounded-full tap"
+            style={period === id ? { background: "#39e673", color: "#050705" } : { background: "rgba(255,255,255,0.05)", color: "#9d9b95", border: "1px solid rgba(255,255,255,0.08)" }}>
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {error && <div className="fs-12 c-warn mb-4">{error}</div>}
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        {[["Credited revenue", money(sum("total"))], ["Net", money(sum("net"))], ["Sales", String(sum("sales"))], ["Messages sent", String(sum("messagesSent"))]].map(([label, value]) => (
+          <div key={label} className="rounded-2xl p-4" style={cardStyle}>
+            <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-1.5">{label}</div>
+            <div className="text-xl font-extrabold c-text tabular-nums">{value}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-2xl overflow-x-auto" style={cardStyle}>
+        <table className="w-full fs-12" style={{ borderCollapse: "collapse", minWidth: 640 }}>
+          <thead>
+            <tr className="fs-10 uppercase tracking-widest c-faint font-mono text-left">
+              <th className="p-3">Chatter</th>
+              <th className="p-3 text-right">Revenue</th>
+              <th className="p-3 text-right">Net</th>
+              <th className="p-3 text-right">Tips</th>
+              <th className="p-3 text-right">Messages</th>
+              <th className="p-3 text-right">Sales</th>
+              <th className="p-3 text-right">PPV conv.</th>
+              <th className="p-3 text-right">Reply</th>
+            </tr>
+          </thead>
+          <tbody>
+            {chatters.length === 0 && (
+              <tr><td colSpan={8} className="p-4 c-muted">{loading ? "Loading..." : "No credited sales in this period."}</td></tr>
+            )}
+            {chatters.map((c) => (
+              <React.Fragment key={c.id || c.name}>
+                <tr onClick={() => setOpen((o) => ({ ...o, [c.id || c.name]: !o[c.id || c.name] }))} className="cursor-pointer c-text tabular-nums" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                  <td className="p-3 font-semibold">{c.name}</td>
+                  <td className="p-3 text-right">{money(c.total)}</td>
+                  <td className="p-3 text-right c-muted">{money(c.net)}</td>
+                  <td className="p-3 text-right c-muted">{money(c.tips)}</td>
+                  <td className="p-3 text-right c-muted">{money(c.messages)}</td>
+                  <td className="p-3 text-right c-muted">{c.sales}</td>
+                  <td className="p-3 text-right c-muted">{c.ppvConversionPct == null ? "n/a" : `${c.ppvConversionPct}%`}</td>
+                  <td className="p-3 text-right c-muted">{secs(c.avgResponseSecs)}</td>
+                </tr>
+                {open[c.id || c.name] && Object.entries(c.byModel).sort((a, b) => b[1].total - a[1].total).map(([model, m]) => (
+                  <tr key={model} className="fs-11 c-muted tabular-nums" style={{ background: "rgba(255,255,255,0.02)" }}>
+                    <td className="p-2 pl-6">{model}</td>
+                    <td className="p-2 text-right">{money(m.total)}</td>
+                    <td className="p-2 text-right">{money(m.net)}</td>
+                    <td className="p-2 text-right">{money(m.tips)}</td>
+                    <td className="p-2 text-right">{money(m.messages)}</td>
+                    <td className="p-2 text-right">{m.sales}</td>
+                    <td className="p-2" /><td className="p-2" />
+                  </tr>
+                ))}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="fs-10 c-faint font-mono mt-3">Click a chatter to see the split by model. Covers {data?.models?.join(", ") || "connected models"}; revenue not credited to anyone is not listed.</p>
+    </div>
+  );
+}
+
 function TrendsPage({ weeklyTrendReels, onReload, loading }) {
   const [filter, setFilter] = useState("all");
   const [topN, setTopN] = useState(15);
@@ -13051,6 +13178,7 @@ const NAV_ADMIN = [
   { id: "calendar", label: "Calendar", icon: Calendar },
   { id: "tasks", label: "Tasks", icon: CheckSquare },
   { id: "stats", label: "Stats", icon: TrendingUp },
+  { id: "chatters", label: "Chatters", icon: DollarSign },
   { id: "weeklytrends", label: "Trends", icon: Flame },
   { id: "reelsorter", label: "Reels Sorter", icon: Repeat },
   { id: "titlegen", label: "Title Generator", icon: Mic },
@@ -13425,6 +13553,7 @@ function App() {
             {currentView === "calendar" && <CalendarView cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks} onNavigate={setView} restrictModel={restrictModel} />}
             {currentView === "tasks" && <TaskManager tasks={isAdmin ? scopedTasks : tasks} persistTasks={isAdmin ? scopedPersistTasks : persistTasks} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} />}
             {currentView === "stats" && <StatsManager stats={scopedStats} persistStats={scopedPersistStats} models={agencyModels} reels={scopedReels} persistReels={scopedPersistReels} />}
+            {currentView === "chatters" && isAdmin && <ChattersPage />}
             {currentView === "reelsorter" && isAdmin && <ReelSorterPage />}
             {currentView === "titlegen" && isAdmin && <TitleGeneratorPage />}
             {currentView === "weeklytrends" && isAdmin && <TrendsPage weeklyTrendReels={weeklyTrendReels} onReload={reloadWeeklyTrendReels} loading={weeklyTrendReelsLoading} />}
