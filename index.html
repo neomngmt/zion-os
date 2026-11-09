@@ -13266,6 +13266,7 @@ function App() {
   const { value: weeklyTrendReels, loading: weeklyTrendReelsLoading, reload: reloadWeeklyTrendReels } = useSupaTable("weekly_trend_reels", "id", [], weeklyTrendReelsToJS, weeklyTrendReelsToDB);
   const { value: xCompetitors, persist: persistXCompetitors } = useSupaTable("x_competitor_profiles", "id", [], xCompetitorProfilesToJS, xCompetitorProfilesToDB);
   const [session, setSession] = useState(() => loadSavedSession());
+  const [previewFrom, setPreviewFrom] = useState(null); // admin session while previewing as a creator
   const editWorker = useEditWorker(!!session && session.role === "admin");
   const [showLanding, setShowLanding] = useState(true);
   const [view, setView] = useState(null);
@@ -13329,7 +13330,7 @@ function App() {
     return (
       <LoginScreen
         models={models}
-        onLogin={(s) => { saveSession(s); setSession(s); setView("dashboard"); setOnboardingDismissed(false); }}
+        onLogin={(s) => { setPreviewFrom(null); saveSession(s); setSession(s); setView("dashboard"); setOnboardingDismissed(false); }}
       />
     );
   }
@@ -13396,6 +13397,13 @@ function App() {
         </div>
       ) : (
       <>
+      {previewFrom && (
+        <div className="flex items-center justify-center gap-3 px-3 py-1.5 font-mono fs-11 uppercase tracking-widest flex-shrink-0" style={{ background: "#39e673", color: "#03110a" }}>
+          <span>Preview: you see Zion OS as {session.name}</span>
+          <button onClick={() => { setSession(previewFrom); setPreviewFrom(null); setView("dashboard"); }}
+            className="tap px-2 py-0.5 rounded border font-bold" style={{ borderColor: "#03110a" }}>Exit preview</button>
+        </div>
+      )}
       {/* Full-width top bar (desktop + mobile — sidebar nav now covers both) */}
       <div className="flex items-center justify-between c-bg-panel flex-shrink-0">
         <button onClick={() => setView("dashboard")} title="Go to Dashboard"
@@ -13415,6 +13423,19 @@ function App() {
           </div>
         </button>
         <div className="flex items-center gap-1.5 px-4 py-3 flex-1 justify-end min-w-0">
+          {isAdmin && !previewFrom && (
+            <select value="" title="Preview as creator"
+              onChange={(e) => {
+                const m = models.find((x) => x.name === e.target.value);
+                if (!m) return;
+                setPreviewFrom(session); setOnboardingDismissed(true);
+                setSession({ role: "creator", name: m.name, agency: m.agency || "CZ", preview: true }); setView("dashboard");
+              }}
+              className="tap hidden sm:block px-2 py-1 rounded-lg border font-mono fs-11 c-muted c-bg-panel" style={{ borderColor: "rgba(57,230,115,0.3)" }}>
+              <option value="">Preview as creator</option>
+              {agencyModels.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
+            </select>
+          )}
           <GlobalSearch
             cards={isAdmin ? scopedCards : (restrictModel ? cards.filter((c) => c.model === restrictModel) : cards)}
             tasks={isAdmin ? scopedTasks : (restrictModel ? tasks.filter((t) => t.model === restrictModel) : tasks)}
