@@ -12120,6 +12120,11 @@ function OnboardingScreen({ name, url, onContinue, onQuestionnaireReceived }) {
             Not loading? Open directly →
           </a>
         )}
+        <button onClick={() => onContinue()}
+          className="tap px-3 py-1.5 rounded-lg border font-mono fs-11 uppercase tracking-widest"
+          style={{ borderColor: "rgba(57,230,115,0.5)", color: "#39e673" }}>
+          Continue to Zion OS →
+        </button>
       </div>
     </div>
   );
@@ -13329,7 +13334,7 @@ function App() {
 
   if (session.role === "creator" && !onboardingDismissed) {
     const record = models.find((m) => m.name === session.name);
-    if (record && (!record.onboarded || record.alwaysOnboard)) {
+    if (record && ((!record.onboarded && !record.bioReceivedAt) || record.alwaysOnboard)) {
       return (
         <OnboardingScreen
           name={session.name}
