@@ -13436,7 +13436,7 @@ function App() {
                 setPreviewFrom(session); setOnboardingDismissed(true);
                 setSession({ role: "creator", name: m.name, agency: m.agency || "CZ", preview: true }); setView("dashboard");
               }}
-              className="tap hidden sm:block px-2 py-1 rounded-lg border font-mono fs-11 c-muted c-bg-panel" style={{ borderColor: "rgba(57,230,115,0.3)" }}>
+              className="tap px-2 py-1 rounded-lg border font-mono fs-11 c-bg-panel flex-shrink-0" style={{ borderColor: "#39e673", color: "#39e673", maxWidth: "150px" }}>
               <option value="">Preview as creator</option>
               {agencyModels.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
             </select>
