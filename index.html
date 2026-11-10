@@ -18024,7 +18024,10 @@ function App() {
     title: "Go to Dashboard",
     className: "tap w-14 sm:w-56 flex items-center justify-center sm:justify-start sm:pl-5 py-3 flex-shrink-0 hover-bg-surface transition-colors"
   }, React.createElement("div", {
-    className: "flex flex-col items-center sm:items-start"
+    className: "flex items-center",
+    style: {
+      position: "relative"
+    }
   }, React.createElement("span", {
     className: "sm:hidden"
   }, React.createElement(ZionMark, {
@@ -18044,8 +18047,9 @@ function App() {
       lineHeight: 1,
       whiteSpace: "nowrap",
       fontSize: "11px",
-      marginTop: "6px",
-      alignSelf: "flex-end",
+      position: "absolute",
+      right: 0,
+      top: "calc(50% + 16px)",
       pointerEvents: "none",
       WebkitClipPath: "inset(0 100% 0 0)",
       clipPath: "inset(0 100% 0 0)",
@@ -18352,7 +18356,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1f3de53</script>
+<script type="text/babel" id="zion-version">mbo80o</script>
 <script>
 (function () {
   var last = 0;

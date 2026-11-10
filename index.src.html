@@ -13574,10 +13574,10 @@ function App() {
       <div className="topbar-smooth flex items-center justify-between c-bg-panel flex-shrink-0" data-preview={previewFrom ? "1" : "0"} style={{ paddingTop: previewFrom ? 0 : "env(safe-area-inset-top)" }}>
         <button onClick={() => setView("dashboard")} title="Go to Dashboard"
           className="tap w-14 sm:w-56 flex items-center justify-center sm:justify-start sm:pl-5 py-3 flex-shrink-0 hover-bg-surface transition-colors">
-          <div className="flex flex-col items-center sm:items-start">
+          <div className="flex items-center" style={{ position: "relative" }}>
             <span className="sm:hidden"><ZionMark size={18} gradId="zionMarkGradTopbar" /></span>
             <span className="hidden sm:block"><ZionWordmark height={25} /></span>
-            <span className="hidden sm:block" style={{ fontFamily: "'Dancing Script', cursive", fontWeight: 700, color: "var(--accent, #39ffa0)", textShadow: "0 0 3px currentColor, 0 0 6px currentColor", lineHeight: 1, whiteSpace: "nowrap", fontSize: "11px", marginTop: "6px", alignSelf: "flex-end", pointerEvents: "none", WebkitClipPath: "inset(0 100% 0 0)", clipPath: "inset(0 100% 0 0)", animation: "writeOn 1.2s steps(20,end) forwards, neoFlicker 3.5s ease-in-out infinite 1.2s" }}>by neomngmt</span>
+            <span className="hidden sm:block" style={{ fontFamily: "'Dancing Script', cursive", fontWeight: 700, color: "var(--accent, #39ffa0)", textShadow: "0 0 3px currentColor, 0 0 6px currentColor", lineHeight: 1, whiteSpace: "nowrap", fontSize: "11px", position: "absolute", right: 0, top: "calc(50% + 16px)", pointerEvents: "none", WebkitClipPath: "inset(0 100% 0 0)", clipPath: "inset(0 100% 0 0)", animation: "writeOn 1.2s steps(20,end) forwards, neoFlicker 3.5s ease-in-out infinite 1.2s" }}>by neomngmt</span>
           </div>
         </button>
         <div className="flex items-center gap-1.5 px-4 py-3 flex-1 justify-end min-w-0">
