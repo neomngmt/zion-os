@@ -14626,6 +14626,204 @@ function timeAgo(ts) {
   const days = Math.floor(hrs / 24);
   return `${days}d ago`;
 }
+const PUSH_VAPID_PUBLIC = "BND3nH0hJWFo4F0Yw9D3_BH9vy4fl-rOEqbaROSfKqBAJLXKV3tQzuITnVbL0uZgUlnMNiX3kWn33hEQ606W8DY";
+const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+const pushStandalone = () => window.navigator.standalone === true || window.matchMedia && window.matchMedia("(display-mode: standalone)").matches;
+const pushKey = b64 => {
+  const pad = "=".repeat((4 - b64.length % 4) % 4);
+  const raw = atob((b64 + pad).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(raw, c => c.charCodeAt(0));
+};
+if ("serviceWorker" in navigator) {
+  try {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  } catch (e) {}
+}
+async function pushApi(body) {
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/push-subscribe`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+    },
+    body: JSON.stringify(body)
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+}
+function PushToggle() {
+  const [state, setState] = useState("checking");
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    (async () => {
+      if (!pushSupported()) {
+        setState(/iPhone|iPad|iPod/.test(navigator.userAgent) && !pushStandalone() ? "install" : "unsupported");
+        return;
+      }
+      if (Notification.permission === "denied") {
+        setState("blocked");
+        return;
+      }
+      try {
+        const reg = await navigator.serviceWorker.getRegistration();
+        const sub = reg && (await reg.pushManager.getSubscription());
+        setState(sub && Notification.permission === "granted" ? "on" : "off");
+      } catch (e) {
+        setState("off");
+      }
+    })();
+  }, []);
+  const enable = async () => {
+    setErr("");
+    setState("busy");
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== "granted") {
+        setState(perm === "denied" ? "blocked" : "off");
+        return;
+      }
+      await navigator.serviceWorker.register("sw.js");
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: pushKey(PUSH_VAPID_PUBLIC)
+      });
+      const ses = loadSavedSession() || {};
+      await pushApi({
+        subscription: sub.toJSON(),
+        role: ses.role,
+        model: ses.role === "creator" ? ses.name : undefined,
+        agency: ses.agency
+      });
+      setState("on");
+    } catch (e) {
+      setErr(e.message || "Could not turn on");
+      setState("off");
+    }
+  };
+  const disable = async () => {
+    setState("busy");
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      const sub = reg && (await reg.pushManager.getSubscription());
+      if (sub) {
+        await pushApi({
+          unsubscribe: true,
+          endpoint: sub.endpoint
+        });
+        await sub.unsubscribe();
+      }
+    } catch (e) {}
+    setState("off");
+  };
+  if (state === "checking" || state === "unsupported") return null;
+  const box = {
+    borderBottom: "1px solid rgba(57,230,115,0.16)"
+  };
+  return React.createElement("div", {
+    className: "px-3 py-2.5",
+    style: box
+  }, state === "install" && React.createElement("div", {
+    className: "fs-11 c-muted leading-snug"
+  }, "To get push notifications, add Zion OS to your home screen first (Share, Add to Home Screen), then turn them on there."), state === "blocked" && React.createElement("div", {
+    className: "fs-11 c-muted leading-snug"
+  }, "Notifications are blocked. Allow them for Zion OS in the phone settings."), (state === "off" || state === "busy" || state === "on") && React.createElement("div", {
+    className: "flex items-center justify-between gap-3"
+  }, React.createElement("div", {
+    className: "fs-12 c-text"
+  }, "Push notifications"), React.createElement("button", {
+    onClick: state === "on" ? disable : enable,
+    disabled: state === "busy",
+    className: "px-3 py-1 rounded-full fs-11 font-mono uppercase tracking-wide tap",
+    style: state === "on" ? {
+      background: "#39e673",
+      color: "#03110a"
+    } : {
+      border: "1px solid #39e673",
+      color: "#39e673"
+    }
+  }, state === "busy" ? "..." : state === "on" ? "On" : "Turn on")), err && React.createElement("div", {
+    className: "fs-10 mt-1",
+    style: {
+      color: "#ff6b6b"
+    }
+  }, err));
+}
+function PushToast() {
+  const [t, setT] = useState(null);
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    let timer;
+    const onMsg = e => {
+      if (!e.data || e.data.type !== "push") return;
+      setT({
+        title: e.data.title,
+        body: e.data.body
+      });
+      clearTimeout(timer);
+      timer = setTimeout(() => setT(null), 7000);
+    };
+    navigator.serviceWorker.addEventListener("message", onMsg);
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", onMsg);
+      clearTimeout(timer);
+    };
+  }, []);
+  if (!t) return null;
+  return React.createElement("div", {
+    onClick: () => setT(null),
+    className: "anim-view",
+    style: {
+      position: "fixed",
+      left: 12,
+      right: 12,
+      top: "calc(env(safe-area-inset-top) + 8px)",
+      zIndex: 9999,
+      maxWidth: 420,
+      margin: "0 auto",
+      background: "#0e1310",
+      border: "1px solid rgba(57,230,115,0.45)",
+      borderRadius: 16,
+      padding: "12px 14px",
+      display: "flex",
+      gap: 12,
+      alignItems: "center",
+      cursor: "pointer"
+    }
+  }, React.createElement("svg", {
+    viewBox: "0 0 24 24",
+    width: "28",
+    height: "28",
+    fill: "none",
+    style: {
+      flexShrink: 0
+    }
+  }, React.createElement("path", {
+    d: "M12 1L23 12L12 23L1 12Z",
+    stroke: "#39e673",
+    strokeWidth: "1.5"
+  }), React.createElement("path", {
+    d: "M12 7L17 12L12 17L7 12Z",
+    fill: "#39e673"
+  })), React.createElement("div", {
+    style: {
+      minWidth: 0
+    }
+  }, React.createElement("div", {
+    className: "fs-13 font-semibold c-text"
+  }, t.title), t.body && React.createElement("div", {
+    className: "fs-12 c-muted",
+    style: {
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      display: "-webkit-box",
+      WebkitLineClamp: 2,
+      WebkitBoxOrient: "vertical"
+    }
+  }, t.body)));
+}
 function NotificationBell({
   model,
   cards,
@@ -14693,7 +14891,7 @@ function NotificationBell({
     className: "absolute -top-0.5 -right-0.5 min-w-[15px] h-[15px] px-1 rounded-full c-bg-accent c-onaccent fs-9 font-mono font-bold flex items-center justify-center"
   }, total > 9 ? "9+" : total)), open && React.createElement("div", {
     className: "search-pop fixed left-3 right-3 sm:absolute sm:left-auto sm:right-0 sm:mt-2 sm:w-80 c-bg-surface border c-border rounded-xl z-50 overflow-hidden"
-  }, React.createElement("div", {
+  }, React.createElement(PushToggle, null), React.createElement("div", {
     className: "flex items-center justify-between px-3 py-2.5 border-b c-border"
   }, React.createElement("div", {
     className: "flex items-center gap-2"
@@ -14862,7 +15060,7 @@ function AdminNotificationBell({
     className: "absolute -top-0.5 -right-0.5 min-w-[15px] h-[15px] px-1 rounded-full c-bg-accent c-onaccent fs-9 font-mono font-bold flex items-center justify-center"
   }, total > 9 ? "9+" : total)), open && React.createElement("div", {
     className: "search-pop fixed left-3 right-3 sm:absolute sm:left-auto sm:right-0 sm:mt-2 sm:w-80 c-bg-surface border c-border rounded-xl z-50 overflow-hidden"
-  }, React.createElement("div", {
+  }, React.createElement(PushToggle, null), React.createElement("div", {
     className: "flex items-center justify-between px-3 py-2.5 border-b c-border"
   }, React.createElement("div", {
     className: "flex items-center gap-2"
@@ -17719,7 +17917,7 @@ function App() {
     style: {
       fontFamily: "Inter, sans-serif"
     }
-  }, React.createElement("style", null, fontImport), currentView === "neo" ? React.createElement("div", {
+  }, React.createElement("style", null, fontImport), React.createElement(PushToast, null), currentView === "neo" ? React.createElement("div", {
     className: "fixed inset-0 z-40",
     style: {
       background: "#030705",
@@ -18132,7 +18330,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1cpfhiw</script>
+<script type="text/babel" id="zion-version">1kw8yrc</script>
 <script>
 (function () {
   var last = 0;
