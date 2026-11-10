@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Zion OS">
 <meta name="theme-color" content="#080c0a">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Zion OS</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M12 2L22 12L12 22L2 12Z' fill='url(%23g)'/%3E%3Cdefs%3E%3ClinearGradient id='g' x1='2' y1='2' x2='22' y2='22'%3E%3Cstop stop-color='%2339e673'/%3E%3Cstop offset='1' stop-color='%2312b34c'/%3E%3C/linearGradient%3E%3C/defs%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13251,322 +13251,6 @@ function clearSavedSession() {
   } catch {}
 }
 
-// ---------- phone app mode (Capacitor wrapper or ?app=1) ----------
-const readBasicFlag = () => {
-  try {
-    return localStorage.getItem("zionBasic") === "1";
-  } catch (e) { return false; }
-};
-const APP_C = { bg: "#080c0a", card: "#0f1612", card2: "#131c17", line: "#173425", dim: "#6b8074", ac: "#39e673", tx: "#f2f5f0" };
-const appCard = { background: APP_C.card, border: `1px solid ${APP_C.line}`, borderRadius: 20 };
-const appMoney = (n) => "$" + Math.round(Number(n) || 0).toLocaleString("en-US").replace(/,/g, " ");
-const appYmd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-const appWeekDays = () => { const t = new Date(); const off = (t.getDay() + 6) % 7; return Array.from({ length: 7 }, (_, i) => appYmd(new Date(t.getFullYear(), t.getMonth(), t.getDate() - off + i))); };
-const appMonthName = (d) => d.toLocaleString("en-US", { month: "short", year: "numeric" });
-
-function AppStats({ items }) {
-  return (
-    <div style={{ ...appCard, borderRadius: 16, display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", margin: "12px 0" }}>
-      {items.map(([label, value, green], i) => (
-        <div key={label} style={{ padding: "11px 10px", borderRight: i < items.length - 1 ? `1px solid ${APP_C.line}` : 0, minWidth: 0 }}>
-          <div style={{ fontSize: 10, letterSpacing: ".08em", color: APP_C.dim, textTransform: "uppercase", whiteSpace: "nowrap" }}>{label}</div>
-          <div style={{ fontSize: 18, fontWeight: 500, marginTop: 3, whiteSpace: "nowrap", color: green ? APP_C.ac : APP_C.tx }}>{value}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function AppAgencySwitch({ agency, onSwitch }) {
-  const [asking, setAsking] = useState(null);
-  const [pin, setPin] = useState("");
-  const [err, setErr] = useState("");
-  const [busy, setBusy] = useState(false);
-  const submit = async () => {
-    if (busy || !pin) return;
-    setBusy(true); setErr("");
-    try {
-      const { data, error } = await supabaseClient.functions.invoke("auth-verify", { body: { type: "team", agency: asking, pin } });
-      if (error || !data?.ok) { setErr("Wrong PIN"); }
-      else { onSwitch(asking); setAsking(null); setPin(""); }
-    } catch (e) { setErr("Couldn't reach the server"); }
-    setBusy(false);
-  };
-  const seg = (a) => (
-    <div key={a} onClick={() => { if (a !== agency) { setAsking(a); setPin(""); setErr(""); } }}
-      style={{ padding: "6px 16px", borderRadius: 20, fontSize: 13, fontWeight: 500, cursor: "pointer", background: a === agency ? "#27322b" : "transparent", color: a === agency ? APP_C.ac : APP_C.dim }}>{a}</div>
-  );
-  return (
-    <div>
-      <div style={{ display: "inline-flex", background: APP_C.card2, border: `1px solid ${APP_C.line}`, borderRadius: 22, padding: 3 }}>{["CZ", "US"].map(seg)}</div>
-      {asking && (
-        <div style={{ ...appCard, padding: 12, marginTop: 10 }}>
-          <div style={{ fontSize: 12, color: APP_C.dim, marginBottom: 8 }}>Enter the {asking} team PIN</div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input type="password" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-              style={{ flex: 1, minWidth: 0, background: "#080c0a", border: `1px solid ${APP_C.line}`, borderRadius: 12, padding: "8px 12px", color: APP_C.tx, fontSize: 16 }} />
-            <div onClick={submit} style={{ padding: "8px 16px", borderRadius: 12, background: APP_C.ac, color: "#04140c", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>{busy ? "..." : "Switch"}</div>
-            <div onClick={() => setAsking(null)} style={{ padding: "8px 10px", color: APP_C.dim, cursor: "pointer" }}>x</div>
-          </div>
-          {err && <div style={{ color: "#ff6b6b", fontSize: 12, marginTop: 6 }}>{err}</div>}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function AppNoData({ agency }) {
-  return (
-    <div style={{ ...appCard, padding: 16, fontSize: 13, color: APP_C.dim, lineHeight: 1.5 }}>
-      {agency === "CZ" ? "No numbers yet for this period." : `${agency} models run on Infloww. Numbers show up here once the Infloww API is connected.`}
-    </div>
-  );
-}
-
-function AppModelList({ items, onOpen }) {
-  return (
-    <div style={{ ...appCard, padding: "2px 14px", marginBottom: 12 }}>
-      {items.map((m, i) => (
-        <div key={m.name} onClick={() => onOpen(m.name)} style={{ padding: "12px 0", borderBottom: i < items.length - 1 ? `1px solid ${APP_C.line}` : 0, cursor: "pointer" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 16, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}{m.tag ? <span style={{ fontSize: 10, color: APP_C.dim, marginLeft: 6 }}>{m.tag}</span> : null}</div>
-              {m.sub && <div style={{ fontSize: 12, color: APP_C.dim }}>{m.sub}</div>}
-            </div>
-            <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-              <div style={{ fontSize: 15 }}>{appMoney(m.net)}</div>
-              {m.rank != null && <div style={{ fontSize: 11, color: APP_C.ac }}>Top {Number(m.rank).toFixed(m.rank < 1 ? 2 : 0)} %</div>}
-            </div>
-          </div>
-          {m.mini && <div style={{ fontSize: 11, color: APP_C.dim, marginTop: 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.mini}</div>}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function AppSales({ rows, models, agency, onSwitch, onOpenModel }) {
-  const days = appWeekDays();
-  const today = appYmd(new Date());
-  const byDay = {};
-  rows.forEach((r) => { byDay[r.statDate] = (byDay[r.statDate] || 0) + (r.earningsNet || 0); });
-  const vals = days.map((d) => byDay[d] || 0);
-  const max = Math.max(1, ...vals);
-  const week = vals.reduce((a, b) => a + b, 0);
-  const per = models.map((m) => ({ name: m.name, net: rows.filter((r) => r.model === m.name && days.includes(r.statDate)).reduce((t, r) => t + (r.earningsNet || 0), 0) })).sort((a, b) => b.net - a.net);
-  return (
-    <div style={{ maxWidth: 560, margin: "0 auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ fontSize: 30, fontWeight: 500 }}>Sales</div>
-        <AppAgencySwitch agency={agency} onSwitch={onSwitch} />
-      </div>
-      <AppStats items={[["Week", appMoney(week), true], ["Models", String(models.length)], ["Today", appMoney(byDay[today] || 0)]]} />
-      {rows.length === 0 ? <AppNoData agency={agency} /> : (
-        <div style={{ ...appCard, padding: 14, marginBottom: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 15 }}><span>Agency revenue</span><span style={{ fontSize: 10, color: APP_C.dim, letterSpacing: ".08em" }}>THIS WEEK</span></div>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 7, height: 92, marginTop: 10 }}>
-            {vals.map((v, i) => <div key={i} style={{ flex: 1, height: `${Math.max(4, (v / max) * 100)}%`, background: APP_C.ac, opacity: days[i] === today ? 1 : 0.7, borderRadius: "8px 8px 3px 3px" }} />)}
-          </div>
-          <div style={{ display: "flex", gap: 7, marginTop: 5, fontSize: 10, color: APP_C.dim }}>{["M", "T", "W", "T", "F", "S", "S"].map((l, i) => <span key={i} style={{ flex: 1, textAlign: "center" }}>{l}</span>)}</div>
-        </div>
-      )}
-      {per.length > 0 && <div style={{ fontSize: 12, color: APP_C.dim, margin: "14px 0 6px 4px" }}>Models this week</div>}
-      <AppModelList items={per} onOpen={onOpenModel} />
-    </div>
-  );
-}
-
-function AppModels({ rows, models, agency, onSwitch, selected, onSelect }) {
-  const [off, setOff] = useState(0);
-  const [picked, setPicked] = useState(null);
-  const t = new Date();
-  const base = new Date(t.getFullYear(), t.getMonth() + off, 1);
-  const y = base.getFullYear(), mo = base.getMonth();
-  const prefix = `${y}-${String(mo + 1).padStart(2, "0")}-`;
-  const nDays = new Date(y, mo + 1, 0).getDate();
-  const latest = (name, key) => { const r = rows.filter((x) => x.model === name && x[key] != null).sort((a, b) => (a.statDate < b.statDate ? 1 : -1))[0]; return r ? r[key] : null; };
-  const info = (name) => {
-    const mr = rows.filter((r) => r.model === name && r.statDate.startsWith(prefix));
-    const sum = (k) => mr.reduce((s, r) => s + (Number(r[k]) || 0), 0);
-    const free = rows.some((r) => r.model === name && r.accountType === "free") && !rows.some((r) => r.model === name && r.accountType === "paid");
-    return { name, mr, net: sum("earningsNet"), subs: sum("newSubscribers"), renew: sum("subscriberRenewals"), active: latest(name, "activeFans"), rank: latest(name, "performanceRank"), tag: free ? "free" : "" };
-  };
-  const list = models.map((m) => info(m.name)).sort((a, b) => b.net - a.net);
-  const monthPill = (
-    <div style={{ display: "flex", alignItems: "center", gap: 14, background: APP_C.card2, border: `1px solid ${APP_C.line}`, borderRadius: 24, padding: "7px 12px", fontSize: 14, whiteSpace: "nowrap" }}>
-      <span onClick={() => { setOff(off - 1); setPicked(null); }} style={{ color: APP_C.ac, fontSize: 20, cursor: "pointer", padding: "0 4px" }}>&#8249;</span>
-      <span>{appMonthName(base)}</span>
-      <span onClick={() => { if (off < 0) { setOff(off + 1); setPicked(null); } }} style={{ color: off < 0 ? APP_C.ac : "#2a3a30", fontSize: 20, cursor: "pointer", padding: "0 4px" }}>&#8250;</span>
-    </div>
-  );
-  if (selected) {
-    const i = info(selected);
-    const byDay = {};
-    i.mr.forEach((r) => { const d = Number(r.statDate.slice(8, 10)); byDay[d] = byDay[d] || { net: 0, msg: 0, tips: 0, subs: 0 }; byDay[d].net += r.earningsNet || 0; byDay[d].msg += r.messagesNet || 0; byDay[d].tips += r.tipsNet || 0; byDay[d].subs += r.subsNet || 0; });
-    const lead = (new Date(y, mo, 1).getDay() + 6) % 7;
-    const cells = [...Array(lead).fill(null), ...Array.from({ length: nDays }, (_, k) => k + 1)];
-    const todayKey = appYmd(t);
-    const pk = picked && byDay[picked];
-    return (
-      <div style={{ maxWidth: 560, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "6px 0 14px" }}>
-          <div onClick={() => { onSelect(null); setPicked(null); }} style={{ width: 38, height: 38, borderRadius: "50%", background: APP_C.card2, border: `1px solid ${APP_C.line}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, cursor: "pointer", flexShrink: 0 }}>&#8249;</div>
-          <div style={{ flex: 1, fontSize: 16, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{selected}</div>
-          {monthPill}
-        </div>
-        <AppStats items={[["Net", appMoney(i.net), true], ["Rank", i.rank != null ? `${Number(i.rank).toFixed(i.rank < 1 ? 2 : 0)} %` : "n/a"], ["Active", i.active != null ? Number(i.active).toLocaleString("en-US").replace(/,/g, " ") : "n/a"]]} />
-        <div style={{ ...appCard, padding: 14, marginBottom: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}><span style={{ fontSize: 16, fontWeight: 500 }}>Revenue by day</span><span style={{ fontSize: 12, color: APP_C.dim }}>{appMonthName(base)}</span></div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))", gap: 5 }}>
-            {["M", "T", "W", "T", "F", "S", "S"].map((l, k) => <div key={k} style={{ fontSize: 10, color: APP_C.dim, textAlign: "center" }}>{l}</div>)}
-            {cells.map((d, k) => {
-              if (d == null) return <div key={k} />;
-              const v = byDay[d];
-              const isFuture = `${prefix}${String(d).padStart(2, "0")}` > todayKey;
-              return (
-                <div key={k} onClick={() => v && setPicked(d)} style={{ background: picked === d ? "#1b2a21" : "#0b110e", border: `1px solid ${picked === d ? APP_C.ac : "#122219"}`, borderRadius: 9, padding: "5px 0", textAlign: "center", fontSize: 10, color: APP_C.dim, minHeight: 42, opacity: isFuture ? 0.4 : 1, cursor: v ? "pointer" : "default" }}>
-                  {d}<div style={{ fontSize: 10, color: APP_C.tx, fontWeight: 500, marginTop: 2 }}>{v ? appMoney(v.net) : "-"}</div>
-                </div>
-              );
-            })}
-          </div>
-          {pk ? (
-            <div style={{ marginTop: 12, fontSize: 12, color: APP_C.dim, lineHeight: 1.7 }}>
-              <span style={{ color: APP_C.tx }}>{picked}. {mo + 1}.</span> net <span style={{ color: APP_C.ac }}>{appMoney(pk.net)}</span> &middot; messages {appMoney(pk.msg)} &middot; tips {appMoney(pk.tips)} &middot; subs {appMoney(pk.subs)}
-            </div>
-          ) : <div style={{ fontSize: 11, color: APP_C.dim, marginTop: 10 }}>Tap a day for its figures.</div>}
-        </div>
-      </div>
-    );
-  }
-  const total = list.reduce((s, m) => s + m.net, 0);
-  return (
-    <div style={{ maxWidth: 560, margin: "0 auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
-        <AppAgencySwitch agency={agency} onSwitch={onSwitch} />
-        {monthPill}
-      </div>
-      <div style={{ fontSize: 30, fontWeight: 500, margin: "12px 0 0" }}>Model reports</div>
-      <AppStats items={[["Net", appMoney(total), true], ["Models", String(list.length)], ["Earning", String(list.filter((m) => m.net > 0).length), true]]} />
-      {total === 0 && agency !== "CZ" ? <AppNoData agency={agency} /> : null}
-      <AppModelList onOpen={onSelect} items={list.map((m) => ({ name: m.name, tag: m.tag, net: m.net, rank: m.rank, sub: "", mini: `${m.subs} new subs  ${m.renew} renewals  ${m.active != null ? Number(m.active).toLocaleString("en-US").replace(/,/g, " ") : "0"} active` }))} />
-    </div>
-  );
-}
-
-function AppChatters({ agency, onSwitch }) {
-  const ymd = appYmd;
-  const sh = (days) => { const d = new Date(); d.setDate(d.getDate() + days); return d; };
-  const mo = () => (new Date().getDay() + 6) % 7;
-  const periods = {
-    thisweek: ["This week", () => [ymd(sh(-mo())), ymd(sh(1))]],
-    lastweek: ["Last week", () => [ymd(sh(-mo() - 7)), ymd(sh(-mo()))]],
-    month: ["This month", () => { const t = new Date(); return [ymd(new Date(t.getFullYear(), t.getMonth(), 1)), ymd(sh(1))]; }],
-  };
-  const [period, setPeriod] = useState("thisweek");
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [open, setOpen] = useState({});
-  useEffect(() => {
-    if (agency !== "CZ") return;
-    let cancel = false;
-    (async () => {
-      setLoading(true); setError("");
-      try {
-        const [from, to] = periods[period][1]();
-        const r = await fetch(`${SUPABASE_URL}/functions/v1/famee-chatters`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_ANON_KEY}` }, body: JSON.stringify({ from, to }) });
-        const j = await r.json();
-        if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
-        if (!cancel) setData(j);
-      } catch (e) { if (!cancel) setError(e.message || "Failed to load"); }
-      if (!cancel) setLoading(false);
-    })();
-    return () => { cancel = true; };
-  }, [period, agency]);
-  const chatters = (data && data.chatters) || [];
-  const sum = (k) => chatters.reduce((t, c) => t + (Number(c[k]) || 0), 0);
-  return (
-    <div style={{ maxWidth: 560, margin: "0 auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ fontSize: 30, fontWeight: 500 }}>Chatters</div>
-        <AppAgencySwitch agency={agency} onSwitch={onSwitch} />
-      </div>
-      {agency !== "CZ" ? <div style={{ marginTop: 12 }}><AppNoData agency={agency} /></div> : (
-        <>
-          <div style={{ display: "flex", gap: 8, margin: "12px 0 0" }}>
-            {Object.entries(periods).map(([id, p]) => (
-              <div key={id} onClick={() => setPeriod(id)} style={{ padding: "6px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", background: period === id ? APP_C.ac : APP_C.card2, color: period === id ? "#04140c" : APP_C.dim, border: `1px solid ${APP_C.line}` }}>{p[0]}</div>
-            ))}
-          </div>
-          <AppStats items={[["Credited", appMoney(sum("total")), true], ["Net", appMoney(sum("net"))], ["Sales", String(sum("sales"))]]} />
-          {error && <div style={{ color: "#ff6b6b", fontSize: 12, marginBottom: 8 }}>{error}</div>}
-          <div style={{ ...appCard, padding: "2px 14px" }}>
-            {chatters.length === 0 && <div style={{ padding: "14px 0", fontSize: 13, color: APP_C.dim }}>{loading ? "Loading..." : "No credited sales in this period."}</div>}
-            {chatters.map((c, i) => {
-              const key = c.id || c.name;
-              return (
-                <div key={key} style={{ padding: "12px 0", borderBottom: i < chatters.length - 1 ? `1px solid ${APP_C.line}` : 0 }}>
-                  <div onClick={() => setOpen((o) => ({ ...o, [key]: !o[key] }))} style={{ display: "flex", justifyContent: "space-between", cursor: "pointer" }}>
-                    <div><div style={{ fontSize: 16 }}>{c.name}</div><div style={{ fontSize: 12, color: APP_C.dim }}>{c.sales} sales</div></div>
-                    <div style={{ textAlign: "right" }}><div style={{ fontSize: 15 }}>{appMoney(c.total)}</div><div style={{ fontSize: 11, color: APP_C.ac }}>net {appMoney(c.net)}</div></div>
-                  </div>
-                  {open[key] && Object.entries(c.byModel || {}).sort((a, b) => b[1].total - a[1].total).map(([model, m]) => (
-                    <div key={model} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: APP_C.dim, padding: "6px 0 0 10px" }}><span>{model}</span><span>{appMoney(m.total)}</span></div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function AppMenu({ title, groups, onGo }) {
-  return (
-    <div style={{ maxWidth: 560, margin: "0 auto" }}>
-      <div style={{ fontSize: title === "More" ? 17 : 30, fontWeight: 500, textAlign: title === "More" ? "center" : "left", margin: "10px 0 6px" }}>{title}</div>
-      {groups.map(([label, items]) => (
-        <div key={label}>
-          {label && <div style={{ fontSize: 12, color: APP_C.dim, margin: "14px 0 6px 4px" }}>{label}</div>}
-          <div style={{ ...appCard, padding: "2px 14px", marginBottom: 6 }}>
-            {items.map(([id, name, hint], i) => (
-              <div key={id} onClick={() => onGo(id)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 0", borderBottom: i < items.length - 1 ? `1px solid ${APP_C.line}` : 0, cursor: "pointer" }}>
-                <div><div style={{ fontSize: 15 }}>{name}</div>{hint && <div style={{ fontSize: 12, color: APP_C.dim }}>{hint}</div>}</div>
-                <span style={{ color: APP_C.dim, fontSize: 18 }}>&#8250;</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-const APP_TAB_OF = { m_sales: "m_sales", m_models: "m_models", m_chatters: "m_chatters" };
-function AppTabBar({ view, setView }) {
-  const cur = APP_TAB_OF[view] || "m_more";
-  const svgs = {
-    m_sales: <svg viewBox="0 0 32 32" fill="currentColor"><rect x="3" y="15" width="7" height="14" rx="2" /><rect x="12.5" y="6" width="7" height="23" rx="2" /><rect x="22" y="11" width="7" height="18" rx="2" /></svg>,
-    m_models: <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4v22a2 2 0 0 0 2 2h22" /><path d="M9 21l6-7 5 4 8-10" /><path d="M22 8h6v6" /></svg>,
-    m_chatters: <svg viewBox="0 0 32 32" fill="currentColor"><path d="M3 8a5 5 0 0 1 5-5h10a5 5 0 0 1 5 5v6a5 5 0 0 1-5 5h-6l-5 4v-4H8a5 5 0 0 1-5-5z" /><path d="M26 10a4 4 0 0 1 3 4v6a5 5 0 0 1-5 5h-1v4l-5-4h-4a5 5 0 0 1-3.5-1.4H18a7 7 0 0 0 8-7z" opacity=".7" /></svg>,
-    m_content: <svg viewBox="0 0 32 32" fill="currentColor"><rect x="3" y="3" width="11" height="11" rx="3" /><rect x="18" y="3" width="11" height="11" rx="3" /><rect x="3" y="18" width="11" height="11" rx="3" /><rect x="18" y="18" width="11" height="11" rx="3" /></svg>,
-    m_more: <svg viewBox="0 0 32 32" fill="currentColor"><circle cx="6" cy="16" r="3.3" /><circle cx="16" cy="16" r="3.3" /><circle cx="26" cy="16" r="3.3" /></svg>,
-  };
-  const tabs = [["m_sales", "Sales"], ["m_models", "Models"], ["m_chatters", "Chatters"], ["m_more", "More"]];
-  return (
-    <div style={{ position: "fixed", left: 22, right: 22, bottom: "calc(10px + env(safe-area-inset-bottom))", zIndex: 60, background: "#161b18", border: "1px solid #243029", borderRadius: 26, padding: 4, display: "flex", maxWidth: 520, margin: "0 auto" }}>
-      {tabs.map(([id, label]) => (
-        <div key={id} onClick={() => setView(id)} style={{ flex: "1 1 0", minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "6px 0 5px", borderRadius: 22, cursor: "pointer", userSelect: "none", fontSize: 10, fontWeight: 500, background: cur === id ? "#27322b" : "transparent", color: cur === id ? APP_C.ac : APP_C.tx }}>
-          <div style={{ width: 20, height: 20 }}>{svgs[id]}</div>{label}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function App() {
   const { value: cards, loading: cardsLoading, persist: persistCards } = useSupaTable("cards", "id", [], cardsToJS, cardsToDB);
   const { value: models, loading: modelsLoading, persist: persistModels } = useSupaTable("models", "name", [], modelsToJS, modelsToDB,
@@ -13587,9 +13271,6 @@ function App() {
   const { value: weeklyTrendReels, loading: weeklyTrendReelsLoading, reload: reloadWeeklyTrendReels } = useSupaTable("weekly_trend_reels", "id", [], weeklyTrendReelsToJS, weeklyTrendReelsToDB);
   const { value: xCompetitors, persist: persistXCompetitors } = useSupaTable("x_competitor_profiles", "id", [], xCompetitorProfilesToJS, xCompetitorProfilesToDB);
   const [session, setSession] = useState(() => loadSavedSession());
-  const [appModel, setAppModel] = useState(null);
-  const [basicView, setBasicViewRaw] = useState(readBasicFlag);
-  const setBasicView = (on) => { try { if (on) localStorage.setItem("zionBasic", "1"); else localStorage.removeItem("zionBasic"); } catch (e) {} setAppModel(null); setBasicViewRaw(on); setView(on ? "m_sales" : "dashboard"); };
   const [previewFrom, setPreviewFrom] = useState(null); // admin session while previewing as a creator
   const editWorker = useEditWorker(!!session && session.role === "admin");
   const [showLanding, setShowLanding] = useState(true);
@@ -13680,11 +13361,7 @@ function App() {
 
   const NAV = session.role === "admin" ? NAV_ADMIN : NAV_CREATOR;
   const restrictModel = session.role === "creator" ? session.name : undefined;
-  let currentView = view || "dashboard";
-  const appUI = basicView && isAdmin;
-  if (appUI && !currentView.startsWith("m_")) currentView = "m_sales";
-  const appRows = appUI ? (inflowwDailyStats || []).filter((r) => agencyModelNameSet.has(r.model)) : [];
-  const switchAgency = (a) => { const s2 = { ...session, agency: a }; saveSession(s2); setSession(s2); setAppModel(null); };
+  const currentView = view || "dashboard";
   // trends are shared/global — Team manages the same list from either login, choosing per-trend who sees it
 
   const scopedPersistCards = isAdmin
@@ -13703,9 +13380,8 @@ function App() {
     ? async (next) => persistModels([...models.filter((m) => (m.agency || "CZ") !== session.agency), ...next])
     : persistModels;
   return (
-    <div className="min-h-screen c-bg-app flex flex-col" style={{ fontFamily: "Inter, sans-serif", paddingTop: appUI ? "env(safe-area-inset-top)" : undefined }}>
+    <div className="min-h-screen c-bg-app flex flex-col" style={{ fontFamily: "Inter, sans-serif" }}>
       <style>{fontImport}</style>
-      {appUI && <style>{".zion-topbar,.zion-sidebar{display:none !important} body{background:#080c0a}"}</style>}
 
       {currentView === "neo" ? (
         <div className="fixed inset-0 z-40" style={{ background: "#030705", overflowX: "hidden", maxWidth: "100vw" }}>
@@ -13734,7 +13410,7 @@ function App() {
         </div>
       )}
       {/* Full-width top bar (desktop + mobile — sidebar nav now covers both) */}
-      <div className="zion-topbar flex items-center justify-between c-bg-panel flex-shrink-0">
+      <div className="flex items-center justify-between c-bg-panel flex-shrink-0">
         <button onClick={() => setView("dashboard")} title="Go to Dashboard"
           className="tap w-14 sm:w-56 flex items-center justify-center sm:justify-start sm:pl-4 py-3 flex-shrink-0 hover-bg-surface transition-colors">
           <div className="flex items-center gap-2" style={{ position: "relative" }}>
@@ -13752,10 +13428,6 @@ function App() {
           </div>
         </button>
         <div className="flex items-center gap-1.5 px-4 py-3 flex-1 justify-end min-w-0">
-          {isAdmin && !previewFrom && (
-            <button onClick={() => setBasicView(true)} title="Basic view: numbers only"
-              className="tap px-2 py-1 rounded-lg border font-mono fs-11 flex-shrink-0" style={{ borderColor: "#39e673", color: "#39e673" }}>Basic view</button>
-          )}
           {isAdmin && !previewFrom && (
             <select value="" title="Preview as creator"
               onChange={(e) => {
@@ -13804,11 +13476,11 @@ function App() {
       <div className="flex flex-1 min-h-0">
         {/* Backdrop for the mobile popup menu — always mounted so opacity can transition; tapping it closes the menu */}
         <div onClick={() => setMobileNavOpen(false)}
-          className={`zion-sidebar fixed inset-0 z-40 bg-black/60 sm:hidden transition-opacity duration-300 ${mobileNavOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`} />
+          className={`fixed inset-0 z-40 bg-black/60 sm:hidden transition-opacity duration-300 ${mobileNavOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`} />
 
         {/* Sidebar — slides in from the left on phones when the top-right
             menu button is tapped; always visible (static) from sm up. */}
-        <aside className={`zion-sidebar fixed inset-y-0 left-0 z-50 w-56 shadow-2xl flex c-bg-panel flex-shrink-0 flex-col transition-transform duration-300 ease-out sm:static sm:z-auto sm:shadow-none sm:translate-x-0 ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <aside className={`fixed inset-y-0 left-0 z-50 w-56 shadow-2xl flex c-bg-panel flex-shrink-0 flex-col transition-transform duration-300 ease-out sm:static sm:z-auto sm:shadow-none sm:translate-x-0 ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}`}>
           {mobileNavOpen && (
             <div className="sm:hidden flex items-center justify-center pt-6 pb-5">
               <div style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: "8px", transform: "translateX(-6px)" }}>
@@ -13898,8 +13570,8 @@ function App() {
         </aside>
 
         <div className="flex-1 flex flex-col min-w-0">
-          <main key={currentView} className={`flex-1 px-4 md:px-6 py-4 md:py-6 overflow-x-hidden anim-view ${appUI ? "pb-32" : "pb-6"}`}>
-            {currentView !== "neo" && currentView !== "content" && !appUI && (
+          <main key={currentView} className="flex-1 px-4 md:px-6 py-4 md:py-6 overflow-x-hidden pb-6 anim-view">
+            {currentView !== "neo" && currentView !== "content" && (
               <div className="mb-5 md:mb-6">
                 <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight c-text">
                   {NAV.find((n) => n.id === currentView)?.label}
@@ -13907,16 +13579,6 @@ function App() {
               </div>
             )}
 
-            {appUI && !currentView.startsWith("m_") && (
-              <div onClick={() => setView(["stats", "weeklytrends", "models", "whatsnew", "settings"].includes(currentView) ? "m_more" : "m_content")}
-                style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 14, padding: "6px 14px 6px 10px", borderRadius: 20, background: "#131c17", border: "1px solid #173425", color: "#39e673", fontSize: 14, cursor: "pointer" }}>
-                <span style={{ fontSize: 20, lineHeight: 1 }}>&#8249;</span> {NAV.find((n) => n.id === currentView)?.label || "Back"}
-              </div>
-            )}
-            {appUI && currentView === "m_sales" && <AppSales rows={appRows} models={agencyModels} agency={session.agency} onSwitch={switchAgency} onOpenModel={(n) => { setAppModel(n); setView("m_models"); }} />}
-            {appUI && currentView === "m_models" && <AppModels rows={appRows} models={agencyModels} agency={session.agency} onSwitch={switchAgency} selected={appModel} onSelect={setAppModel} />}
-            {appUI && currentView === "m_chatters" && <AppChatters agency={session.agency} onSwitch={switchAgency} />}
-            {appUI && currentView === "m_more" && <AppMenu title="More" onGo={(id) => { if (id === "signout") { clearSavedSession(); setSession(null); setView(null); setOnboardingDismissed(false); } else if (id === "full") setBasicView(false); }} groups={[["View", [["full", "Full Zion OS", "Content, editor, calendar and all tools"]]], ["Account", [["signout", "Sign out", ""]]]]} />}
             {currentView === "dashboard" && (session.role === "admin"
               ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} inflowwDailyStats={inflowwDailyStats} inflowwSyncing={inflowwSyncing} refreshInfloww={refreshInfloww} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} settings={settings} />
               : <CreatorDashboard stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} ofDailyStats={ofDailyStats} inflowwDailyStats={inflowwDailyStats} />)}
@@ -13938,7 +13600,6 @@ function App() {
           </main>
         </div>
       </div>
-      {appUI && <AppTabBar view={currentView} setView={(v) => { setAppModel(null); setView(v); }} />}
       </>
       )}
 
