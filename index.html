@@ -11518,14 +11518,7 @@ const LANDING_PAGE_BODY = `
   <div class="wrap">
     <div class="nav">
       <div class="brand" id="brandHome">
-        <span class="mark">
-          <svg viewBox="0 0 24 24" fill="none">
-            <path d="M12 1L23 12L12 23L1 12Z" stroke="url(#g)" stroke-width="1.5"/>
-            <path d="M12 7L17 12L12 17L7 12Z" fill="url(#g)"/>
-            <defs><linearGradient id="g" x1="0" y1="0" x2="24" y2="24"><stop stop-color="#39e673"/><stop offset="1" stop-color="#12b34c"/></linearGradient></defs>
-          </svg>
-        </span>
-        ZION OS
+        <svg viewBox="-6 0 788 180" height="22" width="96" fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="butt" stroke-linejoin="miter" role="img" aria-label="ZION" style="display:block"><path d="M0 6H160"/><path d="M160 6L92.8 76.6"/><path d="M76.8 93.4L0 174"/><path d="M0 174H160"/><path d="M252 6V174"/><path d="M344 90V128Q344 174 390 174H458Q504 174 504 128V52Q504 6 458 6H390Q344 6 344 52"/><path d="M596 6V174"/><path d="M596 6L660.8 66.5"/><path d="M678.8 83.3L776 174"/><path d="M776 6V174"/></svg>
         <span class="by-neo-tag">by neomngmt</span>
       </div>
       <div class="links">
@@ -12268,6 +12261,47 @@ function LandingPage({
     onClick: () => {}
   }), orbMountEl));
 }
+function ZionWordmark({
+  height = 22,
+  color = "#ffffff"
+}) {
+  return React.createElement("svg", {
+    viewBox: "-6 0 788 180",
+    width: Math.round(height * 788 / 180),
+    height: height,
+    fill: "none",
+    stroke: color,
+    strokeWidth: "12",
+    strokeLinecap: "butt",
+    strokeLinejoin: "miter",
+    role: "img",
+    "aria-label": "ZION",
+    style: {
+      display: "block",
+      flexShrink: 0
+    }
+  }, React.createElement("path", {
+    d: "M0 6H160"
+  }), React.createElement("path", {
+    d: "M160 6L92.8 76.6"
+  }), React.createElement("path", {
+    d: "M76.8 93.4L0 174"
+  }), React.createElement("path", {
+    d: "M0 174H160"
+  }), React.createElement("path", {
+    d: "M252 6V174"
+  }), React.createElement("path", {
+    d: "M344 90V128Q344 174 390 174H458Q504 174 504 128V52Q504 6 458 6H390Q344 6 344 52"
+  }), React.createElement("path", {
+    d: "M596 6V174"
+  }), React.createElement("path", {
+    d: "M596 6L660.8 66.5"
+  }), React.createElement("path", {
+    d: "M678.8 83.3L776 174"
+  }), React.createElement("path", {
+    d: "M776 6V174"
+  }));
+}
 function ZionMark({
   size = 22,
   gradId = "zionMarkGrad"
@@ -12437,15 +12471,9 @@ function LoginScreen({
       alignItems: "center",
       gap: "10px"
     }
-  }, React.createElement(ZionMark, {
-    size: 34,
-    gradId: "zionMarkGradLogin"
+  }, React.createElement(ZionWordmark, {
+    height: 38
   }), React.createElement("span", {
-    className: "font-extrabold tracking-tight c-text",
-    style: {
-      fontSize: "34px"
-    }
-  }, "ZION OS"), React.createElement("span", {
     style: {
       position: "absolute",
       right: 0,
@@ -17997,12 +18025,16 @@ function App() {
     style: {
       position: "relative"
     }
+  }, React.createElement("span", {
+    className: "sm:hidden"
   }, React.createElement(ZionMark, {
     size: 18,
     gradId: "zionMarkGradTopbar"
-  }), React.createElement("span", {
-    className: "text-lg font-extrabold tracking-tight c-text hidden sm:inline"
-  }, "ZION OS"), React.createElement("span", {
+  })), React.createElement("span", {
+    className: "hidden sm:block"
+  }, React.createElement(ZionWordmark, {
+    height: 20
+  })), React.createElement("span", {
     className: "hidden sm:inline",
     style: {
       position: "absolute",
@@ -18108,15 +18140,9 @@ function App() {
       gap: "8px",
       transform: "translateX(-6px)"
     }
-  }, React.createElement(ZionMark, {
-    size: 26,
-    gradId: "zionMarkGradMobileNav"
+  }, React.createElement(ZionWordmark, {
+    height: 24
   }), React.createElement("span", {
-    className: "font-extrabold tracking-tight c-text",
-    style: {
-      fontSize: "22px"
-    }
-  }, "ZION OS"), React.createElement("span", {
     style: {
       position: "absolute",
       right: 0,
@@ -18330,7 +18356,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1kw8yrc</script>
+<script type="text/babel" id="zion-version">126s9ff</script>
 <script>
 (function () {
   var last = 0;
