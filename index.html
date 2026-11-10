@@ -13379,6 +13379,12 @@ function App() {
   const scopedPersistModels = isAdmin
     ? async (next) => persistModels([...models.filter((m) => (m.agency || "CZ") !== session.agency), ...next])
     : persistModels;
+  const startPreview = (name) => {
+    const m = models.find((x) => x.name === name);
+    if (!m) return;
+    setPreviewFrom(session); setOnboardingDismissed(true); setMobileNavOpen(false);
+    setSession({ role: "creator", name: m.name, agency: m.agency || "CZ", preview: true }); setView("dashboard");
+  };
   return (
     <div className="min-h-screen c-bg-app flex flex-col" style={{ fontFamily: "Inter, sans-serif" }}>
       <style>{fontImport}</style>
@@ -13429,14 +13435,8 @@ function App() {
         </button>
         <div className="flex items-center gap-1.5 px-4 py-3 flex-1 justify-end min-w-0">
           {isAdmin && !previewFrom && (
-            <select value="" title="Preview as creator"
-              onChange={(e) => {
-                const m = models.find((x) => x.name === e.target.value);
-                if (!m) return;
-                setPreviewFrom(session); setOnboardingDismissed(true);
-                setSession({ role: "creator", name: m.name, agency: m.agency || "CZ", preview: true }); setView("dashboard");
-              }}
-              className="tap px-2 py-1 rounded-lg border font-mono fs-11 c-bg-panel flex-shrink-0" style={{ borderColor: "#39e673", color: "#39e673", maxWidth: "150px" }}>
+            <select value="" title="Preview as creator" onChange={(e) => startPreview(e.target.value)}
+              className="tap hidden sm:block px-2 py-1 rounded-lg border font-mono fs-11 c-bg-panel flex-shrink-0" style={{ borderColor: "#39e673", color: "#39e673", maxWidth: "150px" }}>
               <option value="">Preview as creator</option>
               {agencyModels.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
             </select>
@@ -13495,6 +13495,15 @@ function App() {
                   animation: "writeOn 1.2s steps(20,end) forwards, neoFlicker 3.5s ease-in-out infinite 1.2s",
                 }}>by neomngmt</span>
               </div>
+            </div>
+          )}
+          {mobileNavOpen && isAdmin && !previewFrom && (
+            <div className="sm:hidden px-3 pb-2">
+              <select value="" title="Preview as creator" onChange={(e) => startPreview(e.target.value)}
+                className="tap w-full px-2 py-2 rounded-lg border font-mono fs-11 c-bg-panel" style={{ borderColor: "#39e673", color: "#39e673" }}>
+                <option value="">Preview as creator</option>
+                {agencyModels.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
+              </select>
             </div>
           )}
           <nav className="flex-1 px-2 py-3 space-y-1 overflow-y-auto">
