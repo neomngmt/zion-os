@@ -12470,30 +12470,23 @@ function LoginScreen({
     className: "flex items-center justify-center mb-8"
   }, React.createElement("div", {
     style: {
-      position: "relative",
       display: "inline-flex",
-      alignItems: "center",
-      gap: "10px"
+      flexDirection: "column",
+      alignItems: "center"
     }
   }, React.createElement(ZionWordmark, {
-    height: 38
+    height: 46
   }), React.createElement("span", {
     style: {
-      position: "absolute",
-      right: 0,
-      top: "100%",
-      marginTop: "8px",
-      display: "inline-block",
-      lineHeight: 1,
-      whiteSpace: "nowrap",
       fontFamily: "'Dancing Script', cursive",
       fontWeight: 700,
-      fontSize: "15px",
       color: "var(--accent, #39ffa0)",
       textShadow: "0 0 3px currentColor, 0 0 6px currentColor",
-      WebkitClipPath: "inset(0 100% 0 0)",
-      clipPath: "inset(0 100% 0 0)",
-      animation: "writeOn 1.2s steps(20,end) forwards, neoFlicker 3.5s ease-in-out infinite 1.2s"
+      lineHeight: 1,
+      whiteSpace: "nowrap",
+      fontSize: "16px",
+      marginTop: "12px",
+      alignSelf: "flex-end"
     }
   }, "by neomngmt"))), React.createElement("div", {
     className: "flex gap-1.5 c-bg-surface border c-border rounded-lg p-1 mb-5"
@@ -18025,10 +18018,7 @@ function App() {
     title: "Go to Dashboard",
     className: "tap w-14 sm:w-56 flex items-center justify-center sm:justify-start sm:pl-4 py-3 flex-shrink-0 hover-bg-surface transition-colors"
   }, React.createElement("div", {
-    className: "flex items-center gap-2",
-    style: {
-      position: "relative"
-    }
+    className: "flex flex-col items-center sm:items-start"
   }, React.createElement("span", {
     className: "sm:hidden"
   }, React.createElement(ZionMark, {
@@ -18037,21 +18027,19 @@ function App() {
   })), React.createElement("span", {
     className: "hidden sm:block"
   }, React.createElement(ZionWordmark, {
-    height: 20
+    height: 30
   })), React.createElement("span", {
-    className: "hidden sm:inline",
+    className: "hidden sm:block",
     style: {
-      position: "absolute",
-      right: 0,
-      top: "100%",
-      marginTop: "5px",
-      lineHeight: 1,
-      whiteSpace: "nowrap",
       fontFamily: "'Dancing Script', cursive",
       fontWeight: 700,
-      fontSize: "10px",
-      color: "var(--accent, #12b34c)",
+      color: "var(--accent, #39ffa0)",
       textShadow: "0 0 3px currentColor, 0 0 6px currentColor",
+      lineHeight: 1,
+      whiteSpace: "nowrap",
+      fontSize: "13px",
+      marginTop: "8px",
+      alignSelf: "flex-end",
       pointerEvents: "none"
     }
   }, "by neomngmt"))), React.createElement("div", {
@@ -18138,31 +18126,23 @@ function App() {
     className: "sm:hidden flex items-center justify-center pt-6 pb-5"
   }, React.createElement("div", {
     style: {
-      position: "relative",
       display: "inline-flex",
-      alignItems: "center",
-      gap: "8px",
-      transform: "translateX(-6px)"
+      flexDirection: "column",
+      alignItems: "center"
     }
   }, React.createElement(ZionWordmark, {
-    height: 24
+    height: 34
   }), React.createElement("span", {
     style: {
-      position: "absolute",
-      right: 0,
-      top: "100%",
-      marginTop: "6px",
-      display: "inline-block",
-      lineHeight: 1,
-      whiteSpace: "nowrap",
       fontFamily: "'Dancing Script', cursive",
       fontWeight: 700,
-      fontSize: "11px",
       color: "var(--accent, #39ffa0)",
       textShadow: "0 0 3px currentColor, 0 0 6px currentColor",
-      WebkitClipPath: "inset(0 100% 0 0)",
-      clipPath: "inset(0 100% 0 0)",
-      animation: "writeOn 1.2s steps(20,end) forwards, neoFlicker 3.5s ease-in-out infinite 1.2s"
+      lineHeight: 1,
+      whiteSpace: "nowrap",
+      fontSize: "14px",
+      marginTop: "10px",
+      alignSelf: "flex-end"
     }
   }, "by neomngmt"))), mobileNavOpen && isAdmin && !previewFrom && React.createElement("div", {
     className: "sm:hidden px-3 pb-2"
@@ -18360,7 +18340,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1psvzuf</script>
+<script type="text/babel" id="zion-version">3wo6tm</script>
 <script>
 (function () {
   var last = 0;

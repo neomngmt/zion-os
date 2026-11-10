@@ -9337,16 +9337,9 @@ function LoginScreen({ models, onLogin }) {
       <div className="w-full max-w-sm login-desktop-scale">
       <div className="anim-card-in">
         <div className="flex items-center justify-center mb-8">
-          <div style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: "10px" }}>
-            <ZionWordmark height={38} />
-            <span style={{
-              position: "absolute", right: 0, top: "100%", marginTop: "8px",
-              display: "inline-block", lineHeight: 1, whiteSpace: "nowrap",
-              fontFamily: "'Dancing Script', cursive", fontWeight: 700, fontSize: "15px",
-              color: "var(--accent, #39ffa0)", textShadow: "0 0 3px currentColor, 0 0 6px currentColor",
-              WebkitClipPath: "inset(0 100% 0 0)", clipPath: "inset(0 100% 0 0)",
-              animation: "writeOn 1.2s steps(20,end) forwards, neoFlicker 3.5s ease-in-out infinite 1.2s",
-            }}>by neomngmt</span>
+          <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center" }}>
+            <ZionWordmark height={46} />
+            <span style={{ fontFamily: "'Dancing Script', cursive", fontWeight: 700, color: "var(--accent, #39ffa0)", textShadow: "0 0 3px currentColor, 0 0 6px currentColor", lineHeight: 1, whiteSpace: "nowrap", fontSize: "16px", marginTop: "12px", alignSelf: "flex-end" }}>by neomngmt</span>
           </div>
         </div>
 
@@ -13579,16 +13572,10 @@ function App() {
       <div className="topbar-smooth flex items-center justify-between c-bg-panel flex-shrink-0" style={{ paddingTop: previewFrom ? 0 : "calc(env(safe-area-inset-top) + 14px)" }}>
         <button onClick={() => setView("dashboard")} title="Go to Dashboard"
           className="tap w-14 sm:w-56 flex items-center justify-center sm:justify-start sm:pl-4 py-3 flex-shrink-0 hover-bg-surface transition-colors">
-          <div className="flex items-center gap-2" style={{ position: "relative" }}>
+          <div className="flex flex-col items-center sm:items-start">
             <span className="sm:hidden"><ZionMark size={18} gradId="zionMarkGradTopbar" /></span>
-            <span className="hidden sm:block"><ZionWordmark height={20} /></span>
-            <span className="hidden sm:inline" style={{
-              position: "absolute", right: 0, top: "100%", marginTop: "5px",
-              lineHeight: 1, whiteSpace: "nowrap",
-              fontFamily: "'Dancing Script', cursive", fontWeight: 700, fontSize: "10px",
-              color: "var(--accent, #12b34c)", textShadow: "0 0 3px currentColor, 0 0 6px currentColor",
-              pointerEvents: "none",
-            }}>by neomngmt</span>
+            <span className="hidden sm:block"><ZionWordmark height={30} /></span>
+            <span className="hidden sm:block" style={{ fontFamily: "'Dancing Script', cursive", fontWeight: 700, color: "var(--accent, #39ffa0)", textShadow: "0 0 3px currentColor, 0 0 6px currentColor", lineHeight: 1, whiteSpace: "nowrap", fontSize: "13px", marginTop: "8px", alignSelf: "flex-end", pointerEvents: "none" }}>by neomngmt</span>
           </div>
         </button>
         <div className="flex items-center gap-1.5 px-4 py-3 flex-1 justify-end min-w-0">
@@ -13641,16 +13628,9 @@ function App() {
         <aside className={`fixed inset-y-0 left-0 z-50 w-56 shadow-2xl flex c-bg-panel flex-shrink-0 flex-col transition-transform duration-300 ease-out sm:static sm:z-auto sm:shadow-none sm:translate-x-0 ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}`} style={{ paddingTop: "env(safe-area-inset-top)" }}>
           {mobileNavOpen && (
             <div className="sm:hidden flex items-center justify-center pt-6 pb-5">
-              <div style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: "8px", transform: "translateX(-6px)" }}>
-                <ZionWordmark height={24} />
-                <span style={{
-                  position: "absolute", right: 0, top: "100%", marginTop: "6px",
-                  display: "inline-block", lineHeight: 1, whiteSpace: "nowrap",
-                  fontFamily: "'Dancing Script', cursive", fontWeight: 700, fontSize: "11px",
-                  color: "var(--accent, #39ffa0)", textShadow: "0 0 3px currentColor, 0 0 6px currentColor",
-                  WebkitClipPath: "inset(0 100% 0 0)", clipPath: "inset(0 100% 0 0)",
-                  animation: "writeOn 1.2s steps(20,end) forwards, neoFlicker 3.5s ease-in-out infinite 1.2s",
-                }}>by neomngmt</span>
+              <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center" }}>
+                <ZionWordmark height={34} />
+                <span style={{ fontFamily: "'Dancing Script', cursive", fontWeight: 700, color: "var(--accent, #39ffa0)", textShadow: "0 0 3px currentColor, 0 0 6px currentColor", lineHeight: 1, whiteSpace: "nowrap", fontSize: "14px", marginTop: "10px", alignSelf: "flex-end" }}>by neomngmt</span>
               </div>
             </div>
           )}
