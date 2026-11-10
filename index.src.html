@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <link rel="manifest" href="https://neomngmt.github.io/zion-os/manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="https://neomngmt.github.io/zion-os/icon-180.png">
-<link rel="icon" type="image/png" sizes="192x192" href="https://neomngmt.github.io/zion-os/icon-192.png">
+<link rel="icon" type="image/png" sizes="48x48" href="https://neomngmt.github.io/zion-os/favicon-v2-48.png">
+<link rel="icon" type="image/png" sizes="192x192" href="https://neomngmt.github.io/zion-os/favicon-v2-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -417,6 +418,7 @@ const fontImport = `
 .focus-border-accent:focus { border-color: var(--accent) !important; }
 .search-pop{ top:calc(env(safe-area-inset-top) + 4.6rem); box-shadow:none; }
 @media (max-width:639px){
+  .topbar-smooth[data-preview="0"]{ padding-top:calc(env(safe-area-inset-top) + 14px) !important; }
   .topbar-smooth{ background-color:transparent !important; box-shadow:none !important; border:0 !important; filter:none !important; backdrop-filter:none !important; -webkit-backdrop-filter:none !important; }
   .topbar-smooth *{ box-shadow:none !important; text-shadow:none !important; filter:none !important; backdrop-filter:none !important; -webkit-backdrop-filter:none !important; animation:none !important; transition:none !important; }
   .topbar-smooth svg{ shape-rendering:geometricPrecision; }
@@ -13569,9 +13571,9 @@ function App() {
         </div>
       )}
       {/* Full-width top bar (desktop + mobile — sidebar nav now covers both) */}
-      <div className="topbar-smooth flex items-center justify-between c-bg-panel flex-shrink-0" style={{ paddingTop: previewFrom ? 0 : "calc(env(safe-area-inset-top) + 14px)" }}>
+      <div className="topbar-smooth flex items-center justify-between c-bg-panel flex-shrink-0" data-preview={previewFrom ? "1" : "0"} style={{ paddingTop: previewFrom ? 0 : "env(safe-area-inset-top)" }}>
         <button onClick={() => setView("dashboard")} title="Go to Dashboard"
-          className="tap w-14 sm:w-56 flex items-center justify-center sm:justify-start sm:pl-4 py-3 flex-shrink-0 hover-bg-surface transition-colors">
+          className="tap w-14 sm:w-56 flex items-center justify-center sm:justify-start sm:pl-5 py-3 flex-shrink-0 hover-bg-surface transition-colors">
           <div className="flex flex-col items-center sm:items-start">
             <span className="sm:hidden"><ZionMark size={18} gradId="zionMarkGradTopbar" /></span>
             <span className="hidden sm:block"><ZionWordmark height={25} /></span>
