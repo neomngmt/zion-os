@@ -13618,5 +13618,34 @@ function App() {
 
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
+<script>
+(function () {
+  var last = 0;
+  function hash(str) { var x = 5381; for (var i = 0; i < str.length; i++) { x = ((x << 5) + x + str.charCodeAt(i)) | 0; } return x; }
+  function mine() { var el = document.querySelector('script[type="text/babel"]'); return el ? hash(el.textContent) : null; }
+  async function check(force) {
+    if (!force && Date.now() - last < 60000) return;
+    last = Date.now();
+    try {
+      var r = await fetch(location.pathname + "?_=" + Date.now(), { cache: "no-store" });
+      if (!r.ok) return;
+      var t = await r.text();
+      var m = t.match(/<script type="text\/babel"[^>]*>([\s\S]*?)<\/script>/);
+      var cur = mine();
+      if (!m || cur === null || hash(m[1]) === cur) return;
+      var prev = 0;
+      try { prev = Number(sessionStorage.getItem("zionReloadAt")) || 0; } catch (e) {}
+      if (Date.now() - prev < 30000) return;
+      try { sessionStorage.setItem("zionReloadAt", String(Date.now())); } catch (e) {}
+      location.replace(location.pathname + "?v=" + Date.now());
+    } catch (e) {}
+  }
+  window.__zionUpdateCheck = check;
+  setTimeout(check, 3000);
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") check(); });
+  window.addEventListener("pageshow", function () { check(); });
+  setInterval(check, 300000);
+})();
+</script>
 </body>
 </html>
