@@ -2,6 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Zion OS">
+<meta name="theme-color" content="#080c0a">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <title>Zion OS</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M12 2L22 12L12 22L2 12Z' fill='url(%23g)'/%3E%3Cdefs%3E%3ClinearGradient id='g' x1='2' y1='2' x2='22' y2='22'%3E%3Cstop stop-color='%2339e673'/%3E%3Cstop offset='1' stop-color='%2312b34c'/%3E%3C/linearGradient%3E%3C/defs%3E%3C/svg%3E">
@@ -13244,14 +13251,14 @@ function clearSavedSession() {
 }
 
 // ---------- phone app mode (Capacitor wrapper or ?app=1) ----------
-const APP_MODE = (() => {
+const readBasicFlag = () => {
   try {
-    const q = new URLSearchParams(location.search).get("app");
-    if (q === "1") localStorage.setItem("zionAppMode", "1");
-    if (q === "0") localStorage.removeItem("zionAppMode");
-    return /ZionApp/.test(navigator.userAgent) || !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) || localStorage.getItem("zionAppMode") === "1";
+    const q = new URLSearchParams(location.search).get("basic");
+    if (q === "1") localStorage.setItem("zionBasic", "1");
+    if (q === "0") localStorage.removeItem("zionBasic");
+    return localStorage.getItem("zionBasic") === "1";
   } catch (e) { return false; }
-})();
+};
 const APP_C = { bg: "#080c0a", card: "#0f1612", card2: "#131c17", line: "#173425", dim: "#6b8074", ac: "#39e673", tx: "#f2f5f0" };
 const appCard = { background: APP_C.card, border: `1px solid ${APP_C.line}`, borderRadius: 20 };
 const appMoney = (n) => "$" + Math.round(Number(n) || 0).toLocaleString("en-US").replace(/,/g, " ");
@@ -13540,7 +13547,7 @@ function AppMenu({ title, groups, onGo }) {
   );
 }
 
-const APP_TAB_OF = { m_sales: "m_sales", m_models: "m_models", m_chatters: "m_chatters", m_content: "m_content", content: "m_content", editor: "m_content", calendar: "m_content", tasks: "m_content", reelsorter: "m_content", titlegen: "m_content" };
+const APP_TAB_OF = { m_sales: "m_sales", m_models: "m_models", m_chatters: "m_chatters" };
 function AppTabBar({ view, setView }) {
   const cur = APP_TAB_OF[view] || "m_more";
   const svgs = {
@@ -13550,7 +13557,7 @@ function AppTabBar({ view, setView }) {
     m_content: <svg viewBox="0 0 32 32" fill="currentColor"><rect x="3" y="3" width="11" height="11" rx="3" /><rect x="18" y="3" width="11" height="11" rx="3" /><rect x="3" y="18" width="11" height="11" rx="3" /><rect x="18" y="18" width="11" height="11" rx="3" /></svg>,
     m_more: <svg viewBox="0 0 32 32" fill="currentColor"><circle cx="6" cy="16" r="3.3" /><circle cx="16" cy="16" r="3.3" /><circle cx="26" cy="16" r="3.3" /></svg>,
   };
-  const tabs = [["m_sales", "Sales"], ["m_models", "Models"], ["m_chatters", "Chatters"], ["m_content", "Content"], ["m_more", "More"]];
+  const tabs = [["m_sales", "Sales"], ["m_models", "Models"], ["m_chatters", "Chatters"], ["m_more", "More"]];
   return (
     <div style={{ position: "fixed", left: 22, right: 22, bottom: "calc(10px + env(safe-area-inset-bottom))", zIndex: 60, background: "#161b18", border: "1px solid #243029", borderRadius: 26, padding: 4, display: "flex", maxWidth: 520, margin: "0 auto" }}>
       {tabs.map(([id, label]) => (
@@ -13583,6 +13590,8 @@ function App() {
   const { value: xCompetitors, persist: persistXCompetitors } = useSupaTable("x_competitor_profiles", "id", [], xCompetitorProfilesToJS, xCompetitorProfilesToDB);
   const [session, setSession] = useState(() => loadSavedSession());
   const [appModel, setAppModel] = useState(null);
+  const [basicView, setBasicViewRaw] = useState(readBasicFlag);
+  const setBasicView = (on) => { try { if (on) localStorage.setItem("zionBasic", "1"); else localStorage.removeItem("zionBasic"); } catch (e) {} setAppModel(null); setBasicViewRaw(on); setView(on ? "m_sales" : "dashboard"); };
   const [previewFrom, setPreviewFrom] = useState(null); // admin session while previewing as a creator
   const editWorker = useEditWorker(!!session && session.role === "admin");
   const [showLanding, setShowLanding] = useState(true);
@@ -13674,8 +13683,8 @@ function App() {
   const NAV = session.role === "admin" ? NAV_ADMIN : NAV_CREATOR;
   const restrictModel = session.role === "creator" ? session.name : undefined;
   let currentView = view || "dashboard";
-  const appUI = APP_MODE && isAdmin;
-  if (appUI && currentView === "dashboard") currentView = "m_sales";
+  const appUI = basicView && isAdmin;
+  if (appUI && !currentView.startsWith("m_")) currentView = "m_sales";
   const appRows = appUI ? (inflowwDailyStats || []).filter((r) => agencyModelNameSet.has(r.model)) : [];
   const switchAgency = (a) => { const s2 = { ...session, agency: a }; saveSession(s2); setSession(s2); setAppModel(null); };
   // trends are shared/global — Team manages the same list from either login, choosing per-trend who sees it
@@ -13745,6 +13754,10 @@ function App() {
           </div>
         </button>
         <div className="flex items-center gap-1.5 px-4 py-3 flex-1 justify-end min-w-0">
+          {isAdmin && !previewFrom && (
+            <button onClick={() => setBasicView(true)} title="Basic view: numbers only"
+              className="tap px-2 py-1 rounded-lg border font-mono fs-11 flex-shrink-0" style={{ borderColor: "#39e673", color: "#39e673" }}>Basic view</button>
+          )}
           {isAdmin && !previewFrom && (
             <select value="" title="Preview as creator"
               onChange={(e) => {
@@ -13905,8 +13918,7 @@ function App() {
             {appUI && currentView === "m_sales" && <AppSales rows={appRows} models={agencyModels} agency={session.agency} onSwitch={switchAgency} onOpenModel={(n) => { setAppModel(n); setView("m_models"); }} />}
             {appUI && currentView === "m_models" && <AppModels rows={appRows} models={agencyModels} agency={session.agency} onSwitch={switchAgency} selected={appModel} onSelect={setAppModel} />}
             {appUI && currentView === "m_chatters" && <AppChatters agency={session.agency} onSwitch={switchAgency} />}
-            {appUI && currentView === "m_content" && <AppMenu title="Content" onGo={setView} groups={[["", [["content", "Content Director", "Snap, X, Instagram posting"], ["editor", "Editor", "Reel cutting"], ["calendar", "Calendar", "Planned posts"], ["tasks", "Tasks", "Open to-dos"], ["reelsorter", "Reels Sorter", ""], ["titlegen", "Title Generator", ""]]]]} />}
-            {appUI && currentView === "m_more" && <AppMenu title="More" onGo={(id) => { if (id === "signout") { clearSavedSession(); setSession(null); setView(null); setOnboardingDismissed(false); } else setView(id); }} groups={[["Operations", [["stats", "Stats", ""], ["weeklytrends", "Trends", ""], ["neo", "Neo", ""], ["models", "Model Manager", ""], ["whatsnew", "OF News", ""]]], ["Account", [["settings", "Settings", ""], ["signout", "Sign out", ""]]]]} />}
+            {appUI && currentView === "m_more" && <AppMenu title="More" onGo={(id) => { if (id === "signout") { clearSavedSession(); setSession(null); setView(null); setOnboardingDismissed(false); } else if (id === "full") setBasicView(false); }} groups={[["View", [["full", "Full Zion OS", "Content, editor, calendar and all tools"]]], ["Account", [["signout", "Sign out", ""]]]]} />}
             {currentView === "dashboard" && (session.role === "admin"
               ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} inflowwDailyStats={inflowwDailyStats} inflowwSyncing={inflowwSyncing} refreshInfloww={refreshInfloww} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} settings={settings} />
               : <CreatorDashboard stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} ofDailyStats={ofDailyStats} inflowwDailyStats={inflowwDailyStats} />)}
