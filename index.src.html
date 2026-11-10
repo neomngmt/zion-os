@@ -11741,6 +11741,7 @@ function useSupaChangelog() {
       setValue((data || []).map((r) => ({
         id: r.id, title: r.title, description: r.description || "",
         category: r.category || "improvement", createdAt: r.created_at,
+        sourceUrl: r.source_url || "", sourceName: r.source_name || "",
       })));
     } catch (e) {
       console.error("load failed for changelog", e);
@@ -11765,6 +11766,20 @@ function useSupaChangelog() {
 
 const CHANGELOG_SEEN_KEY = "agencyos_changelog_last_seen";
 
+function useSupaOfStats() {
+  const [value, setValue] = useState([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabaseClient.from("of_platform_stats").select("*");
+        if (error) throw error;
+        setValue(data || []);
+      } catch (e) { console.error("load failed for of_platform_stats", e); }
+    })();
+  }, []);
+  return value;
+}
+
 function WhatsNewPage() {
   const { value: rawEntries, loading } = useSupaChangelog();
   // Defensive: a since-removed debug CI workflow used to insert a hardcoded
@@ -11782,12 +11797,38 @@ function WhatsNewPage() {
     feature: { label: "Feature", bg: "rgba(18,179,76,0.16)", color: "#39e673" },
     fix: { label: "Fix", bg: "rgba(216,90,48,0.16)", color: "#e0876a" },
     improvement: { label: "Improvement", bg: "rgba(120,140,255,0.16)", color: "#9aa8ff" },
+    platform: { label: "Platform", bg: "rgba(18,179,76,0.16)", color: "#39e673" },
+    money: { label: "Money", bg: "rgba(240,190,60,0.16)", color: "#f0be3c" },
+    policy: { label: "Policy", bg: "rgba(216,90,48,0.16)", color: "#e0876a" },
+    competition: { label: "Competition", bg: "rgba(120,140,255,0.16)", color: "#9aa8ff" },
+    market: { label: "Market", bg: "rgba(56,189,248,0.16)", color: "#5cc8f5" },
   };
+  const ofStats = useSupaOfStats();
+  const statOrder = ["Creators", "Fans", "Gross payments", "Creator payouts", "Platform revenue", "Profit", "Platform fee"];
+  const orderedStats = statOrder.map((l) => ofStats.find((x) => x.label === l)).filter(Boolean);
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
   return (
     <div className="max-w-2xl">
-      <p className="fs-13 c-muted mb-6">News and developments from the OnlyFans / creator economy world.</p>
+      <p className="fs-13 c-muted mb-6">News and developments from the OnlyFans / creator economy world. Checked several times a day.</p>
+
+      {orderedStats.length > 0 && (
+        <div className="mb-7">
+          <div className="fs-10 font-mono uppercase tracking-widest c-faint mb-2">OnlyFans in numbers</div>
+          <div className="grid grid-cols-2 gap-2.5">
+            {orderedStats.map((st) => (
+              <a key={st.label} href={st.source_url} target="_blank" rel="noopener noreferrer"
+                className="c-bg-surface border c-border rounded-xl px-3.5 py-3 block hover-lift" style={{ textDecoration: "none" }}>
+                <div className="fs-10 font-mono uppercase tracking-wide c-faint">{st.label}</div>
+                <div className="fs-20 font-extrabold c-accent mt-0.5">{st.value}</div>
+                <div className="fs-10 c-muted mt-0.5">{st.period || ""}</div>
+                {st.note && <div className="fs-10 c-faint mt-1 leading-snug">{st.note}</div>}
+              </a>
+            ))}
+          </div>
+          <div className="fs-10 c-faint font-mono mt-2">Figures from the latest public reports, tap a card to open the source.</div>
+        </div>
+      )}
 
       {loading && <div className="fs-13 c-muted flex items-center gap-2"><Loader2 size={14} className="animate-spin" />Loading...</div>}
       {!loading && !entries.length && (
@@ -11817,6 +11858,11 @@ function WhatsNewPage() {
               </div>
               <div className="fs-14 font-semibold c-text mb-0.5">{e.title}</div>
               {e.description && <div className="fs-12 c-muted leading-relaxed">{e.description}</div>}
+              {e.sourceUrl && (
+                <a href={e.sourceUrl} target="_blank" rel="noopener noreferrer" className="fs-11 font-mono c-accent mt-2 inline-block">
+                  {e.sourceName || "Source"} &rarr;
+                </a>
+              )}
             </div>
           );
         })}
