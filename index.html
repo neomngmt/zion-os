@@ -28,6 +28,7 @@
 </script>
 <style>
 html,body{margin:0;padding:0;overflow-x:hidden;max-width:100vw;}
+html{padding-bottom:env(safe-area-inset-bottom);}
 body{ background-color:#07090a; }
 .global-shoot{ position:fixed; z-index:9999; width:3px; height:3px; border-radius:50%; opacity:0; pointer-events:none;
   background:#eafff0;
@@ -413,8 +414,6 @@ const fontImport = `
 .focus-border-accent:focus { border-color: var(--accent) !important; }
 .search-pop{ top:calc(env(safe-area-inset-top) + 4.6rem); box-shadow:none; }
 @media (max-width:639px){
-  .app-shell{ height:100vh; height:100dvh; min-height:0 !important; overflow:hidden; }
-  .app-scroll{ overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; padding-bottom:env(safe-area-inset-bottom); }
   .topbar-smooth{ background-color:transparent !important; box-shadow:none !important; border:0 !important; filter:none !important; backdrop-filter:none !important; -webkit-backdrop-filter:none !important; }
   .topbar-smooth *{ box-shadow:none !important; text-shadow:none !important; filter:none !important; backdrop-filter:none !important; -webkit-backdrop-filter:none !important; animation:none !important; transition:none !important; }
   .topbar-smooth svg{ shape-rendering:geometricPrecision; }
@@ -13395,7 +13394,7 @@ function App() {
     setSession({ role: "creator", name: m.name, agency: m.agency || "CZ", preview: true }); setView("dashboard");
   };
   return (
-    <div className="app-shell min-h-screen c-bg-app flex flex-col" style={{ fontFamily: "Inter, sans-serif" }}>
+    <div className="min-h-screen c-bg-app flex flex-col" style={{ fontFamily: "Inter, sans-serif" }}>
       <style>{fontImport}</style>
 
       {currentView === "neo" ? (
@@ -13482,7 +13481,7 @@ function App() {
         </div>
       </div>
 
-      <div className="app-scroll flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0">
         {/* Backdrop for the mobile popup menu — always mounted so opacity can transition; tapping it closes the menu */}
         <div onClick={() => setMobileNavOpen(false)}
           className={`fixed inset-0 z-40 bg-black/60 sm:hidden transition-opacity duration-300 ${mobileNavOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`} />
