@@ -13413,14 +13413,14 @@ function App() {
       ) : (
       <>
       {previewFrom && (
-        <div className="flex items-center justify-center gap-3 px-3 py-1.5 font-mono fs-11 uppercase tracking-widest flex-shrink-0" style={{ background: "#39e673", color: "#03110a" }}>
+        <div className="flex items-center justify-center gap-3 px-3 py-1.5 font-mono fs-11 uppercase tracking-widest flex-shrink-0" style={{ background: "#39e673", color: "#03110a", paddingTop: "calc(env(safe-area-inset-top) + 0.375rem)" }}>
           <span>Preview: you see Zion OS as {session.name}</span>
           <button onClick={() => { setSession(previewFrom); setPreviewFrom(null); setView("dashboard"); }}
             className="tap px-2 py-0.5 rounded border font-bold" style={{ borderColor: "#03110a" }}>Exit preview</button>
         </div>
       )}
       {/* Full-width top bar (desktop + mobile — sidebar nav now covers both) */}
-      <div className="topbar-smooth flex items-center justify-between c-bg-panel flex-shrink-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+      <div className="topbar-smooth flex items-center justify-between c-bg-panel flex-shrink-0" style={{ paddingTop: previewFrom ? 0 : "env(safe-area-inset-top)" }}>
         <button onClick={() => setView("dashboard")} title="Go to Dashboard"
           className="tap w-14 sm:w-56 flex items-center justify-center sm:justify-start sm:pl-4 py-3 flex-shrink-0 hover-bg-surface transition-colors">
           <div className="flex items-center gap-2" style={{ position: "relative" }}>
