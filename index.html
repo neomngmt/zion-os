@@ -413,7 +413,11 @@ const fontImport = `
 .hover-border-2:hover { border-color: var(--border2) !important; }
 .focus-border-accent:focus { border-color: var(--accent) !important; }
 .search-pop{ top:calc(env(safe-area-inset-top) + 4.6rem); box-shadow:none; }
-@media (max-width:639px){ .topbar-smooth{ background-color:transparent !important; } }
+@media (max-width:639px){
+  .topbar-smooth{ background-color:transparent !important; box-shadow:none !important; border:0 !important; filter:none !important; backdrop-filter:none !important; -webkit-backdrop-filter:none !important; }
+  .topbar-smooth *{ box-shadow:none !important; text-shadow:none !important; filter:none !important; backdrop-filter:none !important; -webkit-backdrop-filter:none !important; animation:none !important; transition:none !important; }
+  .topbar-smooth svg{ shape-rendering:geometricPrecision; }
+}
 @media (min-width:640px){ .search-pop{ top:100%; } }
 
 .fs-7 { font-size: 7px; }
