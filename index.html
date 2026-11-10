@@ -412,6 +412,8 @@ const fontImport = `
 .hover-border-warn:hover { border-color: var(--warn) !important; }
 .hover-border-2:hover { border-color: var(--border2) !important; }
 .focus-border-accent:focus { border-color: var(--accent) !important; }
+.search-pop{ top:calc(env(safe-area-inset-top) + 4.6rem); box-shadow:none; }
+@media (min-width:640px){ .search-pop{ top:100%; } }
 
 .fs-7 { font-size: 7px; }
 .fs-8 { font-size: 8px; }
@@ -11310,7 +11312,7 @@ function GlobalSearch({ cards, tasks, models, trends, onNavigate, trendsNavId, s
         <span className="fs-12 font-mono">Search</span>
       </button>
       {open && (
-        <div className="fixed left-3 right-3 top-14 sm:absolute sm:left-auto sm:top-full sm:right-0 sm:mt-2 sm:w-80 c-bg-surface border c-border rounded-xl shadow-2xl z-50 p-2">
+        <div className="search-pop fixed left-3 right-3 sm:absolute sm:left-auto sm:right-0 sm:mt-2 sm:w-80 c-bg-surface border c-border rounded-xl z-50 p-2">
           <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search pages, scenes, tasks, models, trends..."
             className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent mb-1" />
           {query && totalMatches === 0 && <div className="fs-12 c-faint font-mono italic text-center py-4">No matches.</div>}
