@@ -10,11 +10,13 @@ const re = /<script type="text\/babel"[^>]*>([\s\S]*?)<\/script>/;
 const m = html.match(re);
 if (!m) throw new Error("no text/babel script found");
 const compiled = Babel.transform(m[1], { presets: [["react", { runtime: "classic" }]], compact: false, comments: false }).code;
-let x = 5381;
-for (let i = 0; i < compiled.length; i++) x = ((x << 5) + x + compiled.charCodeAt(i)) | 0;
-const version = (x >>> 0).toString(36);
 if (compiled.includes("</script")) throw new Error("compiled code contains </script");
-let outHtml = html.replace(re, () => `<script id="zion-main">\n${compiled}\n</script>\n<script type="text/babel" id="zion-version">${version}</script>`);
+let outHtml = html.replace(re, () => `<script id="zion-main">\n${compiled}\n</script>\n<script type="text/babel" id="zion-version">__VERSION__</script>`);
 outHtml = outHtml.replace(/<script src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/babel-standalone\/[^"]*"><\/script>\n?/, "");
+// version = hash of the whole page, so style and head changes also trigger the in-app update
+let x = 5381;
+for (let i = 0; i < outHtml.length; i++) x = ((x << 5) + x + outHtml.charCodeAt(i)) | 0;
+const version = (x >>> 0).toString(36);
+outHtml = outHtml.replace("__VERSION__", version);
 fs.writeFileSync(out, outHtml);
 console.log("built", out, outHtml.length, "bytes, version", version);
