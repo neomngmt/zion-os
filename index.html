@@ -13498,6 +13498,7 @@ function App() {
               </div>
             </div>
           )}
+          {mobileNavOpen && <div className="sm:hidden text-center fs-10 font-mono c-faint pb-2">build 10.11. 14:14</div>}
           {mobileNavOpen && isAdmin && !previewFrom && (
             <div className="sm:hidden px-3 pb-2">
               <select value="" title="Preview as creator" onChange={(e) => startPreview(e.target.value)}
