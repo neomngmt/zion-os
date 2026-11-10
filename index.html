@@ -13424,7 +13424,7 @@ function App() {
         </div>
       )}
       {/* Full-width top bar (desktop + mobile — sidebar nav now covers both) */}
-      <div className="topbar-smooth flex items-center justify-between c-bg-panel flex-shrink-0" style={{ paddingTop: previewFrom ? 0 : "env(safe-area-inset-top)" }}>
+      <div className="topbar-smooth flex items-center justify-between c-bg-panel flex-shrink-0" style={{ paddingTop: previewFrom ? 0 : "calc(env(safe-area-inset-top) + 14px)" }}>
         <button onClick={() => setView("dashboard")} title="Go to Dashboard"
           className="tap w-14 sm:w-56 flex items-center justify-center sm:justify-start sm:pl-4 py-3 flex-shrink-0 hover-bg-surface transition-colors">
           <div className="flex items-center gap-2" style={{ position: "relative" }}>
