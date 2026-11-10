@@ -13254,9 +13254,6 @@ function clearSavedSession() {
 // ---------- phone app mode (Capacitor wrapper or ?app=1) ----------
 const readBasicFlag = () => {
   try {
-    const q = new URLSearchParams(location.search).get("basic");
-    if (q === "1") localStorage.setItem("zionBasic", "1");
-    if (q === "0") localStorage.removeItem("zionBasic");
     return localStorage.getItem("zionBasic") === "1";
   } catch (e) { return false; }
 };
