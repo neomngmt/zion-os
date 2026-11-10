@@ -13498,7 +13498,7 @@ function App() {
               </div>
             </div>
           )}
-          {mobileNavOpen && <div className="sm:hidden text-center fs-10 font-mono c-faint pb-2">build 10.11. 14:14</div>}
+          {mobileNavOpen && <div className="sm:hidden text-center fs-10 font-mono c-faint pb-2">build 10.11. 14:15 | safe top {(() => { try { const d = document.createElement("div"); d.style.paddingTop = "env(safe-area-inset-top)"; document.body.appendChild(d); const v = getComputedStyle(d).paddingTop; d.remove(); return v; } catch (e) { return "?"; } })()} | app {window.navigator.standalone ? "yes" : "no"} | bar {(() => { const m = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]'); return m ? m.content : "none"; })()}</div>}
           {mobileNavOpen && isAdmin && !previewFrom && (
             <div className="sm:hidden px-3 pb-2">
               <select value="" title="Preview as creator" onChange={(e) => startPreview(e.target.value)}
