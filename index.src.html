@@ -12573,7 +12573,6 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
         <CreatorMoney model={restrictModel} record={modelRecord} rows={inflowwDailyStats}>{inflowwSectionEmbedded}</CreatorMoney>
       <CreatorGrowth model={restrictModel} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} igGraphStats={igGraphStats} />
         <ThisWeeksAsks tasks={tasks} restrictModel={restrictModel} onNavigate={onNavigate} />
-        <CreatorInsightsSection models={[{ name: restrictModel }]} inflowwDailyStats={inflowwDailyStats} days={30} periodLabel="30d" />
         <XStatsSection models={[{ name: restrictModel }]} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} restrictModel={restrictModel} />
         {bufferSection}
         <div className="fs-12 c-faint font-mono italic py-16 text-center border border-dashed c-border rounded-xl">
@@ -12589,7 +12588,6 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
       <CreatorGrowth model={restrictModel} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} igGraphStats={igGraphStats} />
       <GoalCard latest={latest} />
       <ThisWeeksAsks tasks={tasks} restrictModel={restrictModel} onNavigate={onNavigate} />
-      <CreatorInsightsSection models={[{ name: restrictModel }]} inflowwDailyStats={inflowwDailyStats} days={30} periodLabel="30d" />
       <XStatsSection models={[{ name: restrictModel }]} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} restrictModel={restrictModel} />
       {bufferSection}
 
@@ -13751,6 +13749,7 @@ function TrendsPage({ weeklyTrendReels, onReload, loading }) {
 const NAV_ADMIN = [
   { id: "dashboard", label: "Dashboard", icon: LayoutGrid },
   { id: "content", label: "Content Director", icon: Film },
+  { id: "igstudio", label: "IG Studio", icon: Instagram },
   { id: "editor", label: "Editor", icon: Clapperboard },
   { id: "calendar", label: "Calendar", icon: Calendar },
   { id: "tasks", label: "Tasks", icon: CheckSquare },
@@ -14030,6 +14029,467 @@ function CustomsCreatorPage({ model, record }) {
           <div className="space-y-2.5">{done.map(card)}</div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------- IG Studio: Instagram dashboard (numbers from pasted Insights or screenshots) + AI studio ----------
+async function igFn(body) {
+  let token = "";
+  try { token = (JSON.parse(localStorage.getItem("agencyos_session") || "{}")).token || ""; } catch (e) {}
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/ig-studio`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, "x-zion-token": token },
+    body: JSON.stringify(body),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+}
+
+function igShrinkImage(file, maxSide = 1400) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const k = Math.min(1, maxSide / Math.max(img.width, img.height));
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        resolve(c.toDataURL("image/jpeg", 0.82));
+      };
+      img.onerror = () => reject(new Error("Could not read that image"));
+      img.src = fr.result;
+    };
+    fr.onerror = () => reject(new Error("Could not read that file"));
+    fr.readAsDataURL(file);
+  });
+}
+
+const IG_C = { card: "#0e1310", card2: "#111a14", line: "rgba(57,230,115,0.16)", tx: "#f2f5f0", dim: "#8fa39a", ac: "#39e673", ac2: "#12b34c", ac3: "#0a5c2c" };
+const igCard = { background: IG_C.card, border: `1px solid ${IG_C.line}`, borderRadius: 20, padding: 20 };
+const igN = (n) => (n == null ? "n/a" : Number(n).toLocaleString("en-US").replace(/,/g, " "));
+const igK = (n) => { if (n == null) return "n/a"; const v = Number(n); if (v >= 1e6) return (v / 1e6).toFixed(v >= 1e7 ? 0 : 1).replace(/\.0$/, "") + "M"; if (v >= 1e4) return Math.round(v / 1e3) + "K"; if (v >= 1e3) return (v / 1e3).toFixed(1).replace(/\.0$/, "") + "K"; return String(Math.round(v)); };
+
+function IgDelta({ cur, prev, pct }) {
+  if (cur == null || prev == null) return null;
+  const d = cur - prev;
+  if (d === 0) return <span style={{ fontSize: 12, color: IG_C.dim }}>no change</span>;
+  const up = d > 0;
+  return <span style={{ fontSize: 12, color: up ? IG_C.ac : "#ff8a6b", fontFamily: "'JetBrains Mono', monospace" }}>{up ? "↑" : "↓"} {pct ? Math.abs(d).toFixed(2) : igK(Math.abs(d))}</span>;
+}
+
+function IgKpi({ label, value, cur, prev, pct, icon }) {
+  return (
+    <div style={{ ...igCard, padding: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(57,230,115,0.1)", border: `1px solid ${IG_C.line}`, display: "flex", alignItems: "center", justifyContent: "center", color: IG_C.ac }}>{icon}</div>
+        <div style={{ fontSize: 14, color: IG_C.dim, lineHeight: 1.2 }}>{label}</div>
+      </div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 16 }}>
+        <span style={{ fontSize: 30, fontWeight: 700, color: IG_C.tx, letterSpacing: "-0.02em" }}>{value}</span>
+        <IgDelta cur={cur} prev={prev} pct={pct} />
+      </div>
+    </div>
+  );
+}
+
+function IgAreaChart({ points }) {
+  const W = 620, H = 220, padL = 42, padB = 26, padT = 10, padR = 8;
+  if (points.length < 2) return <div style={{ height: H, display: "flex", alignItems: "center", justifyContent: "center", color: IG_C.dim, fontSize: 13, textAlign: "center" }}>Needs at least two saved snapshots to draw the growth.<br />Add numbers again next week.</div>;
+  const vals = points.map((p) => p.v);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const lo = min - (max - min) * 0.15, hi = max + (max - min) * 0.15 || max + 1;
+  const x = (i) => padL + (i / (points.length - 1)) * (W - padL - padR);
+  const y = (v) => padT + (1 - (v - lo) / (hi - lo)) * (H - padT - padB);
+  const line = points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ");
+  const area = `${line} L${x(points.length - 1).toFixed(1)} ${H - padB} L${x(0).toFixed(1)} ${H - padB} Z`;
+  const ticks = [lo + (hi - lo) * 0.15, (lo + hi) / 2, hi - (hi - lo) * 0.15];
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+      <defs><linearGradient id="igArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#39e673" stopOpacity="0.32" /><stop offset="1" stopColor="#39e673" stopOpacity="0" /></linearGradient></defs>
+      {ticks.map((t, i) => (<g key={i}><line x1={padL} x2={W - padR} y1={y(t)} y2={y(t)} stroke="rgba(255,255,255,0.06)" strokeDasharray="3 4" /><text x={padL - 8} y={y(t) + 4} textAnchor="end" fontSize="11" fill="#6b8074" fontFamily="'JetBrains Mono', monospace">{igK(t)}</text></g>))}
+      <path d={area} fill="url(#igArea)" />
+      <path d={line} fill="none" stroke="#39e673" strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round" />
+      {points.map((p, i) => (i === points.length - 1 ? <circle key={i} cx={x(i)} cy={y(p.v)} r="5" fill="#39e673" stroke="#0e1310" strokeWidth="2" /> : null))}
+      {[0, Math.floor((points.length - 1) / 2), points.length - 1].filter((v, i, a) => a.indexOf(v) === i).map((i) => (
+        <text key={i} x={x(i)} y={H - 6} textAnchor={i === 0 ? "start" : i === points.length - 1 ? "end" : "middle"} fontSize="11" fill="#6b8074" fontFamily="'JetBrains Mono', monospace">{points[i].label}</text>
+      ))}
+    </svg>
+  );
+}
+
+function IgDonut({ parts }) {
+  const total = parts.reduce((t, p) => t + (p.v || 0), 0);
+  const R = 70, C = 2 * Math.PI * R;
+  let off = 0;
+  return (
+    <svg viewBox="0 0 200 200" style={{ width: 170, height: 170, display: "block", margin: "6px auto 12px" }}>
+      <circle cx="100" cy="100" r={R} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="30" />
+      {total > 0 && parts.map((p, i) => {
+        const len = ((p.v || 0) / total) * C;
+        const el = <circle key={i} cx="100" cy="100" r={R} fill="none" stroke={p.color} strokeWidth="30" strokeDasharray={`${Math.max(0, len - 2)} ${C - Math.max(0, len - 2)}`} strokeDashoffset={-off} transform="rotate(-90 100 100)" />;
+        off += len;
+        return el;
+      })}
+    </svg>
+  );
+}
+
+function IgHeat({ values, labels, cols }) {
+  const max = Math.max(1, ...values.map((v) => v || 0));
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 6 }}>
+      {values.map((v, i) => (
+        <div key={i} title={`${labels[i]}: ${v == null ? "n/a" : v}`} style={{ aspectRatio: "1.25", borderRadius: 7, background: v ? `rgba(57,230,115,${0.1 + (v / max) * 0.8})` : "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: v && v / max > 0.55 ? "#03110a" : IG_C.dim, fontFamily: "'JetBrains Mono', monospace" }}>{labels[i]}</div>
+      ))}
+    </div>
+  );
+}
+
+function IgBars({ items, suffix = "%" }) {
+  const max = Math.max(1, ...items.map((i) => i.v || 0));
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {items.map((it) => (
+        <div key={it.label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 62, fontSize: 14, color: IG_C.tx, flexShrink: 0 }}>{it.label}</div>
+          <div style={{ flex: 1, height: 26, borderRadius: 13, background: "rgba(255,255,255,0.05)", overflow: "hidden", position: "relative" }}>
+            <div style={{ width: `${Math.max(6, ((it.v || 0) / max) * 100)}%`, height: "100%", borderRadius: 13, background: "linear-gradient(90deg,#12b34c,#39e673)" }} />
+            <span style={{ position: "absolute", left: 12, top: 0, bottom: 0, display: "flex", alignItems: "center", fontSize: 12, color: "#03110a", fontWeight: 600, mixBlendMode: "normal" }}>{it.v == null ? "n/a" : `${it.v}${suffix}`}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function IgVisitors({ rows }) {
+  if (!rows.length) return <div style={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center", color: IG_C.dim, fontSize: 13 }}>No profile visit numbers yet.</div>;
+  const max = Math.max(1, ...rows.map((r) => r.v));
+  return (
+    <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 190, paddingTop: 22 }}>
+      {rows.slice(-8).map((r, i, arr) => (
+        <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
+          {i === arr.length - 1 && <div style={{ background: "#f2f5f0", color: "#03110a", fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 6, marginBottom: 4 }}>{igK(r.v)}</div>}
+          <div style={{ width: "100%", maxWidth: 34, height: `${Math.max(6, (r.v / max) * 82)}%`, borderRadius: 9, background: i === arr.length - 1 ? "linear-gradient(180deg,#39e673,#12b34c)" : "rgba(255,255,255,0.08)" }} />
+          <div style={{ fontSize: 10, color: IG_C.dim, marginTop: 6, fontFamily: "'JetBrains Mono', monospace" }}>{r.label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const IG_ICONS = {
+  users: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>,
+  heart: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z" /></svg>,
+  reach: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18" /><path d="M7 14l4-4 3 3 5-6" /></svg>,
+  eye: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>,
+};
+
+function IgUpdateModal({ model, onClose, onSaved }) {
+  const [text, setText] = useState("");
+  const [images, setImages] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [snap, setSnap] = useState(null);
+  const field = { width: "100%", background: "#080c0a", border: `1px solid ${IG_C.line}`, borderRadius: 10, padding: "8px 10px", color: IG_C.tx, fontSize: 14 };
+
+  const addFiles = async (files) => {
+    try {
+      const out = [];
+      for (const f of Array.from(files).slice(0, 6 - images.length)) out.push(await igShrinkImage(f));
+      setImages((p) => [...p, ...out].slice(0, 6));
+    } catch (e) { setErr(e.message); }
+  };
+  const parse = async () => {
+    setBusy(true); setErr("");
+    try { const j = await igFn({ action: "parse", model, input: text, images }); setSnap(j.snapshot); }
+    catch (e) { setErr(e.message); }
+    setBusy(false);
+  };
+  const save = async () => {
+    setBusy(true); setErr("");
+    try { await igFn({ action: "save-snapshot", model, snapshot: snap }); onSaved(); }
+    catch (e) { setErr(e.message); setBusy(false); }
+  };
+  const setCore = (k, v) => setSnap((s) => ({ ...s, [k]: v === "" ? null : (k === "snap_date" ? v : Number(v)) }));
+  const core = [["snap_date", "Date", "date"], ["followers", "Followers"], ["following", "Following"], ["posts", "Posts"], ["engagement_rate", "Engagement %"], ["reach", "Reach"], ["impressions", "Views"], ["profile_visits", "Profile visits"]];
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 9000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={onClose}>
+      <div style={{ ...igCard, width: "100%", maxWidth: 640, maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div style={{ fontSize: 18, fontWeight: 600 }}>Add numbers for {model}</div>
+          <div onClick={onClose} style={{ cursor: "pointer", color: IG_C.dim, fontSize: 22, lineHeight: 1 }}>&times;</div>
+        </div>
+        {!snap ? (
+          <>
+            <div style={{ fontSize: 13, color: IG_C.dim, lineHeight: 1.5, marginBottom: 10 }}>Upload screenshots from Instagram Insights (overview, audience, most active times) or paste the numbers as text. Zion reads the numbers, you check them and save. Nothing is connected to Instagram.</div>
+            <label style={{ display: "block", border: `1px dashed ${IG_C.line}`, borderRadius: 14, padding: 18, textAlign: "center", color: IG_C.dim, cursor: "pointer", fontSize: 13 }}>
+              Choose screenshots (up to 6)
+              <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={(e) => addFiles(e.target.files)} />
+            </label>
+            {images.length > 0 && (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                {images.map((d, i) => (
+                  <div key={i} style={{ position: "relative" }}>
+                    <img src={d} alt="" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 10, border: `1px solid ${IG_C.line}` }} />
+                    <div onClick={() => setImages((p) => p.filter((_, k) => k !== i))} style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, borderRadius: 9, background: "#ff6b6b", color: "#fff", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>&times;</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} placeholder="Or paste text, for example: Followers 12.4K, reached 1.1M, views 892K, profile visits 4 000, men 52%, women 48%, top countries Czechia 62%, Slovakia 14% ..." style={{ ...field, marginTop: 12, fontFamily: "inherit" }} />
+            {err && <div style={{ color: "#ff6b6b", fontSize: 13, marginTop: 8 }}>{err}</div>}
+            <div onClick={busy ? undefined : parse} style={{ marginTop: 14, textAlign: "center", padding: "11px 0", borderRadius: 12, background: IG_C.ac, color: "#03110a", fontWeight: 600, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>{busy ? "Reading the numbers..." : "Read the numbers"}</div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 13, color: IG_C.dim, marginBottom: 10 }}>{snap.note || "Check the numbers, fix anything wrong and save."} Empty fields were not visible and stay empty.</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
+              {core.map(([k, label, type]) => (
+                <label key={k} style={{ fontSize: 12, color: IG_C.dim }}>{label}
+                  <input type={type || "number"} value={snap[k] == null ? "" : snap[k]} onChange={(e) => setCore(k, e.target.value)} style={{ ...field, marginTop: 4 }} />
+                </label>
+              ))}
+            </div>
+            <div style={{ fontSize: 12, color: IG_C.dim, marginTop: 12, lineHeight: 1.6 }}>
+              Also read: {[snap.gender && "gender split", snap.age && "age groups", snap.countries && snap.countries.length && "countries", snap.active_hours && "active hours", snap.active_days && "active days"].filter(Boolean).join(", ") || "nothing more"}.
+            </div>
+            {err && <div style={{ color: "#ff6b6b", fontSize: 13, marginTop: 8 }}>{err}</div>}
+            <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+              <div onClick={busy ? undefined : save} style={{ flex: 1, textAlign: "center", padding: "11px 0", borderRadius: 12, background: IG_C.ac, color: "#03110a", fontWeight: 600, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>{busy ? "Saving..." : "Save to dashboard"}</div>
+              <div onClick={() => setSnap(null)} style={{ padding: "11px 18px", borderRadius: 12, border: `1px solid ${IG_C.line}`, color: IG_C.dim, cursor: "pointer" }}>Back</div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function IgStudioAI({ model, agency }) {
+  const [kind, setKind] = useState("reel");
+  const [input, setInput] = useState("");
+  const [idea, setIdea] = useState("");
+  const [lang, setLang] = useState(agency === "US" ? "en" : "cs");
+  const [busy, setBusy] = useState(false);
+  const [out, setOut] = useState("");
+  const [err, setErr] = useState("");
+  const [runs, setRuns] = useState([]);
+  const [copied, setCopied] = useState(false);
+  const loadRuns = useCallback(async () => { try { const j = await igFn({ action: "history", model }); setRuns(j.runs || []); } catch (e) {} }, [model]);
+  useEffect(() => { setOut(""); setErr(""); loadRuns(); }, [model, loadRuns]);
+  const field = { width: "100%", background: "#080c0a", border: `1px solid ${IG_C.line}`, borderRadius: 12, padding: "10px 12px", color: IG_C.tx, fontSize: 14, fontFamily: "inherit" };
+  const run = async () => {
+    setBusy(true); setErr(""); setOut("");
+    try { const j = await igFn({ action: kind, model, input, idea, lang }); setOut(j.text); loadRuns(); }
+    catch (e) { setErr(e.message); }
+    setBusy(false);
+  };
+  const copy = () => { try { navigator.clipboard.writeText(out); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch (e) {} };
+  const tabs = [["reel", "Write a reel"], ["plan", "Plan next week"], ["audit", "Audit"]];
+  const labelFor = { reel: "Run the reel", plan: "Plan the week", audit: "Run the audit" };
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 16 }}>
+      <div style={igCard}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
+          {tabs.map(([k, l]) => (
+            <div key={k} onClick={() => { setKind(k); setOut(""); setErr(""); }} style={{ padding: "8px 18px", borderRadius: 12, cursor: "pointer", fontSize: 14, background: kind === k ? IG_C.ac : "transparent", color: kind === k ? "#03110a" : IG_C.dim, border: `1px solid ${kind === k ? IG_C.ac : IG_C.line}`, fontWeight: kind === k ? 600 : 400 }}>{l}</div>
+          ))}
+          <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+            {[["cs", "Czech"], ["en", "English"]].map(([k, l]) => (<div key={k} onClick={() => setLang(k)} style={{ padding: "6px 12px", borderRadius: 10, cursor: "pointer", fontSize: 12, color: lang === k ? IG_C.ac : IG_C.dim, border: `1px solid ${lang === k ? IG_C.ac : "transparent"}` }}>{l}</div>))}
+          </div>
+        </div>
+        {kind === "reel" && (
+          <>
+            <div style={{ fontSize: 13, color: IG_C.dim, marginBottom: 8 }}>One raw idea. Include what happened and a number or cost if there is one, the more specific the better.</div>
+            <textarea value={idea} onChange={(e) => setIdea(e.target.value)} rows={3} placeholder="For example: how I prepare my morning coffee and outfit in 10 minutes before the walk, it took me 3 tries to get the foam right" style={field} />
+            <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder="Extra facts (optional)" style={{ ...field, marginTop: 10 }} />
+          </>
+        )}
+        {kind === "plan" && (
+          <>
+            <div style={{ fontSize: 13, color: IG_C.dim, marginBottom: 8 }}>Plans are built for the week that starts next Monday, ready for your Friday. Tell what happened to her this week and paste her last posts if you have them. Her persona from the Creator Bible is used automatically.</div>
+            <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={5} placeholder="What happened this week, topics she wants to be known for, recent posts with views (optional)" style={field} />
+          </>
+        )}
+        {kind === "audit" && (
+          <>
+            <div style={{ fontSize: 13, color: IG_C.dim, marginBottom: 8 }}>Paste her recent reels with views, likes, comments, shares and, if you have them, reach, non-follower share and hold at 3 seconds. At least 10 posts gives real patterns.</div>
+            <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={7} placeholder="Reel 1: 8 200 views, 310 likes, 22 comments, 40 shares, 61% non-followers ..." style={field} />
+          </>
+        )}
+        {err && <div style={{ color: "#ff6b6b", fontSize: 13, marginTop: 10 }}>{err}</div>}
+        <div onClick={busy ? undefined : run} style={{ marginTop: 14, display: "inline-block", padding: "11px 26px", borderRadius: 12, background: IG_C.ac, color: "#03110a", fontWeight: 600, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>{busy ? "Working, this takes up to a minute..." : labelFor[kind]}</div>
+        <div style={{ fontSize: 11, color: "#6b8074", marginTop: 8 }}>Every run costs a few cents. Nothing is posted anywhere, you get text to copy.</div>
+      </div>
+
+      {out && (
+        <div style={igCard}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div style={{ fontSize: 12, letterSpacing: ".1em", color: IG_C.dim, textTransform: "uppercase" }}>Result</div>
+            <div onClick={copy} style={{ padding: "6px 14px", borderRadius: 10, border: `1px solid ${IG_C.line}`, color: IG_C.ac, fontSize: 12, cursor: "pointer" }}>{copied ? "Copied" : "Copy"}</div>
+          </div>
+          <div style={{ whiteSpace: "pre-wrap", fontSize: 14, lineHeight: 1.65, color: IG_C.tx }}>{out}</div>
+        </div>
+      )}
+
+      {runs.length > 0 && (
+        <div style={igCard}>
+          <div style={{ fontSize: 12, letterSpacing: ".1em", color: IG_C.dim, textTransform: "uppercase", marginBottom: 10 }}>Earlier runs for {model}</div>
+          {runs.map((r) => (
+            <div key={r.id} onClick={() => { setKind(r.kind); setOut(r.output); }} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "9px 0", borderTop: `1px solid ${IG_C.line}`, cursor: "pointer", fontSize: 13 }}>
+              <span style={{ color: IG_C.tx, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><span style={{ color: IG_C.ac, textTransform: "uppercase", fontSize: 11, marginRight: 8 }}>{r.kind}</span>{(r.input || "").slice(0, 70)}</span>
+              <span style={{ color: IG_C.dim, flexShrink: 0, fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>{new Date(r.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function IgStudioPage({ models }) {
+  const [modelName, setModelName] = useState((models[0] && models[0].name) || "");
+  const [tab, setTab] = useState("overview");
+  const [period, setPeriod] = useState(90);
+  const [snaps, setSnaps] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [modal, setModal] = useState(false);
+  const model = models.find((m) => m.name === modelName) || models[0];
+  const load = useCallback(async () => {
+    if (!modelName) return;
+    setLoading(true); setError("");
+    try { const j = await igFn({ action: "snapshots", model: modelName }); setSnaps(j.snapshots || []); }
+    catch (e) { setError(e.message); }
+    setLoading(false);
+  }, [modelName]);
+  useEffect(() => { load(); }, [load]);
+
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - period);
+  const inRange = snaps.filter((s) => new Date(s.snap_date) >= cutoff);
+  const latest = snaps[snaps.length - 1];
+  const prev = snaps[snaps.length - 2];
+  const growth = inRange.filter((s) => s.followers != null).map((s) => ({ v: Number(s.followers), label: new Date(s.snap_date).toLocaleDateString(undefined, { day: "numeric", month: "short" }) }));
+  const visitors = snaps.filter((s) => s.profile_visits != null).map((s) => ({ v: Number(s.profile_visits), label: new Date(s.snap_date).toLocaleDateString(undefined, { day: "numeric", month: "numeric" }) }));
+  const g = latest && latest.gender;
+  const age = latest && latest.age;
+  const countries = (latest && latest.countries) || [];
+  const hours = latest && latest.active_hours;
+  const days = latest && latest.active_days;
+  const handle = model && model.igHandle;
+  const sel = { background: IG_C.card, border: `1px solid ${IG_C.line}`, borderRadius: 14, padding: "10px 14px", color: IG_C.tx, fontSize: 14 };
+
+  return (
+    <div className="igs-wrap" style={{ color: IG_C.tx }}>
+      <style>{`.igs-grid{display:grid;gap:16px;grid-template-columns:repeat(12,minmax(0,1fr));margin-bottom:16px}.igs-kpis{display:grid;gap:16px;grid-template-columns:repeat(4,minmax(0,1fr))}.igs-8{grid-column:span 8}.igs-4{grid-column:span 4}.igs-5{grid-column:span 5}.igs-3{grid-column:span 3}@media (max-width:1100px){.igs-8,.igs-4,.igs-5,.igs-3{grid-column:span 12}.igs-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}`}</style>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+        <div style={{ display: "inline-flex", background: IG_C.card, border: `1px solid ${IG_C.line}`, borderRadius: 16, padding: 5, gap: 4 }}>
+          {[["overview", "Instagram"], ["studio", "AI Studio"]].map(([k, l]) => (
+            <div key={k} onClick={() => setTab(k)} style={{ padding: "9px 20px", borderRadius: 12, cursor: "pointer", fontSize: 15, background: tab === k ? IG_C.ac : "transparent", color: tab === k ? "#03110a" : IG_C.dim, fontWeight: tab === k ? 600 : 400 }}>{l}</div>
+          ))}
+        </div>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <select value={modelName} onChange={(e) => setModelName(e.target.value)} style={sel}>{models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}</select>
+          {tab === "overview" && <select value={period} onChange={(e) => setPeriod(Number(e.target.value))} style={sel}><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option><option value={365}>Last year</option></select>}
+          {tab === "overview" && <div onClick={() => setModal(true)} style={{ padding: "10px 18px", borderRadius: 14, background: IG_C.ac, color: "#03110a", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Add numbers</div>}
+        </div>
+      </div>
+
+      {tab === "studio" && <IgStudioAI model={modelName} agency={model && model.agency} />}
+
+      {tab === "overview" && (
+        <>
+          {error && <div style={{ ...igCard, color: "#ff8a6b", marginBottom: 16 }}>{error}</div>}
+          {!loading && !latest && !error && (
+            <div style={{ ...igCard, textAlign: "center", padding: 40, marginBottom: 16 }}>
+              <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 6 }}>No numbers for {modelName} yet</div>
+              <div style={{ color: IG_C.dim, fontSize: 14, maxWidth: 460, margin: "0 auto 18px", lineHeight: 1.5 }}>Take screenshots of her Instagram Insights (or copy the numbers) and add them here. Do it once a week and the growth builds up on its own.</div>
+              <div onClick={() => setModal(true)} style={{ display: "inline-block", padding: "11px 26px", borderRadius: 12, background: IG_C.ac, color: "#03110a", fontWeight: 600, cursor: "pointer" }}>Add numbers</div>
+            </div>
+          )}
+
+          <div className="igs-grid">
+            <div className="igs-8">
+              <div className="igs-kpis">
+                <IgKpi label="Total Followers" icon={IG_ICONS.users} value={latest ? igN(latest.followers) : "n/a"} cur={latest && latest.followers} prev={prev && prev.followers} />
+                <IgKpi label="Engagement Rate" icon={IG_ICONS.heart} value={latest && latest.engagement_rate != null ? `${Number(latest.engagement_rate).toFixed(2)}%` : "n/a"} cur={latest && latest.engagement_rate} prev={prev && prev.engagement_rate} pct />
+                <IgKpi label="Post Reach" icon={IG_ICONS.reach} value={latest ? igK(latest.reach) : "n/a"} cur={latest && latest.reach} prev={prev && prev.reach} />
+                <IgKpi label="Impressions" icon={IG_ICONS.eye} value={latest ? igK(latest.impressions) : "n/a"} cur={latest && latest.impressions} prev={prev && prev.impressions} />
+              </div>
+            </div>
+            <div className="igs-4">
+              <div style={igCard}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14, paddingBottom: 16, borderBottom: `1px solid ${IG_C.line}` }}>
+                  <div style={{ width: 62, height: 62, borderRadius: 18, background: "linear-gradient(135deg,#39e673,#0a5c2c)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, fontWeight: 700, color: "#03110a" }}>{(modelName || "?").slice(0, 1)}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 19, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{modelName}</div>
+                    <div style={{ fontSize: 13, color: handle ? IG_C.ac : IG_C.dim }}>{handle ? `@${handle}` : "No Instagram handle yet (add it in Model Manager)"}</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 16 }}>
+                  {[["Followers", latest && latest.followers], ["Following", latest && latest.following], ["Total Posts", latest && latest.posts]].map(([l, v]) => (
+                    <div key={l}><div style={{ fontSize: 22, fontWeight: 700 }}>{v == null ? "n/a" : igK(v)}</div><div style={{ fontSize: 12, color: IG_C.dim, marginTop: 2 }}>{l}</div></div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="igs-grid">
+            <div className="igs-5"><div style={{ ...igCard, height: "100%" }}><div style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>Follower Growth Trend</div><IgAreaChart points={growth} /></div></div>
+            <div className="igs-3">
+              <div style={{ ...igCard, height: "100%" }}>
+                <div style={{ fontSize: 18, fontWeight: 600 }}>Gender Split</div>
+                {g ? (<>
+                  <IgDonut parts={[{ v: g.male, color: "#39e673" }, { v: g.female, color: "#12b34c" }, { v: g.other, color: "#0a5c2c" }]} />
+                  {[["Male", g.male, "#39e673"], ["Female", g.female, "#12b34c"], ["Other", g.other, "#0a5c2c"]].map(([l, v, c]) => (
+                    <div key={l} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, padding: "3px 0" }}><span style={{ width: 9, height: 9, borderRadius: 5, background: c }} />{l}<span style={{ marginLeft: "auto", fontFamily: "'JetBrains Mono', monospace" }}>{v == null ? "n/a" : `${v}%`}</span></div>
+                  ))}
+                </>) : <div style={{ color: IG_C.dim, fontSize: 13, marginTop: 16 }}>Not in the numbers yet.</div>}
+              </div>
+            </div>
+            <div className="igs-4">
+              <div style={{ ...igCard, height: "100%" }}>
+                <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>Active Hours</div>
+                {days || hours ? (<>
+                  {days && (<><div style={{ fontSize: 11, color: IG_C.dim, marginBottom: 6, letterSpacing: ".08em" }}>BY DAY</div><IgHeat values={days} labels={["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]} cols={7} /></>)}
+                  {hours && (<><div style={{ fontSize: 11, color: IG_C.dim, margin: "14px 0 6px", letterSpacing: ".08em" }}>BY HOUR</div><IgHeat values={hours} labels={hours.map((_, i) => String(i))} cols={12} /></>)}
+                </>) : <div style={{ color: IG_C.dim, fontSize: 13 }}>Not in the numbers yet. Add the "Most active times" screen from Insights.</div>}
+              </div>
+            </div>
+          </div>
+
+          <div className="igs-grid">
+            <div className="igs-4">
+              <div style={{ ...igCard, height: "100%" }}>
+                <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 14 }}>Audience by country</div>
+                {countries.length ? <IgBars items={countries.slice(0, 6).map((c) => ({ label: c.name.length > 9 ? c.name.slice(0, 8) + "." : c.name, v: c.pct }))} /> : <div style={{ color: IG_C.dim, fontSize: 13 }}>Not in the numbers yet.</div>}
+              </div>
+            </div>
+            <div className="igs-4">
+              <div style={{ ...igCard, height: "100%" }}>
+                <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 14 }}>Age groups</div>
+                {age ? <IgBars items={Object.entries(age).filter(([, v]) => v != null).map(([k, v]) => ({ label: k, v }))} /> : <div style={{ color: IG_C.dim, fontSize: 13 }}>Not in the numbers yet.</div>}
+              </div>
+            </div>
+            <div className="igs-4">
+              <div style={{ ...igCard, height: "100%" }}>
+                <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 6 }}>Profile Visitors</div>
+                <IgVisitors rows={visitors} />
+              </div>
+            </div>
+          </div>
+          {latest && <div style={{ fontSize: 11, color: "#6b8074", fontFamily: "'JetBrains Mono', monospace", marginBottom: 20 }}>Latest numbers from {new Date(latest.snap_date).toLocaleDateString()} ({snaps.length} saved). Numbers are added by hand or from screenshots, Zion is not connected to Instagram.</div>}
+        </>
+      )}
+
+      {modal && <IgUpdateModal model={modelName} onClose={() => setModal(false)} onSaved={() => { setModal(false); load(); }} />}
     </div>
   );
 }
@@ -14370,6 +14830,7 @@ function App() {
             {currentView === "tasks" && <TaskManager tasks={isAdmin ? scopedTasks : tasks} persistTasks={isAdmin ? scopedPersistTasks : persistTasks} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} />}
             {currentView === "stats" && <StatsManager stats={scopedStats} persistStats={scopedPersistStats} models={agencyModels} reels={scopedReels} persistReels={scopedPersistReels} />}
             {currentView === "chatters" && isAdmin && <ChattersPage />}
+            {currentView === "igstudio" && isAdmin && <IgStudioPage models={agencyModels} />}
             {currentView === "customs" && isAdmin && <CustomsAdminPage models={agencyModels} />}
             {currentView === "customs" && !isAdmin && <CustomsCreatorPage model={restrictModel} record={models.find((mm) => mm.name === restrictModel)} />}
             {currentView === "reelsorter" && isAdmin && <ReelSorterPage />}
