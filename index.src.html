@@ -254,6 +254,10 @@ const ICON_DATA = {
   ThreadsLogo: [
     ["path", { d: "M18.263 11.097c-.03-3.486-1.92-5.586-5.111-5.586-2.13 0-3.922.963-4.863 2.499l2.062 1.438c.535-.843 1.272-1.543 2.628-1.543 1.528 0 2.318.85 2.544 2.431a15 15 0 0 0-2.236-.173c-4.125 0-6.068 1.867-6.068 4.336s1.943 3.99 4.804 3.99c3.139 0 5.013-2.115 5.781-4.735.798.361 1.348 1.204 1.348 2.47 0 3.387-3.907 5.232-7.22 5.232-4.885 0-8.077-3.207-8.077-8.424 0-6.392 4.223-10.487 9.9-10.487 3.808 0 5.69 1.671 6.97 3.914l2.108-1.475C21.44 2.078 18.331 0 13.663 0 6.227 0 1.168 5.277 1.168 12.934c0 7 4.953 11.066 10.856 11.066 4.878 0 9.809-2.846 9.809-7.716 0-2.545-1.46-4.231-3.569-5.187m-6.33 4.855c-1.077 0-2.026-.512-2.026-1.453 0-1.483 1.822-1.934 3.606-1.934.678 0 1.34.045 1.927.173-.422 1.927-1.671 3.215-3.508 3.214Z", fill: "currentColor", stroke: "none" }],
   ],
+  Pencil: [
+    ["path", { d: "M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" }],
+    ["path", { d: "m15 5 4 4" }],
+  ],
   FacebookLogo: [
     ["path", { d: "M14 8h3V4h-3a4 4 0 0 0-4 4v2H7v4h3v8h4v-8h3l1-4h-4V8.5c0-.3.2-.5.5-.5Z" }],
   ],
@@ -328,7 +332,7 @@ const {
   Plus, X, Clapperboard, Users, ChevronRight, ChevronDown, MapPin, Calendar, User,
   Trash2, Loader2, LayoutGrid, Film, UserCircle2, Send, Circle,
   CheckCircle2, Repeat, ChevronLeft, CheckSquare, Lock, LogOut, ShieldCheck,
-  TrendingUp, TrendingDown, DollarSign, Instagram, Eye, Minus, Flame, Sparkles, Mic, Bell, Settings, Search, XLogo, TikTokLogo, ThreadsLogo, SnapchatLogo, FacebookLogo, Menu, Zap, Megaphone,
+  TrendingUp, TrendingDown, DollarSign, Instagram, Eye, Minus, Flame, Sparkles, Mic, Bell, Settings, Search, XLogo, TikTokLogo, ThreadsLogo, SnapchatLogo, FacebookLogo, Pencil, Menu, Zap, Megaphone,
   Play, Copy, Heart, FileText, BarChart3, Shuffle, ExternalLink, Link2, Gift,
 } = Icons;
 
@@ -5702,7 +5706,7 @@ function TikTokContentHub({ models, cards, selectedModelName, onBackToModels }) 
 
 // ---------- model manager ----------
 
-function ModelManager({ models, persistModels, cards, reels, agency, bufferDailyStats, igGraphStats, igAccounts, onIgAccountSynced }) {
+function ModelManager({ models, persistModels, cards, reels, agency, bufferDailyStats, igGraphStats, igAccounts, onIgAccountSynced, inflowwDailyStats }) {
   const [adding, setAdding] = useState(false);
   const NEW_MODEL_DEFAULTS = {
     name: "", note: "", pin: "", igHandle: "", xHandle: "", tiktokHandle: "",
@@ -5713,7 +5717,7 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
   const [addError, setAddError] = useState("");
   const [detailName, setDetailName] = useState(null);
   const [editName, setEditName] = useState(null);
-  const [mmTab, setMmTab] = useState("models"); // models | accounts
+  const [mmTab, setMmTab] = useState("accounts"); // the overview is the only page now
   const [platformFocus, setPlatformFocus] = useState("tt"); // tt | ig | x — which handle shows under each name
   const [syncingNow, setSyncingNow] = useState(false);
   const [syncResult, setSyncResult] = useState("");
@@ -5856,7 +5860,7 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
       {/* ---- header ---- */}
       <div className="flex items-start justify-between gap-3 mb-1 flex-wrap">
         <div>
-          <p className="c-muted text-sm mt-1.5">{models.length} model{models.length === 1 ? "" : "s"} tracked — performance ranking & accountability.</p>
+          <p className="c-muted text-sm mt-1.5">{models.length} model{models.length === 1 ? "" : "s"}. New models appear here by themselves when they fill in the Creator Bible.</p>
         </div>
         <div className="text-right flex-shrink-0">
           <div className="flex items-center justify-end gap-1.5 fs-10 font-mono uppercase tracking-wide"
@@ -5865,56 +5869,6 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
             All systems online
           </div>
           <div className="fs-13 font-mono c-muted mt-1">{clock.toLocaleTimeString("en-GB")}</div>
-        </div>
-      </div>
-
-      {/* ---- stat pills + tabs + actions ---- */}
-      <div className="flex items-center gap-2.5 flex-wrap mt-5 mb-4">
-        <div className="rounded-xl px-3.5 py-2" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)" }}>
-          <div className="text-lg font-mono font-bold c-text">{weeklyAvgPct}%</div>
-          <div className="fs-8 font-mono uppercase c-faint tracking-wide">Weekly avg</div>
-        </div>
-        <div className="rounded-xl px-3.5 py-2" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)" }}>
-          <div className="text-lg font-mono font-bold c-text">{cardsToday}/{cards.length}</div>
-          <div className="fs-8 font-mono uppercase c-faint tracking-wide">Today</div>
-        </div>
-
-        <div className="flex rounded-full overflow-hidden border" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
-          <button onClick={() => setPlatformFocus("tt")}
-            className="fs-10 font-mono uppercase px-3 py-2 transition-colors"
-            style={platformFocus === "tt" ? { background: "#fff", color: "#0b0f0d" } : { color: "#8B93A1" }}>
-            TT only
-          </button>
-          <button onClick={() => setPlatformFocus("ig")}
-            className="fs-10 font-mono uppercase px-3 py-2 transition-colors"
-            style={platformFocus === "ig" ? { background: "#fff", color: "#0b0f0d" } : { color: "#8B93A1" }}>
-            IG only
-          </button>
-          <button onClick={() => setPlatformFocus("x")}
-            className="fs-10 font-mono uppercase px-3 py-2 transition-colors"
-            style={platformFocus === "x" ? { background: "#fff", color: "#0b0f0d" } : { color: "#8B93A1" }}>
-            X only
-          </button>
-        </div>
-
-        <div className="flex rounded-full overflow-hidden border" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
-          <button onClick={() => setMmTab("models")}
-            className="fs-10 font-mono uppercase px-3 py-2 transition-colors"
-            style={mmTab === "models" ? { background: "rgba(57,230,115,0.12)", color: "#39e673" } : { color: "#8B93A1" }}>
-            Models
-          </button>
-          <button onClick={() => setMmTab("accounts")}
-            className="fs-10 font-mono uppercase px-3 py-2 transition-colors"
-            style={mmTab === "accounts" ? { background: "rgba(57,230,115,0.12)", color: "#39e673" } : { color: "#8B93A1" }}>
-            Accounts
-          </button>
-        </div>
-
-        <div className="ml-auto flex items-center gap-2">
-          <button onClick={() => setAdding(true)}
-            className="flex items-center gap-1.5 fs-11 font-mono uppercase tracking-wide c-bg-accent c-onaccent px-3 py-1.5 rounded-full font-semibold hover-bg-accent2">
-            <Plus size={13} /> Add model
-          </button>
         </div>
       </div>
 
@@ -6011,36 +5965,18 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
         </div>
       )}
 
-      {/* ---- publer sync bar — real: publer-sync runs hourly via Supabase
-          cron and matches Publer accounts to models by name automatically,
-          nothing to configure per-model. This used to be a fake toggle with
-          an invented "sweep every 4h" schedule that didn't match the real
-          cron and did nothing when clicked. ---- */}
-      <div className="flex items-center gap-3 flex-wrap rounded-xl px-4 py-3 mb-5" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)" }}>
-        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#39e673", boxShadow: "0 0 6px #39e673" }} />
-        <span className="fs-11 font-mono uppercase c-text font-semibold flex-shrink-0">Publer sync</span>
-        <span className="fs-11 c-muted">
-          runs every hour · auto-matches Publer accounts to models by name · last synced {lastSyncedTs ? timeAgo(lastSyncedTs) : "never yet"}
-        </span>
-        <button onClick={runSyncNow} disabled={syncingNow || syncOnCooldown}
-          className="ml-auto fs-10 font-mono uppercase c-muted hover-accent-text transition-colors flex-shrink-0 flex items-center gap-1 disabled:opacity-50">
-          {syncingNow ? <Loader2 size={11} className="animate-spin" /> : <Repeat size={11} />}
-          {syncingNow ? "Syncing…" : syncOnCooldown ? `Wait ${Math.ceil((syncCooldownUntil - Date.now()) / 1000)}s` : "Sync now"}
-        </button>
-      </div>
-      {syncResult && <div className="fs-10 font-mono c-faint mt-1 mb-3">{syncResult}</div>}
 
       {mmTab === "accounts" ? (
         <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
-          <div className="hidden md:grid md:grid-cols-[1.3fr_1fr_1fr_1fr_1fr] gap-2 px-4 py-2 fs-9 font-mono uppercase c-faint tracking-wide"
+          <div className="hidden md:grid md:grid-cols-[1.3fr_1fr_1fr_1fr_1fr_1fr_1fr_44px] gap-2 px-4 py-2 fs-9 font-mono uppercase c-faint tracking-wide"
             style={{ background: "rgba(255,255,255,0.02)" }}>
-            <span>Model</span><span>Instagram</span><span>X</span><span>TikTok</span><span>Threads</span>
+            <span>Model</span><span>Instagram</span><span>X</span><span>TikTok</span><span>Threads</span><span>Snapchat</span><span>Facebook</span><span />
           </div>
           {models.length === 0 && (
             <div className="fs-12 c-faint font-mono italic py-8 text-center">no models yet — add your first one</div>
           )}
           {models.map((m, i) => (
-            <div key={m.name} className="grid grid-cols-1 md:grid-cols-[1.3fr_1fr_1fr_1fr_1fr] gap-2 px-4 py-3 items-center"
+            <div key={m.name} className="grid grid-cols-1 md:grid-cols-[1.3fr_1fr_1fr_1fr_1fr_1fr_1fr_44px] gap-2 px-4 py-3 items-center"
               style={{ borderTop: i === 0 ? "none" : "1px solid rgba(255,255,255,0.06)" }}>
               <div className="flex items-center gap-2 min-w-0">
                 <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: colorFor(m.name) }} />
@@ -6050,49 +5986,29 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
                 { key: "ig", handle: m.igHandle },
                 { key: "x", handle: m.xHandle },
                 { key: "tiktok", handle: m.tiktokHandle },
-                { key: "threads", handle: "" },
+                { key: "threads", handle: m.threadsHandle },
+                { key: "snap", handle: m.snapHandle },
+                { key: "fb", handle: m.fbUrl ? m.fbUrl.replace(/^https?:\/\/(www\.)?facebook\.com\//i, "") : "" },
               ].map(({ key, handle }) => {
-                const removed = key !== "ig" && (m.disabledPlatforms || []).includes(key);
-                // IG is off Publer entirely now — connection status comes
-                // from ig_graph_stats (her own Meta Graph API token in
-                // Model Manager), not buffer_daily_stats. X/TikTok still
-                // sync via Publer.
                 const graphRow = key === "ig" ? (igGraphStats || []).find((g) => g.model === m.name) : null;
-                const platRows = key === "ig" ? [] : (bufferDailyStats || []).filter((r) => r.model === m.name && r.platform === key);
-                const connected = key === "ig" ? !!graphRow : platRows.length > 0;
-                const lastDate = platRows.map((r) => r.statDate).sort().pop();
-                const lastLabel = key === "ig"
-                  ? (graphRow?.syncedAt ? timeAgo(new Date(graphRow.syncedAt).getTime()) : null)
-                  : (lastDate ? timeAgo(new Date(lastDate + "T12:00:00").getTime()) : null);
-                const imp7d = key === "ig" ? (graphRow?.views7d || 0) : platRows.filter((r) => r.statDate >= cutoff7dStr).reduce((s, r) => s + (r.impressions || 0), 0);
-                if (removed) {
-                  return (
-                    <div key={key} className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "rgba(255,255,255,0.15)" }} />
-                      <div className="min-w-0 flex-1">
-                        <div className="fs-10 font-mono c-faint">account removed</div>
-                        <button onClick={() => addPlatformAccount(m, key)} className="mt-1 fs-9 font-mono uppercase px-2 py-0.5 rounded-md c-accent" style={{ border: "1px solid rgba(57,230,115,0.45)", background: "rgba(57,230,115,0.08)" }}>+ Add account</button>
-                      </div>
-                    </div>
-                  );
-                }
+                const platRows = ["ig", "snap", "fb"].includes(key) ? [] : (bufferDailyStats || []).filter((r) => r.model === m.name && r.platform === key);
+                const hasHandle = !!handle;
+                const imp7d = key === "ig" ? (graphRow?.views7d || 0) : platRows.filter((r) => r.statDate >= cutoff7dStr).reduce((t, r) => t + (r.impressions || 0), 0);
+                const sub = !hasHandle ? "not set up"
+                  : key === "ig" ? (graphRow ? `${imp7d.toLocaleString()} views · 7d` : "waiting for first sync")
+                  : platRows.length ? `${imp7d.toLocaleString()} · 7d` : "linked";
                 return (
-                  <div key={key} className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: connected ? "#39e673" : "rgba(255,255,255,0.15)" }} />
+                  <div key={key} className="flex items-center gap-2 min-w-0">
+                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: hasHandle ? "#39e673" : "rgba(255,255,255,0.15)" }} />
                     <div className="min-w-0">
-                      <div className="fs-10 font-mono c-faint truncate">{handle ? `@${handle}` : "no handle set"}</div>
-                      <div className="fs-9 font-mono" style={{ color: connected ? "#39e673" : "#5c6e65" }}>
-                        {connected
-                          ? `${imp7d.toLocaleString()} · 7d · synced ${lastLabel}`
-                          : key === "ig" ? "no Meta API token" : "not synced via Publer"}
-                      </div>
-                      {key !== "ig" && (
-                        <button onClick={() => removePlatformAccount(m, key)} className="mt-1 fs-9 font-mono uppercase px-2 py-0.5 rounded-md transition-colors" style={{ color: "#e07a5f", border: "1px solid rgba(224,122,95,0.45)", background: "rgba(224,122,95,0.08)" }}>Remove account</button>
-                      )}
+                      <div className="fs-11 font-mono c-text truncate" style={{ opacity: hasHandle ? 1 : 0.45 }}>{hasHandle ? (key === "fb" ? handle : `@${handle}`) : "-"}</div>
+                      <div className="fs-9 font-mono" style={{ color: hasHandle ? "#39e673" : "#5c6e65" }}>{sub}</div>
                     </div>
                   </div>
                 );
               })}
+              <button onClick={() => setEditName(m.name)} title="Edit model" className="tap flex w-9 h-9 rounded-xl items-center justify-center c-muted hover-accent-text"
+                style={{ border: "1px solid rgba(255,255,255,0.1)" }}><Pencil size={15} /></button>
             </div>
           ))}
         </div>
@@ -6182,7 +6098,7 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
       {editModel && (
         <ModelDetail model={editModel} onClose={() => setEditName(null)} onSave={async (updated) => { await saveDetail(updated); setEditName(null); }}
           onSetPin={setModelPin} onToggleAlwaysOnboard={toggleAlwaysOnboard} models={models} persistModels={persistModels}
-          igAccounts={igAccounts} onIgAccountSynced={onIgAccountSynced} />
+          igAccounts={igAccounts} onIgAccountSynced={onIgAccountSynced} igGraphStats={igGraphStats} inflowwDailyStats={inflowwDailyStats} />
       )}
     </div>
   );
@@ -6565,7 +6481,34 @@ function ModelOfAccount({ modelName, accountId, username, onConnected }) {
   );
 }
 
-function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, models, persistModels, igAccounts, onIgAccountSynced }) {
+function ModelDrawerStats({ model, igGraphStats, inflowwDailyStats }) {
+  const g = (igGraphStats || []).find((x) => x.model === model.name);
+  const now = new Date();
+  const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-`;
+  const rowsM = (inflowwDailyStats || []).filter((r) => r.model === model.name);
+  const monthNet = rowsM.filter((r) => r.statDate.startsWith(prefix)).reduce((t, r) => t + (r.earningsNet || 0), 0);
+  const lastDay = rowsM.filter((r) => (r.earningsNet || 0) > 0).map((r) => r.statDate).sort().pop();
+  const tiles = [
+    ["Month net", rowsM.length ? `$${Math.round(monthNet).toLocaleString()}` : "-"],
+    ["Followers", g && g.followers != null ? g.followers.toLocaleString() : "-"],
+    ["Views 7d", g ? (g.views7d || 0).toLocaleString() : "-"],
+    ["Views 30d", g ? (g.views30d || 0).toLocaleString() : "-"],
+    ["Last sale", lastDay ? new Date(lastDay + "T12:00:00").toLocaleDateString("cs-CZ") : "-"],
+    ["IG synced", g && g.syncedAt ? timeAgo(new Date(g.syncedAt).getTime()) : "-"],
+  ];
+  return (
+    <div className="grid grid-cols-3 gap-2 mb-5">
+      {tiles.map(([k, v]) => (
+        <div key={k} className="rounded-xl px-3 py-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+          <div className="fs-9 font-mono uppercase c-faint">{k}</div>
+          <div className="fs-14 font-bold c-text">{v}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, models, persistModels, igAccounts, onIgAccountSynced, igGraphStats, inflowwDailyStats }) {
   const [form, setForm] = useState(model);
   useEffect(() => setForm(model), [model]);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -6580,15 +6523,19 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, 
   const removeRefProfile = (id) => set("inspoProfiles", refProfiles.filter(p => p.id !== id));
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="c-bg-surface border c-border rounded-2xl w-full max-w-lg p-5 maxh-85vh overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/60 flex justify-end z-50" onClick={onClose}>
+      <div className="c-bg-surface border-l c-border w-full max-w-xl p-5 h-full overflow-y-auto" onClick={(e) => e.stopPropagation()} style={{ boxShadow: "-24px 0 60px rgba(0,0,0,.5)" }}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <UserCircle2 size={20} className="c-accent" />
-            <span className="text-lg font-extrabold tracking-tight c-text">{model.name}</span>
+            <UserCircle2 size={22} className="c-accent" />
+            <div>
+              <div className="text-xl font-extrabold tracking-tight c-text leading-tight">{model.name}</div>
+              <div className="fs-10 font-mono uppercase c-faint">{model.agency || "CZ"} agency{model.addedAt ? ` · since ${new Date(model.addedAt).toLocaleDateString("cs-CZ")}` : ""}</div>
+            </div>
           </div>
           <button onClick={onClose} className="c-muted hover-text-primary"><X size={18} /></button>
         </div>
+        <ModelDrawerStats model={model} igGraphStats={igGraphStats} inflowwDailyStats={inflowwDailyStats} />
 
         <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Niche / persona note</label>
         <input value={form.note || ""} onChange={(e) => set("note", e.target.value)}
@@ -6654,8 +6601,6 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, 
               className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
           </div>
         </div>
-
-        <ModelIgAccounts model={model.name} igAccounts={igAccounts} onSynced={onIgAccountSynced} />
 
         <ModelOfAccount modelName={model.name} accountId={form.onlyfansAccountId} username={form.onlyfansUsername}
           onConnected={(accId, uname) => { set("onlyfansAccountId", accId); set("onlyfansUsername", uname); }} />
@@ -15084,7 +15029,7 @@ function App() {
             {currentView === "titlegen" && isAdmin && <TitleGeneratorPage />}
             {currentView === "weeklytrends" && isAdmin && <TrendsPage weeklyTrendReels={weeklyTrendReels} onReload={reloadWeeklyTrendReels} loading={weeklyTrendReelsLoading} />}
             {currentView === "trending" && <CreatorTrending trends={trends} agency={session.agency} />}
-            {currentView === "models" && <ModelManager models={agencyModels} persistModels={scopedPersistModels} cards={scopedCards} reels={scopedReels} agency={session.agency} bufferDailyStats={bufferDailyStats} igGraphStats={igGraphStats} igAccounts={igAccountsHook} onIgAccountSynced={() => Promise.all([refreshIgGraphStats(), refreshIgGraphMedia()])} />}
+            {currentView === "models" && <ModelManager inflowwDailyStats={inflowwDailyStats} models={agencyModels} persistModels={scopedPersistModels} cards={scopedCards} reels={scopedReels} agency={session.agency} bufferDailyStats={bufferDailyStats} igGraphStats={igGraphStats} igAccounts={igAccountsHook} onIgAccountSynced={() => Promise.all([refreshIgGraphStats(), refreshIgGraphMedia()])} />}
             {currentView === "whatsnew" && <WhatsNewPage />}
             {currentView === "settings" && (isAdmin
               ? <SettingsPanel settings={settings} persistSettings={persistSettings} />
