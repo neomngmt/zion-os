@@ -3956,6 +3956,7 @@ function EditorPage() {
 }
 
 function ContentDirector({ cards, persistCards, models, restrictModel, forcedNetwork, reels, persistReels, xCompetitors, persistXCompetitors, bufferDailyStats, bufferTopPosts, inflowwDailyStats, igGraphStats, igGraphMedia, igViralVariations }) {
+  const [igAiStudio, setIgAiStudio] = useState(false);
   const [detail, setDetail] = useState(null);
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -4031,13 +4032,27 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
         />
       );
     }
+    if (igAiStudio) {
+      return (
+        <>
+          <button onClick={() => setIgAiStudio(false)}
+            className="flex items-center gap-1 fs-10 font-mono uppercase c-faint hover-accent-text mb-3 transition-colors">
+            <ChevronLeft size={12} /> Instagram Dashboard
+          </button>
+          <IgStudioPage models={models.filter((m) => !(m.disabledPlatforms || []).includes("ig"))} onlyStudio />
+        </>
+      );
+    }
     if (!igPlanningMode) {
       return (
+        <><div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+          <button onClick={() => setIgAiStudio(true)} style={{ padding: "10px 18px", borderRadius: 14, background: "#3ee65a", color: "#03110a", fontWeight: 600, fontSize: 14 }}>AI Studio</button>
+        </div>
         <IGOverviewDashboard
           models={models} inflowwDailyStats={inflowwDailyStats} igGraphStats={igGraphStats} igGraphMedia={igGraphMedia} igViralVariations={igViralVariations}
           onPlanPosts={() => { setIgEntryScreen("menu"); setIgPlanningMode(true); }}
           onMakeContentPlan={() => { setIgEntryScreen("plan"); setIgPlanningMode(true); }}
-        />
+        /></>
       );
     }
     return (
@@ -13749,7 +13764,6 @@ function TrendsPage({ weeklyTrendReels, onReload, loading }) {
 const NAV_ADMIN = [
   { id: "dashboard", label: "Dashboard", icon: LayoutGrid },
   { id: "content", label: "Content Director", icon: Film },
-  { id: "igstudio", label: "IG Studio", icon: Instagram },
   { id: "editor", label: "Editor", icon: Clapperboard },
   { id: "calendar", label: "Calendar", icon: Calendar },
   { id: "tasks", label: "Tasks", icon: CheckSquare },
@@ -14290,8 +14304,21 @@ function IgStudioAI({ model, agency }) {
     setBusy(false);
   };
   const copy = () => { try { navigator.clipboard.writeText(out); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch (e) {} };
-  const tabs = [["reel", "Write a reel"], ["plan", "Plan next week"], ["audit", "Audit"]];
+  const SIMPLE_UI = {
+    caption: ["Caption", "Describe the reel or post, or paste its script."],
+    carousel: ["Carousel", "Give the idea. You get slide by slide copy plus caption."],
+    story: ["Stories", "What is happening today, or what should the stories sell?"],
+    profile: ["Profile", "Paste her name field, bio, link, highlight names, what is pinned and describe the first 9 grid covers."],
+    comment: ["Comments", "Paste the post or reel text with the account name (one or several)."],
+    reply: ["Reply", "Paste the comments under her post."],
+    dm: ["DM", "Who is the DM for and what happened (answered a story, commented a keyword, collab pitch)."],
+    repurpose: ["Repurpose", "Paste the transcript or text of a long video, podcast, call or article."],
+    viral: ["Swipe file", "Paste 3 or more reels that work in her niche: account, views, hook line, what happens. Do the searching from an account that is not linked to any model."],
+    human: ["Humanize", "Paste any text to strip AI wording and dashes."],
+  };
+  const tabs = [["reel", "Write a reel"], ["plan", "Plan next week"], ["audit", "Audit"], ...Object.keys(SIMPLE_UI).map((k) => [k, SIMPLE_UI[k][0]])];
   const labelFor = { reel: "Run the reel", plan: "Plan the week", audit: "Run the audit" };
+  if (SIMPLE_UI[kind]) labelFor[kind] = "Run " + SIMPLE_UI[kind][0].toLowerCase();
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 16 }}>
       <div style={igCard}>
@@ -14320,6 +14347,12 @@ function IgStudioAI({ model, agency }) {
           <>
             <div style={{ fontSize: 13, color: IG_C.dim, marginBottom: 8 }}>Paste her recent reels with views, likes, comments, shares and, if you have them, reach, non-follower share and hold at 3 seconds. At least 10 posts gives real patterns.</div>
             <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={7} placeholder="Reel 1: 8 200 views, 310 likes, 22 comments, 40 shares, 61% non-followers ..." style={field} />
+          </>
+        )}
+        {SIMPLE_UI[kind] && (
+          <>
+            <div style={{ fontSize: 13, color: IG_C.dim, marginBottom: 8 }}>{SIMPLE_UI[kind][1]}</div>
+            <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={7} style={field} />
           </>
         )}
         {err && <div style={{ color: "#ff6b6b", fontSize: 13, marginTop: 10 }}>{err}</div>}
@@ -14352,9 +14385,9 @@ function IgStudioAI({ model, agency }) {
   );
 }
 
-function IgStudioPage({ models }) {
+function IgStudioPage({ models, onlyStudio }) {
   const [modelName, setModelName] = useState((models[0] && models[0].name) || "");
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState(onlyStudio ? "studio" : "overview");
   const [period, setPeriod] = useState(90);
   const [snaps, setSnaps] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14389,11 +14422,11 @@ function IgStudioPage({ models }) {
       <style>{`.igs-grid{display:grid;gap:16px;grid-template-columns:repeat(12,minmax(0,1fr));margin-bottom:16px}.igs-kpis{display:grid;gap:16px;grid-template-columns:repeat(4,minmax(0,1fr))}.igs-8{grid-column:span 8}.igs-4{grid-column:span 4}.igs-5{grid-column:span 5}.igs-3{grid-column:span 3}@media (max-width:1100px){.igs-8,.igs-4,.igs-5,.igs-3{grid-column:span 12}.igs-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}`}</style>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-        <div style={{ display: "inline-flex", background: IG_C.card, border: `1px solid ${IG_C.line}`, borderRadius: 16, padding: 5, gap: 4 }}>
+        {!onlyStudio && <div style={{ display: "inline-flex", background: IG_C.card, border: `1px solid ${IG_C.line}`, borderRadius: 16, padding: 5, gap: 4 }}>
           {[["overview", "Instagram"], ["studio", "AI Studio"]].map(([k, l]) => (
             <div key={k} onClick={() => setTab(k)} style={{ padding: "9px 20px", borderRadius: 12, cursor: "pointer", fontSize: 15, background: tab === k ? IG_C.ac : "transparent", color: tab === k ? "#03110a" : IG_C.dim, fontWeight: tab === k ? 600 : 400 }}>{l}</div>
           ))}
-        </div>
+        </div>}
         <div style={{ marginLeft: "auto", display: "flex", gap: 10, flexWrap: "wrap" }}>
           <select value={modelName} onChange={(e) => setModelName(e.target.value)} style={sel}>{models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}</select>
           {tab === "overview" && <select value={period} onChange={(e) => setPeriod(Number(e.target.value))} style={sel}><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option><option value={365}>Last year</option></select>}
@@ -14830,7 +14863,6 @@ function App() {
             {currentView === "tasks" && <TaskManager tasks={isAdmin ? scopedTasks : tasks} persistTasks={isAdmin ? scopedPersistTasks : persistTasks} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} />}
             {currentView === "stats" && <StatsManager stats={scopedStats} persistStats={scopedPersistStats} models={agencyModels} reels={scopedReels} persistReels={scopedPersistReels} />}
             {currentView === "chatters" && isAdmin && <ChattersPage />}
-            {currentView === "igstudio" && isAdmin && <IgStudioPage models={agencyModels} />}
             {currentView === "customs" && isAdmin && <CustomsAdminPage models={agencyModels} />}
             {currentView === "customs" && !isAdmin && <CustomsCreatorPage model={restrictModel} record={models.find((mm) => mm.name === restrictModel)} />}
             {currentView === "reelsorter" && isAdmin && <ReelSorterPage />}

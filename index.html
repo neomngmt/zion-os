@@ -5629,6 +5629,7 @@ function ContentDirector({
   igGraphMedia,
   igViralVariations
 }) {
+  const [igAiStudio, setIgAiStudio] = useState(false);
   const [detail, setDetail] = useState(null);
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -5703,8 +5704,35 @@ function ContentDirector({
         initialScreen: igEntryScreen
       });
     }
+    if (igAiStudio) {
+      return React.createElement(React.Fragment, null, React.createElement("button", {
+        onClick: () => setIgAiStudio(false),
+        className: "flex items-center gap-1 fs-10 font-mono uppercase c-faint hover-accent-text mb-3 transition-colors"
+      }, React.createElement(ChevronLeft, {
+        size: 12
+      }), " Instagram Dashboard"), React.createElement(IgStudioPage, {
+        models: models.filter(m => !(m.disabledPlatforms || []).includes("ig")),
+        onlyStudio: true
+      }));
+    }
     if (!igPlanningMode) {
-      return React.createElement(IGOverviewDashboard, {
+      return React.createElement(React.Fragment, null, React.createElement("div", {
+        style: {
+          display: "flex",
+          justifyContent: "flex-end",
+          marginBottom: 12
+        }
+      }, React.createElement("button", {
+        onClick: () => setIgAiStudio(true),
+        style: {
+          padding: "10px 18px",
+          borderRadius: 14,
+          background: "#3ee65a",
+          color: "#03110a",
+          fontWeight: 600,
+          fontSize: 14
+        }
+      }, "AI Studio")), React.createElement(IGOverviewDashboard, {
         models: models,
         inflowwDailyStats: inflowwDailyStats,
         igGraphStats: igGraphStats,
@@ -5718,7 +5746,7 @@ function ContentDirector({
           setIgEntryScreen("plan");
           setIgPlanningMode(true);
         }
-      });
+      }));
     }
     return React.createElement(React.Fragment, null, React.createElement("button", {
       onClick: () => setIgPlanningMode(false),
@@ -18552,10 +18580,6 @@ const NAV_ADMIN = [{
   label: "Content Director",
   icon: Film
 }, {
-  id: "igstudio",
-  label: "IG Studio",
-  icon: Instagram
-}, {
   id: "editor",
   label: "Editor",
   icon: Clapperboard
@@ -19908,12 +19932,25 @@ function IgStudioAI({
       setTimeout(() => setCopied(false), 1500);
     } catch (e) {}
   };
-  const tabs = [["reel", "Write a reel"], ["plan", "Plan next week"], ["audit", "Audit"]];
+  const SIMPLE_UI = {
+    caption: ["Caption", "Describe the reel or post, or paste its script."],
+    carousel: ["Carousel", "Give the idea. You get slide by slide copy plus caption."],
+    story: ["Stories", "What is happening today, or what should the stories sell?"],
+    profile: ["Profile", "Paste her name field, bio, link, highlight names, what is pinned and describe the first 9 grid covers."],
+    comment: ["Comments", "Paste the post or reel text with the account name (one or several)."],
+    reply: ["Reply", "Paste the comments under her post."],
+    dm: ["DM", "Who is the DM for and what happened (answered a story, commented a keyword, collab pitch)."],
+    repurpose: ["Repurpose", "Paste the transcript or text of a long video, podcast, call or article."],
+    viral: ["Swipe file", "Paste 3 or more reels that work in her niche: account, views, hook line, what happens. Do the searching from an account that is not linked to any model."],
+    human: ["Humanize", "Paste any text to strip AI wording and dashes."]
+  };
+  const tabs = [["reel", "Write a reel"], ["plan", "Plan next week"], ["audit", "Audit"], ...Object.keys(SIMPLE_UI).map(k => [k, SIMPLE_UI[k][0]])];
   const labelFor = {
     reel: "Run the reel",
     plan: "Plan the week",
     audit: "Run the audit"
   };
+  if (SIMPLE_UI[kind]) labelFor[kind] = "Run " + SIMPLE_UI[kind][0].toLowerCase();
   return React.createElement("div", {
     style: {
       display: "grid",
@@ -20008,6 +20045,17 @@ function IgStudioAI({
     onChange: e => setInput(e.target.value),
     rows: 7,
     placeholder: "Reel 1: 8 200 views, 310 likes, 22 comments, 40 shares, 61% non-followers ...",
+    style: field
+  })), SIMPLE_UI[kind] && React.createElement(React.Fragment, null, React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: IG_C.dim,
+      marginBottom: 8
+    }
+  }, SIMPLE_UI[kind][1]), React.createElement("textarea", {
+    value: input,
+    onChange: e => setInput(e.target.value),
+    rows: 7,
     style: field
   })), err && React.createElement("div", {
     style: {
@@ -20120,10 +20168,11 @@ function IgStudioAI({
   }))))));
 }
 function IgStudioPage({
-  models
+  models,
+  onlyStudio
 }) {
   const [modelName, setModelName] = useState(models[0] && models[0].name || "");
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState(onlyStudio ? "studio" : "overview");
   const [period, setPeriod] = useState(90);
   const [snaps, setSnaps] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20194,7 +20243,7 @@ function IgStudioPage({
       flexWrap: "wrap",
       marginBottom: 16
     }
-  }, React.createElement("div", {
+  }, !onlyStudio && React.createElement("div", {
     style: {
       display: "inline-flex",
       background: IG_C.card,
@@ -21157,9 +21206,7 @@ function App() {
     models: agencyModels,
     reels: scopedReels,
     persistReels: scopedPersistReels
-  }), currentView === "chatters" && isAdmin && React.createElement(ChattersPage, null), currentView === "igstudio" && isAdmin && React.createElement(IgStudioPage, {
-    models: agencyModels
-  }), currentView === "customs" && isAdmin && React.createElement(CustomsAdminPage, {
+  }), currentView === "chatters" && isAdmin && React.createElement(ChattersPage, null), currentView === "customs" && isAdmin && React.createElement(CustomsAdminPage, {
     models: agencyModels
   }), currentView === "customs" && !isAdmin && React.createElement(CustomsCreatorPage, {
     model: restrictModel,
@@ -21191,7 +21238,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">h66k87</script>
+<script type="text/babel" id="zion-version">17a2ge</script>
 <script>
 (function () {
   var last = 0;
