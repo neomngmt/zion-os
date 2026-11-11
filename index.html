@@ -16104,7 +16104,8 @@ function InflowwRevenueCard({
   title,
   last7Dates,
   dayList30,
-  sumInfloww
+  sumInfloww,
+  embedded
 }) {
   const rowsAll = myInflowwRows.filter(r => r.accountType === accountType);
   const [range, setRange] = useState(7);
@@ -16132,7 +16133,7 @@ function InflowwRevenueCard({
   const prevTotal = prevDays.reduce((t, day) => t + sumForDay(day), 0);
   const rangeRows = rowsAll.filter(r => days.includes(r.statDate));
   return React.createElement("div", {
-    className: "c-bg-surface border c-border rounded-xl p-4 mb-3"
+    className: embedded ? "mt-5 pt-4 border-t c-border" : "c-bg-surface border c-border rounded-xl p-4 mb-3"
   }, React.createElement("div", {
     className: "flex items-center justify-between mb-1 flex-wrap gap-2"
   }, React.createElement("span", {
@@ -16153,7 +16154,9 @@ function InflowwRevenueCard({
     key: n,
     onClick: () => setRange(n),
     className: `tap px-2 py-0.5 fs-9 font-mono uppercase transition-colors ${range === n ? "c-bg-accent c-onaccent" : "c-muted hover-bg-surface"}`
-  }, n, "D"))))), React.createElement("div", {
+  }, n, "D"))))), embedded ? React.createElement("div", {
+    className: "fs-12 c-muted mb-1"
+  }, "$", Math.round(rangeTotal).toLocaleString("en-US"), " net revenue in the last ", range, " days") : React.createElement("div", {
     className: "text-2xl font-extrabold c-accent mb-1"
   }, "$", React.createElement(CountUp, {
     value: rangeTotal
@@ -16161,7 +16164,7 @@ function InflowwRevenueCard({
     className: "mb-2"
   }, React.createElement(RevenueChart, {
     data: chartData,
-    height: 200,
+    height: embedded ? 160 : 200,
     sparseUntil: range === 7 ? 7 : 0
   })), React.createElement("div", {
     className: "flex flex-wrap gap-4 fs-10 font-mono c-faint uppercase"
@@ -16176,7 +16179,8 @@ function InflowwRevenueCard({
 function CreatorMoney({
   model,
   record,
-  rows
+  rows,
+  children
 }) {
   const [ins, setIns] = useState(null);
   const [err, setErr] = useState("");
@@ -16200,6 +16204,33 @@ function CreatorMoney({
         if (!cancel) setIns(j);
       } catch (e) {
         if (!cancel) setErr(e.message || "Could not load");
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [model]);
+  const [topFan, setTopFan] = useState(undefined);
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/creator-insights`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({
+            model,
+            allTime: true
+          })
+        });
+        const j = await r.json();
+        if (!cancel) setTopFan(j && j.topFanAllTime ? j : null);
+      } catch (e) {
+        if (!cancel) setTopFan(null);
       }
     })();
     return () => {
@@ -16258,7 +16289,7 @@ function CreatorMoney({
     className: "fs-11 c-muted mt-2"
   }, record.goalNote, " ", React.createElement("span", {
     className: "c-faint font-mono"
-  }, "(set automatically from your stats)"))) : null), err && React.createElement("div", {
+  }, "(set automatically from your stats)"))) : null, children), err && React.createElement("div", {
     className: "fs-12 c-muted mb-3"
   }, "Extra insights are not available right now."), ins && ins.connected && React.createElement("div", {
     className: "grid grid-cols-1 md:grid-cols-2 gap-3"
@@ -16272,27 +16303,27 @@ function CreatorMoney({
     className: "text-2xl font-extrabold c-text"
   }, money(ins.payout.available + ins.payout.pending)), React.createElement("span", {
     className: "fs-12 c-muted"
-  }, "balance")), React.createElement("div", {
+  }, "paid out to you by OnlyFans")), React.createElement("div", {
     className: "fs-12 c-muted mt-1"
   }, money(ins.payout.available), " available, ", money(ins.payout.pending), " still pending."), sharePct != null && React.createElement("div", {
     className: "fs-12 c-text mt-2"
-  }, "Your share of it: about ", money((ins.payout.available + ins.payout.pending) * sharePct / 100)), React.createElement("div", {
+  }, "You keep about ", money((ins.payout.available + ins.payout.pending) * sharePct / 100), ". Your manager sends you an invoice for the agency share (about ", money((ins.payout.available + ins.payout.pending) * (100 - sharePct) / 100), ") after the payout reaches you."), React.createElement("div", {
     className: "fs-10 c-faint font-mono mt-2"
-  }, "Estimate. The final payout is sent by your manager.")), ins.leaderboard && React.createElement("div", {
+  }, "Estimate from your current balance, the invoice is the exact amount.")), ins.leaderboard && React.createElement("div", {
     className: card
   }, React.createElement("div", {
     className: label
-  }, "This month's ranking"), React.createElement("div", {
+  }, "This month's standing"), React.createElement("div", {
     className: "flex items-baseline gap-2 mt-2"
   }, React.createElement("span", {
     className: "text-2xl font-extrabold c-accent"
-  }, "#", ins.leaderboard.rank), React.createElement("span", {
+  }, "Top ", ins.leaderboard.topPct, "%"), React.createElement("span", {
     className: "fs-12 c-muted"
-  }, "of ", ins.leaderboard.of, " models")), React.createElement("div", {
+  }, "of the agency")), React.createElement("div", {
     className: "fs-12 c-muted mt-1"
-  }, ins.leaderboard.rank === 1 ? `You lead by ${money(ins.leaderboard.leadOverNext)}.` : `${money(ins.leaderboard.gapToNext)} to reach #${ins.leaderboard.rank - 1}.`), React.createElement("div", {
+  }, ins.leaderboard.tier), React.createElement("div", {
     className: "fs-10 c-faint font-mono mt-2"
-  }, "Anonymous, other models are not named.")), ins.topFans && ins.topFans.length > 0 && React.createElement("div", {
+  }, "Based on this month's revenue, nobody else is named.")), ins.topFans && ins.topFans.length > 0 && React.createElement("div", {
     className: card
   }, React.createElement("div", {
     className: label
@@ -16304,7 +16335,11 @@ function CreatorMoney({
     style: {
       borderBottom: "1px solid rgba(255,255,255,0.05)"
     }
-  }, React.createElement("span", null, f.label, " ", React.createElement("span", {
+  }, React.createElement("span", {
+    style: {
+      wordBreak: "break-word"
+    }
+  }, f.label, " ", React.createElement("span", {
     className: "c-faint fs-10 font-mono"
   }, f.count, "x")), React.createElement("span", {
     className: "font-mono"
@@ -16312,39 +16347,33 @@ function CreatorMoney({
     className: "c-faint"
   }, "(", f.sharePct, "%)"))))), React.createElement("div", {
     className: "fs-11 c-muted mt-2"
-  }, "Your top 5 fans bring ", ins.top5SharePct, "% of your income. Keep them happy.")), ins.bestHours && ins.bestHours.length > 0 && React.createElement("div", {
-    className: card
-  }, React.createElement("div", {
-    className: label
-  }, "When you earn most"), React.createElement("div", {
-    className: "fs-12 c-text mt-2"
-  }, ins.bestHours.map(h => `${String(h.hour).padStart(2, "0")}:00 (${money(h.net)})`).join("   ")), React.createElement("div", {
-    className: "flex items-end gap-1.5 mt-3",
+  }, "Your top 5 fans bring ", ins.top5SharePct, "% of your income. Keep them happy.")), topFan && topFan.topFanAllTime && React.createElement("div", {
+    className: card,
     style: {
-      height: 56
-    }
-  }, (ins.weekdays || []).map((v, i) => React.createElement("div", {
-    key: i,
-    className: "flex-1 flex flex-col items-center justify-end",
-    style: {
-      height: "100%"
+      borderColor: "rgba(240,190,60,0.45)"
     }
   }, React.createElement("div", {
+    className: label,
     style: {
-      width: "100%",
-      height: `${Math.max(4, v / maxDay * 100)}%`,
-      background: "#39e673",
-      opacity: 0.75,
-      borderRadius: "4px 4px 2px 2px"
+      color: "#f0be3c"
     }
-  })))), React.createElement("div", {
-    className: "flex gap-1.5 mt-1"
-  }, days.map(d => React.createElement("span", {
-    key: d,
-    className: "flex-1 text-center fs-9 c-faint font-mono"
-  }, d))), React.createElement("div", {
+  }, "Top fan all time"), React.createElement("div", {
+    className: "flex items-baseline gap-2 mt-2 flex-wrap"
+  }, React.createElement("span", {
+    className: "text-2xl font-extrabold c-text",
+    style: {
+      wordBreak: "break-word"
+    }
+  }, topFan.topFanAllTime.name)), React.createElement("div", {
+    className: "fs-13 c-accent font-extrabold mt-1"
+  }, money(topFan.topFanAllTime.net), " spent"), React.createElement("div", {
+    className: "fs-12 c-muted mt-1"
+  }, topFan.topFanAllTime.count, " purchases", topFan.topFanAllTime.first ? `, since ${new Date(topFan.topFanAllTime.first).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short"
+  })}` : ""), React.createElement("div", {
     className: "fs-10 c-faint font-mono mt-2"
-  }, "Prague time, net revenue by hour and by weekday.")), ins.chatters && ins.chatters.length > 0 && React.createElement("div", {
+  }, "Counted from the start of your sales with us", topFan.partial ? " (very long history, may be incomplete)" : "", ".")), ins.chatters && ins.chatters.length > 0 && React.createElement("div", {
     className: card
   }, React.createElement("div", {
     className: label
@@ -16409,6 +16438,23 @@ function CreatorDashboard({
     accountType: "paid",
     title: "OnlyFans · Paid"
   }), hasFreeInfloww && React.createElement(InflowwRevenueCard, {
+    myInflowwRows: myInflowwRows,
+    last7Dates: last7Dates,
+    dayList30: dayList30,
+    sumInfloww: sumInfloww,
+    accountType: "free",
+    title: "OnlyFans · Free"
+  }));
+  const inflowwSectionEmbedded = (hasFreeInfloww || hasPaidInfloww) && React.createElement("div", null, hasPaidInfloww && React.createElement(InflowwRevenueCard, {
+    embedded: true,
+    myInflowwRows: myInflowwRows,
+    last7Dates: last7Dates,
+    dayList30: dayList30,
+    sumInfloww: sumInfloww,
+    accountType: "paid",
+    title: "OnlyFans · Paid"
+  }), hasFreeInfloww && React.createElement(InflowwRevenueCard, {
+    embedded: true,
     myInflowwRows: myInflowwRows,
     last7Dates: last7Dates,
     dayList30: dayList30,
@@ -16482,11 +16528,11 @@ function CreatorDashboard({
       model: restrictModel,
       record: modelRecord,
       rows: inflowwDailyStats
-    }), React.createElement(ThisWeeksAsks, {
+    }, inflowwSectionEmbedded), React.createElement(ThisWeeksAsks, {
       tasks: tasks,
       restrictModel: restrictModel,
       onNavigate: onNavigate
-    }), inflowwSection, React.createElement(CreatorInsightsSection, {
+    }), React.createElement(CreatorInsightsSection, {
       models: [{
         name: restrictModel
       }],
@@ -16510,13 +16556,13 @@ function CreatorDashboard({
     model: restrictModel,
     record: modelRecord,
     rows: inflowwDailyStats
-  }), React.createElement(GoalCard, {
+  }, inflowwSectionEmbedded), React.createElement(GoalCard, {
     latest: latest
   }), React.createElement(ThisWeeksAsks, {
     tasks: tasks,
     restrictModel: restrictModel,
     onNavigate: onNavigate
-  }), inflowwSection, React.createElement(CreatorInsightsSection, {
+  }), React.createElement(CreatorInsightsSection, {
     models: [{
       name: restrictModel
     }],
@@ -19001,7 +19047,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1dv6xft</script>
+<script type="text/babel" id="zion-version">7lbrj1</script>
 <script>
 (function () {
   var last = 0;

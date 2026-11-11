@@ -12052,7 +12052,7 @@ function useSupaInflowwDailyStats() {
 // component gets a fresh function identity every render, which makes React
 // treat it as a brand-new component type and remount it, discarding this
 // card's own range state (the 7D/30D toggle) every time the parent re-renders.
-function InflowwRevenueCard({ myInflowwRows, accountType, title, last7Dates, dayList30, sumInfloww }) {
+function InflowwRevenueCard({ myInflowwRows, accountType, title, last7Dates, dayList30, sumInfloww, embedded }) {
   const rowsAll = myInflowwRows.filter((r) => r.accountType === accountType);
   const [range, setRange] = useState(7);
   if (!rowsAll.length) return null;
@@ -12067,7 +12067,7 @@ function InflowwRevenueCard({ myInflowwRows, accountType, title, last7Dates, day
   const rangeRows = rowsAll.filter((r) => days.includes(r.statDate));
 
   return (
-    <div className="c-bg-surface border c-border rounded-xl p-4 mb-3">
+    <div className={embedded ? "mt-5 pt-4 border-t c-border" : "c-bg-surface border c-border rounded-xl p-4 mb-3"}>
       <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
         <span className="fs-10 uppercase tracking-widest c-muted font-mono">
           {title}
@@ -12085,8 +12085,10 @@ function InflowwRevenueCard({ myInflowwRows, accountType, title, last7Dates, day
           </div>
         </div>
       </div>
-      <div className="text-2xl font-extrabold c-accent mb-1">$<CountUp value={rangeTotal} /></div>
-      <div className="mb-2"><RevenueChart data={chartData} height={200} sparseUntil={range === 7 ? 7 : 0} /></div>
+      {embedded
+        ? <div className="fs-12 c-muted mb-1">${Math.round(rangeTotal).toLocaleString("en-US")} net revenue in the last {range} days</div>
+        : <div className="text-2xl font-extrabold c-accent mb-1">$<CountUp value={rangeTotal} /></div>}
+      <div className="mb-2"><RevenueChart data={chartData} height={embedded ? 160 : 200} sparseUntil={range === 7 ? 7 : 0} /></div>
       <div className="flex flex-wrap gap-4 fs-10 font-mono c-faint uppercase">
         <span><CountUp value={sumInfloww(rangeRows, "messagesCount")} /> messages</span>
         <span><CountUp value={sumInfloww(rangeRows, "tipsCount")} /> tips</span>
@@ -12096,7 +12098,7 @@ function InflowwRevenueCard({ myInflowwRows, accountType, title, last7Dates, day
   );
 }
 
-function CreatorMoney({ model, record, rows }) {
+function CreatorMoney({ model, record, rows, children }) {
   const [ins, setIns] = useState(null);
   const [err, setErr] = useState("");
   useEffect(() => {
@@ -12112,6 +12114,23 @@ function CreatorMoney({ model, record, rows }) {
         if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
         if (!cancel) setIns(j);
       } catch (e) { if (!cancel) setErr(e.message || "Could not load"); }
+    })();
+    return () => { cancel = true; };
+  }, [model]);
+
+  const [topFan, setTopFan] = useState(undefined);
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/creator-insights`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+          body: JSON.stringify({ model, allTime: true }),
+        });
+        const j = await r.json();
+        if (!cancel) setTopFan(j && j.topFanAllTime ? j : null);
+      } catch (e) { if (!cancel) setTopFan(null); }
     })();
     return () => { cancel = true; };
   }, [model]);
@@ -12151,6 +12170,7 @@ function CreatorMoney({ model, record, rows }) {
             {record && record.goalAuto && record.goalNote && <div className="fs-11 c-muted mt-2">{record.goalNote} <span className="c-faint font-mono">(set automatically from your stats)</span></div>}
           </div>
         ) : null}
+        {children}
       </div>
 
       {err && <div className="fs-12 c-muted mb-3">Extra insights are not available right now.</div>}
@@ -12162,25 +12182,27 @@ function CreatorMoney({ model, record, rows }) {
               <div className={label}>At OnlyFans now</div>
               <div className="flex items-baseline gap-2 mt-2">
                 <span className="text-2xl font-extrabold c-text">{money(ins.payout.available + ins.payout.pending)}</span>
-                <span className="fs-12 c-muted">balance</span>
+                <span className="fs-12 c-muted">paid out to you by OnlyFans</span>
               </div>
               <div className="fs-12 c-muted mt-1">{money(ins.payout.available)} available, {money(ins.payout.pending)} still pending.</div>
-              {sharePct != null && <div className="fs-12 c-text mt-2">Your share of it: about {money((ins.payout.available + ins.payout.pending) * sharePct / 100)}</div>}
-              <div className="fs-10 c-faint font-mono mt-2">Estimate. The final payout is sent by your manager.</div>
+              {sharePct != null && (
+                <div className="fs-12 c-text mt-2">
+                  You keep about {money((ins.payout.available + ins.payout.pending) * sharePct / 100)}. Your manager sends you an invoice for the agency share (about {money((ins.payout.available + ins.payout.pending) * (100 - sharePct) / 100)}) after the payout reaches you.
+                </div>
+              )}
+              <div className="fs-10 c-faint font-mono mt-2">Estimate from your current balance, the invoice is the exact amount.</div>
             </div>
           )}
 
           {ins.leaderboard && (
             <div className={card}>
-              <div className={label}>This month's ranking</div>
+              <div className={label}>This month's standing</div>
               <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-2xl font-extrabold c-accent">#{ins.leaderboard.rank}</span>
-                <span className="fs-12 c-muted">of {ins.leaderboard.of} models</span>
+                <span className="text-2xl font-extrabold c-accent">Top {ins.leaderboard.topPct}%</span>
+                <span className="fs-12 c-muted">of the agency</span>
               </div>
-              <div className="fs-12 c-muted mt-1">
-                {ins.leaderboard.rank === 1 ? `You lead by ${money(ins.leaderboard.leadOverNext)}.` : `${money(ins.leaderboard.gapToNext)} to reach #${ins.leaderboard.rank - 1}.`}
-              </div>
-              <div className="fs-10 c-faint font-mono mt-2">Anonymous, other models are not named.</div>
+              <div className="fs-12 c-muted mt-1">{ins.leaderboard.tier}</div>
+              <div className="fs-10 c-faint font-mono mt-2">Based on this month's revenue, nobody else is named.</div>
             </div>
           )}
 
@@ -12190,7 +12212,7 @@ function CreatorMoney({ model, record, rows }) {
               <div className="mt-2">
                 {ins.topFans.map((f) => (
                   <div key={f.label} className="flex items-center justify-between py-1.5 fs-12 c-text" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                    <span>{f.label} <span className="c-faint fs-10 font-mono">{f.count}x</span></span>
+                    <span style={{ wordBreak: "break-word" }}>{f.label} <span className="c-faint fs-10 font-mono">{f.count}x</span></span>
                     <span className="font-mono">{money(f.net)} <span className="c-faint">({f.sharePct}%)</span></span>
                   </div>
                 ))}
@@ -12199,21 +12221,15 @@ function CreatorMoney({ model, record, rows }) {
             </div>
           )}
 
-          {(ins.bestHours && ins.bestHours.length > 0) && (
-            <div className={card}>
-              <div className={label}>When you earn most</div>
-              <div className="fs-12 c-text mt-2">
-                {ins.bestHours.map((h) => `${String(h.hour).padStart(2, "0")}:00 (${money(h.net)})`).join("   ")}
+          {topFan && topFan.topFanAllTime && (
+            <div className={card} style={{ borderColor: "rgba(240,190,60,0.45)" }}>
+              <div className={label} style={{ color: "#f0be3c" }}>Top fan all time</div>
+              <div className="flex items-baseline gap-2 mt-2 flex-wrap">
+                <span className="text-2xl font-extrabold c-text" style={{ wordBreak: "break-word" }}>{topFan.topFanAllTime.name}</span>
               </div>
-              <div className="flex items-end gap-1.5 mt-3" style={{ height: 56 }}>
-                {(ins.weekdays || []).map((v, i) => (
-                  <div key={i} className="flex-1 flex flex-col items-center justify-end" style={{ height: "100%" }}>
-                    <div style={{ width: "100%", height: `${Math.max(4, (v / maxDay) * 100)}%`, background: "#39e673", opacity: 0.75, borderRadius: "4px 4px 2px 2px" }} />
-                  </div>
-                ))}
-              </div>
-              <div className="flex gap-1.5 mt-1">{days.map((d) => <span key={d} className="flex-1 text-center fs-9 c-faint font-mono">{d}</span>)}</div>
-              <div className="fs-10 c-faint font-mono mt-2">Prague time, net revenue by hour and by weekday.</div>
+              <div className="fs-13 c-accent font-extrabold mt-1">{money(topFan.topFanAllTime.net)} spent</div>
+              <div className="fs-12 c-muted mt-1">{topFan.topFanAllTime.count} purchases{topFan.topFanAllTime.first ? `, since ${new Date(topFan.topFanAllTime.first).toLocaleDateString(undefined, { day: "numeric", month: "short" })}` : ""}</div>
+              <div className="fs-10 c-faint font-mono mt-2">Counted from the start of your sales with us{topFan.partial ? " (very long history, may be incomplete)" : ""}.</div>
             </div>
           )}
 
@@ -12265,6 +12281,12 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
       {hasFreeInfloww && <InflowwRevenueCard myInflowwRows={myInflowwRows} last7Dates={last7Dates} dayList30={dayList30} sumInfloww={sumInfloww} accountType="free" title="OnlyFans · Free" />}
     </div>
   );
+  const inflowwSectionEmbedded = (hasFreeInfloww || hasPaidInfloww) && (
+    <div>
+      {hasPaidInfloww && <InflowwRevenueCard embedded myInflowwRows={myInflowwRows} last7Dates={last7Dates} dayList30={dayList30} sumInfloww={sumInfloww} accountType="paid" title="OnlyFans · Paid" />}
+      {hasFreeInfloww && <InflowwRevenueCard embedded myInflowwRows={myInflowwRows} last7Dates={last7Dates} dayList30={dayList30} sumInfloww={sumInfloww} accountType="free" title="OnlyFans · Free" />}
+    </div>
+  );
   const myBufferRows = (bufferDailyStats || []).filter((r) => r.model === restrictModel && r.statDate >= sevenDaysAgoStr);
   const platformTotals = {};
   myBufferRows.forEach((r) => {
@@ -12306,9 +12328,8 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
   if (!latest) {
     return (
       <div className="creator-glow-scope">
-        <CreatorMoney model={restrictModel} record={modelRecord} rows={inflowwDailyStats} />
+        <CreatorMoney model={restrictModel} record={modelRecord} rows={inflowwDailyStats}>{inflowwSectionEmbedded}</CreatorMoney>
         <ThisWeeksAsks tasks={tasks} restrictModel={restrictModel} onNavigate={onNavigate} />
-        {inflowwSection}
         <CreatorInsightsSection models={[{ name: restrictModel }]} inflowwDailyStats={inflowwDailyStats} days={30} periodLabel="30d" />
         <XStatsSection models={[{ name: restrictModel }]} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} restrictModel={restrictModel} />
         {bufferSection}
@@ -12321,10 +12342,9 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
 
   return (
     <div className="creator-glow-scope">
-      <CreatorMoney model={restrictModel} record={modelRecord} rows={inflowwDailyStats} />
+      <CreatorMoney model={restrictModel} record={modelRecord} rows={inflowwDailyStats}>{inflowwSectionEmbedded}</CreatorMoney>
       <GoalCard latest={latest} />
       <ThisWeeksAsks tasks={tasks} restrictModel={restrictModel} onNavigate={onNavigate} />
-      {inflowwSection}
       <CreatorInsightsSection models={[{ name: restrictModel }]} inflowwDailyStats={inflowwDailyStats} days={30} periodLabel="30d" />
       <XStatsSection models={[{ name: restrictModel }]} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} restrictModel={restrictModel} />
       {bufferSection}
