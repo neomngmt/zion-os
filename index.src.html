@@ -4070,14 +4070,21 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
   const upload = async (file, kind) => {
     if (!tunnel || !file) return;
     setErr("");
-    const CH = 40 * 1024 * 1024, total = Math.max(1, Math.ceil(file.size / CH)), uid = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+    const CH = 16 * 1024 * 1024, total = Math.max(1, Math.ceil(file.size / CH)), uid = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+    const sendChunk = (i) => new Promise((resolve, reject) => {
+      const x = new XMLHttpRequest();
+      x.open("POST", `${tunnel}/upload?kind=${kind}&uid=${uid}&idx=${i}&off=${i * CH}&total=${total}&name=${encodeURIComponent(file.name)}`);
+      x.setRequestHeader("x-zion-token", token);
+      x.upload.onprogress = (e) => { const done = i * CH + (e.loaded || 0); setUp({ name: file.name, kind, pct: Math.min(99, Math.round((done / file.size) * 100)) }); };
+      x.onload = () => { try { const j = JSON.parse(x.responseText); if (x.status >= 400) reject(new Error(j.error || "Upload failed")); else resolve(j); } catch (e) { reject(new Error("Upload failed (" + x.status + ")")); } };
+      x.onerror = () => reject(new Error("Lost the connection to the Mac"));
+      x.send(file.slice(i * CH, (i + 1) * CH));
+    });
     try {
       let last = null;
       for (let i = 0; i < total; i++) {
-        setUp({ name: file.name, kind, pct: Math.round((i / total) * 100) });
-        const r = await fetch(`${tunnel}/upload?kind=${kind}&uid=${uid}&idx=${i}&total=${total}&name=${encodeURIComponent(file.name)}`, { method: "POST", headers: { "x-zion-token": token }, body: file.slice(i * CH, (i + 1) * CH) });
-        last = await r.json();
-        if (!r.ok) throw new Error(last.error || "Upload failed");
+        let tries = 0;
+        for (;;) { try { last = await sendChunk(i); break; } catch (e) { if (++tries >= 3) throw e; await new Promise((r) => setTimeout(r, 1500)); } }
       }
       if (last && last.name) { if (kind === "raw") setSelRaw(last.name); else setSelRef(last.name); }
       await loadLib();
