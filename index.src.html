@@ -12586,13 +12586,7 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
     return (
       <div className="creator-glow-scope">
         <CreatorMoney model={restrictModel} record={modelRecord} rows={inflowwDailyStats}>{inflowwSectionEmbedded}</CreatorMoney>
-      <CreatorGrowth model={restrictModel} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} igGraphStats={igGraphStats} />
         <ThisWeeksAsks tasks={tasks} restrictModel={restrictModel} onNavigate={onNavigate} />
-        <XStatsSection models={[{ name: restrictModel }]} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} restrictModel={restrictModel} />
-        {bufferSection}
-        <div className="fs-12 c-faint font-mono italic py-16 text-center border border-dashed c-border rounded-xl">
-          No stats yet. Ask your manager to add this week's numbers.
-        </div>
       </div>
     );
   }
@@ -12600,11 +12594,8 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
   return (
     <div className="creator-glow-scope">
       <CreatorMoney model={restrictModel} record={modelRecord} rows={inflowwDailyStats}>{inflowwSectionEmbedded}</CreatorMoney>
-      <CreatorGrowth model={restrictModel} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} igGraphStats={igGraphStats} />
       <GoalCard latest={latest} />
       <ThisWeeksAsks tasks={tasks} restrictModel={restrictModel} onNavigate={onNavigate} />
-      <XStatsSection models={[{ name: restrictModel }]} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} restrictModel={restrictModel} />
-      {bufferSection}
 
       <div className="flex gap-3 flex-wrap mb-6">
         <StatCardBig icon={DollarSign} label="OF earnings this week" value={`$${latest.ofEarnings.toLocaleString()}`}

@@ -17205,25 +17205,11 @@ function CreatorDashboard({
       model: restrictModel,
       record: modelRecord,
       rows: inflowwDailyStats
-    }, inflowwSectionEmbedded), React.createElement(CreatorGrowth, {
-      model: restrictModel,
-      bufferDailyStats: bufferDailyStats,
-      bufferTopPosts: bufferTopPosts,
-      igGraphStats: igGraphStats
-    }), React.createElement(ThisWeeksAsks, {
+    }, inflowwSectionEmbedded), React.createElement(ThisWeeksAsks, {
       tasks: tasks,
       restrictModel: restrictModel,
       onNavigate: onNavigate
-    }), React.createElement(XStatsSection, {
-      models: [{
-        name: restrictModel
-      }],
-      bufferDailyStats: bufferDailyStats,
-      bufferTopPosts: bufferTopPosts,
-      restrictModel: restrictModel
-    }), bufferSection, React.createElement("div", {
-      className: "fs-12 c-faint font-mono italic py-16 text-center border border-dashed c-border rounded-xl"
-    }, "No stats yet. Ask your manager to add this week's numbers."));
+    }));
   }
   return React.createElement("div", {
     className: "creator-glow-scope"
@@ -17231,25 +17217,13 @@ function CreatorDashboard({
     model: restrictModel,
     record: modelRecord,
     rows: inflowwDailyStats
-  }, inflowwSectionEmbedded), React.createElement(CreatorGrowth, {
-    model: restrictModel,
-    bufferDailyStats: bufferDailyStats,
-    bufferTopPosts: bufferTopPosts,
-    igGraphStats: igGraphStats
-  }), React.createElement(GoalCard, {
+  }, inflowwSectionEmbedded), React.createElement(GoalCard, {
     latest: latest
   }), React.createElement(ThisWeeksAsks, {
     tasks: tasks,
     restrictModel: restrictModel,
     onNavigate: onNavigate
-  }), React.createElement(XStatsSection, {
-    models: [{
-      name: restrictModel
-    }],
-    bufferDailyStats: bufferDailyStats,
-    bufferTopPosts: bufferTopPosts,
-    restrictModel: restrictModel
-  }), bufferSection, React.createElement("div", {
+  }), React.createElement("div", {
     className: "flex gap-3 flex-wrap mb-6"
   }, React.createElement(StatCardBig, {
     icon: DollarSign,
@@ -21238,7 +21212,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">17a2ge</script>
+<script type="text/babel" id="zion-version">gz9zqh</script>
 <script>
 (function () {
   var last = 0;
