@@ -9364,6 +9364,46 @@ a:focus-visible, button:focus-visible{ outline:2px solid var(--lp-green); outlin
 .nav .cta:hover{ transform:translateY(-1px) scale(1.03); box-shadow:0 0 16px var(--lp-green-glow); }
 
 
+
+/* ---- See it work: three live widgets (sample data) ---- */
+.widgets{ display:grid; grid-template-columns:1.25fr 1fr; gap:18px; margin-top:34px; }
+.widgets .w-wide{ grid-column:1 / -1; }
+.w-pad{ padding:22px; }
+.w-note{ font-size:10px; letter-spacing:2px; color:var(--lp-text-dim); margin-top:12px; }
+.w-big{ font-size:44px; font-weight:800; letter-spacing:-1px; }
+.w-big small{ font-size:13px; font-weight:500; color:var(--lp-text-dim); letter-spacing:0; margin-left:8px; }
+.w-chart{ width:100%; height:150px; display:block; margin-top:10px; }
+.w-chart .line{ fill:none; stroke:var(--lp-green-soft); stroke-width:3; stroke-linecap:round; stroke-dasharray:900; stroke-dashoffset:900; animation:w-draw 7s ease-in-out infinite; filter:drop-shadow(0 0 6px var(--lp-green-glow)); }
+.w-chart .area{ fill:url(#wArea); opacity:0; animation:w-area 7s ease-in-out infinite; }
+.w-chart .end{ fill:var(--lp-green-soft); opacity:0; animation:w-end 7s ease-in-out infinite; }
+@keyframes w-draw{ 0%{stroke-dashoffset:900} 45%,85%{stroke-dashoffset:0} 100%{stroke-dashoffset:-900} }
+@keyframes w-area{ 0%,10%{opacity:0} 45%,85%{opacity:1} 100%{opacity:0} }
+@keyframes w-end{ 0%,44%{opacity:0;transform:scale(.4)} 50%,85%{opacity:1;transform:scale(1)} 100%{opacity:0} }
+.w-tiles{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+.w-tile{ border:1px solid var(--lp-border); border-radius:12px; padding:12px 14px; background:rgba(255,255,255,.02); }
+.w-tile .k{ font-size:10px; letter-spacing:2px; color:var(--lp-text-dim); }
+.w-tile .v{ font-size:20px; font-weight:700; margin-top:4px; }
+.w-prog{ height:6px; border-radius:6px; background:rgba(255,255,255,.07); margin-top:8px; overflow:hidden; }
+.w-prog i{ display:block; height:100%; width:0; background:linear-gradient(90deg,var(--lp-green),var(--lp-green-soft)); border-radius:6px; animation:w-fill 6s ease-in-out infinite; }
+@keyframes w-fill{ 0%{width:6%} 55%,85%{width:72%} 100%{width:6%} }
+.w-models{ display:flex; flex-direction:column; gap:10px; margin-top:14px; }
+.w-model{ display:flex; align-items:center; gap:12px; border:1px solid var(--lp-border); border-radius:12px; padding:10px 12px; background:rgba(255,255,255,.02); }
+.w-av{ width:34px; height:34px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; font-weight:800; color:#03110a; }
+.w-model .n{ font-weight:600; font-size:14px; min-width:70px; }
+.w-bar{ flex:1; height:8px; border-radius:8px; background:rgba(255,255,255,.07); overflow:hidden; }
+.w-bar i{ display:block; height:100%; width:0; border-radius:8px; animation:w-grow 6s ease-in-out infinite; }
+@keyframes w-grow{ 0%{width:8%} 50%,85%{width:var(--to)} 100%{width:8%} }
+.w-badge{ font-size:10px; letter-spacing:1.5px; padding:4px 9px; border-radius:99px; border:1px solid var(--lp-green); color:var(--lp-green-soft); animation:w-pulse 2.4s ease-in-out infinite; }
+@keyframes w-pulse{ 0%,100%{box-shadow:0 0 0 0 rgba(57,230,115,0)} 50%{box-shadow:0 0 14px rgba(57,230,115,.45)} }
+.w-ed{ position:relative; margin-top:14px; background:#0a0d0c; border:1px solid var(--lp-border); border-radius:14px; padding:14px; height:250px; overflow:hidden; }
+.w-ed .bar{ position:absolute; left:0; top:0; height:3px; width:0; background:var(--lp-green-soft); box-shadow:0 0 10px var(--lp-green-soft); animation:w-load 10s linear infinite; }
+@keyframes w-load{ 0%{width:0} 90%,100%{width:100%} }
+.w-lane{ position:relative; height:30px; margin-top:8px; border-radius:7px; background:rgba(255,255,255,.03); }
+.w-lane b{ position:absolute; top:4px; bottom:4px; border-radius:6px; font-size:10px; font-weight:700; padding:0 8px; display:flex; align-items:center; opacity:0; animation:w-clip 10s ease-in-out infinite backwards; animation-delay:var(--dl,0s); white-space:nowrap; }
+@keyframes w-clip{ 0%{opacity:0;transform:scale(.6)} 6%,88%{opacity:1;transform:scale(1)} 100%{opacity:0;transform:scale(.9)} }
+.w-cur{ position:absolute; left:0; top:0; font-size:10px; font-weight:800; padding:2px 8px; border-radius:6px; color:#10140a; white-space:nowrap; box-shadow:0 0 12px currentColor; animation:w-fly 9s ease-in-out infinite; }
+@keyframes w-fly{ 0%{transform:translate(var(--x0),var(--y0))} 25%{transform:translate(var(--x1),var(--y1))} 50%{transform:translate(var(--x2),var(--y2))} 75%{transform:translate(var(--x3),var(--y3))} 100%{transform:translate(var(--x0),var(--y0))} }
+@media (max-width: 860px){ .widgets{ grid-template-columns:1fr; } }
 `;
 
 const LANDING_PAGE_BODY = `
@@ -9443,6 +9483,58 @@ const LANDING_PAGE_BODY = `
     <div class="floor-ticker mono">
       <div class="floor-ticker-track" id="floorTicker"></div>
     </div>
+    </div>
+  </div>
+</div>
+
+
+<div class="wrap" id="see">
+  <div class="section" style="padding-bottom:40px">
+    <div class="section-head" data-reveal>
+      <div class="tag mono">SEE IT WORK</div>
+      <h2>Money, models and edits<span class="script-inline">in motion.</span></h2>
+      <p class="section-sub">Three live pieces of Zion OS. The numbers and names here are sample data, nothing real.</p>
+    </div>
+    <div class="widgets">
+      <div class="panel w-pad" data-reveal>
+        <div class="panel-head"><div class="label mono">DASHBOARD · SAMPLE DATA</div><div class="meta mono">THIS MONTH</div></div>
+        <div class="w-big">$<span data-count="4280">0</span><small>net, sample</small></div>
+        <svg class="w-chart" viewBox="0 0 600 150" preserveAspectRatio="none">
+          <defs><linearGradient id="wArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#39e673" stop-opacity=".35"/><stop offset="100%" stop-color="#39e673" stop-opacity="0"/></linearGradient></defs>
+          <path class="area" d="M0,120 C60,110 90,70 140,84 C190,98 220,40 280,56 C340,72 360,30 420,42 C480,54 520,20 600,14 L600,150 L0,150 Z"/>
+          <path class="line" d="M0,120 C60,110 90,70 140,84 C190,98 220,40 280,56 C340,72 360,30 420,42 C480,54 520,20 600,14"/>
+          <circle class="end" cx="598" cy="14" r="6"/>
+        </svg>
+        <div class="w-tiles">
+          <div class="w-tile"><div class="k mono">MONTHLY GOAL</div><div class="v">71%</div><div class="w-prog"><i></i></div></div>
+          <div class="w-tile"><div class="k mono">YOUR STANDING</div><div class="v">Top 3</div><div class="w-prog"><i style="animation-delay:.6s"></i></div></div>
+        </div>
+      </div>
+      <div class="panel w-pad" data-reveal>
+        <div class="panel-head"><div class="label mono">MODELS · SAMPLE DATA</div><div class="meta mono">THIS WEEK</div></div>
+        <div class="w-models">
+          <div class="w-model"><div class="w-av" style="background:#39e673">A</div><div class="n">Model A</div><div class="w-bar"><i style="--to:88%;background:#39e673"></i></div><span class="w-badge mono">TOP 1</span></div>
+          <div class="w-model"><div class="w-av" style="background:#4cc3ff">B</div><div class="n">Model B</div><div class="w-bar"><i style="--to:70%;background:#4cc3ff;animation-delay:.3s"></i></div><span class="w-badge mono" style="animation-delay:.5s">TOP 2</span></div>
+          <div class="w-model"><div class="w-av" style="background:#ff5db1">C</div><div class="n">Model C</div><div class="w-bar"><i style="--to:52%;background:#ff5db1;animation-delay:.6s"></i></div><span class="w-badge mono" style="animation-delay:1s">TOP 3</span></div>
+          <div class="w-model"><div class="w-av" style="background:#ffb020">D</div><div class="n">Model D</div><div class="w-bar"><i style="--to:36%;background:#ffb020;animation-delay:.9s"></i></div><span class="w-badge mono" style="animation-delay:1.5s">RISING</span></div>
+        </div>
+        <div class="w-note mono">GOALS, RANKING AND TOP FANS, PER MODEL.</div>
+      </div>
+      <div class="panel w-pad w-wide" data-reveal>
+        <div class="panel-head"><div class="label mono">EDITOR · AGENTS AT WORK</div><div class="meta mono">SAMPLE EDIT</div></div>
+        <div class="w-ed">
+          <div class="bar"></div>
+          <div class="w-lane"><b style="left:4%;width:34%;background:rgba(198,244,50,.2);color:#c6f432;border:1px solid #c6f432;--dl:0.8s">CAPTIONS</b><b style="left:44%;width:30%;background:rgba(198,244,50,.2);color:#c6f432;border:1px solid #c6f432;--dl:1.8s">CAPTIONS</b></div>
+          <div class="w-lane"><b style="left:20%;width:12%;background:rgba(255,93,177,.2);color:#ff5db1;border:1px solid #ff5db1;--dl:2.8s">ZOOM</b><b style="left:58%;width:12%;background:rgba(255,93,177,.2);color:#ff5db1;border:1px solid #ff5db1;--dl:3.8s">ZOOM</b></div>
+          <div class="w-lane"><b style="left:8%;width:22%;background:rgba(76,195,255,.2);color:#4cc3ff;border:1px solid #4cc3ff;--dl:4.6s">CARD</b><b style="left:62%;width:20%;background:rgba(76,195,255,.2);color:#4cc3ff;border:1px solid #4cc3ff;--dl:5.4s">B-ROLL</b></div>
+          <div class="w-lane"><b style="left:0;width:36%;background:rgba(57,230,115,.2);color:#39e673;border:1px solid #39e673;--dl:0.2s">TAKE 1</b><b style="left:38%;width:30%;background:rgba(57,230,115,.2);color:#39e673;border:1px solid #39e673;--dl:1.2s">TAKE 2</b><b style="left:70%;width:30%;background:rgba(57,230,115,.2);color:#39e673;border:1px solid #39e673;--dl:2.2s">TAKE 3</b></div>
+          <span class="w-cur" style="background:#39e673;color:#39e673;--x0:20px;--y0:60px;--x1:340px;--y1:150px;--x2:640px;--y2:80px;--x3:220px;--y3:190px"><span style="color:#10140a">Cutter</span></span>
+          <span class="w-cur" style="background:#c6f432;color:#c6f432;animation-delay:-2s;--x0:300px;--y0:40px;--x1:80px;--y1:110px;--x2:480px;--y2:170px;--x3:700px;--y3:60px"><span style="color:#10140a">Captions</span></span>
+          <span class="w-cur" style="background:#ff5db1;color:#ff5db1;animation-delay:-4s;--x0:520px;--y0:120px;--x1:260px;--y1:60px;--x2:60px;--y2:180px;--x3:420px;--y3:100px"><span style="color:#10140a">Color</span></span>
+          <span class="w-cur" style="background:#4cc3ff;color:#4cc3ff;animation-delay:-6s;--x0:120px;--y0:180px;--x1:560px;--y1:40px;--x2:380px;--y2:120px;--x3:760px;--y3:150px"><span style="color:#10140a">B-roll</span></span>
+        </div>
+        <div class="w-note mono">AGENTS CUT, CAPTION AND DECORATE THE VIDEO. YOU PRESS EDIT.</div>
+      </div>
     </div>
   </div>
 </div>
