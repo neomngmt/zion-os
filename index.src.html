@@ -4031,6 +4031,25 @@ function EditorPage() {
   );
 }
 
+function PlatformEmpty({ platform }) {
+  const meta = { ig: ["Instagram", Instagram, "#ff2e78"], x: ["X", XLogo, "#ffffff"], tiktok: ["TikTok", TikTokLogo, "#5B8FA8"], threads: ["Threads", ThreadsLogo, "#E4E4E4"], snap: ["Snapchat", SnapchatLogo, "#FFFC00"], fb: ["Facebook", FacebookLogo, "#4C8BF5"] }[platform] || ["", Instagram, "#39e673"];
+  const Icon = meta[1];
+  return (
+    <div className="rounded-3xl p-6" style={{ background: "radial-gradient(ellipse 130% 100% at 10% 0%, rgba(57,230,115,0.14), transparent 55%), radial-gradient(ellipse 100% 80% at 100% 0%, rgba(56,189,248,0.10), transparent 55%), #0b0f0d", border: "1px solid rgba(255,255,255,0.08)" }}>
+      <div className="flex items-center gap-3 mb-5">
+        <div className="rounded-2xl flex items-center justify-center flex-shrink-0" style={{ width: 44, height: 44, background: "rgba(255,255,255,0.06)", border: `1px solid ${meta[2]}66` }}><Icon size={20} color={meta[2]} /></div>
+        <div>
+          <div className="text-2xl font-extrabold tracking-tight c-text">{meta[0]} Dashboard</div>
+          <p className="text-sm mt-0.5" style={{ color: "#9d9b95" }}>Not set up yet</p>
+        </div>
+      </div>
+      <div className="fs-12 italic py-10 text-center rounded-2xl" style={{ border: "1px dashed rgba(255,255,255,0.14)", color: "#9d9b95", background: "rgba(255,255,255,0.035)" }}>
+        You have no {meta[0]} account with us yet. When your manager adds it, your numbers show up here automatically.
+      </div>
+    </div>
+  );
+}
+
 function FacebookPagesPanel({ models, restrictModel }) {
   const [urls, setUrls] = useState(() => Object.fromEntries(models.map((m) => [m.name, m.fbUrl || ""])));
   const [saved, setSaved] = useState("");
@@ -4146,6 +4165,14 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
   const igModelName = restrictModel || (filter !== "all" ? filter : null);
   const igModelObj = igModelName ? models.find((m) => m.name === igModelName) : null;
   const igMode = network === "ig" && !restrictModel;
+
+  // Model login: a platform she has no account on yet shows one calm placeholder instead of a board or planner.
+  if (restrictModel && ["ig", "x", "tiktok", "threads", "snap", "fb"].includes(network)) {
+    const mm = models.find((x) => x.name === restrictModel) || {};
+    const connected = network === "ig" ? !!mm.igHandle : network === "x" ? !!mm.xHandle : network === "tiktok" ? !!mm.tiktokHandle
+      : network === "fb" ? !!mm.fbUrl : network === "threads" ? (bufferDailyStats || []).some((r) => r.model === restrictModel && r.platform === "threads") : false;
+    if (!connected) return <PlatformEmpty platform={network} />;
+  }
 
   // Model login: her Instagram page is the same dashboard the team sees, only with her own account.
   if (network === "ig" && restrictModel) {
