@@ -16924,35 +16924,123 @@ function WhatsNewPage() {
   const orderedStats = statOrder.map(l => ofStats.find(x => x.label === l)).filter(Boolean);
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   return React.createElement("div", {
-    className: "max-w-2xl"
+    className: "max-w-5xl"
   }, React.createElement("p", {
     className: "fs-13 c-muted mb-6"
-  }, "News and developments from the OnlyFans / creator economy world. Checked several times a day."), orderedStats.length > 0 && React.createElement("div", {
-    className: "mb-7"
-  }, React.createElement("div", {
-    className: "fs-10 font-mono uppercase tracking-widest c-faint mb-2"
-  }, "OnlyFans in numbers"), React.createElement("div", {
-    className: "grid grid-cols-2 gap-2.5"
-  }, orderedStats.map(st => React.createElement("a", {
-    key: st.label,
-    href: st.source_url,
-    target: "_blank",
-    rel: "noopener noreferrer",
-    className: "c-bg-surface border c-border rounded-xl px-3.5 py-3 block hover-lift",
-    style: {
-      textDecoration: "none"
-    }
-  }, React.createElement("div", {
-    className: "fs-10 font-mono uppercase tracking-wide c-faint"
-  }, st.label), React.createElement("div", {
-    className: "fs-20 font-extrabold c-accent mt-0.5"
-  }, st.value), React.createElement("div", {
-    className: "fs-10 c-muted mt-0.5"
-  }, st.period || ""), st.note && React.createElement("div", {
-    className: "fs-10 c-faint mt-1 leading-snug"
-  }, st.note)))), React.createElement("div", {
-    className: "fs-10 c-faint font-mono mt-2"
-  }, "Figures from the latest public reports, tap a card to open the source.")), loading && React.createElement("div", {
+  }, "News and developments from the OnlyFans / creator economy world. Checked several times a day."), orderedStats.length > 0 && (() => {
+    const get = l => orderedStats.find(x => x.label === l);
+    const hero = get("Gross payments");
+    const tiles = [["Creators", Users], ["Fans", Eye], ["Platform revenue", TrendingUp], ["Profit", DollarSign]].map(([l, Ic]) => [get(l), Ic]).filter(([x]) => x);
+    const payouts = get("Creator payouts"),
+      fee = get("Platform fee");
+    return React.createElement("div", {
+      className: "mb-8"
+    }, React.createElement("div", {
+      className: "fs-10 font-mono uppercase tracking-widest c-faint mb-3"
+    }, "OnlyFans in numbers"), React.createElement("div", {
+      className: "grid grid-cols-1 lg:grid-cols-12 gap-3"
+    }, hero && React.createElement("a", {
+      href: hero.source_url,
+      target: "_blank",
+      rel: "noopener noreferrer",
+      className: "lg:col-span-5 rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between hover-lift",
+      style: {
+        textDecoration: "none",
+        minHeight: 250,
+        background: "linear-gradient(150deg, #39e673, #17c58a 85%)",
+        boxShadow: "0 24px 48px rgba(57,230,115,0.18), inset 0 1px 0 rgba(255,255,255,0.25)"
+      }
+    }, React.createElement("div", {
+      className: "absolute pointer-events-none",
+      style: {
+        top: -60,
+        right: -60,
+        width: 200,
+        height: 200,
+        borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(255,255,255,0.35), transparent 70%)",
+        filter: "blur(10px)"
+      }
+    }), React.createElement("div", {
+      className: "relative"
+    }, React.createElement("div", {
+      className: "fs-13 font-semibold",
+      style: {
+        color: "rgba(255,255,255,0.9)"
+      }
+    }, "Fans paid in total"), React.createElement("div", {
+      className: "text-5xl font-extrabold text-white leading-none mt-3",
+      style: {
+        textShadow: "0 2px 16px rgba(0,0,0,0.15)"
+      }
+    }, hero.value), React.createElement("div", {
+      className: "fs-11 mt-2",
+      style: {
+        color: "rgba(255,255,255,0.8)"
+      }
+    }, hero.period || "", hero.note ? ` · ${hero.note.replace(/^Total fan spending, audited gross fan payments, /i, "")}` : "")), React.createElement("div", {
+      className: "relative flex gap-2 flex-wrap mt-5"
+    }, payouts && React.createElement("div", {
+      className: "rounded-2xl px-3 py-2",
+      style: {
+        background: "rgba(0,0,0,0.16)"
+      }
+    }, React.createElement("div", {
+      className: "fs-9 font-mono uppercase",
+      style: {
+        color: "rgba(255,255,255,0.7)"
+      }
+    }, "Creators got"), React.createElement("div", {
+      className: "fs-15 font-bold text-white"
+    }, payouts.value)), fee && React.createElement("div", {
+      className: "rounded-2xl px-3 py-2",
+      style: {
+        background: "rgba(0,0,0,0.16)"
+      }
+    }, React.createElement("div", {
+      className: "fs-9 font-mono uppercase",
+      style: {
+        color: "rgba(255,255,255,0.7)"
+      }
+    }, "OnlyFans keeps"), React.createElement("div", {
+      className: "fs-15 font-bold text-white"
+    }, fee.value)))), React.createElement("div", {
+      className: "lg:col-span-7 grid grid-cols-2 gap-3"
+    }, tiles.map(([st, Ic]) => React.createElement("a", {
+      key: st.label,
+      href: st.source_url,
+      target: "_blank",
+      rel: "noopener noreferrer",
+      className: "rounded-3xl p-5 flex flex-col hover-lift",
+      style: {
+        textDecoration: "none",
+        background: "rgba(255,255,255,0.035)",
+        border: "1px solid rgba(255,255,255,0.08)"
+      }
+    }, React.createElement("div", {
+      className: "flex items-center justify-between mb-3"
+    }, React.createElement("div", {
+      className: "rounded-xl flex items-center justify-center",
+      style: {
+        width: 32,
+        height: 32,
+        background: "rgba(57,230,115,0.12)"
+      }
+    }, React.createElement(Ic, {
+      size: 15,
+      color: "#39e673"
+    })), React.createElement("span", {
+      className: "fs-9 font-mono c-faint"
+    }, st.period || "")), React.createElement("div", {
+      className: "fs-11 c-muted"
+    }, st.label), React.createElement("div", {
+      className: "text-3xl font-extrabold c-text leading-tight mt-0.5"
+    }, st.value), st.note && React.createElement("div", {
+      className: "fs-10 c-faint mt-2 leading-snug"
+    }, st.note))))), React.createElement("div", {
+      className: "fs-10 c-faint font-mono mt-3"
+    }, "Figures from the latest public reports, tap a card to open the source."));
+  })(), loading && React.createElement("div", {
     className: "fs-13 c-muted flex items-center gap-2"
   }, React.createElement(Loader2, {
     size: 14,
@@ -16960,7 +17048,7 @@ function WhatsNewPage() {
   }), "Loading..."), !loading && !entries.length && React.createElement("div", {
     className: "c-bg-surface border c-border rounded-xl px-4 py-6 text-center fs-13 c-muted"
   }, "No news yet."), React.createElement("div", {
-    className: "space-y-3"
+    className: "space-y-3 max-w-3xl"
   }, entries.map(e => {
     const isNew = new Date(e.createdAt).getTime() >= sevenDaysAgo;
     const cat = categoryStyle[e.category] || categoryStyle.improvement;
@@ -21546,7 +21634,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">88gfgp</script>
+<script type="text/babel" id="zion-version">1i92jmm</script>
 <script>
 (function () {
   var last = 0;
