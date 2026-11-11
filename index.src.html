@@ -254,6 +254,9 @@ const ICON_DATA = {
   ThreadsLogo: [
     ["path", { d: "M18.263 11.097c-.03-3.486-1.92-5.586-5.111-5.586-2.13 0-3.922.963-4.863 2.499l2.062 1.438c.535-.843 1.272-1.543 2.628-1.543 1.528 0 2.318.85 2.544 2.431a15 15 0 0 0-2.236-.173c-4.125 0-6.068 1.867-6.068 4.336s1.943 3.99 4.804 3.99c3.139 0 5.013-2.115 5.781-4.735.798.361 1.348 1.204 1.348 2.47 0 3.387-3.907 5.232-7.22 5.232-4.885 0-8.077-3.207-8.077-8.424 0-6.392 4.223-10.487 9.9-10.487 3.808 0 5.69 1.671 6.97 3.914l2.108-1.475C21.44 2.078 18.331 0 13.663 0 6.227 0 1.168 5.277 1.168 12.934c0 7 4.953 11.066 10.856 11.066 4.878 0 9.809-2.846 9.809-7.716 0-2.545-1.46-4.231-3.569-5.187m-6.33 4.855c-1.077 0-2.026-.512-2.026-1.453 0-1.483 1.822-1.934 3.606-1.934.678 0 1.34.045 1.927.173-.422 1.927-1.671 3.215-3.508 3.214Z", fill: "currentColor", stroke: "none" }],
   ],
+  FacebookLogo: [
+    ["path", { d: "M14 8h3V4h-3a4 4 0 0 0-4 4v2H7v4h3v8h4v-8h3l1-4h-4V8.5c0-.3.2-.5.5-.5Z" }],
+  ],
   SnapchatLogo: [
     ["path", { d: "M12 3c-3 0-5 2.2-5 5v2.5c-.7.2-1.5.5-1.5 1.2 0 .6.8 1 1.6 1.3-.5 1.3-1.6 2.4-3.1 2.9.2.6 1.5 1 2.6 1.1.2.5.2 1.2.7 1.2.6 0 1.5-.3 2.5.1 1 .4 1.8 1.7 3.2 1.7s2.2-1.3 3.2-1.7c1-.4 1.9-.1 2.5-.1.5 0 .5-.7.7-1.2 1.1-.1 2.4-.5 2.6-1.1-1.5-.5-2.6-1.6-3.1-2.9.8-.3 1.6-.7 1.6-1.3 0-.7-.8-1-1.5-1.2V8c0-2.8-2-5-5-5z", fill: "currentColor", stroke: "none" }],
   ],
@@ -325,7 +328,7 @@ const {
   Plus, X, Clapperboard, Users, ChevronRight, ChevronDown, MapPin, Calendar, User,
   Trash2, Loader2, LayoutGrid, Film, UserCircle2, Send, Circle,
   CheckCircle2, Repeat, ChevronLeft, CheckSquare, Lock, LogOut, ShieldCheck,
-  TrendingUp, TrendingDown, DollarSign, Instagram, Eye, Minus, Flame, Sparkles, Mic, Bell, Settings, Search, XLogo, TikTokLogo, ThreadsLogo, SnapchatLogo, Menu, Zap, Megaphone,
+  TrendingUp, TrendingDown, DollarSign, Instagram, Eye, Minus, Flame, Sparkles, Mic, Bell, Settings, Search, XLogo, TikTokLogo, ThreadsLogo, SnapchatLogo, FacebookLogo, Menu, Zap, Megaphone,
   Play, Copy, Heart, FileText, BarChart3, Shuffle, ExternalLink, Link2, Gift,
 } = Icons;
 
@@ -401,6 +404,7 @@ const PLATFORMS = [
   { id: "tiktok", label: "TikTok", icon: "TikTokLogo", color: "#5B8FA8" },
   { id: "threads", label: "Threads", icon: "ThreadsLogo", color: "#E4E4E4" },
   { id: "snap", label: "Snapchat", icon: "SnapchatLogo", color: "#FFFC00" },
+  { id: "fb", label: "Facebook", icon: "FacebookLogo", color: "#4C8BF5" },
 ];
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -1072,7 +1076,7 @@ function useSupaBufferTopPosts() {
 const modelsToJS = (r) => ({
   name: r.name, note: r.note || "", onboarded: !!r.onboarded,
   agency: r.agency || "CZ", addedAt: r.added_at ? new Date(r.added_at).getTime() : Date.now(),
-  igHandle: r.ig_handle || "", xHandle: r.x_handle || "", tiktokHandle: r.tiktok_handle || "",
+  igHandle: r.ig_handle || "", fbUrl: r.fb_url || "", xHandle: r.x_handle || "", tiktokHandle: r.tiktok_handle || "",
   ofUrl: r.of_url || "", driveUrl: r.drive_url || "", bio: r.bio || "",
   bioReceivedAt: r.bio_received_at ? new Date(r.bio_received_at).getTime() : null,
   alwaysOnboard: !!r.always_onboard,
@@ -4022,6 +4026,60 @@ function EditorPage() {
   );
 }
 
+function FacebookPagesPanel({ models, restrictModel }) {
+  const [urls, setUrls] = useState(() => Object.fromEntries(models.map((m) => [m.name, m.fbUrl || ""])));
+  const [saved, setSaved] = useState("");
+  const [err, setErr] = useState("");
+  const list = restrictModel ? models.filter((m) => m.name === restrictModel) : models;
+  const save = async (name) => {
+    setErr("");
+    let v = (urls[name] || "").trim();
+    if (v && !/^https?:\/\//i.test(v)) v = "https://" + v;
+    try {
+      const { error } = await supabaseClient.from("models").update({ fb_url: v }).eq("name", name);
+      if (error) throw error;
+      setUrls((u) => ({ ...u, [name]: v })); setSaved(name); setTimeout(() => setSaved(""), 1500);
+    } catch (e) { setErr(e.message || "Could not save."); }
+  };
+  return (
+    <div className="max-w-4xl">
+      <div className="flex items-center gap-3 mb-1">
+        <div className="rounded-2xl flex items-center justify-center" style={{ width: 40, height: 40, background: "rgba(76,139,245,0.16)", border: "1px solid rgba(76,139,245,0.4)" }}><FacebookLogo size={20} /></div>
+        <div>
+          <div className="text-2xl font-extrabold tracking-tight c-text">Facebook pages</div>
+          <p className="fs-12 c-muted">The Facebook page we run marketing on for a model. Paste the link and it is one click away for the whole team.</p>
+        </div>
+      </div>
+      {err && <div className="fs-12 mt-3" style={{ color: "#ff8a6b" }}>{err}</div>}
+      <div className="grid gap-3 mt-5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>
+        {list.map((m) => {
+          const url = (urls[m.name] || "").trim();
+          return (
+            <div key={m.name} className="rounded-3xl p-4 flex flex-col gap-3" style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <div className="flex items-center justify-between">
+                <div className="fs-14 font-bold c-text">{m.name}</div>
+                <span className="fs-9 font-mono uppercase px-2 py-0.5 rounded-full" style={url ? { background: "rgba(57,230,115,0.14)", color: "#39e673" } : { background: "rgba(255,255,255,0.06)", color: "#9d9b95" }}>{url ? "page linked" : "no page yet"}</span>
+              </div>
+              {!restrictModel ? (
+                <div className="flex gap-2">
+                  <input value={urls[m.name] || ""} onChange={(e) => setUrls({ ...urls, [m.name]: e.target.value })} placeholder="facebook.com/..."
+                    className="flex-1 min-w-0 rounded-xl px-3 py-2 fs-12 c-text" style={{ background: "#080c0a", border: "1px solid rgba(255,255,255,0.1)" }} />
+                  <button onClick={() => save(m.name)} className="tap px-3 rounded-xl fs-11 font-mono uppercase font-semibold" style={{ background: "#39e673", color: "#03110a" }}>{saved === m.name ? "Saved" : "Save"}</button>
+                </div>
+              ) : null}
+              {url ? (
+                <a href={url} target="_blank" rel="noreferrer" className="flex items-center gap-2 fs-12 c-accent hover-accent-text">
+                  <ExternalLink size={13} /> Open the Facebook page
+                </a>
+              ) : <div className="fs-11 c-faint italic">{restrictModel ? "No Facebook page yet." : "Paste the page link above."}</div>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ContentDirector({ cards, persistCards, models, restrictModel, forcedNetwork, reels, persistReels, xCompetitors, persistXCompetitors, bufferDailyStats, bufferTopPosts, inflowwDailyStats, igGraphStats, igGraphMedia, igViralVariations }) {
   const [igAiStudio, setIgAiStudio] = useState(false);
   const [xCreatorPlan, setXCreatorPlan] = useState(false);
@@ -4266,6 +4324,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
 
   // Snapchat is posted through OneUp (Publer has no Snapchat), but the planner
   // shell is the same one X and Threads use, so it just points at "snap".
+  if (network === "fb") return <FacebookPagesPanel models={models} restrictModel={restrictModel} />;
   const snapMode = network === "snap" && !restrictModel;
   if (snapMode) {
     const snapModelName = filter !== "all" ? filter : null;
@@ -4281,7 +4340,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
             <span>All</span><span className="fs-10 c-faint">{countFor("all")}</span>
           </button>
           {PLATFORMS.map((p) => {
-            const Icon = p.icon === "Instagram" ? Instagram : p.icon === "TikTokLogo" ? TikTokLogo : p.icon === "ThreadsLogo" ? ThreadsLogo : p.icon === "SnapchatLogo" ? SnapchatLogo : XLogo;
+            const Icon = p.icon === "Instagram" ? Instagram : p.icon === "TikTokLogo" ? TikTokLogo : p.icon === "ThreadsLogo" ? ThreadsLogo : p.icon === "SnapchatLogo" ? SnapchatLogo : p.icon === "FacebookLogo" ? FacebookLogo : XLogo;
             return (
               <button key={p.id} onClick={() => setNetwork(p.id)}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-lg fs-12 font-mono transition-colors ${network === p.id ? "c-bg-accent-a2 c-accent font-semibold" : "c-muted hover-bg-surface"}`}>
@@ -14630,7 +14689,7 @@ function IgStudioPage({ models, onlyStudio }) {
 function App() {
   const { value: cards, loading: cardsLoading, persist: persistCards } = useSupaTable("cards", "id", [], cardsToJS, cardsToDB);
   const { value: models, loading: modelsLoading, persist: persistModels } = useSupaTable("models", "name", [], modelsToJS, modelsToDB,
-    "name, note, onboarded, added_at, ig_handle, x_handle, tiktok_handle, of_url, drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank, disabled_platforms, agency_cut_pct, goal_note, goal_auto_value, notif_prefs, about");
+    "name, note, onboarded, added_at, ig_handle, x_handle, tiktok_handle, of_url, drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank, disabled_platforms, agency_cut_pct, goal_note, goal_auto_value, notif_prefs, about, fb_url");
   const { value: tasks, loading: tasksLoading, persist: persistTasks } = useSupaTable("tasks", "id", [], tasksToJS, tasksToDB);
   const { value: stats, loading: statsLoading, persist: persistStats } = useSupaTable("stats", "id", [], statsToJS, statsToDB);
   const { value: reels, loading: reelsLoading, persist: persistReels } = useSupaTable("reels", "id", [], reelsToJS, reelsToDB);
@@ -14890,7 +14949,7 @@ function App() {
                     {contentNavOpen && (
                       <div className={`ml-6 mt-1 space-y-0.5 border-l c-border pl-2 ${mobileNavOpen ? "" : "hidden sm:block"}`}>
                         {PLATFORMS.map((p) => {
-                          const PIcon = p.icon === "Instagram" ? Instagram : p.icon === "TikTokLogo" ? TikTokLogo : p.icon === "ThreadsLogo" ? ThreadsLogo : p.icon === "SnapchatLogo" ? SnapchatLogo : XLogo;
+                          const PIcon = p.icon === "Instagram" ? Instagram : p.icon === "TikTokLogo" ? TikTokLogo : p.icon === "ThreadsLogo" ? ThreadsLogo : p.icon === "SnapchatLogo" ? SnapchatLogo : p.icon === "FacebookLogo" ? FacebookLogo : XLogo;
                           const platformActive = activeNav && contentPlatform === p.id;
                           return (
                             <button key={p.id}
