@@ -732,6 +732,9 @@ const PLATFORMS = [{
   icon: "FacebookLogo",
   color: "#4C8BF5"
 }];
+const pragueDate = v => new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Europe/Prague"
+}).format(new Date(v));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const fontImport = `
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:ital,wght@1,700&family=Dancing+Script:wght@600;700&family=Orbitron:wght@700;800&display=swap');
@@ -2020,7 +2023,11 @@ async function computeBestHours(modelName, platform = "x") {
   const buckets = {};
   data.posts.forEach(p => {
     if (!p.scheduledAt) return;
-    const hour = new Date(p.scheduledAt).getHours();
+    const hour = Number(new Intl.DateTimeFormat("en-GB", {
+      hour: "2-digit",
+      hourCycle: "h23",
+      timeZone: "Europe/Prague"
+    }).format(new Date(p.scheduledAt)));
     if (!buckets[hour]) buckets[hour] = {
       total: 0,
       count: 0
@@ -3531,7 +3538,7 @@ function PlatformPostsCalendar({
     const map = {};
     posts.forEach(p => {
       if (!p.scheduledAt) return;
-      const iso = toISO(new Date(p.scheduledAt));
+      const iso = pragueDate(p.scheduledAt);
       (map[iso] ||= []).push(p);
     });
     Object.values(map).forEach(list => list.sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt)));
@@ -3708,9 +3715,10 @@ function PlatformPostsCalendar({
       }
     }, isPosted ? "posted" : "scheduled", React.createElement("span", {
       className: "c-faint block"
-    }, ts ? new Date(ts).toLocaleTimeString(undefined, {
+    }, ts ? new Date(ts).toLocaleTimeString("cs-CZ", {
       hour: "2-digit",
-      minute: "2-digit"
+      minute: "2-digit",
+      timeZone: "Europe/Prague"
     }) : "")));
   }))));
 }
@@ -21617,7 +21625,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">bjcr4y</script>
+<script type="text/babel" id="zion-version">cg1l0w</script>
 <script>
 (function () {
   var last = 0;

@@ -407,6 +407,8 @@ const PLATFORMS = [
   { id: "fb", label: "Facebook", icon: "FacebookLogo", color: "#4C8BF5" },
 ];
 
+// Posts always show Prague time (CZ), whatever the device or the viewer's country is.
+const pragueDate = (v) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague" }).format(new Date(v));
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 const fontImport = `
@@ -1473,7 +1475,7 @@ async function computeBestHours(modelName, platform = "x") {
   const buckets = {};
   data.posts.forEach((p) => {
     if (!p.scheduledAt) return;
-    const hour = new Date(p.scheduledAt).getHours();
+    const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hourCycle: "h23", timeZone: "Europe/Prague" }).format(new Date(p.scheduledAt)));
     if (!buckets[hour]) buckets[hour] = { total: 0, count: 0 };
     buckets[hour].total += p.reach || 0;
     buckets[hour].count += 1;
@@ -2630,7 +2632,7 @@ function PlatformPostsCalendar({ posts, accountColor, glowRgb }) {
     const map = {};
     posts.forEach((p) => {
       if (!p.scheduledAt) return;
-      const iso = toISO(new Date(p.scheduledAt));
+      const iso = pragueDate(p.scheduledAt);
       (map[iso] ||= []).push(p);
     });
     Object.values(map).forEach((list) => list.sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt)));
@@ -2732,7 +2734,7 @@ function PlatformPostsCalendar({ posts, accountColor, glowRgb }) {
                   <div className="flex-1 min-w-0 fs-11 c-text truncate">{p.text || <span className="c-faint italic">No text</span>}</div>
                   <div className="flex-shrink-0 fs-10 font-mono text-right" style={{ color: isPosted ? glowRgb : "#9d9b95" }}>
                     {isPosted ? "posted" : "scheduled"}
-                    <span className="c-faint block">{ts ? new Date(ts).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : ""}</span>
+                    <span className="c-faint block">{ts ? new Date(ts).toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Prague" }) : ""}</span>
                   </div>
                 </div>
               );
