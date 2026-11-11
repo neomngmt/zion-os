@@ -6560,7 +6560,7 @@ function EditorStudio({
     ref: rootRef,
     style: {
       position: "relative",
-      minWidth: 1180,
+      minWidth: 900,
       height: "calc(100vh - 126px)",
       minHeight: 600,
       background: ES.bg,
@@ -7023,7 +7023,7 @@ function EditorStudio({
   }, React.createElement("div", {
     style: {
       display: "grid",
-      gridTemplateColumns: "190px 1fr 1.1fr 260px",
+      gridTemplateColumns: "minmax(120px, 170px) minmax(0, 0.9fr) minmax(0, 1fr) minmax(210px, 250px)",
       gap: 8,
       flex: "1 1 0",
       minHeight: 0
@@ -7279,7 +7279,9 @@ function EditorStudio({
       flexDirection: "column",
       gap: 8,
       minHeight: 0,
-      overflow: "hidden"
+      overflowY: "auto",
+      overflowX: "hidden",
+      scrollbarWidth: "none"
     }
   }, React.createElement(EsPanel, {
     dataAg: "color",
@@ -7307,12 +7309,10 @@ function EditorStudio({
     title: "Captions",
     right: "word by word",
     style: {
-      flex: "1 1 0",
-      minHeight: 70
+      flex: "0 0 auto",
+      minHeight: 150
     },
-    bodyStyle: {
-      overflowY: "auto"
-    }
+    bodyStyle: {}
   }, React.createElement("div", {
     style: {
       display: "flex",
@@ -7354,7 +7354,8 @@ function EditorStudio({
       gridTemplateColumns: "1.3fr 1fr 1fr 1.1fr",
       gap: 8,
       height: 104,
-      flexShrink: 0
+      flexShrink: 0,
+      minWidth: 0
     }
   }, React.createElement(EsPanel, {
     title: "Waveform",
@@ -23723,7 +23724,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">ghwvn7</script>
+<script type="text/babel" id="zion-version">x388no</script>
 <script>
 (function () {
   var last = 0;

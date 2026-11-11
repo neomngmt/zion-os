@@ -4296,7 +4296,7 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
 
   return (
     <div style={{ overflowX: "auto", marginBottom: 20 }}>
-      <div ref={rootRef} style={{ position: "relative", minWidth: 1180, height: "calc(100vh - 126px)", minHeight: 600, background: ES.bg, border: `1px solid ${ES.line}`, borderRadius: 20, padding: 10, color: ES.tx, display: "flex", flexDirection: "column", gap: 8 }}>
+      <div ref={rootRef} style={{ position: "relative", minWidth: 900, height: "calc(100vh - 126px)", minHeight: 600, background: ES.bg, border: `1px solid ${ES.line}`, borderRadius: 20, padding: 10, color: ES.tx, display: "flex", flexDirection: "column", gap: 8 }}>
         {/* top bar */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "2px 4px", whiteSpace: "nowrap", flexShrink: 0 }}>
           <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: "-.01em" }}>Zion <span style={{ color: ES.ac }}>studio</span></div>
@@ -4379,7 +4379,7 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
 
         {(phase === "idle" || phase === "working" || docking) && (<div key="studio" style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, minHeight: 0, animation: docking ? "esOut .8s ease-in forwards" : "esIn .55s ease-out" }}>
         {/* middle */}
-        <div style={{ display: "grid", gridTemplateColumns: "190px 1fr 1.1fr 260px", gap: 8, flex: "1 1 0", minHeight: 0 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(120px, 170px) minmax(0, 0.9fr) minmax(0, 1fr) minmax(210px, 250px)", gap: 8, flex: "1 1 0", minHeight: 0 }}>
           <EsPanel dataAg="poolpanel" title="Pool" right={`${(libV.raw.length + libV.refs.length) || ES_POOL.length} items`} bodyStyle={{ overflowY: "auto" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
               {(tunnel && (libV.raw.length + libV.refs.length) ? [...libV.raw, ...libV.refs].map((f) => [f.name, f.duration ? `${Math.round(f.duration)}s` : ""]) : ES_POOL).map(([n, d], i) => (
@@ -4429,14 +4429,14 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
             </div>
           </EsPanel>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, minHeight: 0, overflow: "hidden" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, minHeight: 0, overflowY: "auto", overflowX: "hidden", scrollbarWidth: "none" }}>
             <EsPanel dataAg="color" title="Color" right="LUT warm commercial 65%" style={{ flex: "0 0 auto" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                 {Object.keys(wheels).map((k) => <EsWheel key={k} label={k} value={wheels[k]} onChange={(v) => setWheels({ ...wheels, [k]: v })} />)}
               </div>
               {slider("Temp", -50, 50)}{slider("Tint", -50, 50)}{slider("Contrast", -50, 50)}{slider("Saturation", -50, 50)}{slider("Exposure", -50, 50)}
             </EsPanel>
-            <EsPanel dataAg="captions" title="Captions" right="word by word" style={{ flex: "1 1 0", minHeight: 70 }} bodyStyle={{ overflowY: "auto" }}>
+            <EsPanel dataAg="captions" title="Captions" right="word by word" style={{ flex: "0 0 auto", minHeight: 150 }} bodyStyle={{}}>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8 }}>
                 {ES_CAPTION_STYLES.map((c) => <span key={c} data-es="1" data-style={c} onClick={() => setStyle(c)} style={{ fontSize: 10, padding: "4px 9px", borderRadius: 8, cursor: "pointer", border: `1px solid ${style === c ? ES.lime : ES.line}`, color: style === c ? ES.lime : ES.dim, background: style === c ? "rgba(198,244,50,.08)" : "transparent" }}>{c}</span>)}
               </div>
@@ -4446,7 +4446,7 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
         </div>
 
         {/* analysis row */}
-        <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr 1.1fr", gap: 8, height: 104, flexShrink: 0 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr 1.1fr", gap: 8, height: 104, flexShrink: 0, minWidth: 0 }}>
           <EsPanel title="Waveform" right="Luma" bodyStyle={{}}>
             <svg viewBox="0 0 160 40" preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block" }}>
               {wave.map((v, i) => <rect key={i} x={i} y={20 - v * 18} width="0.7" height={v * 36} fill={i / 160 * 100 < pct ? ES.ac : "rgba(57,230,115,.28)"} />)}
