@@ -587,6 +587,89 @@ const {
 const SUPABASE_URL = "https://kvwwjyvkoiqsvpyzbcmn.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_LkaAa6azdXD1emOoN2rCOQ_E-4NSy7V";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+(function secureWrites() {
+  const realFrom = supabaseClient.from.bind(supabaseClient);
+  const sessionToken = () => {
+    try {
+      return JSON.parse(localStorage.getItem("agencyos_session") || "{}").token || "";
+    } catch (e) {
+      return "";
+    }
+  };
+  const send = async plan => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/db-write`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          "x-zion-token": sessionToken()
+        },
+        body: JSON.stringify(plan)
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.status === 401) {
+        try {
+          window.dispatchEvent(new Event("zion-auth-expired"));
+        } catch (e) {}
+        return {
+          data: null,
+          error: {
+            message: "Please sign in again."
+          }
+        };
+      }
+      return {
+        data: j.data == null ? null : j.data,
+        error: j.error || (r.ok ? null : {
+          message: `HTTP ${r.status}`
+        })
+      };
+    } catch (e) {
+      return {
+        data: null,
+        error: {
+          message: e && e.message || "Network error"
+        }
+      };
+    }
+  };
+  supabaseClient.from = table => {
+    const q = realFrom(table);
+    const write = op => (values, options) => {
+      const plan = {
+        table,
+        op,
+        values,
+        options: options || {},
+        filters: []
+      };
+      const b = {
+        then: (res, rej) => send(plan).then(res, rej),
+        catch: rej => send(plan).catch(rej)
+      };
+      ["eq", "neq", "in", "lt", "lte", "gt", "gte"].forEach(f => {
+        b[f] = (col, val) => {
+          plan.filters.push([f, col, val]);
+          return b;
+        };
+      });
+      b.select = () => b;
+      b.single = () => b;
+      b.maybeSingle = () => b;
+      return b;
+    };
+    return new Proxy(q, {
+      get(t, prop) {
+        if (prop === "insert" || prop === "update" || prop === "upsert") return write(prop);
+        if (prop === "delete") return () => write("delete")(undefined, undefined);
+        const v = t[prop];
+        return typeof v === "function" ? v.bind(t) : v;
+      }
+    });
+  };
+})();
 const CREATOR_BIBLE_URL = "https://neomngmt.github.io/creator-bible/";
 const STAGES = [{
   id: "idea",
@@ -12404,7 +12487,8 @@ function LoginScreen({
       onLogin({
         role: "admin",
         name: "Team",
-        agency: teamAgency
+        agency: teamAgency,
+        token: data.token
       });
     } catch (e) {
       flagError("Couldn't reach the server — try again.");
@@ -12471,7 +12555,8 @@ function LoginScreen({
       onLogin({
         role: "creator",
         name: matchedModel?.name || typed,
-        agency: data.agency || "CZ"
+        agency: data.agency || "CZ",
+        token: data.token
       });
     } finally {
       setSubmitting(false);
@@ -18577,10 +18662,15 @@ function loadSavedSession() {
       localStorage.removeItem(SESSION_KEY);
       return null;
     }
+    if (!parsed.token) {
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
     return {
       role: parsed.role,
       name: parsed.name,
-      agency: parsed.agency
+      agency: parsed.agency,
+      token: parsed.token
     };
   } catch {
     return null;
@@ -19103,6 +19193,15 @@ function App() {
   const [showLanding, setShowLanding] = useState(true);
   const [view, setView] = useState(null);
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
+  useEffect(() => {
+    const h = () => {
+      clearSavedSession();
+      setSession(null);
+      setView(null);
+    };
+    window.addEventListener("zion-auth-expired", h);
+    return () => window.removeEventListener("zion-auth-expired", h);
+  }, []);
   const [contentNavOpen, setContentNavOpen] = useState(false);
   const [contentPlatform, setContentPlatform] = useState(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -19625,7 +19724,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">l948so</script>
+<script type="text/babel" id="zion-version">mu6e85</script>
 <script>
 (function () {
   var last = 0;
