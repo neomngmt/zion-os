@@ -1323,13 +1323,13 @@ function useSupaIgAccounts() {
       const {
         data,
         error
-      } = await supabaseClient.from("ig_accounts").select("*");
+      } = await supabaseClient.from("ig_accounts").select("id, model, label, ig_user_id, ig_username, connected_at, created_at");
       if (error) throw error;
       setValue((data || []).map(r => ({
         id: r.id,
         model: r.model,
         label: r.label || "Main",
-        igAccessToken: r.ig_access_token || "",
+        igAccessToken: "",
         igUserId: r.ig_user_id || "",
         igUsername: r.ig_username || "",
         connectedAt: r.connected_at ? new Date(r.connected_at).getTime() : null
@@ -19724,7 +19724,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">mu6e85</script>
+<script type="text/babel" id="zion-version">1krda9w</script>
 <script>
 (function () {
   var last = 0;

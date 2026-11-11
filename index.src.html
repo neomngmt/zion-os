@@ -970,10 +970,10 @@ function useSupaIgAccounts() {
   const load = useCallback(async (isFirst) => {
     if (isFirst) setLoading(true);
     try {
-      const { data, error } = await supabaseClient.from("ig_accounts").select("*");
+      const { data, error } = await supabaseClient.from("ig_accounts").select("id, model, label, ig_user_id, ig_username, connected_at, created_at");
       if (error) throw error;
       setValue((data || []).map((r) => ({
-        id: r.id, model: r.model, label: r.label || "Main", igAccessToken: r.ig_access_token || "",
+        id: r.id, model: r.model, label: r.label || "Main", igAccessToken: "",
         igUserId: r.ig_user_id || "", igUsername: r.ig_username || "",
         connectedAt: r.connected_at ? new Date(r.connected_at).getTime() : null,
       })));
