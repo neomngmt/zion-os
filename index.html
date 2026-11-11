@@ -6401,6 +6401,16 @@ function EditorStudio({
       ["graphics-07", "sfx-05", "checker-09"].forEach((a, k) => setTimeout(() => agentTo(idx(a), '[data-ag="tl"]'), k * 400));
     }
   }, [job && job.stage, liveOn]);
+  const stageM = job && job.stage ? /^(\d+)\/(\d+)/.exec(job.stage) : null;
+  const stageStep = stageM ? Number(stageM[1]) : 0,
+    stageTotal = stageM ? Number(stageM[2]) : 8;
+  const [creep, setCreep] = useState(0);
+  useEffect(() => {
+    setCreep(0);
+    const id = setInterval(() => setCreep(c => c + (0.92 - c) * 0.05), 600);
+    return () => clearInterval(id);
+  }, [stageStep, job && job.id]);
+  const barPct = phase === "working" ? Math.min(99, Math.max(2, (Math.max(0, stageStep - 1) + creep) / stageTotal * 100)) : 0;
   const reset = () => {
     setJob(null);
     setSelRaw(null);
@@ -7026,17 +7036,41 @@ function EditorStudio({
     }
   }, "Export"))), phase === "working" && job && React.createElement("div", {
     style: {
+      position: "relative",
+      overflow: "hidden",
       background: ES.panel,
       border: `1px solid ${ES.ac}55`,
       borderRadius: 12,
-      padding: "8px 14px",
+      padding: "9px 58px 12px 14px",
       display: "flex",
       alignItems: "center",
       gap: 12,
       fontSize: 12,
       flexShrink: 0
     }
-  }, React.createElement("span", {
+  }, React.createElement("div", {
+    style: {
+      position: "absolute",
+      left: 0,
+      bottom: 0,
+      height: 4,
+      width: `${barPct}%`,
+      background: `linear-gradient(90deg, ${ES.ac}, ${ES.lime})`,
+      boxShadow: `0 0 12px ${ES.ac}`,
+      transition: "width .6s ease-out",
+      borderRadius: 4
+    }
+  }), React.createElement("span", {
+    style: {
+      position: "absolute",
+      right: 14,
+      top: 8,
+      fontSize: 11,
+      fontWeight: 800,
+      color: ES.lime,
+      fontFamily: "ui-monospace, monospace"
+    }
+  }, Math.round(barPct), "%"), React.createElement("span", {
     style: {
       width: 8,
       height: 8,
@@ -23823,7 +23857,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">hdy7zf</script>
+<script type="text/babel" id="zion-version">rv807j</script>
 <script>
 (function () {
   var last = 0;

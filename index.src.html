@@ -4233,6 +4233,12 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
     }
     else if (/effects/i.test(st)) { ["graphics-07", "sfx-05", "checker-09"].forEach((a, k) => setTimeout(() => agentTo(idx(a), '[data-ag="tl"]'), k * 400)); }
   }, [job && job.stage, liveOn]);
+  // Loading bar: finished steps plus a slow creep inside the current one (the Mac does not report percent inside a step).
+  const stageM = job && job.stage ? /^(\d+)\/(\d+)/.exec(job.stage) : null;
+  const stageStep = stageM ? Number(stageM[1]) : 0, stageTotal = stageM ? Number(stageM[2]) : 8;
+  const [creep, setCreep] = useState(0);
+  useEffect(() => { setCreep(0); const id = setInterval(() => setCreep((c) => c + (0.92 - c) * 0.05), 600); return () => clearInterval(id); }, [stageStep, job && job.id]);
+  const barPct = phase === "working" ? Math.min(99, Math.max(2, ((Math.max(0, stageStep - 1) + creep) / stageTotal) * 100)) : 0;
   const reset = () => { setJob(null); setSelRaw(null); setSelRef(null); setBrief(""); setErr(""); setPhase("prepare"); };
   const goPrepare = () => { setDocking(true); dockCursors(); setTimeout(() => { setPhase("prepare"); setDocking(false); }, 1100); };
   const cancelPrepare = () => setPhase("idle");
@@ -4375,7 +4381,9 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
         )}
 
         {phase === "working" && job && (
-          <div style={{ background: ES.panel, border: `1px solid ${ES.ac}55`, borderRadius: 12, padding: "8px 14px", display: "flex", alignItems: "center", gap: 12, fontSize: 12, flexShrink: 0 }}>
+          <div style={{ position: "relative", overflow: "hidden", background: ES.panel, border: `1px solid ${ES.ac}55`, borderRadius: 12, padding: "9px 58px 12px 14px", display: "flex", alignItems: "center", gap: 12, fontSize: 12, flexShrink: 0 }}>
+            <div style={{ position: "absolute", left: 0, bottom: 0, height: 4, width: `${barPct}%`, background: `linear-gradient(90deg, ${ES.ac}, ${ES.lime})`, boxShadow: `0 0 12px ${ES.ac}`, transition: "width .6s ease-out", borderRadius: 4 }} />
+            <span style={{ position: "absolute", right: 14, top: 8, fontSize: 11, fontWeight: 800, color: ES.lime, fontFamily: "ui-monospace, monospace" }}>{Math.round(barPct)}%</span>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: job.status === "error" ? ES.red : ES.ac, boxShadow: `0 0 10px ${job.status === "error" ? ES.red : ES.ac}` }} />
             <span style={{ fontWeight: 700 }}>{job.status === "error" ? "The edit failed" : job.stage || "Working"}</span>
             <span style={{ color: ES.dim, flex: 1 }}>{job.status === "error" ? err : "Everything stays on the Mac. The preview appears here when it is done."}</span>
