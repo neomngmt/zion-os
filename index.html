@@ -5899,7 +5899,27 @@ function EditorStudio({
     pulse: 0
   })));
   const wk = useEditWorker();
-  const tunnel = wk.tunnelUrl;
+  const [localOk, setLocalOk] = useState(false);
+  useEffect(() => {
+    let dead = false;
+    const probe = async () => {
+      try {
+        const r = await fetch("http://127.0.0.1:4799/health", {
+          signal: AbortSignal.timeout(1500)
+        });
+        if (!dead) setLocalOk(r.ok);
+      } catch (e) {
+        if (!dead) setLocalOk(false);
+      }
+    };
+    probe();
+    const id = setInterval(probe, 20000);
+    return () => {
+      dead = true;
+      clearInterval(id);
+    };
+  }, []);
+  const tunnel = localOk ? "http://127.0.0.1:4799" : wk.tunnelUrl;
   const token = (() => {
     try {
       return JSON.parse(localStorage.getItem("agencyos_session") || "{}").token || "";
@@ -6288,7 +6308,7 @@ function EditorStudio({
       color: tunnel ? ES.ac : ES.orange,
       fontFamily: "ui-monospace, monospace"
     }
-  }, tunnel ? "MAC CONNECTED" : wk.checked ? "MAC OFFLINE" : "CHECKING"), React.createElement("div", {
+  }, tunnel ? localOk ? "MAC · DIRECT" : "MAC CONNECTED" : wk.checked ? "MAC OFFLINE" : "CHECKING"), React.createElement("div", {
     style: {
       display: "flex",
       gap: 3
@@ -23311,7 +23331,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1pypsex</script>
+<script type="text/babel" id="zion-version">1niz8gg</script>
 <script>
 (function () {
   var last = 0;

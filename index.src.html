@@ -4055,7 +4055,15 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
   const rootRef = useRef(null);
   const [cursors, setCursors] = useState(() => ES_AGENTS.map((a, i) => ({ id: a.id, x: 80 + i * 110, y: 120 + (i % 4) * 70, pulse: 0 })));
   const wk = useEditWorker();
-  const tunnel = wk.tunnelUrl;
+  const [localOk, setLocalOk] = useState(false);
+  // When the browser runs on the same Mac as the worker, talk to it directly (no trip through the internet, uploads are instant).
+  useEffect(() => {
+    let dead = false;
+    const probe = async () => { try { const r = await fetch("http://127.0.0.1:4799/health", { signal: AbortSignal.timeout(1500) }); if (!dead) setLocalOk(r.ok); } catch (e) { if (!dead) setLocalOk(false); } };
+    probe(); const id = setInterval(probe, 20000);
+    return () => { dead = true; clearInterval(id); };
+  }, []);
+  const tunnel = localOk ? "http://127.0.0.1:4799" : wk.tunnelUrl;
   const token = (() => { try { return (JSON.parse(localStorage.getItem("agencyos_session") || "{}")).token || ""; } catch (e) { return ""; } })();
   const api = (p, o = {}) => fetch(`${tunnel}${p}`, { ...o, headers: { "x-zion-token": token, ...(o.headers || {}) } }).then((r) => r.json());
   const [lib, setLib] = useState({ raw: [], refs: [] });
@@ -4183,7 +4191,7 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
             <div style={{ fontWeight: 700 }}>reel_demo_v1</div>
             <div style={{ fontSize: 9, color: ES.dim, fontFamily: "ui-monospace, monospace" }}>editing live · autosaved</div>
           </div>
-          <span style={{ fontSize: 9, letterSpacing: ".12em", padding: "4px 8px", borderRadius: 99, border: `1px solid ${tunnel ? ES.ac : ES.orange}66`, color: tunnel ? ES.ac : ES.orange, fontFamily: "ui-monospace, monospace" }}>{tunnel ? "MAC CONNECTED" : wk.checked ? "MAC OFFLINE" : "CHECKING"}</span>
+          <span style={{ fontSize: 9, letterSpacing: ".12em", padding: "4px 8px", borderRadius: 99, border: `1px solid ${tunnel ? ES.ac : ES.orange}66`, color: tunnel ? ES.ac : ES.orange, fontFamily: "ui-monospace, monospace" }}>{tunnel ? (localOk ? "MAC · DIRECT" : "MAC CONNECTED") : wk.checked ? "MAC OFFLINE" : "CHECKING"}</span>
           <div style={{ display: "flex", gap: 3 }}>{ES_AGENTS.map((a) => <span key={a.id} data-dot={a.id} title={a.name} onClick={() => setAgentFilter(agentFilter === a.id ? null : a.id)} style={{ width: 11, height: 11, borderRadius: "50%", background: a.color, opacity: live ? 0.3 : 1, cursor: "pointer", boxShadow: live ? "none" : `0 0 6px ${a.color}`, transition: "opacity .4s, box-shadow .4s", animation: !live ? "esBreath 3.2s ease-in-out infinite" : "none" }} />)}</div>
           <div style={{ ...btn, cursor: "default", display: "flex", alignItems: "center", gap: 7, borderColor: live ? "rgba(57,230,115,.45)" : ES.line }}>
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: live ? ES.ac : ES.faint, boxShadow: live ? `0 0 8px ${ES.ac}` : "none" }} />{phase === "working" ? `${liveAgents} agents working` : phase === "idle" ? "agents on standby" : "agents asleep"}
