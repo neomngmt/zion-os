@@ -5763,9 +5763,11 @@ function EsPanel({
   right,
   children,
   style,
-  bodyStyle
+  bodyStyle,
+  dataAg
 }) {
   return React.createElement("div", {
+    "data-ag": dataAg,
     style: {
       background: ES.panel,
       border: `1px solid ${ES.line}`,
@@ -5828,10 +5830,11 @@ function EsWheel({
   }, React.createElement("div", {
     ref: ref,
     "data-es": "1",
+    "data-wheel": label,
     onMouseDown: down,
     style: {
-      width: 74,
-      height: 74,
+      width: 58,
+      height: 58,
       borderRadius: "50%",
       margin: "0 auto",
       position: "relative",
@@ -5860,6 +5863,118 @@ function EsWheel({
       fontFamily: "ui-monospace, monospace"
     }
   }, label));
+}
+function EsLivePreview({
+  src,
+  keep,
+  events,
+  onOut,
+  grade
+}) {
+  const ref = useRef(null);
+  const [out, setOut] = useState(0);
+  const lastOut = useRef(0);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    let raf;
+    const tick = () => {
+      if (keep && keep.length && v.readyState > 1) {
+        const tt = v.currentTime;
+        const i = keep.findIndex(k => tt >= k.start && tt < k.end);
+        if (i === -1) {
+          const nx = keep.find(k => k.start > tt);
+          v.currentTime = nx ? nx.start : keep[0].start;
+        } else {
+          const o = keep[i].outStart + (tt - keep[i].start);
+          if (Math.abs(o - lastOut.current) > 0.04) {
+            lastOut.current = o;
+            setOut(o);
+            if (onOut) onOut(o);
+          }
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [keep]);
+  const at = kind => (events || []).find(e => e.kind === kind && out >= e.t && out < e.t + e.dur);
+  const cap = at("caption"),
+    zoom = at("zoom"),
+    card = at("card");
+  const lime = "#c6f432";
+  return React.createElement("div", {
+    style: {
+      position: "absolute",
+      inset: 0,
+      overflow: "hidden",
+      background: "#000"
+    }
+  }, React.createElement("video", {
+    ref: ref,
+    src: src,
+    muted: true,
+    autoPlay: true,
+    loop: true,
+    playsInline: true,
+    style: {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+      transform: zoom ? "scale(1.13)" : "scale(1)",
+      transition: "transform .3s cubic-bezier(.2,.8,.2,1)",
+      filter: `contrast(${1 + (grade.Contrast || 0) / 100}) saturate(${1 + (grade.Saturation || 0) / 100}) brightness(${1 + (grade.Exposure || 0) / 100})`
+    }
+  }), card && React.createElement("div", {
+    style: {
+      position: "absolute",
+      left: "8%",
+      right: "8%",
+      top: "11%",
+      textAlign: "center",
+      background: "rgba(10,13,12,.78)",
+      border: `1.5px solid ${lime}`,
+      borderRadius: 14,
+      padding: "8px 10px",
+      fontWeight: 800,
+      color: "#fff",
+      fontSize: 15,
+      animation: "esPop .35s both"
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 8,
+      letterSpacing: ".16em",
+      color: lime
+    }
+  }, "CARD"), card.label.toUpperCase()), cap && React.createElement("div", {
+    key: cap.t,
+    style: {
+      position: "absolute",
+      left: 10,
+      right: 10,
+      bottom: "24%",
+      textAlign: "center",
+      fontWeight: 900,
+      fontSize: 17,
+      lineHeight: 1.05,
+      color: "#fff",
+      textShadow: "0 2px 8px #000, 0 0 2px #000",
+      WebkitTextStroke: "2px #0b0d0c",
+      paintOrder: "stroke fill",
+      animation: "esPop .18s both"
+    }
+  }, cap.label.toUpperCase()), React.createElement("div", {
+    style: {
+      position: "absolute",
+      left: 0,
+      top: 0,
+      height: 3,
+      background: lime,
+      width: `${Math.min(100, out / Math.max(1, keep && keep.length ? keep[keep.length - 1].outEnd : 1) * 100)}%`
+    }
+  }));
 }
 const STAGE_AGENT = stage => /Transcrib|captions/i.test(stage) ? "captions-02" : /audio/i.test(stage) ? "mix-08" : /Cut|Render/i.test(stage) ? "cutter-01" : "checker-09";
 function EditorStudio({
@@ -5892,6 +6007,9 @@ function EditorStudio({
   const [zoom, setZoom] = useState(1);
   const tick = useRef(0);
   const rootRef = useRef(null);
+  const locks = useRef({});
+  const jobLiveRef = useRef(false);
+  const [ghost, setGhost] = useState(null);
   const [cursors, setCursors] = useState(() => ES_AGENTS.map((a, i) => ({
     id: a.id,
     x: 80 + i * 110,
@@ -6103,7 +6221,7 @@ function EditorStudio({
     const poll = async () => {
       const {
         data
-      } = await supabaseClient.from("edit_jobs").select("id, status, stage, summary, error, final_file, source_duration").eq("id", job.id).maybeSingle();
+      } = await supabaseClient.from("edit_jobs").select("id, status, stage, summary, error, final_file, source_duration, source_name, checker").eq("id", job.id).maybeSingle();
       if (stop || !data) return;
       setJob(data);
       if ((data.status === "awaiting_review" || data.status === "done") && !finishing.current) {
@@ -6134,6 +6252,133 @@ function EditorStudio({
       msg: job.stage
     }]);
   }, [job && job.stage]);
+  const liveKeep = job && job.checker && job.checker.keep || [];
+  const liveEv = job && job.checker && job.checker.events || [];
+  const liveOn = !!(job && phase === "working");
+  jobLiveRef.current = liveOn;
+  const DUR_ = liveKeep.length ? liveKeep[liveKeep.length - 1].outEnd : ES_DUR;
+  const TRK_ = liveKeep.length ? [{
+    id: "text",
+    label: "CAPTIONS",
+    clips: liveEv.filter(e => e.kind === "caption").map(e => [e.t, e.dur, e.label, ES.lime])
+  }, {
+    id: "sfx",
+    label: "ZOOM",
+    clips: liveEv.filter(e => e.kind === "zoom").map(e => [e.t, e.dur, e.label, ES.pink])
+  }, {
+    id: "broll",
+    label: "CARDS",
+    clips: liveEv.filter(e => e.kind === "card").map(e => [e.t, e.dur, e.label, ES.blue])
+  }, {
+    id: "aroll",
+    label: "A-ROLL",
+    clips: liveKeep.map((k, i) => [k.outStart, k.outEnd - k.outStart, `take ${i + 1}`, ES.ac])
+  }, {
+    id: "voice",
+    label: "VOICE",
+    clips: [[0, DUR_, "voice", ES.ac]],
+    wave: true
+  }] : ES_TRACKS;
+  const agentTo = (ai, selector, pulse = true) => {
+    const root = rootRef.current;
+    if (!root) return;
+    const el = root.querySelector(selector);
+    if (!el) return;
+    const rr = root.getBoundingClientRect(),
+      r = el.getBoundingClientRect();
+    locks.current[ai] = Date.now() + 3200;
+    setCursors(cs => cs.map((c, i) => i === ai ? {
+      ...c,
+      x: r.left - rr.left + r.width * 0.4,
+      y: r.top - rr.top + r.height * 0.5
+    } : c));
+    if (pulse) setTimeout(() => setCursors(cs => cs.map((c, i) => i === ai ? {
+      ...c,
+      pulse: c.pulse + 1
+    } : c)), 950);
+  };
+  useEffect(() => {
+    if (!liveOn || !job.stage) return;
+    const st = job.stage;
+    const idx = id => ES_AGENTS.findIndex(a => a.id === id);
+    if (/audio/i.test(st)) {
+      agentTo(idx("mix-08"), '[data-ag="pool"]');
+    } else if (/Transcrib/i.test(st)) {
+      agentTo(idx("captions-02"), '[data-ag="captions"]');
+      setTimeout(() => setStyle("Lime Gradient"), 1100);
+      setTimeout(() => setFont("Helvetica Neue Bold"), 1500);
+    } else if (/reference/i.test(st)) {
+      agentTo(idx("cover-10"), '[data-ag="pool"]');
+    } else if (/director/i.test(st)) {
+      ["cutter-01", "captions-02", "graphics-07"].forEach((a, k) => setTimeout(() => agentTo(idx(a), '[data-ag="activity"]'), k * 350));
+    } else if (/Cutting/i.test(st)) {
+      const root = rootRef.current,
+        from = root && root.querySelector('[data-ag="pool"]'),
+        to = root && root.querySelector('[data-ag="tl-aroll"], [data-ag="tl"]');
+      agentTo(idx("cutter-01"), '[data-ag="pool"]', false);
+      if (root && from && to) {
+        const rr = root.getBoundingClientRect(),
+          a = from.getBoundingClientRect(),
+          b = to.getBoundingClientRect();
+        setTimeout(() => {
+          setGhost({
+            x: a.left - rr.left,
+            y: a.top - rr.top,
+            label: job.source_name || "raw.mov",
+            move: false
+          });
+        }, 900);
+        setTimeout(() => {
+          locks.current[idx("cutter-01")] = Date.now() + 3000;
+          setCursors(cs => cs.map((c, i) => i === idx("cutter-01") ? {
+            ...c,
+            x: b.left - rr.left + 60,
+            y: b.top - rr.top + 12
+          } : c));
+          setGhost(g => g && {
+            ...g,
+            x: b.left - rr.left + 40,
+            y: b.top - rr.top + 6,
+            move: true
+          });
+        }, 1000);
+        setTimeout(() => setGhost(null), 2300);
+      }
+    } else if (/Rendering the cut/i.test(st)) {
+      agentTo(idx("cutter-01"), '[data-ag="tl"]');
+      agentTo(idx("mix-08"), '[data-ag="activity"]');
+    } else if (/composition/i.test(st)) {
+      agentTo(idx("color-03"), '[data-ag="color"]');
+      const steps = [{
+        Temp: 6,
+        Tint: 0,
+        Contrast: 7,
+        Saturation: 16,
+        Exposure: 2
+      }, {
+        Temp: 8,
+        Tint: -2,
+        Contrast: 7,
+        Saturation: 16,
+        Exposure: 2
+      }];
+      setTimeout(() => setGrade(g => ({
+        ...g,
+        ...steps[0]
+      })), 900);
+      setTimeout(() => setGrade(g => ({
+        ...g,
+        ...steps[1]
+      })), 1600);
+      setTimeout(() => setWheels({
+        LIFT: [0.05, -0.04],
+        GAMMA: [0.12, -0.08],
+        GAIN: [-0.08, 0.1]
+      }), 1200);
+    } else if (/effects/i.test(st)) {
+      ["graphics-07", "sfx-05", "checker-09"].forEach((a, k) => setTimeout(() => agentTo(idx(a), '[data-ag="tl"]'), k * 400));
+    }
+  }, [job && job.stage, liveOn]);
   const reset = () => {
     setJob(null);
     setSelRaw(null);
@@ -6181,6 +6426,7 @@ function EditorStudio({
       const targets = [...root.querySelectorAll("[data-es]")];
       if (!targets.length) return;
       const ai = Math.floor(Math.random() * ES_AGENTS.length);
+      if (locks.current[ai] && locks.current[ai] > Date.now()) return;
       const el = targets[Math.floor(Math.random() * targets.length)];
       const r = el.getBoundingClientRect();
       const x = r.left - rr.left + Math.random() * Math.max(8, r.width - 8);
@@ -6190,10 +6436,30 @@ function EditorStudio({
         x,
         y
       } : c));
-      setTimeout(() => setCursors(cs => cs.map((c, i) => i === ai ? {
-        ...c,
-        pulse: c.pulse + 1
-      } : c)), 950);
+      setTimeout(() => {
+        setCursors(cs => cs.map((c, i) => i === ai ? {
+          ...c,
+          pulse: c.pulse + 1
+        } : c));
+        const d = el.dataset || {};
+        const rnd = (a, b) => Math.round(a + Math.random() * (b - a));
+        if (d.slider) {
+          const base = {
+            Temp: 8,
+            Tint: -2,
+            Contrast: 7,
+            Saturation: 16,
+            Exposure: 2
+          }[d.slider] || 0;
+          setGrade(g => ({
+            ...g,
+            [d.slider]: jobLiveRef.current ? base + rnd(-3, 3) : rnd(-18, 28)
+          }));
+        } else if (d.wheel) setWheels(w => ({
+          ...w,
+          [d.wheel]: [(Math.random() - 0.5) * 0.7, (Math.random() - 0.5) * 0.7]
+        }));else if (d.style) setStyle(d.style);else if (d.font) setFont(d.font);else if (d.clip) setSelClip(d.clip);
+      }, 950);
     };
     const id = setInterval(move, 360);
     return () => clearInterval(id);
@@ -6227,7 +6493,7 @@ function EditorStudio({
   }, []);
   const capText = t < 7 ? ["screen", "recordings", "appear"] : t < 14 ? ["this one change", "got me clients"] : t < 22 ? ["the number", "was 4,200"] : ["comment", "GUIDE"];
   const activeCaption = capText.join(" ");
-  const pct = t / ES_DUR * 100;
+  const pct = t / (liveKeep.length ? liveKeep[liveKeep.length - 1].outEnd : ES_DUR) * 100;
   const liveAgents = live ? ES_AGENTS.length : 0;
   const sel = (() => {
     const [tr, i] = selClip.split(":");
@@ -6251,6 +6517,7 @@ function EditorStudio({
   const slider = (k, min, max) => React.createElement("div", {
     key: k,
     "data-es": "1",
+    "data-slider": k,
     style: {
       display: "flex",
       alignItems: "center",
@@ -6258,7 +6525,7 @@ function EditorStudio({
       fontSize: 10,
       color: ES.dim,
       fontFamily: "ui-monospace, monospace",
-      marginBottom: 4
+      marginBottom: 1
     }
   }, React.createElement("span", {
     style: {
@@ -6762,6 +7029,7 @@ function EditorStudio({
       minHeight: 0
     }
   }, React.createElement(EsPanel, {
+    dataAg: "poolpanel",
     title: "Pool",
     right: `${libV.raw.length + libV.refs.length || ES_POOL.length} items`,
     bodyStyle: {
@@ -6776,6 +7044,7 @@ function EditorStudio({
   }, (tunnel && libV.raw.length + libV.refs.length ? [...libV.raw, ...libV.refs].map(f => [f.name, f.duration ? `${Math.round(f.duration)}s` : ""]) : ES_POOL).map(([n, d], i) => React.createElement("div", {
     key: n,
     "data-es": "1",
+    "data-ag": i === 0 ? "pool" : undefined,
     style: {
       borderRadius: 8,
       overflow: "hidden",
@@ -6819,7 +7088,7 @@ function EditorStudio({
     }
   }, "drop raw video here")), React.createElement(EsPanel, {
     title: "Source",
-    right: "take_01.mov · 16:9",
+    right: liveOn ? `${job.source_name || ""}` : "take_01.mov · 16:9",
     bodyStyle: {
       display: "flex",
       flexDirection: "column",
@@ -6837,12 +7106,25 @@ function EditorStudio({
       alignItems: "center",
       justifyContent: "center"
     }
-  }, React.createElement("div", {
+  }, liveOn && tunnel && React.createElement("video", {
+    src: `${tunnel}/file?kind=raw&name=${encodeURIComponent(selRaw || job.source_name || "")}&t=${encodeURIComponent(token)}`,
+    muted: true,
+    autoPlay: true,
+    loop: true,
+    playsInline: true,
+    style: {
+      position: "absolute",
+      inset: 0,
+      width: "100%",
+      height: "100%",
+      objectFit: "contain"
+    }
+  }), React.createElement("div", {
     style: {
       width: "34%",
       height: "78%",
       borderRadius: 6,
-      background: "linear-gradient(160deg, #2b3a31, #0e1512)",
+      background: liveOn ? "transparent" : "linear-gradient(160deg, #2b3a31, #0e1512)",
       position: "relative",
       border: `1.5px dashed ${ES.lime}`
     }
@@ -6896,7 +7178,14 @@ function EditorStudio({
       background: "linear-gradient(170deg, #3b3f38 0%, #1a1d19 55%, #0b0d0b 100%)",
       border: `1px solid ${ES.line}`
     }
-  }, React.createElement("div", {
+  }, liveOn && tunnel ? React.createElement(EsLivePreview, {
+    key: job.id,
+    src: `${tunnel}/file?kind=raw&name=${encodeURIComponent(selRaw || job.source_name || "")}&t=${encodeURIComponent(token)}`,
+    keep: liveKeep,
+    events: liveEv,
+    onOut: setT,
+    grade: grade
+  }) : React.createElement(React.Fragment, null, React.createElement("div", {
     style: {
       position: "absolute",
       left: "50%",
@@ -6953,7 +7242,7 @@ function EditorStudio({
         margin: 2
       } : {})
     }
-  }, w))), React.createElement("div", {
+  }, w)))), React.createElement("div", {
     style: {
       position: "absolute",
       left: 6,
@@ -6988,10 +7277,12 @@ function EditorStudio({
     style: {
       display: "flex",
       flexDirection: "column",
-      gap: 10,
-      minHeight: 0
+      gap: 8,
+      minHeight: 0,
+      overflow: "hidden"
     }
   }, React.createElement(EsPanel, {
+    dataAg: "color",
     title: "Color",
     right: "LUT warm commercial 65%",
     style: {
@@ -7001,7 +7292,7 @@ function EditorStudio({
     style: {
       display: "flex",
       justifyContent: "space-between",
-      marginBottom: 10
+      marginBottom: 6
     }
   }, Object.keys(wheels).map(k => React.createElement(EsWheel, {
     key: k,
@@ -7012,10 +7303,12 @@ function EditorStudio({
       [k]: v
     })
   }))), slider("Temp", -50, 50), slider("Tint", -50, 50), slider("Contrast", -50, 50), slider("Saturation", -50, 50), slider("Exposure", -50, 50)), React.createElement(EsPanel, {
+    dataAg: "captions",
     title: "Captions",
     right: "word by word",
     style: {
-      flex: 1
+      flex: "1 1 0",
+      minHeight: 70
     },
     bodyStyle: {
       overflowY: "auto"
@@ -7030,6 +7323,7 @@ function EditorStudio({
   }, ES_CAPTION_STYLES.map(c => React.createElement("span", {
     key: c,
     "data-es": "1",
+    "data-style": c,
     onClick: () => setStyle(c),
     style: {
       fontSize: 10,
@@ -7043,6 +7337,7 @@ function EditorStudio({
   }, c))), ES_FONTS.map(f => React.createElement("div", {
     key: f,
     "data-es": "1",
+    "data-font": f,
     onClick: () => setFont(f),
     style: {
       fontSize: 11,
@@ -7157,6 +7452,7 @@ function EditorStudio({
     fill: ES.blue,
     opacity: ".7"
   })))), React.createElement(EsPanel, {
+    dataAg: "activity",
     title: "Agent activity",
     right: `${logShown.length} edits`,
     bodyStyle: {
@@ -7188,11 +7484,12 @@ function EditorStudio({
       }
     }, l.msg));
   }))), React.createElement(EsPanel, {
+    dataAg: "tl",
     style: {
       flexShrink: 0
     },
     title: "Timeline",
-    right: React.createElement("span", null, esTime(t), " / ", esTime(ES_DUR), " ", React.createElement("span", {
+    right: React.createElement("span", null, esTime(t), " / ", esTime(DUR_), " ", React.createElement("span", {
       style: {
         marginLeft: 10
       }
@@ -7223,7 +7520,7 @@ function EditorStudio({
     "data-es": "1",
     onClick: e => {
       const r = e.currentTarget.getBoundingClientRect();
-      setT(Math.max(0, Math.min(ES_DUR, (e.clientX - r.left) / r.width * ES_DUR)));
+      setT(Math.max(0, Math.min(DUR_, (e.clientX - r.left) / r.width * DUR_)));
     },
     style: {
       cursor: "pointer",
@@ -7233,12 +7530,12 @@ function EditorStudio({
       position: "relative"
     }
   }, Array.from({
-    length: ES_DUR / 2 + 1
+    length: DUR_ / 2 + 1
   }, (_, i) => React.createElement("span", {
     key: i,
     style: {
       position: "absolute",
-      left: `${i * 2 / ES_DUR * 100}%`,
+      left: `${i * 2 / DUR_ * 100}%`,
       top: 4,
       fontSize: 8,
       color: ES.faint,
@@ -7246,8 +7543,9 @@ function EditorStudio({
       borderLeft: `1px solid ${ES.line}`,
       paddingLeft: 3
     }
-  }, esTime(i * 2).slice(0, 5)))), ES_TRACKS.map(tr => React.createElement("div", {
+  }, esTime(i * 2).slice(0, 5)))), TRK_.map(tr => React.createElement("div", {
     key: tr.id,
+    "data-ag": tr.id === "aroll" ? "tl-aroll" : undefined,
     style: {
       display: "flex",
       height: tr.wave ? 26 : 23,
@@ -7271,13 +7569,15 @@ function EditorStudio({
       position: "relative"
     }
   }, tr.clips.map((c, i) => React.createElement("div", {
-    key: i,
+    key: `${tr.id}${i}${liveKeep.length}`,
     "data-es": "1",
+    "data-clip": `${tr.id}:${i}`,
     onClick: () => setSelClip(`${tr.id}:${i}`),
     style: {
+      animation: liveKeep.length ? `esPop .45s ${Math.min(2, i * 0.07)}s both` : "none",
       position: "absolute",
-      left: `${c[0] / ES_DUR * 100}%`,
-      width: `${c[1] / ES_DUR * 100}%`,
+      left: `${c[0] / DUR_ * 100}%`,
+      width: `${c[1] / DUR_ * 100}%`,
       top: 3,
       bottom: 3,
       borderRadius: 6,
@@ -7342,7 +7642,25 @@ function EditorStudio({
       overflow: "hidden",
       textOverflow: "ellipsis"
     }
-  }, sel ? `selected: ${sel.track.label} · ${sel.clip[2]} · ${esTime(sel.clip[0])} to ${esTime(sel.clip[0] + sel.clip[1])}` : "", "  ·  The agents, the Mac worker and Higgsfield connect in the next step, everything here is sample data.")), cursors.map((c, i) => {
+  }, sel ? `selected: ${sel.track.label} · ${sel.clip[2]} · ${esTime(sel.clip[0])} to ${esTime(sel.clip[0] + sel.clip[1])}` : "", "  ·  The agents, the Mac worker and Higgsfield connect in the next step, everything here is sample data.")), ghost && React.createElement("div", {
+    style: {
+      position: "absolute",
+      left: ghost.x,
+      top: ghost.y,
+      transition: ghost.move ? "left 1.2s cubic-bezier(.4,0,.2,1), top 1.2s cubic-bezier(.4,0,.2,1)" : "none",
+      zIndex: 25,
+      pointerEvents: "none",
+      background: ES.ac,
+      color: "#03110a",
+      fontSize: 10,
+      fontWeight: 800,
+      padding: "5px 10px",
+      borderRadius: 8,
+      boxShadow: `0 8px 24px ${ES.ac}66`,
+      transform: "rotate(-3deg)",
+      whiteSpace: "nowrap"
+    }
+  }, ghost.label), cursors.map((c, i) => {
     const a = ES_AGENTS[i];
     return React.createElement("div", {
       key: a.id,
@@ -7395,7 +7713,7 @@ function EditorStudio({
         animation: "esClick .55s ease-out forwards"
       }
     }));
-  }), React.createElement("style", null, `@keyframes esBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}@keyframes esOut{0%{opacity:1;transform:none;filter:none}100%{opacity:0;transform:scale(.96) translateY(8px);filter:blur(2px)}}@keyframes esIn{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}@keyframes esClick{0%{transform:scale(.3);opacity:.95}100%{transform:scale(1.9);opacity:0}}`)));
+  }), React.createElement("style", null, `@keyframes esPop{0%{opacity:0;transform:scale(.6)}100%{opacity:1;transform:scale(1)}}@keyframes esBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}@keyframes esOut{0%{opacity:1;transform:none;filter:none}100%{opacity:0;transform:scale(.96) translateY(8px);filter:blur(2px)}}@keyframes esIn{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}@keyframes esClick{0%{transform:scale(.3);opacity:.95}100%{transform:scale(1.9);opacity:0}}`)));
 }
 function EditorPage({
   menuHidden,
@@ -23405,7 +23723,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">17lozyh</script>
+<script type="text/babel" id="zion-version">ghwvn7</script>
 <script>
 (function () {
   var last = 0;
