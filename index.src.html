@@ -3957,6 +3957,7 @@ function EditorPage() {
 
 function ContentDirector({ cards, persistCards, models, restrictModel, forcedNetwork, reels, persistReels, xCompetitors, persistXCompetitors, bufferDailyStats, bufferTopPosts, inflowwDailyStats, igGraphStats, igGraphMedia, igViralVariations }) {
   const [igAiStudio, setIgAiStudio] = useState(false);
+  const [xCreatorPlan, setXCreatorPlan] = useState(false);
   const [detail, setDetail] = useState(null);
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -4119,6 +4120,29 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
   // X's caption studio also needs one model in focus.
   const xModelName = restrictModel || (filter !== "all" ? filter : null);
   const xMode = network === "x" && !restrictModel;
+
+  // Model login: same X dashboard the team sees, only her account; the week planner sits behind the button.
+  if (network === "x" && restrictModel) {
+    if (xCreatorPlan) {
+      return (
+        <>
+          <button onClick={() => setXCreatorPlan(false)}
+            className="flex items-center gap-1 fs-10 font-mono uppercase c-faint hover-accent-text mb-3 transition-colors">
+            <ChevronLeft size={12} /> X Dashboard
+          </button>
+          <XCaptionStudio key={restrictModel} models={models} restrictModel={restrictModel} filterModel={restrictModel} />
+        </>
+      );
+    }
+    return (
+      <XOverviewDashboard
+        models={models.filter((m) => m.name === restrictModel)}
+        bufferDailyStats={(bufferDailyStats || []).filter((r) => r.model === restrictModel)}
+        bufferTopPosts={(bufferTopPosts || []).filter((r) => r.model === restrictModel)}
+        onPlanPosts={() => setXCreatorPlan(true)}
+      />
+    );
+  }
   if (xMode) {
     if (xModelName) {
       return <XCaptionStudio key={xModelName} models={models} restrictModel={xModelName} filterModel={xModelName} onBackToModels={!restrictModel ? () => setFilter("all") : undefined} />;

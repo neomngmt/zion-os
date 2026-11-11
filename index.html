@@ -5630,6 +5630,7 @@ function ContentDirector({
   igViralVariations
 }) {
   const [igAiStudio, setIgAiStudio] = useState(false);
+  const [xCreatorPlan, setXCreatorPlan] = useState(false);
   const [detail, setDetail] = useState(null);
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -5809,6 +5810,27 @@ function ContentDirector({
   }
   const xModelName = restrictModel || (filter !== "all" ? filter : null);
   const xMode = network === "x" && !restrictModel;
+  if (network === "x" && restrictModel) {
+    if (xCreatorPlan) {
+      return React.createElement(React.Fragment, null, React.createElement("button", {
+        onClick: () => setXCreatorPlan(false),
+        className: "flex items-center gap-1 fs-10 font-mono uppercase c-faint hover-accent-text mb-3 transition-colors"
+      }, React.createElement(ChevronLeft, {
+        size: 12
+      }), " X Dashboard"), React.createElement(XCaptionStudio, {
+        key: restrictModel,
+        models: models,
+        restrictModel: restrictModel,
+        filterModel: restrictModel
+      }));
+    }
+    return React.createElement(XOverviewDashboard, {
+      models: models.filter(m => m.name === restrictModel),
+      bufferDailyStats: (bufferDailyStats || []).filter(r => r.model === restrictModel),
+      bufferTopPosts: (bufferTopPosts || []).filter(r => r.model === restrictModel),
+      onPlanPosts: () => setXCreatorPlan(true)
+    });
+  }
   if (xMode) {
     if (xModelName) {
       return React.createElement(XCaptionStudio, {
@@ -21223,7 +21245,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">zw5puv</script>
+<script type="text/babel" id="zion-version">w78202</script>
 <script>
 (function () {
   var last = 0;
