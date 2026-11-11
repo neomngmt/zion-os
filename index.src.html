@@ -2778,12 +2778,12 @@ function PlatformOverviewDashboard({
   const avgEr = erDays.length ? erDays.reduce((s, r) => s + r.engagementRate, 0) / erDays.length : null;
 
   const trend30 = React.useMemo(() => {
-    const dates = Array.from({ length: 30 }, (_, i) => dateNDaysAgo(29 - i));
+    const dates = Array.from({ length: range }, (_, i) => dateNDaysAgo(range - 1 - i));
     return dates.map((date) => ({
       date,
       value: rows.filter((r) => r.statDate === date).reduce((s, r) => s + (r.impressions || 0), 0),
     }));
-  }, [bufferDailyStats, platform, account]);
+  }, [bufferDailyStats, platform, account, range]);
 
   const donutSegments = [
     { label: "Likes", value: weekTotals.likes, color: XNEON.pink.fg },
@@ -2973,7 +2973,7 @@ function PlatformOverviewDashboard({
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 mb-5">
             <div className="lg:col-span-3 c-bg-app rounded-xl p-4" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
-              <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-3">{metricLabel} · last 30 days</div>
+              <div className="fs-10 uppercase tracking-widest c-faint font-mono mb-3">{metricLabel} · last {range} days</div>
               <AreaTrendChart data={trend30} color={glowRgb} />
             </div>
             <div className="lg:col-span-2 c-bg-app rounded-xl p-4 flex flex-col justify-center" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>

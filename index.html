@@ -3763,13 +3763,13 @@ function PlatformOverviewDashboard({
   const avgEr = erDays.length ? erDays.reduce((s, r) => s + r.engagementRate, 0) / erDays.length : null;
   const trend30 = React.useMemo(() => {
     const dates = Array.from({
-      length: 30
-    }, (_, i) => dateNDaysAgo(29 - i));
+      length: range
+    }, (_, i) => dateNDaysAgo(range - 1 - i));
     return dates.map(date => ({
       date,
       value: rows.filter(r => r.statDate === date).reduce((s, r) => s + (r.impressions || 0), 0)
     }));
-  }, [bufferDailyStats, platform, account]);
+  }, [bufferDailyStats, platform, account, range]);
   const donutSegments = [{
     label: "Likes",
     value: weekTotals.likes,
@@ -4038,7 +4038,7 @@ function PlatformOverviewDashboard({
     }
   }, React.createElement("div", {
     className: "fs-10 uppercase tracking-widest c-faint font-mono mb-3"
-  }, metricLabel, " · last 30 days"), React.createElement(AreaTrendChart, {
+  }, metricLabel, " · last ", range, " days"), React.createElement(AreaTrendChart, {
     data: trend30,
     color: glowRgb
   })), React.createElement("div", {
@@ -21627,7 +21627,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">8utecj</script>
+<script type="text/babel" id="zion-version">oybjv0</script>
 <script>
 (function () {
   var last = 0;
