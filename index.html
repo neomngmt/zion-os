@@ -5920,6 +5920,8 @@ function EditorStudio({
     };
   }, []);
   const tunnel = localOk ? "http://127.0.0.1:4799" : wk.tunnelUrl;
+  const tunnelRef = useRef(tunnel);
+  tunnelRef.current = tunnel;
   const token = (() => {
     try {
       return JSON.parse(localStorage.getItem("agencyos_session") || "{}").token || "";
@@ -5966,7 +5968,7 @@ function EditorStudio({
       uid = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
     const sendChunk = i => new Promise((resolve, reject) => {
       const x = new XMLHttpRequest();
-      x.open("POST", `${tunnel}/upload?kind=${kind}&uid=${uid}&idx=${i}&off=${i * CH}&total=${total}&name=${encodeURIComponent(file.name)}`);
+      x.open("POST", `${tunnelRef.current}/upload?kind=${kind}&uid=${uid}&idx=${i}&off=${i * CH}&total=${total}&name=${encodeURIComponent(file.name)}`);
       x.setRequestHeader("x-zion-token", token);
       x.upload.onprogress = e => {
         const done = i * CH + (e.loaded || 0);
@@ -5998,8 +6000,8 @@ function EditorStudio({
             last = await sendChunk(i);
             break;
           } catch (e) {
-            if (++tries >= 3) throw e;
-            await new Promise(r => setTimeout(r, 1500));
+            if (++tries >= 12) throw e;
+            await new Promise(r => setTimeout(r, Math.min(15000, 1500 * tries)));
           }
         }
       }
@@ -23376,7 +23378,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">c2t9vy</script>
+<script type="text/babel" id="zion-version">18iw3o5</script>
 <script>
 (function () {
   var last = 0;

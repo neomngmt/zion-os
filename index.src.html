@@ -4064,6 +4064,8 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
     return () => { dead = true; clearInterval(id); };
   }, []);
   const tunnel = localOk ? "http://127.0.0.1:4799" : wk.tunnelUrl;
+  const tunnelRef = useRef(tunnel);
+  tunnelRef.current = tunnel; // an upload in flight always uses the newest address, the tunnel address changes when the Mac reconnects
   const token = (() => { try { return (JSON.parse(localStorage.getItem("agencyos_session") || "{}")).token || ""; } catch (e) { return ""; } })();
   const api = (p, o = {}) => fetch(`${tunnel}${p}`, { ...o, headers: { "x-zion-token": token, ...(o.headers || {}) } }).then((r) => r.json());
   const [lib, setLib] = useState({ raw: [], refs: [] });
@@ -4083,7 +4085,7 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
     const CH = 16 * 1024 * 1024, total = Math.max(1, Math.ceil(file.size / CH)), uid = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
     const sendChunk = (i) => new Promise((resolve, reject) => {
       const x = new XMLHttpRequest();
-      x.open("POST", `${tunnel}/upload?kind=${kind}&uid=${uid}&idx=${i}&off=${i * CH}&total=${total}&name=${encodeURIComponent(file.name)}`);
+      x.open("POST", `${tunnelRef.current}/upload?kind=${kind}&uid=${uid}&idx=${i}&off=${i * CH}&total=${total}&name=${encodeURIComponent(file.name)}`);
       x.setRequestHeader("x-zion-token", token);
       x.upload.onprogress = (e) => { const done = i * CH + (e.loaded || 0); setUps((u) => ({ ...u, [kind]: { name: file.name, pct: Math.min(99, Math.round((done / file.size) * 100)) } })); };
       x.onload = () => { try { const j = JSON.parse(x.responseText); if (x.status >= 400) reject(new Error(j.error || "Upload failed")); else resolve(j); } catch (e) { reject(new Error("Upload failed (" + x.status + ")")); } };
@@ -4094,7 +4096,7 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
       let last = null;
       for (let i = 0; i < total; i++) {
         let tries = 0;
-        for (;;) { try { last = await sendChunk(i); break; } catch (e) { if (++tries >= 3) throw e; await new Promise((r) => setTimeout(r, 1500)); } }
+        for (;;) { try { last = await sendChunk(i); break; } catch (e) { if (++tries >= 12) throw e; await new Promise((r) => setTimeout(r, Math.min(15000, 1500 * tries))); } }
       }
       if (last && last.name) { if (kind === "raw") setSelRaw(last.name); else setSelRef(last.name); }
       await loadLib();
