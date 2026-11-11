@@ -9456,7 +9456,7 @@ function RevenueChart({
     style: {
       animationDelay: `${i / bars.length * 0.4}s`
     }
-  })), linePath && !isSparse && React.createElement("path", {
+  })), linePath && (!isSparse || n > 5) && React.createElement("path", {
     className: "rev-line",
     d: linePath,
     fill: "none",
@@ -21223,7 +21223,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">6h4y0y</script>
+<script type="text/babel" id="zion-version">1qexedo</script>
 <script>
 (function () {
   var last = 0;

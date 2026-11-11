@@ -6711,7 +6711,7 @@ function RevenueChart({ data, height = 240, sparseUntil = 0 }) {
           trend that isn't real yet — bars/dots alone are honest until there's
           enough of the month behind them to actually connect. Only gated for
           sparseUntil-enabled charts (Month); Week's fixed 7-point line is untouched. */}
-      {linePath && !isSparse && (
+      {linePath && (!isSparse || n > 5) && (
         <path className="rev-line" d={linePath} fill="none" stroke="#39e673" strokeWidth="2.5"
           strokeLinejoin="round" strokeLinecap="round" filter="url(#revGlowLine)" clipPath="url(#revNoNegativeClip)"
           pathLength="1000" strokeDasharray="1000" />
