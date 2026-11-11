@@ -4040,8 +4040,9 @@ const STAGE_AGENT = (stage) => /Transcrib|captions/i.test(stage) ? "captions-02"
 function EditorStudio({ menuHidden, onToggleMenu, worker }) {
   const [playing, setPlaying] = useState(false);
   const [t, setT] = useState(3.4);
-  const [phase, setPhase] = useState("idle"); // idle (agents asleep, upload) | working | done (one big preview)
-  const live = phase === "working";
+  const [phase, setPhase] = useState("idle"); // idle (demo, agents flying) | prepare (agents asleep in the dots, upload) | working | done (one big preview)
+  const [docking, setDocking] = useState(false);
+  const live = (phase === "idle" || phase === "working") && !docking; // agents are out and moving
   const [log, setLog] = useState([]);
   const [selClip, setSelClip] = useState("text:0");
   const [style, setStyle] = useState("Lime Gradient");
@@ -4065,6 +4066,7 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
   const [up, setUp] = useState(null);
   const [job, setJob] = useState(null);
   const [err, setErr] = useState("");
+  const finishing = useRef(false);
   const loadLib = useCallback(async () => { if (!tunnel) return; try { const j = await api("/library"); if (j.raw) setLib(j); } catch (e) {} }, [tunnel, token]);
   useEffect(() => { loadLib(); const id = setInterval(loadLib, 15000); return () => clearInterval(id); }, [loadLib]);
   const upload = async (file, kind) => {
@@ -4097,7 +4099,7 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
     try {
       const j = await api("/jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ raw: selRaw, ref: selRef || "", brief, lang, title: selRaw.replace(/\.[^.]+$/, "") }) });
       if (!j.id) throw new Error(j.error || "Could not start the edit");
-      setLog([]); setJob({ id: j.id, status: "queued", stage: "In the queue" }); setPhase("working");
+      finishing.current = false; setLog([]); setJob({ id: j.id, status: "queued", stage: "In the queue" }); setPhase("working");
     } catch (e) { setErr(e.message || "Could not start the edit"); }
   };
   useEffect(() => {
@@ -4107,7 +4109,7 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
       const { data } = await supabaseClient.from("edit_jobs").select("id, status, stage, summary, error, final_file, source_duration").eq("id", job.id).maybeSingle();
       if (stop || !data) return;
       setJob(data);
-      if (data.status === "awaiting_review" || data.status === "done") setTimeout(() => setPhase("done"), 1200);
+      if ((data.status === "awaiting_review" || data.status === "done") && !finishing.current) { finishing.current = true; setDocking(true); dockCursors(); setTimeout(() => { setPhase("done"); setDocking(false); }, 1300); }
       if (data.status === "error") { setErr(data.error || "The edit failed."); }
     };
     poll(); const id = setInterval(poll, 2000);
@@ -4116,14 +4118,16 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
   useEffect(() => {
     if (job && job.stage) setLog((p) => (p.length && p[p.length - 1].msg === job.stage ? p : [...p, { id: Date.now(), t: new Date().toLocaleTimeString("en-GB"), agent: STAGE_AGENT(job.stage), msg: job.stage }]));
   }, [job && job.stage]);
-  const reset = () => { setJob(null); setSelRaw(null); setSelRef(null); setBrief(""); setErr(""); setPhase("idle"); };
+  const reset = () => { setJob(null); setSelRaw(null); setSelRef(null); setBrief(""); setErr(""); setPhase("prepare"); };
+  const goPrepare = () => { setDocking(true); dockCursors(); setTimeout(() => { setPhase("prepare"); setDocking(false); }, 1100); };
+  const cancelPrepare = () => setPhase("idle");
   // Agents sleep in the coloured dots in the top bar and fly out when the edit starts.
   const dockCursors = () => {
     const root = rootRef.current; if (!root) return;
     const rr = root.getBoundingClientRect();
     setCursors((cs) => cs.map((c, i) => { const d = root.querySelector(`[data-dot="${ES_AGENTS[i].id}"]`); if (!d) return c; const r = d.getBoundingClientRect(); return { ...c, x: r.left - rr.left, y: r.top - rr.top }; }));
   };
-  useEffect(() => { if (phase !== "working") { const id = setTimeout(dockCursors, 60); return () => clearTimeout(id); } }, [phase]);
+  useEffect(() => { if (!live) { const id = setTimeout(dockCursors, 60); return () => clearTimeout(id); } }, [live]);
   useEffect(() => {
     if (!live) return;
     const move = () => {
@@ -4172,7 +4176,7 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
     <div style={{ overflowX: "auto", marginBottom: 20 }}>
       <div ref={rootRef} style={{ position: "relative", minWidth: 1180, height: "calc(100vh - 126px)", minHeight: 600, background: ES.bg, border: `1px solid ${ES.line}`, borderRadius: 20, padding: 10, color: ES.tx, display: "flex", flexDirection: "column", gap: 8 }}>
         {/* top bar */}
-        <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "2px 4px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "2px 4px", whiteSpace: "nowrap", flexShrink: 0 }}>
           <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: "-.01em" }}>Zion <span style={{ color: ES.ac }}>studio</span></div>
           {["File", "Edit", "Clip", "Color", "Captions", "Audio", "Agents"].map((m) => <span key={m} style={{ fontSize: 11, color: ES.dim, cursor: "pointer" }}>{m}</span>)}
           <div style={{ flex: 1, textAlign: "center", fontSize: 12 }}>
@@ -4180,17 +4184,19 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
             <div style={{ fontSize: 9, color: ES.dim, fontFamily: "ui-monospace, monospace" }}>editing live · autosaved</div>
           </div>
           <span style={{ fontSize: 9, letterSpacing: ".12em", padding: "4px 8px", borderRadius: 99, border: `1px solid ${tunnel ? ES.ac : ES.orange}66`, color: tunnel ? ES.ac : ES.orange, fontFamily: "ui-monospace, monospace" }}>{tunnel ? "MAC CONNECTED" : wk.checked ? "MAC OFFLINE" : "CHECKING"}</span>
-          <div style={{ display: "flex", gap: 3 }}>{ES_AGENTS.map((a) => <span key={a.id} data-dot={a.id} title={a.name} onClick={() => setAgentFilter(agentFilter === a.id ? null : a.id)} style={{ width: 11, height: 11, borderRadius: "50%", background: a.color, opacity: live ? 0.3 : 1, cursor: "pointer", boxShadow: live ? "none" : `0 0 6px ${a.color}`, transition: "opacity .4s, box-shadow .4s", animation: phase === "idle" ? "esBreath 3.2s ease-in-out infinite" : "none" }} />)}</div>
+          <div style={{ display: "flex", gap: 3 }}>{ES_AGENTS.map((a) => <span key={a.id} data-dot={a.id} title={a.name} onClick={() => setAgentFilter(agentFilter === a.id ? null : a.id)} style={{ width: 11, height: 11, borderRadius: "50%", background: a.color, opacity: live ? 0.3 : 1, cursor: "pointer", boxShadow: live ? "none" : `0 0 6px ${a.color}`, transition: "opacity .4s, box-shadow .4s", animation: !live ? "esBreath 3.2s ease-in-out infinite" : "none" }} />)}</div>
           <div style={{ ...btn, cursor: "default", display: "flex", alignItems: "center", gap: 7, borderColor: live ? "rgba(57,230,115,.45)" : ES.line }}>
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: live ? ES.ac : ES.faint, boxShadow: live ? `0 0 8px ${ES.ac}` : "none" }} />{live ? `${liveAgents} agents working` : "agents asleep"}
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: live ? ES.ac : ES.faint, boxShadow: live ? `0 0 8px ${ES.ac}` : "none" }} />{phase === "working" ? `${liveAgents} agents working` : phase === "idle" ? "agents on standby" : "agents asleep"}
           </div>
+          {phase === "idle" && <div onClick={goPrepare} style={{ ...btn, background: ES.ac, color: "#03110a", fontWeight: 800, border: "none", padding: "7px 18px", boxShadow: `0 0 18px ${ES.ac}55` }}>New edit</div>}
+          {phase === "prepare" && <div onClick={cancelPrepare} style={btn}>Cancel</div>}
           {onToggleMenu && <div onClick={onToggleMenu} style={btn} title="Hide or show the left menu">{menuHidden ? "Show menu" : "Hide menu"}</div>}
           <div style={btn}>Share</div>
           {phase === "done" && job ? <a href={`${tunnel}/file?job=${job.id}&name=${job.final_file || "preview.mp4"}&dl=1&t=${encodeURIComponent(token)}`} style={{ ...btn, background: ES.lime, color: "#10140a", fontWeight: 700, border: "none", textDecoration: "none" }}>Export</a>
             : <div title="Export is ready when the edit is done" style={{ ...btn, background: ES.panel2, color: ES.faint, cursor: "default" }}>Export</div>}
         </div>
 
-        {phase === "idle" && (
+        {phase === "prepare" && (
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", animation: "esIn .5s ease-out" }}>
             <div style={{ width: "min(980px, 100%)" }}>
               <div style={{ textAlign: "center", marginBottom: 22 }}>
@@ -4249,7 +4255,7 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
           </div>
         )}
 
-        {phase === "working" && (<>
+        {(phase === "idle" || phase === "working" || docking) && (<div key="studio" style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, minHeight: 0, animation: docking ? "esOut .8s ease-in forwards" : "esIn .55s ease-out" }}>
         {/* middle */}
         <div style={{ display: "grid", gridTemplateColumns: "190px 1fr 1.1fr 260px", gap: 8, flex: "1 1 0", minHeight: 0 }}>
           <EsPanel title="Pool" right={`${(lib.raw.length + lib.refs.length) || ES_POOL.length} items`} bodyStyle={{ overflowY: "auto" }}>
@@ -4371,14 +4377,14 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
         <div style={{ fontSize: 9, color: ES.faint, fontFamily: "ui-monospace, monospace", padding: "0 4px", flexShrink: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {sel ? `selected: ${sel.track.label} · ${sel.clip[2]} · ${esTime(sel.clip[0])} to ${esTime(sel.clip[0] + sel.clip[1])}` : ""}  ·  The agents, the Mac worker and Higgsfield connect in the next step, everything here is sample data.
         </div>
-        </>)}
+        </div>)}
         {cursors.map((c, i) => { const a = ES_AGENTS[i]; return (
-          <div key={a.id} style={{ position: "absolute", left: c.x, top: c.y, opacity: live ? 1 : 0, transform: live ? "scale(1)" : "scale(.2)", transition: "left 900ms cubic-bezier(.4,0,.2,1), top 900ms cubic-bezier(.4,0,.2,1), opacity .5s, transform .5s", pointerEvents: "none", zIndex: 30 }}>
+          <div key={a.id} style={{ position: "absolute", left: c.x, top: c.y, opacity: live || docking ? 1 : 0, transform: live || docking ? "scale(1)" : "scale(.2)", transition: "left 900ms cubic-bezier(.4,0,.2,1), top 900ms cubic-bezier(.4,0,.2,1), opacity .5s, transform .5s", pointerEvents: "none", zIndex: 30 }}>
             <svg width="16" height="18" viewBox="0 0 16 18" style={{ filter: `drop-shadow(0 0 4px ${a.color})` }}><path d="M1 1l12 6.5-5.2 1.6L5.6 15z" fill={a.color} stroke="#0a0d0c" strokeWidth="1" /></svg>
             <span style={{ position: "absolute", left: 12, top: 13, fontSize: 8.5, fontWeight: 800, background: a.color, color: "#10140a", padding: "1px 6px", borderRadius: 5, whiteSpace: "nowrap", boxShadow: `0 0 8px ${a.color}` }}>{a.name}</span>
             {c.pulse > 0 && <span key={c.pulse} style={{ position: "absolute", left: -8, top: -8, width: 20, height: 20, borderRadius: "50%", border: `2px solid ${a.color}`, animation: "esClick .55s ease-out forwards" }} />}
           </div>); })}
-        <style>{`@keyframes esBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}@keyframes esIn{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}@keyframes esClick{0%{transform:scale(.3);opacity:.95}100%{transform:scale(1.9);opacity:0}}`}</style>
+        <style>{`@keyframes esBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}@keyframes esOut{0%{opacity:1;transform:none;filter:none}100%{opacity:0;transform:scale(.96) translateY(8px);filter:blur(2px)}}@keyframes esIn{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}@keyframes esClick{0%{transform:scale(.3);opacity:.95}100%{transform:scale(1.9);opacity:0}}`}</style>
       </div>
     </div>
   );

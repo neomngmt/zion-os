@@ -5870,7 +5870,8 @@ function EditorStudio({
   const [playing, setPlaying] = useState(false);
   const [t, setT] = useState(3.4);
   const [phase, setPhase] = useState("idle");
-  const live = phase === "working";
+  const [docking, setDocking] = useState(false);
+  const live = (phase === "idle" || phase === "working") && !docking;
   const [log, setLog] = useState([]);
   const [selClip, setSelClip] = useState("text:0");
   const [style, setStyle] = useState("Lime Gradient");
@@ -5924,6 +5925,7 @@ function EditorStudio({
   const [up, setUp] = useState(null);
   const [job, setJob] = useState(null);
   const [err, setErr] = useState("");
+  const finishing = useRef(false);
   const loadLib = useCallback(async () => {
     if (!tunnel) return;
     try {
@@ -6006,6 +6008,7 @@ function EditorStudio({
         })
       });
       if (!j.id) throw new Error(j.error || "Could not start the edit");
+      finishing.current = false;
       setLog([]);
       setJob({
         id: j.id,
@@ -6026,7 +6029,15 @@ function EditorStudio({
       } = await supabaseClient.from("edit_jobs").select("id, status, stage, summary, error, final_file, source_duration").eq("id", job.id).maybeSingle();
       if (stop || !data) return;
       setJob(data);
-      if (data.status === "awaiting_review" || data.status === "done") setTimeout(() => setPhase("done"), 1200);
+      if ((data.status === "awaiting_review" || data.status === "done") && !finishing.current) {
+        finishing.current = true;
+        setDocking(true);
+        dockCursors();
+        setTimeout(() => {
+          setPhase("done");
+          setDocking(false);
+        }, 1300);
+      }
       if (data.status === "error") {
         setErr(data.error || "The edit failed.");
       }
@@ -6052,8 +6063,17 @@ function EditorStudio({
     setSelRef(null);
     setBrief("");
     setErr("");
-    setPhase("idle");
+    setPhase("prepare");
   };
+  const goPrepare = () => {
+    setDocking(true);
+    dockCursors();
+    setTimeout(() => {
+      setPhase("prepare");
+      setDocking(false);
+    }, 1100);
+  };
+  const cancelPrepare = () => setPhase("idle");
   const dockCursors = () => {
     const root = rootRef.current;
     if (!root) return;
@@ -6070,11 +6090,11 @@ function EditorStudio({
     }));
   };
   useEffect(() => {
-    if (phase !== "working") {
+    if (!live) {
       const id = setTimeout(dockCursors, 60);
       return () => clearTimeout(id);
     }
-  }, [phase]);
+  }, [live]);
   useEffect(() => {
     if (!live) return;
     const move = () => {
@@ -6212,8 +6232,10 @@ function EditorStudio({
     style: {
       display: "flex",
       alignItems: "center",
-      gap: 14,
-      padding: "2px 4px"
+      gap: 10,
+      padding: "2px 4px",
+      whiteSpace: "nowrap",
+      flexShrink: 0
     }
   }, React.createElement("div", {
     style: {
@@ -6277,7 +6299,7 @@ function EditorStudio({
       cursor: "pointer",
       boxShadow: live ? "none" : `0 0 6px ${a.color}`,
       transition: "opacity .4s, box-shadow .4s",
-      animation: phase === "idle" ? "esBreath 3.2s ease-in-out infinite" : "none"
+      animation: !live ? "esBreath 3.2s ease-in-out infinite" : "none"
     }
   }))), React.createElement("div", {
     style: {
@@ -6296,7 +6318,21 @@ function EditorStudio({
       background: live ? ES.ac : ES.faint,
       boxShadow: live ? `0 0 8px ${ES.ac}` : "none"
     }
-  }), live ? `${liveAgents} agents working` : "agents asleep"), onToggleMenu && React.createElement("div", {
+  }), phase === "working" ? `${liveAgents} agents working` : phase === "idle" ? "agents on standby" : "agents asleep"), phase === "idle" && React.createElement("div", {
+    onClick: goPrepare,
+    style: {
+      ...btn,
+      background: ES.ac,
+      color: "#03110a",
+      fontWeight: 800,
+      border: "none",
+      padding: "7px 18px",
+      boxShadow: `0 0 18px ${ES.ac}55`
+    }
+  }, "New edit"), phase === "prepare" && React.createElement("div", {
+    onClick: cancelPrepare,
+    style: btn
+  }, "Cancel"), onToggleMenu && React.createElement("div", {
     onClick: onToggleMenu,
     style: btn,
     title: "Hide or show the left menu"
@@ -6320,7 +6356,7 @@ function EditorStudio({
       color: ES.faint,
       cursor: "default"
     }
-  }, "Export")), phase === "idle" && React.createElement("div", {
+  }, "Export")), phase === "prepare" && React.createElement("div", {
     style: {
       flex: 1,
       display: "flex",
@@ -6601,7 +6637,17 @@ function EditorStudio({
   }, job.status === "error" ? err : "Everything stays on the Mac. The preview appears here when it is done."), job.status === "error" && React.createElement("div", {
     onClick: reset,
     style: btn
-  }, "Back")), phase === "working" && React.createElement(React.Fragment, null, React.createElement("div", {
+  }, "Back")), (phase === "idle" || phase === "working" || docking) && React.createElement("div", {
+    key: "studio",
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8,
+      flex: 1,
+      minHeight: 0,
+      animation: docking ? "esOut .8s ease-in forwards" : "esIn .55s ease-out"
+    }
+  }, React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "190px 1fr 1.1fr 260px",
@@ -7198,8 +7244,8 @@ function EditorStudio({
         position: "absolute",
         left: c.x,
         top: c.y,
-        opacity: live ? 1 : 0,
-        transform: live ? "scale(1)" : "scale(.2)",
+        opacity: live || docking ? 1 : 0,
+        transform: live || docking ? "scale(1)" : "scale(.2)",
         transition: "left 900ms cubic-bezier(.4,0,.2,1), top 900ms cubic-bezier(.4,0,.2,1), opacity .5s, transform .5s",
         pointerEvents: "none",
         zIndex: 30
@@ -7243,7 +7289,7 @@ function EditorStudio({
         animation: "esClick .55s ease-out forwards"
       }
     }));
-  }), React.createElement("style", null, `@keyframes esBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}@keyframes esIn{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}@keyframes esClick{0%{transform:scale(.3);opacity:.95}100%{transform:scale(1.9);opacity:0}}`)));
+  }), React.createElement("style", null, `@keyframes esBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}@keyframes esOut{0%{opacity:1;transform:none;filter:none}100%{opacity:0;transform:scale(.96) translateY(8px);filter:blur(2px)}}@keyframes esIn{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}@keyframes esClick{0%{transform:scale(.3);opacity:.95}100%{transform:scale(1.9);opacity:0}}`)));
 }
 function EditorPage({
   menuHidden,
@@ -23253,7 +23299,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">100iekt</script>
+<script type="text/babel" id="zion-version">n5628c</script>
 <script>
 (function () {
   var last = 0;
