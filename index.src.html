@@ -3967,7 +3967,284 @@ function EditStatusChip({ status }) {
   );
 }
 
+// ---------- Editor Studio (UI first, demo data until the agents are connected) ----------
+const ES = {
+  bg: "#0a0d0c", panel: "#101514", panel2: "#141a18", line: "rgba(255,255,255,0.07)", tx: "#e8efe9", dim: "#8a968e", faint: "#5b6760",
+  ac: "#39e673", lime: "#c6f432", pink: "#ff5db1", blue: "#4cc3ff", orange: "#ff9a3c", violet: "#a78bfa", red: "#ff6b5c",
+};
+const ES_AGENTS = [
+  { id: "cutter-01", name: "Cutter", color: ES.ac }, { id: "captions-02", name: "Captions", color: ES.lime },
+  { id: "color-03", name: "Color", color: ES.orange }, { id: "broll-04", name: "B-roll", color: ES.blue },
+  { id: "sfx-05", name: "SFX", color: ES.pink }, { id: "music-06", name: "Music", color: ES.violet },
+  { id: "graphics-07", name: "Graphics", color: ES.lime }, { id: "mix-08", name: "Audio mix", color: ES.ac },
+  { id: "checker-09", name: "Checker", color: ES.red }, { id: "cover-10", name: "Cover", color: ES.blue },
+];
+const ES_LOG_SCRIPT = [
+  ["cutter-01", "removed silence 00:04.2 to 00:05.1"], ["captions-02", "word-by-word captions, 2-4 words per line"],
+  ["color-03", "LUT warm commercial at 65%"], ["broll-04", "picked clip_connector.mov for 'screen recordings'"],
+  ["sfx-05", "whoosh at 00:07.8"], ["music-06", "ducked -14 LUFS under voice"], ["graphics-07", "lower third in, 1.2 s"],
+  ["mix-08", "voice normalised to -16 LUFS"], ["checker-09", "caption inside the safe zone, ok"], ["cover-10", "cover frame from 00:02.4"],
+  ["cutter-01", "tightened pause before the payoff"], ["captions-02", "highlighted the number in line 3"],
+  ["color-03", "skin tones balanced, saturation +6"], ["broll-04", "trimmed b-roll to 1.8 s"],
+];
+const ES_POOL = [
+  ["take_01.mov", "0:18"], ["take_02.mov", "0:24"], ["take_03.mov", "0:12"], ["broll_desk.mp4", "0:09"], ["screen_rec.mov", "0:31"], ["voice_clean.wav", "0:42"],
+];
+const ES_TRACKS = [
+  { id: "text", label: "TEXT", clips: [[1, 7, "SCREEN RECORDINGS APPEAR", ES.lime], [14, 8, "THE NUMBER", ES.lime]] },
+  { id: "sfx", label: "SFX", clips: [[7.5, 2, "whoosh", ES.pink], [15, 2.4, "hit", ES.pink], [23, 2, "riser", ES.pink]] },
+  { id: "broll", label: "B-ROLL", clips: [[6, 5, "clip_connector", ES.blue], [17, 4, "desk_loop", ES.blue]] },
+  { id: "aroll", label: "A-ROLL", clips: [[0, 12, "take_01", ES.ac], [12, 9, "take_02", ES.ac], [21, 9, "take_03", ES.ac]] },
+  { id: "gfx", label: "GRAPHICS", clips: [[2, 4, "lower third", ES.orange], [19, 5, "cta card", ES.orange]] },
+  { id: "voice", label: "VOICE", clips: [[0, 30, "voice_clean", ES.ac]], wave: true },
+  { id: "music", label: "MUSIC", clips: [[0, 30, "bed_lofi_92bpm", ES.violet]], wave: true },
+];
+const ES_CAPTION_STYLES = ["Lime Gradient", "Karaoke", "Hormozi", "Clean white", "Box pop"];
+const ES_FONTS = ["Arial Bold", "Bebas Neue", "Permanent Marker", "Francois Black", "Inter Black", "Helvetica Neue Bold"];
+const ES_DUR = 30;
+const esRand = (seed) => { let s = seed; return () => { s = (s * 16807) % 2147483647; return s / 2147483647; }; };
+const esTime = (t) => { const m = Math.floor(t / 60), s = Math.floor(t % 60), f = Math.floor((t % 1) * 30); return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}:${String(f).padStart(2, "0")}`; };
+
+function EsPanel({ title, right, children, style, bodyStyle }) {
+  return (
+    <div style={{ background: ES.panel, border: `1px solid ${ES.line}`, borderRadius: 14, display: "flex", flexDirection: "column", minHeight: 0, ...style }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", borderBottom: `1px solid ${ES.line}`, fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: ES.dim, fontFamily: "ui-monospace, monospace" }}>
+        <span>{title}</span><span>{right}</span>
+      </div>
+      <div style={{ padding: 10, minHeight: 0, flex: 1, ...bodyStyle }}>{children}</div>
+    </div>
+  );
+}
+
+function EsWheel({ label, value, onChange }) {
+  const ref = useRef(null);
+  const set = (e) => {
+    const r = ref.current.getBoundingClientRect();
+    const x = Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width) * 2 - 1));
+    const y = Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height) * 2 - 1));
+    const d = Math.hypot(x, y); const k = d > 1 ? 1 / d : 1;
+    onChange([x * k, y * k]);
+  };
+  const down = (e) => { set(e); const mv = (ev) => set(ev); const up = () => { window.removeEventListener("mousemove", mv); window.removeEventListener("mouseup", up); }; window.addEventListener("mousemove", mv); window.addEventListener("mouseup", up); };
+  return (
+    <div style={{ textAlign: "center" }}>
+      <div ref={ref} onMouseDown={down} style={{ width: 74, height: 74, borderRadius: "50%", margin: "0 auto", position: "relative", cursor: "crosshair", background: "radial-gradient(circle, #fff 0%, rgba(255,255,255,0) 62%), conic-gradient(from 90deg, #ff3b3b, #ffb13b, #e8ff3b, #3bff6e, #3bffe8, #3b6eff, #b13bff, #ff3b9e, #ff3b3b)", boxShadow: "0 0 0 1px rgba(255,255,255,.12)" }}>
+        <div style={{ position: "absolute", left: `${50 + value[0] * 46}%`, top: `${50 + value[1] * 46}%`, width: 9, height: 9, margin: "-4.5px 0 0 -4.5px", borderRadius: "50%", background: "#fff", border: "2px solid #0a0d0c" }} />
+      </div>
+      <div style={{ fontSize: 9, letterSpacing: ".14em", color: ES.dim, marginTop: 5, fontFamily: "ui-monospace, monospace" }}>{label}</div>
+    </div>
+  );
+}
+
+function EditorStudio() {
+  const [playing, setPlaying] = useState(false);
+  const [t, setT] = useState(3.4);
+  const [live, setLive] = useState(true);
+  const [log, setLog] = useState(() => ES_LOG_SCRIPT.slice(0, 8).map((l, i) => ({ id: i, t: esTime(2 + i * 1.7), agent: l[0], msg: l[1] })));
+  const [selClip, setSelClip] = useState("text:0");
+  const [style, setStyle] = useState("Lime Gradient");
+  const [font, setFont] = useState("Helvetica Neue Bold");
+  const [wheels, setWheels] = useState({ LIFT: [0, 0], GAMMA: [0.15, -0.1], GAIN: [-0.1, 0.05] });
+  const [grade, setGrade] = useState({ Temp: 12, Tint: -3, Contrast: 8, Saturation: 6, Exposure: 0 });
+  const [agentFilter, setAgentFilter] = useState(null);
+  const [zoom, setZoom] = useState(1);
+  const tick = useRef(0);
+
+  useEffect(() => {
+    if (!playing) return;
+    const id = setInterval(() => setT((x) => (x + 0.05 >= ES_DUR ? 0 : x + 0.05)), 50);
+    return () => clearInterval(id);
+  }, [playing]);
+  useEffect(() => {
+    if (!live) return;
+    const id = setInterval(() => {
+      const l = ES_LOG_SCRIPT[tick.current % ES_LOG_SCRIPT.length]; tick.current += 1;
+      setLog((p) => [...p.slice(-40), { id: Date.now(), t: esTime(Math.random() * ES_DUR), agent: l[0], msg: l[1] }]);
+    }, 1800);
+    return () => clearInterval(id);
+  }, [live]);
+
+  const wave = useMemo(() => { const r = esRand(7); return Array.from({ length: 160 }, (_, i) => 0.2 + 0.8 * Math.abs(Math.sin(i / 6.5) * (0.4 + r() * 0.6))); }, []);
+  const scope = useMemo(() => { const r = esRand(11); return Array.from({ length: 140 }, () => { const a = r() * Math.PI * 2, d = Math.pow(r(), 1.7) * 44; return [50 + Math.cos(a) * d * 0.9, 50 + Math.sin(a) * d]; }); }, []);
+  const spec = useMemo(() => { const r = esRand(3); return Array.from({ length: 70 }, (_, i) => 6 + r() * 38 * (1 - i / 120)); }, []);
+
+  const capText = t < 7 ? ["screen", "recordings", "appear"] : t < 14 ? ["this one change", "got me clients"] : t < 22 ? ["the number", "was 4,200"] : ["comment", "GUIDE"];
+  const activeCaption = capText.join(" ");
+  const pct = (t / ES_DUR) * 100;
+  const liveAgents = live ? ES_AGENTS.length : 0;
+  const sel = (() => { const [tr, i] = selClip.split(":"); const track = ES_TRACKS.find((x) => x.id === tr); return track && { track, clip: track.clips[Number(i)] }; })();
+  const logShown = agentFilter ? log.filter((l) => l.agent === agentFilter) : log;
+  const agentOf = (id) => ES_AGENTS.find((a) => a.id === id) || ES_AGENTS[0];
+  const btn = { background: ES.panel2, border: `1px solid ${ES.line}`, color: ES.tx, borderRadius: 9, padding: "6px 12px", fontSize: 12, cursor: "pointer" };
+  const slider = (k, min, max) => (
+    <div key={k} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 10, color: ES.dim, fontFamily: "ui-monospace, monospace", marginBottom: 4 }}>
+      <span style={{ width: 62 }}>{k}</span>
+      <input type="range" min={min} max={max} value={grade[k]} onChange={(e) => setGrade({ ...grade, [k]: Number(e.target.value) })} style={{ flex: 1, accentColor: ES.ac }} />
+      <span style={{ width: 28, textAlign: "right", color: ES.tx }}>{grade[k]}</span>
+    </div>
+  );
+
+  return (
+    <div style={{ overflowX: "auto", marginBottom: 20 }}>
+      <div style={{ minWidth: 1180, background: ES.bg, border: `1px solid ${ES.line}`, borderRadius: 20, padding: 12, color: ES.tx, display: "flex", flexDirection: "column", gap: 10 }}>
+        {/* top bar */}
+        <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "2px 4px" }}>
+          <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: "-.01em" }}>Zion <span style={{ color: ES.ac }}>studio</span></div>
+          {["File", "Edit", "Clip", "Color", "Captions", "Audio", "Agents"].map((m) => <span key={m} style={{ fontSize: 11, color: ES.dim, cursor: "pointer" }}>{m}</span>)}
+          <div style={{ flex: 1, textAlign: "center", fontSize: 12 }}>
+            <div style={{ fontWeight: 700 }}>reel_demo_v1</div>
+            <div style={{ fontSize: 9, color: ES.dim, fontFamily: "ui-monospace, monospace" }}>editing live · autosaved</div>
+          </div>
+          <span style={{ fontSize: 9, letterSpacing: ".12em", padding: "4px 8px", borderRadius: 99, border: `1px dashed ${ES.orange}`, color: ES.orange, fontFamily: "ui-monospace, monospace" }}>DEMO DATA</span>
+          <div style={{ display: "flex", gap: 3 }}>{ES_AGENTS.map((a) => <span key={a.id} title={a.name} onClick={() => setAgentFilter(agentFilter === a.id ? null : a.id)} style={{ width: 11, height: 11, borderRadius: "50%", background: a.color, opacity: live ? (agentFilter && agentFilter !== a.id ? 0.25 : 1) : 0.25, cursor: "pointer", boxShadow: live ? `0 0 6px ${a.color}` : "none" }} />)}</div>
+          <div onClick={() => setLive(!live)} style={{ ...btn, display: "flex", alignItems: "center", gap: 7, borderColor: live ? "rgba(57,230,115,.45)" : ES.line }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: live ? ES.ac : ES.faint, boxShadow: live ? `0 0 8px ${ES.ac}` : "none" }} />{liveAgents} agents live
+          </div>
+          <div style={btn}>Share</div>
+          <div title="Export works once the Mac worker is connected" style={{ ...btn, background: ES.lime, color: "#10140a", fontWeight: 700, border: "none" }}>Export</div>
+        </div>
+
+        {/* middle */}
+        <div style={{ display: "grid", gridTemplateColumns: "200px 1fr 1.1fr 270px", gap: 10, height: 520 }}>
+          <EsPanel title="Pool" right={`${ES_POOL.length} items`} bodyStyle={{ overflowY: "auto" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              {ES_POOL.map(([n, d], i) => (
+                <div key={n} style={{ borderRadius: 8, overflow: "hidden", border: `1px solid ${ES.line}` }}>
+                  <div style={{ height: 56, background: `linear-gradient(${120 + i * 35}deg, ${[ES.ac, ES.blue, ES.orange, ES.violet, ES.pink, ES.lime][i]}33, #0a0d0c)`, position: "relative" }}>
+                    <span style={{ position: "absolute", right: 4, bottom: 3, fontSize: 9, color: ES.tx, background: "rgba(0,0,0,.6)", borderRadius: 4, padding: "0 4px" }}>{d}</span>
+                  </div>
+                  <div style={{ fontSize: 9, color: ES.dim, padding: "3px 5px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{n}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 10, border: `1px dashed ${ES.line}`, borderRadius: 8, padding: 10, textAlign: "center", fontSize: 10, color: ES.faint }}>drop raw video here</div>
+          </EsPanel>
+
+          <EsPanel title="Source" right="take_01.mov · 16:9" bodyStyle={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ flex: 1, background: "#050706", borderRadius: 10, position: "relative", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: "34%", height: "78%", borderRadius: 6, background: "linear-gradient(160deg, #2b3a31, #0e1512)", position: "relative", border: `1.5px dashed ${ES.lime}` }}>
+                <span style={{ position: "absolute", top: -9, left: 0, fontSize: 8, background: ES.lime, color: "#10140a", padding: "1px 5px", borderRadius: 4, fontWeight: 700 }}>AUTO 9:16</span>
+              </div>
+            </div>
+            <div style={{ height: 22, borderRadius: 6, background: ES.panel2, position: "relative" }}>
+              <div style={{ position: "absolute", left: "14%", right: "34%", top: 0, bottom: 0, background: `${ES.ac}33`, border: `1px solid ${ES.ac}`, borderRadius: 6 }} />
+            </div>
+          </EsPanel>
+
+          <EsPanel title="Program" right={esTime(t)} bodyStyle={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
+            <div style={{ flex: 1, aspectRatio: "9 / 16", maxHeight: "100%", borderRadius: 12, position: "relative", overflow: "hidden", background: "linear-gradient(170deg, #3b3f38 0%, #1a1d19 55%, #0b0d0b 100%)", border: `1px solid ${ES.line}` }}>
+              <div style={{ position: "absolute", left: "50%", top: "40%", width: 110, height: 110, marginLeft: -55, borderRadius: "50%", background: "radial-gradient(circle at 40% 35%, #c9a58a, #6b4d3a 70%)", filter: "blur(.4px)" }} />
+              <div style={{ position: "absolute", left: "10%", right: "10%", top: "8%", height: 54, borderRadius: 8, border: `1.5px solid ${ES.lime}`, opacity: t > 6 && t < 11 ? 1 : 0, transition: "opacity .2s", background: "rgba(0,0,0,.35)" }} />
+              <div style={{ position: "absolute", left: 0, right: 0, bottom: "20%", textAlign: "center", padding: "0 14px" }}>
+                {capText.map((w, i) => (
+                  <div key={activeCaption + i} style={{ fontWeight: 900, fontSize: 22, lineHeight: 1.05, textTransform: "uppercase", letterSpacing: "-.01em", fontFamily: font.includes("Marker") ? "'Permanent Marker', cursive" : font.includes("Bebas") ? "Bebas Neue, Impact" : "Inter, Arial Black, sans-serif",
+                    color: style === "Clean white" ? "#fff" : style === "Karaoke" ? (i === 1 ? ES.lime : "#fff") : "transparent",
+                    background: style === "Lime Gradient" ? `linear-gradient(90deg, ${ES.lime}, ${ES.ac})` : style === "Hormozi" ? `linear-gradient(90deg, #ffe14d, #ffb300)` : "none", WebkitBackgroundClip: style === "Lime Gradient" || style === "Hormozi" ? "text" : "border-box", backgroundClip: style === "Lime Gradient" || style === "Hormozi" ? "text" : "border-box",
+                    textShadow: style === "Box pop" ? "none" : "0 2px 10px rgba(0,0,0,.6)", ...(style === "Box pop" ? { color: "#10140a", background: ES.lime, display: "inline-block", padding: "2px 8px", borderRadius: 6, margin: 2 } : {}) }}>{w}</div>
+                ))}
+              </div>
+              <div style={{ position: "absolute", left: 6, bottom: 6, fontSize: 8, color: ES.dim, fontFamily: "ui-monospace, monospace" }}>1080x1920 · safe zone on</div>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <div onClick={() => setT(0)} style={btn}>|&lt;</div>
+              <div onClick={() => setPlaying(!playing)} style={{ ...btn, background: ES.ac, color: "#03110a", fontWeight: 800, minWidth: 64, textAlign: "center" }}>{playing ? "Pause" : "Play"}</div>
+              <div onClick={() => setT(Math.min(ES_DUR, t + 1))} style={btn}>+1s</div>
+            </div>
+          </EsPanel>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, minHeight: 0 }}>
+            <EsPanel title="Color" right="LUT warm commercial 65%" style={{ flex: "0 0 auto" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                {Object.keys(wheels).map((k) => <EsWheel key={k} label={k} value={wheels[k]} onChange={(v) => setWheels({ ...wheels, [k]: v })} />)}
+              </div>
+              {slider("Temp", -50, 50)}{slider("Tint", -50, 50)}{slider("Contrast", -50, 50)}{slider("Saturation", -50, 50)}{slider("Exposure", -50, 50)}
+            </EsPanel>
+            <EsPanel title="Captions" right="word by word" style={{ flex: 1 }} bodyStyle={{ overflowY: "auto" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8 }}>
+                {ES_CAPTION_STYLES.map((c) => <span key={c} onClick={() => setStyle(c)} style={{ fontSize: 10, padding: "4px 9px", borderRadius: 8, cursor: "pointer", border: `1px solid ${style === c ? ES.lime : ES.line}`, color: style === c ? ES.lime : ES.dim, background: style === c ? "rgba(198,244,50,.08)" : "transparent" }}>{c}</span>)}
+              </div>
+              {ES_FONTS.map((f) => <div key={f} onClick={() => setFont(f)} style={{ fontSize: 11, padding: "5px 8px", borderRadius: 7, cursor: "pointer", color: font === f ? "#10140a" : ES.tx, background: font === f ? ES.ac : "transparent", fontWeight: 700 }}>{f}</div>)}
+            </EsPanel>
+          </div>
+        </div>
+
+        {/* analysis row */}
+        <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr 1.1fr", gap: 10, height: 150 }}>
+          <EsPanel title="Waveform" right="Luma">
+            <svg viewBox="0 0 160 40" preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block" }}>
+              {wave.map((v, i) => <rect key={i} x={i} y={20 - v * 18} width="0.7" height={v * 36} fill={i / 160 * 100 < pct ? ES.ac : "rgba(57,230,115,.28)"} />)}
+            </svg>
+          </EsPanel>
+          <EsPanel title="Vectorscope">
+            <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%", display: "block" }}>
+              <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(255,255,255,.1)" /><circle cx="50" cy="50" r="23" fill="none" stroke="rgba(255,255,255,.06)" />
+              {scope.map(([x, y], i) => <circle key={i} cx={x} cy={y} r="0.9" fill={ES.lime} opacity=".75" />)}
+            </svg>
+          </EsPanel>
+          <EsPanel title="Loudness" right="LUFS">
+            {[["VOICE", -16.1], ["MUSIC", -30.8], ["INTEGRATED", -14.1]].map(([k, v]) => (
+              <div key={k} style={{ marginBottom: 8, fontSize: 9, color: ES.dim, fontFamily: "ui-monospace, monospace" }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}><span>{k}</span><span style={{ color: ES.tx }}>{v}</span></div>
+                <div style={{ height: 6, background: ES.panel2, borderRadius: 4, overflow: "hidden", marginTop: 3 }}><div style={{ width: `${Math.min(100, Math.max(5, (v + 40) * 3.2))}%`, height: "100%", background: `linear-gradient(90deg, ${ES.ac}, ${ES.lime})` }} /></div>
+              </div>
+            ))}
+            <svg viewBox="0 0 70 18" style={{ width: "100%", height: 26 }}>{spec.map((v, i) => <rect key={i} x={i} y={18 - v / 3} width="0.7" height={v / 3} fill={ES.blue} opacity=".7" />)}</svg>
+          </EsPanel>
+          <EsPanel title="Agent activity" right={`${logShown.length} edits`} bodyStyle={{ overflowY: "auto", fontFamily: "ui-monospace, monospace", fontSize: 9.5, lineHeight: 1.5 }}>
+            {[...logShown].reverse().map((l) => { const a = agentOf(l.agent); return (
+              <div key={l.id} style={{ display: "flex", gap: 6, color: ES.dim }}>
+                <span style={{ color: ES.faint }}>{l.t}</span><span style={{ color: a.color }}>{l.agent}</span><span style={{ color: ES.tx }}>{l.msg}</span>
+              </div>); })}
+          </EsPanel>
+        </div>
+
+        {/* timeline */}
+        <EsPanel title="Timeline" right={<span>{esTime(t)} / {esTime(ES_DUR)} <span style={{ marginLeft: 10 }}><span onClick={() => setZoom(Math.max(1, zoom - 0.5))} style={{ cursor: "pointer", padding: "0 6px" }}>-</span><span onClick={() => setZoom(Math.min(3, zoom + 0.5))} style={{ cursor: "pointer", padding: "0 6px" }}>+</span></span></span>} bodyStyle={{ padding: 0, overflowX: "auto" }}>
+          <div style={{ width: `${zoom * 100}%`, minWidth: "100%", position: "relative" }}>
+            <div onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setT(Math.max(0, Math.min(ES_DUR, ((e.clientX - r.left - 70) / (r.width - 70)) * ES_DUR))); }} style={{ cursor: "pointer", height: 22, marginLeft: 70, borderBottom: `1px solid ${ES.line}`, position: "relative" }}>
+              {Array.from({ length: ES_DUR / 2 + 1 }, (_, i) => <span key={i} style={{ position: "absolute", left: `${(i * 2 / ES_DUR) * 100}%`, top: 4, fontSize: 8, color: ES.faint, fontFamily: "ui-monospace, monospace", borderLeft: `1px solid ${ES.line}`, paddingLeft: 3 }}>{esTime(i * 2).slice(0, 5)}</span>)}
+            </div>
+            {ES_TRACKS.map((tr) => (
+              <div key={tr.id} style={{ display: "flex", height: tr.wave ? 34 : 30, borderBottom: `1px solid ${ES.line}` }}>
+                <div style={{ width: 70, flexShrink: 0, fontSize: 8.5, letterSpacing: ".12em", color: ES.dim, padding: "0 8px", display: "flex", alignItems: "center", fontFamily: "ui-monospace, monospace" }}>{tr.label}</div>
+                <div style={{ flex: 1, position: "relative" }}>
+                  {tr.clips.map((c, i) => (
+                    <div key={i} onClick={() => setSelClip(`${tr.id}:${i}`)} style={{ position: "absolute", left: `${(c[0] / ES_DUR) * 100}%`, width: `${(c[1] / ES_DUR) * 100}%`, top: 3, bottom: 3, borderRadius: 6, cursor: "pointer", overflow: "hidden", fontSize: 9, fontWeight: 700, padding: "0 6px", display: "flex", alignItems: "center", whiteSpace: "nowrap",
+                      background: tr.wave ? "transparent" : `${c[3]}33`, border: `1px solid ${selClip === `${tr.id}:${i}` ? "#fff" : c[3] + "aa"}`, color: c[3] }}>
+                      {tr.wave ? <svg viewBox="0 0 160 10" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>{wave.map((v, k) => <rect key={k} x={k} y={5 - v * 4} width="0.7" height={v * 8} fill={c[3]} opacity=".8" />)}</svg> : c[2]}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {/* agent cursors */}
+            {live && [[ES.pink, "sfx-05", "sfx", 38], [ES.blue, "broll-04", "broll", 58], [ES.orange, "color-03", "gfx", 48]].map(([c, n, , x]) => (
+              <span key={n} style={{ position: "absolute", left: `calc(70px + (100% - 70px) * ${x / 100})`, top: 40 + (n.startsWith("sfx") ? 0 : n.startsWith("broll") ? 36 : 100), fontSize: 8, fontWeight: 800, background: c, color: "#10140a", padding: "1px 6px", borderRadius: 5, boxShadow: `0 0 8px ${c}`, animation: "esFloat 3.4s ease-in-out infinite alternate", pointerEvents: "none" }}>{n}</span>
+            ))}
+            <div style={{ position: "absolute", top: 0, bottom: 0, left: `calc(70px + (100% - 70px) * ${pct / 100})`, width: 2, background: ES.lime, boxShadow: `0 0 10px ${ES.lime}`, pointerEvents: "none" }}>
+              <span style={{ position: "absolute", top: -1, left: -5, width: 12, height: 10, background: ES.lime, clipPath: "polygon(0 0, 100% 0, 50% 100%)" }} />
+            </div>
+          </div>
+        </EsPanel>
+        <div style={{ fontSize: 10, color: ES.faint, fontFamily: "ui-monospace, monospace", padding: "0 4px" }}>
+          {sel ? `selected: ${sel.track.label} · ${sel.clip[2]} · ${esTime(sel.clip[0])} to ${esTime(sel.clip[0] + sel.clip[1])}` : ""}  ·  The agents, the Mac worker and Higgsfield connect in the next step, everything here is sample data.
+        </div>
+        <style>{`@keyframes esFloat{from{transform:translate(0,0)}to{transform:translate(46px,0)}}`}</style>
+      </div>
+    </div>
+  );
+}
+
 function EditorPage() {
+  return (
+    <div>
+      <EditorStudio />
+      <EditorLauncher />
+    </div>
+  );
+}
+
+function EditorLauncher() {
   const worker = useEditWorker();
   const { jobs, loading } = useEditJobs();
   const offline = worker.checked && !worker.online;
