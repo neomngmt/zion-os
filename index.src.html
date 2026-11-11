@@ -4063,21 +4063,21 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
   const [selRef, setSelRef] = useState(null);
   const [brief, setBrief] = useState("");
   const [lang, setLang] = useState("cs");
-  const [up, setUp] = useState(null);
+  const [ups, setUps] = useState({}); // one upload per slot (raw, ref), they run side by side
   const [job, setJob] = useState(null);
   const [err, setErr] = useState("");
   const finishing = useRef(false);
   const loadLib = useCallback(async () => { if (!tunnel) return; try { const j = await api("/library"); if (j.raw) setLib(j); } catch (e) {} }, [tunnel, token]);
   useEffect(() => { loadLib(); const id = setInterval(loadLib, 15000); return () => clearInterval(id); }, [loadLib]);
   const upload = async (file, kind) => {
-    if (!tunnel || !file) return;
+    if (!tunnel || !file || ups[kind]) return;
     setErr("");
     const CH = 16 * 1024 * 1024, total = Math.max(1, Math.ceil(file.size / CH)), uid = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
     const sendChunk = (i) => new Promise((resolve, reject) => {
       const x = new XMLHttpRequest();
       x.open("POST", `${tunnel}/upload?kind=${kind}&uid=${uid}&idx=${i}&off=${i * CH}&total=${total}&name=${encodeURIComponent(file.name)}`);
       x.setRequestHeader("x-zion-token", token);
-      x.upload.onprogress = (e) => { const done = i * CH + (e.loaded || 0); setUp({ name: file.name, kind, pct: Math.min(99, Math.round((done / file.size) * 100)) }); };
+      x.upload.onprogress = (e) => { const done = i * CH + (e.loaded || 0); setUps((u) => ({ ...u, [kind]: { name: file.name, pct: Math.min(99, Math.round((done / file.size) * 100)) } })); };
       x.onload = () => { try { const j = JSON.parse(x.responseText); if (x.status >= 400) reject(new Error(j.error || "Upload failed")); else resolve(j); } catch (e) { reject(new Error("Upload failed (" + x.status + ")")); } };
       x.onerror = () => reject(new Error("Lost the connection to the Mac"));
       x.send(file.slice(i * CH, (i + 1) * CH));
@@ -4091,7 +4091,7 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
       if (last && last.name) { if (kind === "raw") setSelRaw(last.name); else setSelRef(last.name); }
       await loadLib();
     } catch (e) { setErr(e.message || "Upload failed"); }
-    setUp(null);
+    setUps((u) => { const n = { ...u }; delete n[kind]; return n; });
   };
   const startEdit = async () => {
     if (!tunnel || !selRaw) return;
@@ -4209,10 +4209,10 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
                   <div key={kind} style={{ background: ES.panel, border: `1px solid ${selected ? ES.ac + "88" : ES.line}`, borderRadius: 18, padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
                     <div style={{ fontSize: 11, letterSpacing: ".14em", textTransform: "uppercase", color: ES.dim, fontFamily: "ui-monospace, monospace" }}>{title}{kind === "ref" ? " (optional)" : ""}</div>
                     <label onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); upload(e.dataTransfer.files[0], kind); }} style={{ border: `1.5px dashed ${selected ? ES.ac : ES.line}`, borderRadius: 14, padding: "26px 12px", textAlign: "center", cursor: tunnel ? "pointer" : "not-allowed", color: selected ? ES.ac : ES.dim, fontSize: 13, opacity: tunnel ? 1 : 0.5 }}>
-                      <input type="file" accept="video/*,audio/*" disabled={!tunnel} onChange={(e) => upload(e.target.files[0], kind)} style={{ display: "none" }} />
-                      {up && up.kind === kind ? `Uploading ${up.name} ${up.pct}%` : selected ? selected : hint}
+                      <input type="file" accept="video/*,audio/*" disabled={!tunnel || !!ups[kind]} onChange={(e) => { const f = e.target.files[0]; e.target.value = ""; upload(f, kind); }} style={{ display: "none" }} />
+                      {ups[kind] ? `Uploading ${ups[kind].name} ${ups[kind].pct}%` : selected ? selected : hint}
                     </label>
-                    {up && up.kind === kind && <div style={{ height: 4, background: ES.panel2, borderRadius: 4 }}><div style={{ width: `${up.pct}%`, height: "100%", background: ES.ac, borderRadius: 4, transition: "width .3s" }} /></div>}
+                    {ups[kind] && <div style={{ height: 4, background: ES.panel2, borderRadius: 4 }}><div style={{ width: `${ups[kind].pct}%`, height: "100%", background: ES.ac, borderRadius: 4, transition: "width .3s" }} /></div>}
                     <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 120, overflowY: "auto" }}>
                       {files.slice(0, 8).map((f) => (
                         <div key={f.name} onClick={() => setSel(selected === f.name ? null : f.name)} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, padding: "5px 9px", borderRadius: 8, cursor: "pointer", background: selected === f.name ? "rgba(57,230,115,.12)" : "transparent", color: selected === f.name ? ES.ac : ES.dim, fontFamily: "ui-monospace, monospace" }}>

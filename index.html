@@ -5922,7 +5922,7 @@ function EditorStudio({
   const [selRef, setSelRef] = useState(null);
   const [brief, setBrief] = useState("");
   const [lang, setLang] = useState("cs");
-  const [up, setUp] = useState(null);
+  const [ups, setUps] = useState({});
   const [job, setJob] = useState(null);
   const [err, setErr] = useState("");
   const finishing = useRef(false);
@@ -5939,7 +5939,7 @@ function EditorStudio({
     return () => clearInterval(id);
   }, [loadLib]);
   const upload = async (file, kind) => {
-    if (!tunnel || !file) return;
+    if (!tunnel || !file || ups[kind]) return;
     setErr("");
     const CH = 16 * 1024 * 1024,
       total = Math.max(1, Math.ceil(file.size / CH)),
@@ -5950,11 +5950,13 @@ function EditorStudio({
       x.setRequestHeader("x-zion-token", token);
       x.upload.onprogress = e => {
         const done = i * CH + (e.loaded || 0);
-        setUp({
-          name: file.name,
-          kind,
-          pct: Math.min(99, Math.round(done / file.size * 100))
-        });
+        setUps(u => ({
+          ...u,
+          [kind]: {
+            name: file.name,
+            pct: Math.min(99, Math.round(done / file.size * 100))
+          }
+        }));
       };
       x.onload = () => {
         try {
@@ -5988,7 +5990,13 @@ function EditorStudio({
     } catch (e) {
       setErr(e.message || "Upload failed");
     }
-    setUp(null);
+    setUps(u => {
+      const n = {
+        ...u
+      };
+      delete n[kind];
+      return n;
+    });
   };
   const startEdit = async () => {
     if (!tunnel || !selRaw) return;
@@ -6436,12 +6444,16 @@ function EditorStudio({
   }, React.createElement("input", {
     type: "file",
     accept: "video/*,audio/*",
-    disabled: !tunnel,
-    onChange: e => upload(e.target.files[0], kind),
+    disabled: !tunnel || !!ups[kind],
+    onChange: e => {
+      const f = e.target.files[0];
+      e.target.value = "";
+      upload(f, kind);
+    },
     style: {
       display: "none"
     }
-  }), up && up.kind === kind ? `Uploading ${up.name} ${up.pct}%` : selected ? selected : hint), up && up.kind === kind && React.createElement("div", {
+  }), ups[kind] ? `Uploading ${ups[kind].name} ${ups[kind].pct}%` : selected ? selected : hint), ups[kind] && React.createElement("div", {
     style: {
       height: 4,
       background: ES.panel2,
@@ -6449,7 +6461,7 @@ function EditorStudio({
     }
   }, React.createElement("div", {
     style: {
-      width: `${up.pct}%`,
+      width: `${ups[kind].pct}%`,
       height: "100%",
       background: ES.ac,
       borderRadius: 4,
@@ -23299,7 +23311,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">n5628c</script>
+<script type="text/babel" id="zion-version">1pypsex</script>
 <script>
 (function () {
   var last = 0;
