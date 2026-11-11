@@ -3508,7 +3508,7 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
                   <div className="text-4xl font-extrabold text-white leading-none mb-4" style={{ textShadow: "0 2px 16px rgba(0,0,0,0.15)" }}>{fmtK(realViewsTotal)}</div>
                   <AreaTrendChart
                     data={rangeDays.map((d) => ({ date: d, value: reachForDate(d) }))}
-                    color="#ffffff" height={150} valueFormat={fmtK}
+                    color="#ffffff" height={150} valueFormat={(v) => (v ? `${fmtK(v)} views` : "no reel posted")}
                   />
                   <div className="flex gap-2 mt-3 flex-wrap">
                     {[

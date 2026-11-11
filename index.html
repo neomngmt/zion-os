@@ -4796,7 +4796,7 @@ function IGOverviewDashboard({
     })),
     color: "#ffffff",
     height: 150,
-    valueFormat: fmtK
+    valueFormat: v => v ? `${fmtK(v)} views` : "no reel posted"
   }), React.createElement("div", {
     className: "flex gap-2 mt-3 flex-wrap"
   }, [["Best day", fmtK(Math.max(0, ...dayBars.map(d => d.reach)))], ["Avg / day", fmtK(Math.round(dayBars.reduce((t, d) => t + d.reach, 0) / Math.max(1, dayBars.length)))], ["Reels", String(weekTotals.posts)]].map(([k, v]) => React.createElement("div", {
@@ -21518,7 +21518,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">4iul16</script>
+<script type="text/babel" id="zion-version">m6czqb</script>
 <script>
 (function () {
   var last = 0;
