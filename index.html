@@ -3221,9 +3221,20 @@ function AreaTrendChart({
   const n = data.length;
   const xAt = i => n <= 1 ? W / 2 : i / (n - 1) * W;
   const yAt = v => PAD_TOP + plotH - (v - min) / range * plotH;
-  const linePath = data.map((d, i) => `${i === 0 ? "M" : "L"} ${xAt(i)},${yAt(d.value)}`).join(" ");
+  const pts = data.map((d, i) => [xAt(i), yAt(d.value)]);
+  let linePath = pts.length ? `M ${pts[0][0]},${pts[0][1]}` : "";
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [x0, y0] = pts[i],
+      [x1, y1] = pts[i + 1];
+    const cx = (x0 + x1) / 2;
+    linePath += ` C ${cx},${y0} ${cx},${y1} ${x1},${y1}`;
+  }
   const areaPath = `${linePath} L ${xAt(n - 1)},${H - PAD_BOTTOM} L ${xAt(0)},${H - PAD_BOTTOM} Z`;
   const gradId = React.useMemo(() => `areaGrad${Math.random().toString(36).slice(2)}`, []);
+  const dayLabel = d => new Date(d.date + "T12:00:00").toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short"
+  });
   const handleMove = e => {
     if (!svgRef.current || n === 0) return;
     const rect = svgRef.current.getBoundingClientRect();
@@ -3255,11 +3266,11 @@ function AreaTrendChart({
   }, React.createElement("stop", {
     offset: "0%",
     stopColor: color,
-    stopOpacity: "0.45"
+    stopOpacity: "0.55"
   }), React.createElement("stop", {
     offset: "100%",
     stopColor: color,
-    stopOpacity: "0"
+    stopOpacity: "0.02"
   }))), [0.25, 0.5, 0.75].map(f => React.createElement("line", {
     key: f,
     x1: "0",
@@ -3275,10 +3286,25 @@ function AreaTrendChart({
     d: linePath,
     fill: "none",
     stroke: color,
-    strokeWidth: "2",
+    strokeWidth: "2.5",
     strokeLinejoin: "round",
     strokeLinecap: "round"
-  }), n > 0 && hoverIdx == null && React.createElement("circle", {
+  }), n <= 10 && pts.map(([x, y], i) => React.createElement("circle", {
+    key: i,
+    cx: x,
+    cy: y,
+    r: "3",
+    fill: color,
+    fillOpacity: "0.9"
+  })), n > 1 && [0, Math.floor((n - 1) / 2), n - 1].map((i, k) => React.createElement("text", {
+    key: k,
+    x: xAt(i),
+    y: H - 5,
+    fontSize: "11",
+    fill: color,
+    fillOpacity: "0.75",
+    textAnchor: k === 0 ? "start" : k === 2 ? "end" : "middle"
+  }, dayLabel(data[i]))), n > 0 && hoverIdx == null && React.createElement("circle", {
     cx: xAt(n - 1),
     cy: yAt(values[n - 1]),
     r: "3.5",
@@ -4512,11 +4538,14 @@ function IGOverviewDashboard({
     label: "Replies",
     value: weekTotals.replies,
     color: DONUT_COLORS[1]
-  }, {
+  }, ...(weekTotals.reposts > 0 ? [{
     label: "Reposts",
     value: weekTotals.reposts,
     color: DONUT_COLORS[2]
-  }];
+  }] : [])];
+  const mediaViews = mediaInRange.reduce((t, m) => t + (m.views || 0), 0);
+  const nReels = Math.max(1, mediaInRange.length);
+  const engTiles = [["Avg views / reel", fmtK(Math.round(mediaViews / nReels))], ["Avg likes / reel", fmtK(Math.round(weekTotals.likes / nReels))], ["Engagement", mediaViews > 0 ? `${((weekTotals.likes + weekTotals.replies) / mediaViews * 100).toFixed(1)}%` : "-"]];
   const donutTotal = donutSegments.reduce((s, seg) => s + seg.value, 0);
   const donutR = 40,
     donutCirc = 2 * Math.PI * donutR;
@@ -4756,9 +4785,24 @@ function IGOverviewDashboard({
       value: reachForDate(d)
     })),
     color: "#ffffff",
-    height: 100,
+    height: 150,
     valueFormat: fmtK
-  })), igAccount === "all" && React.createElement("div", {
+  }), React.createElement("div", {
+    className: "flex gap-2 mt-3 flex-wrap"
+  }, [["Best day", fmtK(Math.max(0, ...dayBars.map(d => d.reach)))], ["Avg / day", fmtK(Math.round(dayBars.reduce((t, d) => t + d.reach, 0) / Math.max(1, dayBars.length)))], ["Reels", String(weekTotals.posts)]].map(([k, v]) => React.createElement("div", {
+    key: k,
+    className: "rounded-2xl px-3 py-1.5",
+    style: {
+      background: "rgba(0,0,0,0.16)"
+    }
+  }, React.createElement("div", {
+    className: "fs-9 font-mono uppercase",
+    style: {
+      color: "rgba(255,255,255,0.7)"
+    }
+  }, k), React.createElement("div", {
+    className: "fs-13 font-bold text-white"
+  }, v))))), igAccount === "all" && React.createElement("div", {
     className: "flex items-center gap-2 pt-3 mt-1 relative flex-wrap",
     style: {
       borderTop: "1px solid rgba(255,255,255,0.22)"
@@ -4803,12 +4847,12 @@ function IGOverviewDashboard({
   }, "Engagement mix"), React.createElement(MoreDotsIG, {
     dark: true
   })), React.createElement("div", {
-    className: "flex items-center gap-4"
+    className: "flex items-center gap-5 py-2"
   }, React.createElement("div", {
     className: "relative flex-shrink-0",
     style: {
-      width: 128,
-      height: 128
+      width: 150,
+      height: 150
     }
   }, React.createElement("svg", {
     viewBox: "0 0 100 100",
@@ -4871,7 +4915,30 @@ function IGOverviewDashboard({
     }
   }, seg.label), React.createElement("span", {
     className: "fs-11 font-bold ml-auto pl-3"
-  }, donutTotal > 0 ? Math.round(seg.value / donutTotal * 100) : 0, "%")))))), React.createElement("div", {
+  }, seg.value.toLocaleString()), React.createElement("span", {
+    className: "fs-10",
+    style: {
+      color: C.sub,
+      minWidth: 30,
+      textAlign: "right"
+    }
+  }, donutTotal > 0 ? Math.round(seg.value / donutTotal * 100) : 0, "%"))))), React.createElement("div", {
+    className: "grid grid-cols-3 gap-2 mt-3"
+  }, engTiles.map(([k, v]) => React.createElement("div", {
+    key: k,
+    className: "rounded-2xl px-3 py-2",
+    style: {
+      background: "rgba(255,255,255,0.04)",
+      border: "1px solid rgba(255,255,255,0.06)"
+    }
+  }, React.createElement("div", {
+    className: "fs-9 font-mono uppercase",
+    style: {
+      color: C.sub
+    }
+  }, k), React.createElement("div", {
+    className: "fs-15 font-extrabold"
+  }, v))))), React.createElement("div", {
     className: "lg:col-span-3 flex flex-col gap-4"
   }, React.createElement("div", {
     className: "rounded-3xl p-4 flex items-center gap-3",
@@ -5309,22 +5376,27 @@ function ViralVariationsPanel({
       href: media?.permalink || undefined,
       target: "_blank",
       rel: "noreferrer",
-      className: "flex-shrink-0 rounded-xl overflow-hidden relative",
+      className: "flex-shrink-0 rounded-2xl overflow-hidden relative self-stretch",
       style: {
-        width: 84,
-        height: 149,
-        background: "#15181a"
+        width: 96,
+        minHeight: 170,
+        background: "linear-gradient(160deg, rgba(167,139,250,0.22), #15181a 70%)"
       }
     }, media?.thumbnail_url ? React.createElement("img", {
       src: media.thumbnail_url,
       alt: "",
       className: "w-full h-full object-cover"
     }) : React.createElement("div", {
-      className: "w-full h-full flex items-center justify-center"
+      className: "w-full h-full flex flex-col items-center justify-center gap-1.5"
     }, React.createElement(Flame, {
-      size: 20,
-      color: "rgba(167,139,250,0.5)"
-    })), media?.permalink && React.createElement("div", {
+      size: 22,
+      color: "rgba(167,139,250,0.7)"
+    }), React.createElement("span", {
+      className: "fs-9 font-mono",
+      style: {
+        color: "rgba(255,255,255,0.55)"
+      }
+    }, fmtK(first.sourceViews || 0))), media?.permalink && React.createElement("div", {
       className: "absolute bottom-1 right-1 rounded-md p-0.5",
       style: {
         background: "rgba(0,0,0,0.6)"
@@ -5349,36 +5421,39 @@ function ViralVariationsPanel({
     }, "detected ", new Date(first.detectedAt).toLocaleDateString())), media?.caption && React.createElement("div", {
       className: "fs-10 c-muted mb-2 truncate"
     }, media.caption), React.createElement("div", {
-      className: "flex flex-wrap gap-1.5"
-    }, rows.map(v => {
+      className: "grid gap-2 mt-2",
+      style: {
+        gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))"
+      }
+    }, rows.map((v, vi) => {
       const st = VARIATION_STATUS_STYLE[v.renderStatus] || VARIATION_STATUS_STYLE.pending;
       return React.createElement("div", {
         key: v.id,
         title: v.error || "",
-        className: "rounded-lg px-2 py-1.5 fs-9 font-mono",
+        className: "rounded-2xl px-3 py-3 flex flex-col gap-1.5",
         style: {
-          background: "rgba(255,255,255,0.04)",
-          border: `1px solid ${st.color}44`,
-          minWidth: 76
+          background: `linear-gradient(160deg, ${st.color}14, rgba(255,255,255,0.03))`,
+          border: `1px solid ${st.color}40`
         }
       }, React.createElement("div", {
-        className: "c-faint"
-      }, new Date(v.scheduledFor + "T12:00:00").toLocaleDateString(undefined, {
+        className: "flex items-center justify-between fs-9 font-mono c-faint"
+      }, React.createElement("span", null, new Date(v.scheduledFor + "T12:00:00").toLocaleDateString(undefined, {
         weekday: "short",
         day: "numeric"
-      })), React.createElement("div", {
-        className: "c-text font-semibold"
+      })), React.createElement("span", null, "#", vi + 1)), React.createElement("div", {
+        className: "fs-13 font-bold c-text leading-tight"
       }, VARIATION_STYLE_LABELS[v.variationStyle] || v.variationStyle), React.createElement("div", {
-        className: "flex items-center gap-1",
+        className: "flex items-center gap-1.5 fs-10 font-mono mt-auto",
         style: {
           color: st.color
         }
       }, React.createElement("span", {
         className: "rounded-full flex-shrink-0",
         style: {
-          width: 5,
-          height: 5,
-          background: st.color
+          width: 6,
+          height: 6,
+          background: st.color,
+          boxShadow: `0 0 8px ${st.color}`
         }
       }), st.label));
     }))));
@@ -21299,7 +21374,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">or8gl1</script>
+<script type="text/babel" id="zion-version">1mcalyp</script>
 <script>
 (function () {
   var last = 0;

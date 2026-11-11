@@ -2455,9 +2455,17 @@ function AreaTrendChart({ data, color, height = 160, valueFormat }) {
   const xAt = (i) => (n <= 1 ? W / 2 : (i / (n - 1)) * W);
   const yAt = (v) => PAD_TOP + plotH - ((v - min) / range) * plotH;
 
-  const linePath = data.map((d, i) => `${i === 0 ? "M" : "L"} ${xAt(i)},${yAt(d.value)}`).join(" ");
+  // Smooth curve (monotone-ish cubic through the points) instead of sharp angles.
+  const pts = data.map((d, i) => [xAt(i), yAt(d.value)]);
+  let linePath = pts.length ? `M ${pts[0][0]},${pts[0][1]}` : "";
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [x0, y0] = pts[i], [x1, y1] = pts[i + 1];
+    const cx = (x0 + x1) / 2;
+    linePath += ` C ${cx},${y0} ${cx},${y1} ${x1},${y1}`;
+  }
   const areaPath = `${linePath} L ${xAt(n - 1)},${H - PAD_BOTTOM} L ${xAt(0)},${H - PAD_BOTTOM} Z`;
   const gradId = React.useMemo(() => `areaGrad${Math.random().toString(36).slice(2)}`, []);
+  const dayLabel = (d) => new Date(d.date + "T12:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" });
 
   const handleMove = (e) => {
     if (!svgRef.current || n === 0) return;
@@ -2484,8 +2492,8 @@ function AreaTrendChart({ data, color, height = 160, valueFormat }) {
         onMouseMove={handleMove} onMouseLeave={() => setHoverIdx(null)}>
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.45" />
-            <stop offset="100%" stopColor={color} stopOpacity="0" />
+            <stop offset="0%" stopColor={color} stopOpacity="0.55" />
+            <stop offset="100%" stopColor={color} stopOpacity="0.02" />
           </linearGradient>
         </defs>
         {[0.25, 0.5, 0.75].map((f) => (
@@ -2493,7 +2501,11 @@ function AreaTrendChart({ data, color, height = 160, valueFormat }) {
             stroke="rgba(255,255,255,0.06)" strokeDasharray="3,4" />
         ))}
         <path d={areaPath} fill={`url(#${gradId})`} />
-        <path d={linePath} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        <path d={linePath} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+        {n <= 10 && pts.map(([x, y], i) => <circle key={i} cx={x} cy={y} r="3" fill={color} fillOpacity="0.9" />)}
+        {n > 1 && [0, Math.floor((n - 1) / 2), n - 1].map((i, k) => (
+          <text key={k} x={xAt(i)} y={H - 5} fontSize="11" fill={color} fillOpacity="0.75" textAnchor={k === 0 ? "start" : k === 2 ? "end" : "middle"}>{dayLabel(data[i])}</text>
+        ))}
         {/* Always-on end-point — the "where are we right now" anchor, not
             just something you find by hovering. Same treatment as the
             hover dot, just smaller/quieter so hovering still reads as the
@@ -3320,7 +3332,14 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
   const donutSegments = [
     { label: "Likes", value: weekTotals.likes, color: DONUT_COLORS[0] },
     { label: "Replies", value: weekTotals.replies, color: DONUT_COLORS[1] },
-    { label: "Reposts", value: weekTotals.reposts, color: DONUT_COLORS[2] },
+    ...(weekTotals.reposts > 0 ? [{ label: "Reposts", value: weekTotals.reposts, color: DONUT_COLORS[2] }] : []),
+  ];
+  const mediaViews = mediaInRange.reduce((t, m) => t + (m.views || 0), 0);
+  const nReels = Math.max(1, mediaInRange.length);
+  const engTiles = [
+    ["Avg views / reel", fmtK(Math.round(mediaViews / nReels))],
+    ["Avg likes / reel", fmtK(Math.round(weekTotals.likes / nReels))],
+    ["Engagement", mediaViews > 0 ? `${(((weekTotals.likes + weekTotals.replies) / mediaViews) * 100).toFixed(1)}%` : "-"],
   ];
   const donutTotal = donutSegments.reduce((s, seg) => s + seg.value, 0);
   const donutR = 40, donutCirc = 2 * Math.PI * donutR;
@@ -3485,8 +3504,20 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
                   <div className="text-4xl font-extrabold text-white leading-none mb-4" style={{ textShadow: "0 2px 16px rgba(0,0,0,0.15)" }}>{fmtK(realViewsTotal)}</div>
                   <AreaTrendChart
                     data={rangeDays.map((d) => ({ date: d, value: reachForDate(d) }))}
-                    color="#ffffff" height={100} valueFormat={fmtK}
+                    color="#ffffff" height={150} valueFormat={fmtK}
                   />
+                  <div className="flex gap-2 mt-3 flex-wrap">
+                    {[
+                      ["Best day", fmtK(Math.max(0, ...dayBars.map((d) => d.reach)))],
+                      ["Avg / day", fmtK(Math.round(dayBars.reduce((t, d) => t + d.reach, 0) / Math.max(1, dayBars.length)))],
+                      ["Reels", String(weekTotals.posts)],
+                    ].map(([k, v]) => (
+                      <div key={k} className="rounded-2xl px-3 py-1.5" style={{ background: "rgba(0,0,0,0.16)" }}>
+                        <div className="fs-9 font-mono uppercase" style={{ color: "rgba(255,255,255,0.7)" }}>{k}</div>
+                        <div className="fs-13 font-bold text-white">{v}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 {igAccount === "all" && (
                   <div className="flex items-center gap-2 pt-3 mt-1 relative flex-wrap" style={{ borderTop: "1px solid rgba(255,255,255,0.22)" }}>
@@ -3509,8 +3540,8 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
                   <div className="fs-13 font-semibold">Engagement mix</div>
                   <MoreDotsIG dark />
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="relative flex-shrink-0" style={{ width: 128, height: 128 }}>
+                <div className="flex items-center gap-5 py-2">
+                  <div className="relative flex-shrink-0" style={{ width: 150, height: 150 }}>
                     <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%", transform: "rotate(-90deg)" }}>
                       <circle cx="50" cy="50" r={donutR} fill="none" stroke={C.ringTrack} strokeWidth="13" />
                       {donutTotal > 0 && donutSegments.map((seg, i) => {
@@ -3536,10 +3567,19 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
                       <div key={seg.label} className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: seg.color }} />
                         <span className="fs-11" style={{ color: C.sub }}>{seg.label}</span>
-                        <span className="fs-11 font-bold ml-auto pl-3">{donutTotal > 0 ? Math.round((seg.value / donutTotal) * 100) : 0}%</span>
+                        <span className="fs-11 font-bold ml-auto pl-3">{seg.value.toLocaleString()}</span>
+                        <span className="fs-10" style={{ color: C.sub, minWidth: 30, textAlign: "right" }}>{donutTotal > 0 ? Math.round((seg.value / donutTotal) * 100) : 0}%</span>
                       </div>
                     ))}
                   </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2 mt-3">
+                  {engTiles.map(([k, v]) => (
+                    <div key={k} className="rounded-2xl px-3 py-2" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                      <div className="fs-9 font-mono uppercase" style={{ color: C.sub }}>{k}</div>
+                      <div className="fs-15 font-extrabold">{v}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -3786,11 +3826,11 @@ function ViralVariationsPanel({ variations, igGraphMedia }) {
             return (
               <div key={first.sourceMediaId} className="rounded-2xl p-3.5 flex gap-3.5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
                 <a href={media?.permalink || undefined} target="_blank" rel="noreferrer"
-                  className="flex-shrink-0 rounded-xl overflow-hidden relative" style={{ width: 84, height: 149, background: "#15181a" }}>
+                  className="flex-shrink-0 rounded-2xl overflow-hidden relative self-stretch" style={{ width: 96, minHeight: 170, background: "linear-gradient(160deg, rgba(167,139,250,0.22), #15181a 70%)" }}>
                   {media?.thumbnail_url ? (
                     <img src={media.thumbnail_url} alt="" className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center"><Flame size={20} color="rgba(167,139,250,0.5)" /></div>
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-1.5"><Flame size={22} color="rgba(167,139,250,0.7)" /><span className="fs-9 font-mono" style={{ color: "rgba(255,255,255,0.55)" }}>{fmtK(first.sourceViews || 0)}</span></div>
                   )}
                   {media?.permalink && (
                     <div className="absolute bottom-1 right-1 rounded-md p-0.5" style={{ background: "rgba(0,0,0,0.6)" }}>
@@ -3811,15 +3851,18 @@ function ViralVariationsPanel({ variations, igGraphMedia }) {
                   {media?.caption && (
                     <div className="fs-10 c-muted mb-2 truncate">{media.caption}</div>
                   )}
-                  <div className="flex flex-wrap gap-1.5">
-                    {rows.map((v) => {
+                  <div className="grid gap-2 mt-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))" }}>
+                    {rows.map((v, vi) => {
                       const st = VARIATION_STATUS_STYLE[v.renderStatus] || VARIATION_STATUS_STYLE.pending;
                       return (
-                        <div key={v.id} title={v.error || ""} className="rounded-lg px-2 py-1.5 fs-9 font-mono" style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${st.color}44`, minWidth: 76 }}>
-                          <div className="c-faint">{new Date(v.scheduledFor + "T12:00:00").toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}</div>
-                          <div className="c-text font-semibold">{VARIATION_STYLE_LABELS[v.variationStyle] || v.variationStyle}</div>
-                          <div className="flex items-center gap-1" style={{ color: st.color }}>
-                            <span className="rounded-full flex-shrink-0" style={{ width: 5, height: 5, background: st.color }} />
+                        <div key={v.id} title={v.error || ""} className="rounded-2xl px-3 py-3 flex flex-col gap-1.5" style={{ background: `linear-gradient(160deg, ${st.color}14, rgba(255,255,255,0.03))`, border: `1px solid ${st.color}40` }}>
+                          <div className="flex items-center justify-between fs-9 font-mono c-faint">
+                            <span>{new Date(v.scheduledFor + "T12:00:00").toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}</span>
+                            <span>#{vi + 1}</span>
+                          </div>
+                          <div className="fs-13 font-bold c-text leading-tight">{VARIATION_STYLE_LABELS[v.variationStyle] || v.variationStyle}</div>
+                          <div className="flex items-center gap-1.5 fs-10 font-mono mt-auto" style={{ color: st.color }}>
+                            <span className="rounded-full flex-shrink-0" style={{ width: 6, height: 6, background: st.color, boxShadow: `0 0 8px ${st.color}` }} />
                             {st.label}
                           </div>
                         </div>
