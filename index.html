@@ -1250,6 +1250,8 @@ function useSupaIgGraphStats() {
         igUserId: r.ig_user_id,
         igUsername: r.ig_username,
         mediaCount: r.media_count,
+        followers: r.followers,
+        followers7dAgo: r.followers_7d_ago,
         views7d: r.views_7d,
         views30d: r.views_30d,
         reach7d: r.reach_7d,
@@ -4503,6 +4505,9 @@ function IGOverviewDashboard({
     replies: mediaInRange.reduce((s, m) => s + (m.comments || 0), 0),
     reposts: mediaInRange.reduce((s, m) => s + (m.shares || 0), 0)
   };
+  const selAcc = accountIds.map(id => accountById[id]).filter(a => a && a.followers != null);
+  const followersNow = selAcc.length ? selAcc.reduce((t, a) => t + a.followers, 0) : null;
+  const followersGain = selAcc.length && selAcc.every(a => a.followers7dAgo != null) ? selAcc.reduce((t, a) => t + (a.followers - a.followers7dAgo), 0) : null;
   const dayBars = rangeDays.map(date => ({
     date,
     label: igRange <= 7 ? new Date(date + "T12:00:00").toLocaleDateString(undefined, {
@@ -4800,7 +4805,7 @@ function IGOverviewDashboard({
     valueFormat: v => v ? `${fmtK(v)} views` : "no reel posted"
   }), React.createElement("div", {
     className: "flex gap-2 mt-3 flex-wrap"
-  }, [["Best day", fmtK(Math.max(0, ...dayBars.map(d => d.reach)))], ["Avg / day", fmtK(Math.round(dayBars.reduce((t, d) => t + d.reach, 0) / Math.max(1, dayBars.length)))], ["Reels", String(weekTotals.posts)]].map(([k, v]) => React.createElement("div", {
+  }, [["Best day", fmtK(Math.max(0, ...dayBars.map(d => d.reach)))], ["Avg / day", fmtK(Math.round(dayBars.reduce((t, d) => t + d.reach, 0) / Math.max(1, dayBars.length)))], ["Reels", String(weekTotals.posts)], ...(followersNow != null ? [["Followers", fmtK(followersNow)]] : []), ...(followersNow != null && followersGain != null ? [["New followers", `${followersGain >= 0 ? "+" : ""}${followersGain.toLocaleString()}`]] : [])].map(([k, v]) => React.createElement("div", {
     key: k,
     className: "rounded-2xl px-3 py-1.5",
     style: {
@@ -5045,7 +5050,7 @@ function IGOverviewDashboard({
     }
   }, "Posts · ", igRange, "d"), React.createElement("span", {
     className: "fs-13 font-extrabold"
-  }, weekTotals.posts))))), React.createElement(ViralVariationsPanel, {
+  }, weekTotals.posts))))), !single && React.createElement(ViralVariationsPanel, {
     variations: igViralVariations,
     igGraphMedia: igGraphMedia
   }), igAccount === "all" && demoAccounts.length > 1 && React.createElement("div", {
@@ -21520,7 +21525,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">11ingw1</script>
+<script type="text/babel" id="zion-version">yixdof</script>
 <script>
 (function () {
   var last = 0;
