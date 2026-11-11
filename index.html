@@ -6018,18 +6018,25 @@ function EditorStudio({
       return n;
     });
   };
-  const removeFile = async (kind, name) => {
-    if (!tunnel || !window.confirm(`Delete ${name} from the Mac?`)) return;
+  const [hidden, setHidden] = useState(() => {
     try {
-      await api(`/library?kind=${kind}&name=${encodeURIComponent(name)}`, {
-        method: "DELETE"
-      });
+      return JSON.parse(localStorage.getItem("zionEditorHidden") || "[]");
     } catch (e) {
-      setErr("Could not delete the file.");
+      return [];
     }
+  });
+  const libV = {
+    raw: lib.raw.filter(f => !hidden.includes("raw:" + f.name)),
+    refs: lib.refs.filter(f => !hidden.includes("ref:" + f.name))
+  };
+  const removeFile = (kind, name) => {
+    const next = [...hidden, `${kind}:${name}`];
+    setHidden(next);
+    try {
+      localStorage.setItem("zionEditorHidden", JSON.stringify(next));
+    } catch (e) {}
     if (kind === "raw" && selRaw === name) setSelRaw(null);
     if (kind === "ref" && selRef === name) setSelRef(null);
-    loadLib();
   };
   const startEdit = async () => {
     if (!tunnel || !selRaw) return;
@@ -6439,7 +6446,7 @@ function EditorStudio({
       gridTemplateColumns: "1fr 1fr",
       gap: 14
     }
-  }, [["raw", "Raw video", "Drop the video from the shoot", selRaw, lib.raw, setSelRaw], ["ref", "Reference", "A reel that looks like you want it to look", selRef, lib.refs, setSelRef]].map(([kind, title, hint, selected, files, setSel]) => React.createElement("div", {
+  }, [["raw", "Raw video", "Drop the video from the shoot", selRaw, libV.raw, setSelRaw], ["ref", "Reference", "A reel that looks like you want it to look", selRef, libV.refs, setSelRef]].map(([kind, title, hint, selected, files, setSel]) => React.createElement("div", {
     key: kind,
     style: {
       background: ES.panel,
@@ -6535,7 +6542,7 @@ function EditorStudio({
       gap: 10
     }
   }, f.duration ? `${Math.round(f.duration)}s` : "", " ", (f.size / 1048576).toFixed(0), " MB", React.createElement("span", {
-    title: "Delete from the Mac",
+    title: "Remove from this list (the file stays on the Mac)",
     onClick: e => {
       e.stopPropagation();
       removeFile(kind, f.name);
@@ -6727,7 +6734,7 @@ function EditorStudio({
     }
   }, React.createElement(EsPanel, {
     title: "Pool",
-    right: `${lib.raw.length + lib.refs.length || ES_POOL.length} items`,
+    right: `${libV.raw.length + libV.refs.length || ES_POOL.length} items`,
     bodyStyle: {
       overflowY: "auto"
     }
@@ -6737,7 +6744,7 @@ function EditorStudio({
       gridTemplateColumns: "1fr 1fr",
       gap: 6
     }
-  }, (tunnel && lib.raw.length + lib.refs.length ? [...lib.raw, ...lib.refs].map(f => [f.name, f.duration ? `${Math.round(f.duration)}s` : ""]) : ES_POOL).map(([n, d], i) => React.createElement("div", {
+  }, (tunnel && libV.raw.length + libV.refs.length ? [...libV.raw, ...libV.refs].map(f => [f.name, f.duration ? `${Math.round(f.duration)}s` : ""]) : ES_POOL).map(([n, d], i) => React.createElement("div", {
     key: n,
     "data-es": "1",
     style: {
@@ -23369,7 +23376,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">10kprw1</script>
+<script type="text/babel" id="zion-version">c2t9vy</script>
 <script>
 (function () {
   var last = 0;

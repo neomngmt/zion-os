@@ -4101,12 +4101,14 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
     } catch (e) { setErr(e.message || "Upload failed"); }
     setUps((u) => { const n = { ...u }; delete n[kind]; return n; });
   };
-  const removeFile = async (kind, name) => {
-    if (!tunnel || !window.confirm(`Delete ${name} from the Mac?`)) return;
-    try { await api(`/library?kind=${kind}&name=${encodeURIComponent(name)}`, { method: "DELETE" }); } catch (e) { setErr("Could not delete the file."); }
+  // The x only takes the file out of this list. Nothing is deleted from the Mac.
+  const [hidden, setHidden] = useState(() => { try { return JSON.parse(localStorage.getItem("zionEditorHidden") || "[]"); } catch (e) { return []; } });
+  const libV = { raw: lib.raw.filter((f) => !hidden.includes("raw:" + f.name)), refs: lib.refs.filter((f) => !hidden.includes("ref:" + f.name)) };
+  const removeFile = (kind, name) => {
+    const next = [...hidden, `${kind}:${name}`];
+    setHidden(next); try { localStorage.setItem("zionEditorHidden", JSON.stringify(next)); } catch (e) {}
     if (kind === "raw" && selRaw === name) setSelRaw(null);
     if (kind === "ref" && selRef === name) setSelRef(null);
-    loadLib();
   };
   const startEdit = async () => {
     if (!tunnel || !selRaw) return;
@@ -4220,7 +4222,7 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
               </div>
               {!tunnel && <div style={{ textAlign: "center", color: ES.orange, fontSize: 12, marginBottom: 14 }}>{wk.checked ? "The Mac is offline. Switch it on and sign in, the worker starts by itself." : "Checking the Mac..."}</div>}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                {[["raw", "Raw video", "Drop the video from the shoot", selRaw, lib.raw, setSelRaw], ["ref", "Reference", "A reel that looks like you want it to look", selRef, lib.refs, setSelRef]].map(([kind, title, hint, selected, files, setSel]) => (
+                {[["raw", "Raw video", "Drop the video from the shoot", selRaw, libV.raw, setSelRaw], ["ref", "Reference", "A reel that looks like you want it to look", selRef, libV.refs, setSelRef]].map(([kind, title, hint, selected, files, setSel]) => (
                   <div key={kind} style={{ background: ES.panel, border: `1px solid ${selected ? ES.ac + "88" : ES.line}`, borderRadius: 18, padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
                     <div style={{ fontSize: 11, letterSpacing: ".14em", textTransform: "uppercase", color: ES.dim, fontFamily: "ui-monospace, monospace" }}>{title}{kind === "ref" ? " (optional)" : ""}</div>
                     <label onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); upload(e.dataTransfer.files[0], kind); }} style={{ border: `1.5px dashed ${selected ? ES.ac : ES.line}`, borderRadius: 14, padding: "26px 12px", textAlign: "center", cursor: tunnel ? "pointer" : "not-allowed", color: selected ? ES.ac : ES.dim, fontSize: 13, opacity: tunnel ? 1 : 0.5 }}>
@@ -4231,7 +4233,7 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
                     <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 120, overflowY: "auto" }}>
                       {files.slice(0, 8).map((f) => (
                         <div key={f.name} onClick={() => setSel(selected === f.name ? null : f.name)} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, padding: "5px 9px", borderRadius: 8, cursor: "pointer", background: selected === f.name ? "rgba(57,230,115,.12)" : "transparent", color: selected === f.name ? ES.ac : ES.dim, fontFamily: "ui-monospace, monospace" }}>
-                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span><span style={{ display: "flex", alignItems: "center", gap: 10 }}>{f.duration ? `${Math.round(f.duration)}s` : ""} {(f.size / 1048576).toFixed(0)} MB<span title="Delete from the Mac" onClick={(e) => { e.stopPropagation(); removeFile(kind, f.name); }} style={{ fontSize: 16, lineHeight: 1, padding: "0 4px", color: ES.faint, cursor: "pointer" }} onMouseEnter={(e) => { e.currentTarget.style.color = ES.red; }} onMouseLeave={(e) => { e.currentTarget.style.color = ES.faint; }}>×</span></span>
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span><span style={{ display: "flex", alignItems: "center", gap: 10 }}>{f.duration ? `${Math.round(f.duration)}s` : ""} {(f.size / 1048576).toFixed(0)} MB<span title="Remove from this list (the file stays on the Mac)" onClick={(e) => { e.stopPropagation(); removeFile(kind, f.name); }} style={{ fontSize: 16, lineHeight: 1, padding: "0 4px", color: ES.faint, cursor: "pointer" }} onMouseEnter={(e) => { e.currentTarget.style.color = ES.red; }} onMouseLeave={(e) => { e.currentTarget.style.color = ES.faint; }}>×</span></span>
                         </div>))}
                     </div>
                   </div>))}
@@ -4273,9 +4275,9 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
         {(phase === "idle" || phase === "working" || docking) && (<div key="studio" style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, minHeight: 0, animation: docking ? "esOut .8s ease-in forwards" : "esIn .55s ease-out" }}>
         {/* middle */}
         <div style={{ display: "grid", gridTemplateColumns: "190px 1fr 1.1fr 260px", gap: 8, flex: "1 1 0", minHeight: 0 }}>
-          <EsPanel title="Pool" right={`${(lib.raw.length + lib.refs.length) || ES_POOL.length} items`} bodyStyle={{ overflowY: "auto" }}>
+          <EsPanel title="Pool" right={`${(libV.raw.length + libV.refs.length) || ES_POOL.length} items`} bodyStyle={{ overflowY: "auto" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-              {(tunnel && (lib.raw.length + lib.refs.length) ? [...lib.raw, ...lib.refs].map((f) => [f.name, f.duration ? `${Math.round(f.duration)}s` : ""]) : ES_POOL).map(([n, d], i) => (
+              {(tunnel && (libV.raw.length + libV.refs.length) ? [...libV.raw, ...libV.refs].map((f) => [f.name, f.duration ? `${Math.round(f.duration)}s` : ""]) : ES_POOL).map(([n, d], i) => (
                 <div key={n} data-es="1" style={{ borderRadius: 8, overflow: "hidden", border: `1px solid ${ES.line}` }}>
                   <div style={{ height: 56, background: `linear-gradient(${120 + i * 35}deg, ${[ES.ac, ES.blue, ES.orange, ES.violet, ES.pink, ES.lime][i]}33, #0a0d0c)`, position: "relative" }}>
                     <span style={{ position: "absolute", right: 4, bottom: 3, fontSize: 9, color: ES.tx, background: "rgba(0,0,0,.6)", borderRadius: 4, padding: "0 4px" }}>{d}</span>
