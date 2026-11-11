@@ -3393,11 +3393,11 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
                 <BarChart3 size={14} /> Make content plan
               </button>
             )}
-            <button onClick={onPlanPosts}
+            {onPlanPosts && <button onClick={onPlanPosts}
               className="flex items-center gap-2 px-4 py-2.5 rounded-full fs-12 font-mono uppercase tracking-wide font-semibold tap"
               style={{ background: `linear-gradient(135deg, ${C.accentA}, ${C.accentB})`, color: "#fff", boxShadow: `0 0 14px ${C.accentA}40` }}>
               <Megaphone size={14} /> Plan content
-            </button>
+            </button>}
           </div>
         </div>
 
@@ -4015,6 +4015,21 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
   const igModelName = restrictModel || (filter !== "all" ? filter : null);
   const igModelObj = igModelName ? models.find((m) => m.name === igModelName) : null;
   const igMode = network === "ig" && !restrictModel;
+
+  // Model login: her Instagram page is the same dashboard the team sees, only with her own account.
+  if (network === "ig" && restrictModel) {
+    const mine = (igGraphStats || []).filter((a) => a.model === restrictModel);
+    const mineIds = mine.map((a) => a.id);
+    return (
+      <IGOverviewDashboard
+        models={models.filter((m) => m.name === restrictModel)}
+        inflowwDailyStats={[]}
+        igGraphStats={mine}
+        igGraphMedia={(igGraphMedia || []).filter((m) => mineIds.includes(m.account_id))}
+        igViralVariations={[]}
+      />
+    );
+  }
 
   if (igMode) {
     if (igModelName) {

@@ -4596,7 +4596,7 @@ function IGOverviewDashboard({
     }
   }, React.createElement(BarChart3, {
     size: 14
-  }), " Make content plan"), React.createElement("button", {
+  }), " Make content plan"), onPlanPosts && React.createElement("button", {
     onClick: onPlanPosts,
     className: "flex items-center gap-2 px-4 py-2.5 rounded-full fs-12 font-mono uppercase tracking-wide font-semibold tap",
     style: {
@@ -5690,6 +5690,17 @@ function ContentDirector({
   const igModelName = restrictModel || (filter !== "all" ? filter : null);
   const igModelObj = igModelName ? models.find(m => m.name === igModelName) : null;
   const igMode = network === "ig" && !restrictModel;
+  if (network === "ig" && restrictModel) {
+    const mine = (igGraphStats || []).filter(a => a.model === restrictModel);
+    const mineIds = mine.map(a => a.id);
+    return React.createElement(IGOverviewDashboard, {
+      models: models.filter(m => m.name === restrictModel),
+      inflowwDailyStats: [],
+      igGraphStats: mine,
+      igGraphMedia: (igGraphMedia || []).filter(m => mineIds.includes(m.account_id)),
+      igViralVariations: []
+    });
+  }
   if (igMode) {
     if (igModelName) {
       return React.createElement(InstagramContentHub, {
@@ -21212,7 +21223,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">137svu</script>
+<script type="text/babel" id="zion-version">6h4y0y</script>
 <script>
 (function () {
   var last = 0;
