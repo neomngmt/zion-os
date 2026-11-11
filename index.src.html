@@ -11399,7 +11399,7 @@ function PushToggle() {
     setState("off");
   };
   if (state === "checking" || state === "unsupported") return null;
-  const box = { borderBottom: "1px solid rgba(57,230,115,0.16)" };
+  const box = {};
   return (
     <div className="px-3 py-2.5" style={box}>
       {state === "install" && <div className="fs-11 c-muted leading-snug">To get push notifications, add Zion OS to your home screen first (Share, Add to Home Screen), then turn them on there.</div>}
@@ -11497,9 +11497,9 @@ function NotificationBell({ model, cards, tasks, trends, agency, models, persist
         )}
       </button>
       {open && (
-        <div className="search-pop fixed left-3 right-3 sm:absolute sm:left-auto sm:right-0 sm:mt-2 sm:w-80 c-bg-surface border c-border rounded-xl z-50 overflow-hidden">
+        <div className="search-pop fixed left-3 right-3 sm:absolute sm:left-auto sm:right-0 sm:mt-2 sm:w-80 c-bg-surface rounded-2xl z-50 overflow-hidden" style={{ boxShadow: "0 18px 50px rgba(0,0,0,.55), 0 0 28px rgba(57,230,115,.08)" }}>
           <PushToggle />
-          <div className="flex items-center justify-between px-3 py-2.5 border-b c-border">
+          <div className="flex items-center justify-between px-4 pt-3 pb-2">
             <div className="flex items-center gap-2">
               <span className="fs-13 font-semibold c-text">Notifications</span>
               {total > 0 && (
@@ -11628,9 +11628,9 @@ function AdminNotificationBell({ cards, tasks, onNavigate }) {
         )}
       </button>
       {open && (
-        <div className="search-pop fixed left-3 right-3 sm:absolute sm:left-auto sm:right-0 sm:mt-2 sm:w-80 c-bg-surface border c-border rounded-xl z-50 overflow-hidden">
+        <div className="search-pop fixed left-3 right-3 sm:absolute sm:left-auto sm:right-0 sm:mt-2 sm:w-80 c-bg-surface rounded-2xl z-50 overflow-hidden" style={{ boxShadow: "0 18px 50px rgba(0,0,0,.55), 0 0 28px rgba(57,230,115,.08)" }}>
           <PushToggle />
-          <div className="flex items-center justify-between px-3 py-2.5 border-b c-border">
+          <div className="flex items-center justify-between px-4 pt-3 pb-2">
             <div className="flex items-center gap-2">
               <span className="fs-13 font-semibold c-text">Notifications</span>
               {total > 0 && (
