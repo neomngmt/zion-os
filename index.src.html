@@ -4074,6 +4074,15 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
   const [brief, setBrief] = useState("");
   const [lang, setLang] = useState("cs");
   const [ups, setUps] = useState({}); // one upload per slot (raw, ref), they run side by side
+  const [disp, setDisp] = useState({}); // smoothed percentage shown in the bar
+  useEffect(() => {
+    const id = setInterval(() => setDisp((d) => {
+      const n = {};
+      for (const k of Object.keys(ups)) { const cur = d[k] || 0, target = ups[k].pct || 0; n[k] = target < cur ? target : cur + Math.max(0.05, (target - cur) * 0.18); if (n[k] > target + 1.2) n[k] = target + 1.2; }
+      return n;
+    }), 100);
+    return () => clearInterval(id);
+  }, [ups]);
   const [job, setJob] = useState(null);
   const [err, setErr] = useState("");
   const finishing = useRef(false);
@@ -4083,11 +4092,12 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
     if (!tunnel || !file || ups[kind]) return;
     setErr("");
     const CH = 16 * 1024 * 1024, total = Math.max(1, Math.ceil(file.size / CH)), uid = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+    const t0 = Date.now();
     const sendChunk = (i) => new Promise((resolve, reject) => {
       const x = new XMLHttpRequest();
       x.open("POST", `${tunnelRef.current}/upload?kind=${kind}&uid=${uid}&idx=${i}&off=${i * CH}&total=${total}&name=${encodeURIComponent(file.name)}`);
       x.setRequestHeader("x-zion-token", token);
-      x.upload.onprogress = (e) => { const done = i * CH + (e.loaded || 0); setUps((u) => ({ ...u, [kind]: { name: file.name, pct: Math.min(99, Math.round((done / file.size) * 100)) } })); };
+      x.upload.onprogress = (e) => { const done = i * CH + (e.loaded || 0); setUps((u) => ({ ...u, [kind]: { name: file.name, pct: Math.min(99, (done / file.size) * 100), mbps: ((done / 1048576) / Math.max(1, (Date.now() - t0) / 1000)), retry: 0 } })); };
       x.onload = () => { try { const j = JSON.parse(x.responseText); if (x.status >= 400) reject(new Error(j.error || "Upload failed")); else resolve(j); } catch (e) { reject(new Error("Upload failed (" + x.status + ")")); } };
       x.onerror = () => reject(new Error("Lost the connection to the Mac"));
       x.send(file.slice(i * CH, (i + 1) * CH));
@@ -4096,7 +4106,7 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
       let last = null;
       for (let i = 0; i < total; i++) {
         let tries = 0;
-        for (;;) { try { last = await sendChunk(i); break; } catch (e) { if (++tries >= 12) throw e; await new Promise((r) => setTimeout(r, Math.min(15000, 1500 * tries))); } }
+        for (;;) { try { last = await sendChunk(i); break; } catch (e) { if (++tries >= 12) throw e; setUps((u) => ({ ...u, [kind]: { ...(u[kind] || { name: file.name, pct: 0 }), retry: tries } })); await new Promise((r) => setTimeout(r, Math.min(15000, 1500 * tries))); } }
       }
       if (last && last.name) { if (kind === "raw") setSelRaw(last.name); else setSelRef(last.name); }
       await loadLib();
@@ -4229,9 +4239,9 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
                     <div style={{ fontSize: 11, letterSpacing: ".14em", textTransform: "uppercase", color: ES.dim, fontFamily: "ui-monospace, monospace" }}>{title}{kind === "ref" ? " (optional)" : ""}</div>
                     <label onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); upload(e.dataTransfer.files[0], kind); }} style={{ border: `1.5px dashed ${selected ? ES.ac : ES.line}`, borderRadius: 14, padding: "26px 12px", textAlign: "center", cursor: tunnel ? "pointer" : "not-allowed", color: selected ? ES.ac : ES.dim, fontSize: 13, opacity: tunnel ? 1 : 0.5 }}>
                       <input type="file" accept="video/*,audio/*" disabled={!tunnel || !!ups[kind]} onChange={(e) => { const f = e.target.files[0]; e.target.value = ""; upload(f, kind); }} style={{ display: "none" }} />
-                      {ups[kind] ? `Uploading ${ups[kind].name} ${ups[kind].pct}%` : selected ? selected : hint}
+                      {ups[kind] ? (ups[kind].retry ? `Reconnecting to the Mac (try ${ups[kind].retry} of 12)...` : `Uploading ${ups[kind].name} ${Math.round(disp[kind] || 0)}%${ups[kind].mbps > 0.05 ? ` · ${ups[kind].mbps.toFixed(1)} MB/s` : ""}`) : selected ? selected : hint}
                     </label>
-                    {ups[kind] && <div style={{ height: 4, background: ES.panel2, borderRadius: 4 }}><div style={{ width: `${ups[kind].pct}%`, height: "100%", background: ES.ac, borderRadius: 4, transition: "width .3s" }} /></div>}
+                    {ups[kind] && <div style={{ height: 4, background: ES.panel2, borderRadius: 4 }}><div style={{ width: `${disp[kind] || 0}%`, height: "100%", background: ups[kind].retry ? ES.orange : ES.ac, borderRadius: 4, transition: "width .12s linear" }} /></div>}
                     <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 120, overflowY: "auto" }}>
                       {files.slice(0, 8).map((f) => (
                         <div key={f.name} onClick={() => setSel(selected === f.name ? null : f.name)} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, padding: "5px 9px", borderRadius: 8, cursor: "pointer", background: selected === f.name ? "rgba(57,230,115,.12)" : "transparent", color: selected === f.name ? ES.ac : ES.dim, fontFamily: "ui-monospace, monospace" }}>

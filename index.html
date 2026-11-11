@@ -5945,6 +5945,20 @@ function EditorStudio({
   const [brief, setBrief] = useState("");
   const [lang, setLang] = useState("cs");
   const [ups, setUps] = useState({});
+  const [disp, setDisp] = useState({});
+  useEffect(() => {
+    const id = setInterval(() => setDisp(d => {
+      const n = {};
+      for (const k of Object.keys(ups)) {
+        const cur = d[k] || 0,
+          target = ups[k].pct || 0;
+        n[k] = target < cur ? target : cur + Math.max(0.05, (target - cur) * 0.18);
+        if (n[k] > target + 1.2) n[k] = target + 1.2;
+      }
+      return n;
+    }), 100);
+    return () => clearInterval(id);
+  }, [ups]);
   const [job, setJob] = useState(null);
   const [err, setErr] = useState("");
   const finishing = useRef(false);
@@ -5966,6 +5980,7 @@ function EditorStudio({
     const CH = 16 * 1024 * 1024,
       total = Math.max(1, Math.ceil(file.size / CH)),
       uid = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+    const t0 = Date.now();
     const sendChunk = i => new Promise((resolve, reject) => {
       const x = new XMLHttpRequest();
       x.open("POST", `${tunnelRef.current}/upload?kind=${kind}&uid=${uid}&idx=${i}&off=${i * CH}&total=${total}&name=${encodeURIComponent(file.name)}`);
@@ -5976,7 +5991,9 @@ function EditorStudio({
           ...u,
           [kind]: {
             name: file.name,
-            pct: Math.min(99, Math.round(done / file.size * 100))
+            pct: Math.min(99, done / file.size * 100),
+            mbps: done / 1048576 / Math.max(1, (Date.now() - t0) / 1000),
+            retry: 0
           }
         }));
       };
@@ -6001,6 +6018,16 @@ function EditorStudio({
             break;
           } catch (e) {
             if (++tries >= 12) throw e;
+            setUps(u => ({
+              ...u,
+              [kind]: {
+                ...(u[kind] || {
+                  name: file.name,
+                  pct: 0
+                }),
+                retry: tries
+              }
+            }));
             await new Promise(r => setTimeout(r, Math.min(15000, 1500 * tries)));
           }
         }
@@ -6495,7 +6522,7 @@ function EditorStudio({
     style: {
       display: "none"
     }
-  }), ups[kind] ? `Uploading ${ups[kind].name} ${ups[kind].pct}%` : selected ? selected : hint), ups[kind] && React.createElement("div", {
+  }), ups[kind] ? ups[kind].retry ? `Reconnecting to the Mac (try ${ups[kind].retry} of 12)...` : `Uploading ${ups[kind].name} ${Math.round(disp[kind] || 0)}%${ups[kind].mbps > 0.05 ? ` · ${ups[kind].mbps.toFixed(1)} MB/s` : ""}` : selected ? selected : hint), ups[kind] && React.createElement("div", {
     style: {
       height: 4,
       background: ES.panel2,
@@ -6503,11 +6530,11 @@ function EditorStudio({
     }
   }, React.createElement("div", {
     style: {
-      width: `${ups[kind].pct}%`,
+      width: `${disp[kind] || 0}%`,
       height: "100%",
-      background: ES.ac,
+      background: ups[kind].retry ? ES.orange : ES.ac,
       borderRadius: 4,
-      transition: "width .3s"
+      transition: "width .12s linear"
     }
   })), React.createElement("div", {
     style: {
@@ -23378,7 +23405,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">18iw3o5</script>
+<script type="text/babel" id="zion-version">17lozyh</script>
 <script>
 (function () {
   var last = 0;
