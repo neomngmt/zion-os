@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<link rel="manifest" href="https://neomngmt.github.io/zion-os/manifest.webmanifest">
-<link rel="apple-touch-icon" sizes="180x180" href="https://neomngmt.github.io/zion-os/apple-touch-v2.png">
-<link rel="icon" type="image/png" sizes="48x48" href="https://neomngmt.github.io/zion-os/favicon-v2-48.png">
-<link rel="icon" type="image/png" sizes="192x192" href="https://neomngmt.github.io/zion-os/favicon-v2-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-v2.png">
+<link rel="icon" type="image/png" sizes="48x48" href="favicon-v2-48.png">
+<link rel="icon" type="image/png" sizes="192x192" href="favicon-v2-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -4112,6 +4112,8 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
   const [selRef, setSelRef] = useState(null);
   const [brief, setBrief] = useState("");
   const [lang, setLang] = useState("cs");
+  const [capColor, setCapColor] = useState("#ffffff");
+  const [hlColor, setHlColor] = useState("#c6f432");
   const [ups, setUps] = useState({}); // one upload per slot (raw, ref), they run side by side
   const [disp, setDisp] = useState({}); // smoothed percentage shown in the bar
   useEffect(() => {
@@ -4165,7 +4167,7 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
     if (!tunnel || !selRaw) return;
     setErr("");
     try {
-      const j = await api("/jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ raw: selRaw, ref: selRef || "", brief, lang, title: selRaw.replace(/\.[^.]+$/, "") }) });
+      const j = await api("/jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ raw: selRaw, ref: selRef || "", brief, lang, options: { captionColor: capColor, highlightColor: hlColor }, title: selRaw.replace(/\.[^.]+$/, "") }) });
       if (!j.id) throw new Error(j.error || "Could not start the edit");
       finishing.current = false; setLog([]); setJob({ id: j.id, status: "queued", stage: "In the queue" }); setPhase("working");
     } catch (e) { setErr(e.message || "Could not start the edit"); }
@@ -4256,7 +4258,7 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
     });
     zoom.forEach((e, i) => out.push({ key: `sfx:${i}`, track: "sfx", agent: "color-03", say: `punch-in ${e.label.replace("zoom ", "")}x at ${mmss(e.t)} on an emphasis moment` }));
     card.forEach((e, i) => out.push({ key: `broll:${i}`, track: "broll", agent: "graphics-07", say: `card "${e.label}" at ${mmss(e.t)}` }));
-    cap.forEach((e, i) => out.push({ key: `text:${i}`, track: "text", agent: "captions-02", say: i % 3 === 0 ? `caption "${e.label}" at ${mmss(e.t)}` : null }));
+    cap.forEach((e, i) => out.push({ key: `text:${i}`, track: "text", agent: "captions-02", say: i % 12 === 0 ? `captions from "${e.label}" at ${mmss(e.t)}` : null }));
     return out;
   }, [liveKeep.length, liveEv.length, job && job.id]);
   const [placed, setPlaced] = useState(0);
@@ -4264,7 +4266,7 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
   useEffect(() => {
     if (!liveOn || !seq.length || placed >= seq.length) return;
     const it = seq[placed];
-    const wait = it.track === "text" ? 160 : 520;
+    const wait = it.track === "text" ? 35 : 520;
     const id = setTimeout(() => {
       const ai = ES_AGENTS.findIndex((a) => a.id === it.agent);
       if (it.track) setTimeout(() => agentTo(ai, `[data-clip="${it.track}:${Number(it.key.split(":")[1])}"]`), 40);
@@ -4431,6 +4433,15 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
                   {[["cs", "CZ"], ["en", "EN"]].map(([k, l]) => <span key={k} onClick={() => setLang(k)} style={{ padding: "12px 14px", fontSize: 12, cursor: "pointer", color: lang === k ? "#10140a" : ES.dim, background: lang === k ? ES.ac : "transparent", fontWeight: 700 }}>{l}</span>)}
                 </div>
                 <div onClick={selRaw && tunnel ? startEdit : undefined} style={{ padding: "13px 38px", borderRadius: 12, fontWeight: 800, fontSize: 15, background: selRaw && tunnel ? ES.ac : ES.panel2, color: selRaw && tunnel ? "#03110a" : ES.faint, cursor: selRaw && tunnel ? "pointer" : "not-allowed", boxShadow: selRaw && tunnel ? `0 0 24px ${ES.ac}55` : "none" }}>Edit</div>
+              </div>
+              <div style={{ display: "flex", gap: 22, marginTop: 14, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
+                {[["Caption color", capColor, setCapColor], ["Highlight color", hlColor, setHlColor]].map(([label, val, setVal]) => (
+                  <div key={label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 11, color: ES.dim, fontFamily: "ui-monospace, monospace", textTransform: "uppercase", letterSpacing: ".1em" }}>{label}</span>
+                    {["#ffffff", "#c6f432", "#ffe14d", "#4cc3ff", "#ff5db1", "#ff9a3c", "#39e673"].map((c) => <span key={c} onClick={() => setVal(c)} style={{ width: 22, height: 22, borderRadius: "50%", background: c, cursor: "pointer", border: val === c ? "3px solid #fff" : "2px solid rgba(255,255,255,.2)", boxShadow: val === c ? `0 0 10px ${c}` : "none", transition: "all .2s" }} />)}
+                    <input type="color" value={val} onChange={(e) => setVal(e.target.value)} style={{ width: 28, height: 24, border: "none", background: "transparent", padding: 0, cursor: "pointer" }} />
+                  </div>))}
+                <span style={{ fontSize: 11, color: ES.faint }}>One word on screen at a time</span>
               </div>
               {err && <div style={{ color: ES.red, fontSize: 12, marginTop: 10 }}>{err}</div>}
             </div>
@@ -7533,7 +7544,7 @@ function RevenueChart({ data, height = 240, sparseUntil = 0 }) {
           onMouseEnter={() => setHoverIdx(i)}
           style={{ cursor: "pointer" }}>
           <rect x={p.x - stepX / 2} y={padTop} width={Math.max(stepX, 6)} height={plotH} fill="transparent" />
-          <circle className="rev-dot" cx={p.x} cy={p.y} r={hoverIdx === i ? 5 : 3.5} fill="#39e673" stroke="#07090a" strokeWidth="1.5" filter="url(#revGlowDot)"
+          <circle className="rev-dot" cx={p.x} cy={p.y} r={hoverIdx === i ? 5 : (n > 10 ? 2.2 : 3.5)} fill="#39e673" stroke="#07090a" strokeWidth={n > 10 ? 1 : 1.5} filter={n > 10 && hoverIdx !== i ? undefined : "url(#revGlowDot)"}
             style={{ animationDelay: `${0.15 + (i / Math.max(n - 1, 1)) * 1.0}s` }} />
           {(n - 1 - i) % labelEvery === 0 && (() => {
             const d = new Date(p.date + "T00:00:00");
@@ -13198,7 +13209,7 @@ function InflowwRevenueCard({ myInflowwRows, accountType, title, last7Dates, day
       {embedded
         ? <div className="fs-12 c-muted mb-1">${Math.round(rangeTotal).toLocaleString("en-US")} net revenue in the last {range} days</div>
         : <div className="text-2xl font-extrabold c-accent mb-1">$<CountUp value={rangeTotal} /></div>}
-      <div className="mb-2"><RevenueChart data={chartData} height={embedded ? 160 : 200} sparseUntil={range === 7 ? 7 : 0} /></div>
+      <div className="mb-2"><RevenueChart data={chartData} height={range === 30 ? (embedded ? 280 : 330) : (embedded ? 160 : 200)} sparseUntil={range === 7 ? 7 : 0} /></div>
       <div className="flex flex-wrap gap-4 fs-10 font-mono c-faint uppercase">
         <span><CountUp value={sumInfloww(rangeRows, "messagesCount")} /> messages</span>
         <span><CountUp value={sumInfloww(rangeRows, "tipsCount")} /> tips</span>
@@ -13209,7 +13220,9 @@ function InflowwRevenueCard({ myInflowwRows, accountType, title, last7Dates, day
 }
 
 function CreatorMoney({ model, record, rows, children }) {
-  const [ins, setIns] = useState(null);
+  const cacheGet = (k) => { try { const v = JSON.parse(localStorage.getItem(k) || "null"); return v && v.data ? v.data : null; } catch (e) { return null; } };
+  const cacheSet = (k, data) => { try { localStorage.setItem(k, JSON.stringify({ at: Date.now(), data })); } catch (e) {} };
+  const [ins, setIns] = useState(() => cacheGet(`zionIns:${model}`));
   const [err, setErr] = useState("");
   useEffect(() => {
     let cancel = false;
@@ -13222,13 +13235,14 @@ function CreatorMoney({ model, record, rows, children }) {
         });
         const j = await r.json();
         if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+        cacheSet(`zionIns:${model}`, j);
         if (!cancel) setIns(j);
       } catch (e) { if (!cancel) setErr(e.message || "Could not load"); }
     })();
     return () => { cancel = true; };
   }, [model]);
 
-  const [topFan, setTopFan] = useState(undefined);
+  const [topFan, setTopFan] = useState(() => { const c = cacheGet(`zionTopFan:${model}`); return c === null ? undefined : c; });
   useEffect(() => {
     let cancel = false;
     (async () => {
@@ -13239,6 +13253,7 @@ function CreatorMoney({ model, record, rows, children }) {
           body: JSON.stringify({ model, allTime: true }),
         });
         const j = await r.json();
+        if (j && j.topFanAllTime) cacheSet(`zionTopFan:${model}`, j);
         if (!cancel) setTopFan(j && j.topFanAllTime ? j : null);
       } catch (e) { if (!cancel) setTopFan(null); }
     })();
@@ -14616,7 +14631,6 @@ const NAV_ADMIN = [
   { id: "editor", label: "Editor", icon: Clapperboard },
   { id: "calendar", label: "Calendar", icon: Calendar },
   { id: "tasks", label: "Tasks", icon: CheckSquare },
-  { id: "stats", label: "Stats", icon: TrendingUp },
   { id: "chatters", label: "Chatters", icon: DollarSign },
   { id: "customs", label: "Customs", icon: Gift },
   { id: "weeklytrends", label: "Trends", icon: Flame },
@@ -15711,7 +15725,6 @@ function App() {
             {currentView === "editor" && isAdmin && <EditorPage menuHidden={editorMenuHidden} onToggleMenu={toggleEditorMenu} />}
             {currentView === "calendar" && <CalendarView cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks} onNavigate={setView} restrictModel={restrictModel} />}
             {currentView === "tasks" && <TaskManager tasks={isAdmin ? scopedTasks : tasks} persistTasks={isAdmin ? scopedPersistTasks : persistTasks} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} />}
-            {currentView === "stats" && <StatsManager stats={scopedStats} persistStats={scopedPersistStats} models={agencyModels} reels={scopedReels} persistReels={scopedPersistReels} />}
             {currentView === "chatters" && isAdmin && <ChattersPage />}
             {currentView === "customs" && isAdmin && <CustomsAdminPage models={agencyModels} />}
             {currentView === "customs" && !isAdmin && <CustomsCreatorPage model={restrictModel} record={models.find((mm) => mm.name === restrictModel)} />}
