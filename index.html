@@ -5859,7 +5859,11 @@ function EsWheel({
     }
   }, label));
 }
-function EditorStudio() {
+function EditorStudio({
+  menuHidden,
+  onToggleMenu,
+  worker
+}) {
   const [playing, setPlaying] = useState(false);
   const [t, setT] = useState(3.4);
   const [live, setLive] = useState(true);
@@ -5994,14 +5998,16 @@ function EditorStudio() {
   }, React.createElement("div", {
     style: {
       minWidth: 1180,
+      height: "calc(100vh - 126px)",
+      minHeight: 600,
       background: ES.bg,
       border: `1px solid ${ES.line}`,
       borderRadius: 20,
-      padding: 12,
+      padding: 10,
       color: ES.tx,
       display: "flex",
       flexDirection: "column",
-      gap: 10
+      gap: 8
     }
   }, React.createElement("div", {
     style: {
@@ -6088,7 +6094,11 @@ function EditorStudio() {
       background: live ? ES.ac : ES.faint,
       boxShadow: live ? `0 0 8px ${ES.ac}` : "none"
     }
-  }), liveAgents, " agents live"), React.createElement("div", {
+  }), liveAgents, " agents live"), onToggleMenu && React.createElement("div", {
+    onClick: onToggleMenu,
+    style: btn,
+    title: "Hide or show the left menu"
+  }, menuHidden ? "Show menu" : "Hide menu"), React.createElement("div", {
     style: btn
   }, "Share"), React.createElement("div", {
     title: "Export works once the Mac worker is connected",
@@ -6102,9 +6112,10 @@ function EditorStudio() {
   }, "Export")), React.createElement("div", {
     style: {
       display: "grid",
-      gridTemplateColumns: "200px 1fr 1.1fr 270px",
-      gap: 10,
-      height: 520
+      gridTemplateColumns: "190px 1fr 1.1fr 260px",
+      gap: 8,
+      flex: "1 1 0",
+      minHeight: 0
     }
   }, React.createElement(EsPanel, {
     title: "Pool",
@@ -6277,7 +6288,7 @@ function EditorStudio() {
     key: activeCaption + i,
     style: {
       fontWeight: 900,
-      fontSize: 22,
+      fontSize: 16,
       lineHeight: 1.05,
       textTransform: "uppercase",
       letterSpacing: "-.01em",
@@ -6398,8 +6409,9 @@ function EditorStudio() {
     style: {
       display: "grid",
       gridTemplateColumns: "1.3fr 1fr 1fr 1.1fr",
-      gap: 10,
-      height: 150
+      gap: 8,
+      height: 104,
+      flexShrink: 0
     }
   }, React.createElement(EsPanel, {
     title: "Waveform",
@@ -6453,7 +6465,7 @@ function EditorStudio() {
   }, [["VOICE", -16.1], ["MUSIC", -30.8], ["INTEGRATED", -14.1]].map(([k, v]) => React.createElement("div", {
     key: k,
     style: {
-      marginBottom: 8,
+      marginBottom: 4,
       fontSize: 9,
       color: ES.dim,
       fontFamily: "ui-monospace, monospace"
@@ -6527,6 +6539,9 @@ function EditorStudio() {
       }
     }, l.msg));
   }))), React.createElement(EsPanel, {
+    style: {
+      flexShrink: 0
+    },
     title: "Timeline",
     right: React.createElement("span", null, esTime(t), " / ", esTime(ES_DUR), " ", React.createElement("span", {
       style: {
@@ -6558,11 +6573,11 @@ function EditorStudio() {
   }, React.createElement("div", {
     onClick: e => {
       const r = e.currentTarget.getBoundingClientRect();
-      setT(Math.max(0, Math.min(ES_DUR, (e.clientX - r.left - 70) / (r.width - 70) * ES_DUR)));
+      setT(Math.max(0, Math.min(ES_DUR, (e.clientX - r.left) / r.width * ES_DUR)));
     },
     style: {
       cursor: "pointer",
-      height: 22,
+      height: 18,
       marginLeft: 70,
       borderBottom: `1px solid ${ES.line}`,
       position: "relative"
@@ -6585,7 +6600,7 @@ function EditorStudio() {
     key: tr.id,
     style: {
       display: "flex",
-      height: tr.wave ? 34 : 30,
+      height: tr.wave ? 26 : 23,
       borderBottom: `1px solid ${ES.line}`
     }
   }, React.createElement("div", {
@@ -6649,7 +6664,7 @@ function EditorStudio() {
     style: {
       position: "absolute",
       left: `calc(70px + (100% - 70px) * ${x / 100})`,
-      top: 40 + (n.startsWith("sfx") ? 0 : n.startsWith("broll") ? 36 : 100),
+      top: n.startsWith("sfx") ? 43 : n.startsWith("broll") ? 66 : 112,
       fontSize: 8,
       fontWeight: 800,
       background: c,
@@ -6683,10 +6698,14 @@ function EditorStudio() {
     }
   })))), React.createElement("div", {
     style: {
-      fontSize: 10,
+      fontSize: 9,
       color: ES.faint,
       fontFamily: "ui-monospace, monospace",
-      padding: "0 4px"
+      padding: "0 4px",
+      flexShrink: 0,
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis"
     }
   }, sel ? `selected: ${sel.track.label} · ${sel.clip[2]} · ${esTime(sel.clip[0])} to ${esTime(sel.clip[0] + sel.clip[1])}` : "", "  ·  The agents, the Mac worker and Higgsfield connect in the next step, everything here is sample data."), React.createElement("style", null, `@keyframes esFloat{from{transform:translate(0,0)}to{transform:translate(46px,0)}}`)));
 }
@@ -6694,32 +6713,10 @@ function EditorPage({
   menuHidden,
   onToggleMenu
 }) {
-  const worker = useEditWorker();
-  const offline = worker.checked && !worker.online;
-  const col = !worker.checked ? "#8B93A1" : offline ? "#e07a5f" : "#39e673";
-  return React.createElement("div", null, React.createElement("div", {
-    className: "flex items-center gap-2 mb-3 flex-wrap"
-  }, React.createElement("span", {
-    className: "fs-10 font-mono uppercase px-2.5 py-1 rounded-full flex items-center gap-1.5",
-    style: {
-      color: col,
-      background: `${col}1a`,
-      border: `1px solid ${col}55`
-    }
-  }, React.createElement("span", {
-    className: "w-1.5 h-1.5 rounded-full",
-    style: {
-      background: col
-    }
-  }), !worker.checked ? "Checking the Mac" : offline ? "Mac offline" : "Mac online"), worker.freeGb != null && React.createElement("span", {
-    className: "fs-10 font-mono c-faint"
-  }, "disk free ", worker.freeGb, " GB"), onToggleMenu && React.createElement("button", {
-    onClick: onToggleMenu,
-    className: "tap ml-auto fs-10 font-mono uppercase px-3 py-1.5 rounded-full c-muted hover-accent-text hidden sm:block",
-    style: {
-      border: "1px solid rgba(255,255,255,0.12)"
-    }
-  }, menuHidden ? "Show menu" : "Hide menu")), React.createElement(EditorStudio, null));
+  return React.createElement(EditorStudio, {
+    menuHidden: menuHidden,
+    onToggleMenu: onToggleMenu
+  });
 }
 function EditorLauncher() {
   const worker = useEditWorker();
@@ -22625,7 +22622,7 @@ function App() {
   }, React.createElement("main", {
     key: currentView,
     className: "flex-1 px-4 md:px-6 py-4 md:py-6 overflow-x-hidden pb-6 anim-view"
-  }, currentView !== "neo" && currentView !== "content" && React.createElement("div", {
+  }, currentView !== "neo" && currentView !== "content" && currentView !== "editor" && React.createElement("div", {
     className: "mb-5 md:mb-6"
   }, React.createElement("h1", {
     className: "text-2xl md:text-3xl font-extrabold tracking-tight c-text"
@@ -22720,7 +22717,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">9x9guw</script>
+<script type="text/babel" id="zion-version">97cwha</script>
 <script>
 (function () {
   var last = 0;

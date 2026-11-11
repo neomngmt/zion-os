@@ -4036,7 +4036,7 @@ function EsWheel({ label, value, onChange }) {
   );
 }
 
-function EditorStudio() {
+function EditorStudio({ menuHidden, onToggleMenu, worker }) {
   const [playing, setPlaying] = useState(false);
   const [t, setT] = useState(3.4);
   const [live, setLive] = useState(true);
@@ -4086,7 +4086,7 @@ function EditorStudio() {
 
   return (
     <div style={{ overflowX: "auto", marginBottom: 20 }}>
-      <div style={{ minWidth: 1180, background: ES.bg, border: `1px solid ${ES.line}`, borderRadius: 20, padding: 12, color: ES.tx, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ minWidth: 1180, height: "calc(100vh - 126px)", minHeight: 600, background: ES.bg, border: `1px solid ${ES.line}`, borderRadius: 20, padding: 10, color: ES.tx, display: "flex", flexDirection: "column", gap: 8 }}>
         {/* top bar */}
         <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "2px 4px" }}>
           <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: "-.01em" }}>Zion <span style={{ color: ES.ac }}>studio</span></div>
@@ -4100,12 +4100,13 @@ function EditorStudio() {
           <div onClick={() => setLive(!live)} style={{ ...btn, display: "flex", alignItems: "center", gap: 7, borderColor: live ? "rgba(57,230,115,.45)" : ES.line }}>
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: live ? ES.ac : ES.faint, boxShadow: live ? `0 0 8px ${ES.ac}` : "none" }} />{liveAgents} agents live
           </div>
+          {onToggleMenu && <div onClick={onToggleMenu} style={btn} title="Hide or show the left menu">{menuHidden ? "Show menu" : "Hide menu"}</div>}
           <div style={btn}>Share</div>
           <div title="Export works once the Mac worker is connected" style={{ ...btn, background: ES.lime, color: "#10140a", fontWeight: 700, border: "none" }}>Export</div>
         </div>
 
         {/* middle */}
-        <div style={{ display: "grid", gridTemplateColumns: "200px 1fr 1.1fr 270px", gap: 10, height: 520 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "190px 1fr 1.1fr 260px", gap: 8, flex: "1 1 0", minHeight: 0 }}>
           <EsPanel title="Pool" right={`${ES_POOL.length} items`} bodyStyle={{ overflowY: "auto" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
               {ES_POOL.map(([n, d], i) => (
@@ -4137,7 +4138,7 @@ function EditorStudio() {
               <div style={{ position: "absolute", left: "10%", right: "10%", top: "8%", height: 54, borderRadius: 8, border: `1.5px solid ${ES.lime}`, opacity: t > 6 && t < 11 ? 1 : 0, transition: "opacity .2s", background: "rgba(0,0,0,.35)" }} />
               <div style={{ position: "absolute", left: 0, right: 0, bottom: "20%", textAlign: "center", padding: "0 14px" }}>
                 {capText.map((w, i) => (
-                  <div key={activeCaption + i} style={{ fontWeight: 900, fontSize: 22, lineHeight: 1.05, textTransform: "uppercase", letterSpacing: "-.01em", fontFamily: font.includes("Marker") ? "'Permanent Marker', cursive" : font.includes("Bebas") ? "Bebas Neue, Impact" : "Inter, Arial Black, sans-serif",
+                  <div key={activeCaption + i} style={{ fontWeight: 900, fontSize: 16, lineHeight: 1.05, textTransform: "uppercase", letterSpacing: "-.01em", fontFamily: font.includes("Marker") ? "'Permanent Marker', cursive" : font.includes("Bebas") ? "Bebas Neue, Impact" : "Inter, Arial Black, sans-serif",
                     color: style === "Clean white" ? "#fff" : style === "Karaoke" ? (i === 1 ? ES.lime : "#fff") : "transparent",
                     background: style === "Lime Gradient" ? `linear-gradient(90deg, ${ES.lime}, ${ES.ac})` : style === "Hormozi" ? `linear-gradient(90deg, #ffe14d, #ffb300)` : "none", WebkitBackgroundClip: style === "Lime Gradient" || style === "Hormozi" ? "text" : "border-box", backgroundClip: style === "Lime Gradient" || style === "Hormozi" ? "text" : "border-box",
                     textShadow: style === "Box pop" ? "none" : "0 2px 10px rgba(0,0,0,.6)", ...(style === "Box pop" ? { color: "#10140a", background: ES.lime, display: "inline-block", padding: "2px 8px", borderRadius: 6, margin: 2 } : {}) }}>{w}</div>
@@ -4169,7 +4170,7 @@ function EditorStudio() {
         </div>
 
         {/* analysis row */}
-        <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr 1.1fr", gap: 10, height: 150 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr 1.1fr", gap: 8, height: 104, flexShrink: 0 }}>
           <EsPanel title="Waveform" right="Luma">
             <svg viewBox="0 0 160 40" preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block" }}>
               {wave.map((v, i) => <rect key={i} x={i} y={20 - v * 18} width="0.7" height={v * 36} fill={i / 160 * 100 < pct ? ES.ac : "rgba(57,230,115,.28)"} />)}
@@ -4183,7 +4184,7 @@ function EditorStudio() {
           </EsPanel>
           <EsPanel title="Loudness" right="LUFS">
             {[["VOICE", -16.1], ["MUSIC", -30.8], ["INTEGRATED", -14.1]].map(([k, v]) => (
-              <div key={k} style={{ marginBottom: 8, fontSize: 9, color: ES.dim, fontFamily: "ui-monospace, monospace" }}>
+              <div key={k} style={{ marginBottom: 4, fontSize: 9, color: ES.dim, fontFamily: "ui-monospace, monospace" }}>
                 <div style={{ display: "flex", justifyContent: "space-between" }}><span>{k}</span><span style={{ color: ES.tx }}>{v}</span></div>
                 <div style={{ height: 6, background: ES.panel2, borderRadius: 4, overflow: "hidden", marginTop: 3 }}><div style={{ width: `${Math.min(100, Math.max(5, (v + 40) * 3.2))}%`, height: "100%", background: `linear-gradient(90deg, ${ES.ac}, ${ES.lime})` }} /></div>
               </div>
@@ -4199,13 +4200,13 @@ function EditorStudio() {
         </div>
 
         {/* timeline */}
-        <EsPanel title="Timeline" right={<span>{esTime(t)} / {esTime(ES_DUR)} <span style={{ marginLeft: 10 }}><span onClick={() => setZoom(Math.max(1, zoom - 0.5))} style={{ cursor: "pointer", padding: "0 6px" }}>-</span><span onClick={() => setZoom(Math.min(3, zoom + 0.5))} style={{ cursor: "pointer", padding: "0 6px" }}>+</span></span></span>} bodyStyle={{ padding: 0, overflowX: "auto" }}>
+        <EsPanel style={{ flexShrink: 0 }} title="Timeline" right={<span>{esTime(t)} / {esTime(ES_DUR)} <span style={{ marginLeft: 10 }}><span onClick={() => setZoom(Math.max(1, zoom - 0.5))} style={{ cursor: "pointer", padding: "0 6px" }}>-</span><span onClick={() => setZoom(Math.min(3, zoom + 0.5))} style={{ cursor: "pointer", padding: "0 6px" }}>+</span></span></span>} bodyStyle={{ padding: 0, overflowX: "auto" }}>
           <div style={{ width: `${zoom * 100}%`, minWidth: "100%", position: "relative" }}>
-            <div onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setT(Math.max(0, Math.min(ES_DUR, ((e.clientX - r.left - 70) / (r.width - 70)) * ES_DUR))); }} style={{ cursor: "pointer", height: 22, marginLeft: 70, borderBottom: `1px solid ${ES.line}`, position: "relative" }}>
+            <div onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setT(Math.max(0, Math.min(ES_DUR, ((e.clientX - r.left) / r.width) * ES_DUR))); }} style={{ cursor: "pointer", height: 18, marginLeft: 70, borderBottom: `1px solid ${ES.line}`, position: "relative" }}>
               {Array.from({ length: ES_DUR / 2 + 1 }, (_, i) => <span key={i} style={{ position: "absolute", left: `${(i * 2 / ES_DUR) * 100}%`, top: 4, fontSize: 8, color: ES.faint, fontFamily: "ui-monospace, monospace", borderLeft: `1px solid ${ES.line}`, paddingLeft: 3 }}>{esTime(i * 2).slice(0, 5)}</span>)}
             </div>
             {ES_TRACKS.map((tr) => (
-              <div key={tr.id} style={{ display: "flex", height: tr.wave ? 34 : 30, borderBottom: `1px solid ${ES.line}` }}>
+              <div key={tr.id} style={{ display: "flex", height: tr.wave ? 26 : 23, borderBottom: `1px solid ${ES.line}` }}>
                 <div style={{ width: 70, flexShrink: 0, fontSize: 8.5, letterSpacing: ".12em", color: ES.dim, padding: "0 8px", display: "flex", alignItems: "center", fontFamily: "ui-monospace, monospace" }}>{tr.label}</div>
                 <div style={{ flex: 1, position: "relative" }}>
                   {tr.clips.map((c, i) => (
@@ -4219,14 +4220,14 @@ function EditorStudio() {
             ))}
             {/* agent cursors */}
             {live && [[ES.pink, "sfx-05", "sfx", 38], [ES.blue, "broll-04", "broll", 58], [ES.orange, "color-03", "gfx", 48]].map(([c, n, , x]) => (
-              <span key={n} style={{ position: "absolute", left: `calc(70px + (100% - 70px) * ${x / 100})`, top: 40 + (n.startsWith("sfx") ? 0 : n.startsWith("broll") ? 36 : 100), fontSize: 8, fontWeight: 800, background: c, color: "#10140a", padding: "1px 6px", borderRadius: 5, boxShadow: `0 0 8px ${c}`, animation: "esFloat 3.4s ease-in-out infinite alternate", pointerEvents: "none" }}>{n}</span>
+              <span key={n} style={{ position: "absolute", left: `calc(70px + (100% - 70px) * ${x / 100})`, top: (n.startsWith("sfx") ? 43 : n.startsWith("broll") ? 66 : 112), fontSize: 8, fontWeight: 800, background: c, color: "#10140a", padding: "1px 6px", borderRadius: 5, boxShadow: `0 0 8px ${c}`, animation: "esFloat 3.4s ease-in-out infinite alternate", pointerEvents: "none" }}>{n}</span>
             ))}
             <div style={{ position: "absolute", top: 0, bottom: 0, left: `calc(70px + (100% - 70px) * ${pct / 100})`, width: 2, background: ES.lime, boxShadow: `0 0 10px ${ES.lime}`, pointerEvents: "none" }}>
               <span style={{ position: "absolute", top: -1, left: -5, width: 12, height: 10, background: ES.lime, clipPath: "polygon(0 0, 100% 0, 50% 100%)" }} />
             </div>
           </div>
         </EsPanel>
-        <div style={{ fontSize: 10, color: ES.faint, fontFamily: "ui-monospace, monospace", padding: "0 4px" }}>
+        <div style={{ fontSize: 9, color: ES.faint, fontFamily: "ui-monospace, monospace", padding: "0 4px", flexShrink: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {sel ? `selected: ${sel.track.label} · ${sel.clip[2]} · ${esTime(sel.clip[0])} to ${esTime(sel.clip[0] + sel.clip[1])}` : ""}  ·  The agents, the Mac worker and Higgsfield connect in the next step, everything here is sample data.
         </div>
         <style>{`@keyframes esFloat{from{transform:translate(0,0)}to{transform:translate(46px,0)}}`}</style>
@@ -4236,21 +4237,7 @@ function EditorStudio() {
 }
 
 function EditorPage({ menuHidden, onToggleMenu }) {
-  const worker = useEditWorker();
-  const offline = worker.checked && !worker.online;
-  const col = !worker.checked ? "#8B93A1" : offline ? "#e07a5f" : "#39e673";
-  return (
-    <div>
-      <div className="flex items-center gap-2 mb-3 flex-wrap">
-        <span className="fs-10 font-mono uppercase px-2.5 py-1 rounded-full flex items-center gap-1.5" style={{ color: col, background: `${col}1a`, border: `1px solid ${col}55` }}>
-          <span className="w-1.5 h-1.5 rounded-full" style={{ background: col }} />{!worker.checked ? "Checking the Mac" : offline ? "Mac offline" : "Mac online"}
-        </span>
-        {worker.freeGb != null && <span className="fs-10 font-mono c-faint">disk free {worker.freeGb} GB</span>}
-        {onToggleMenu && <button onClick={onToggleMenu} className="tap ml-auto fs-10 font-mono uppercase px-3 py-1.5 rounded-full c-muted hover-accent-text hidden sm:block" style={{ border: "1px solid rgba(255,255,255,0.12)" }}>{menuHidden ? "Show menu" : "Hide menu"}</button>}
-      </div>
-      <EditorStudio />
-    </div>
-  );
+  return <EditorStudio menuHidden={menuHidden} onToggleMenu={onToggleMenu} />;
 }
 
 function EditorLauncher() {
@@ -15319,7 +15306,7 @@ function App() {
 
         <div className="flex-1 flex flex-col min-w-0">
           <main key={currentView} className="flex-1 px-4 md:px-6 py-4 md:py-6 overflow-x-hidden pb-6 anim-view">
-            {currentView !== "neo" && currentView !== "content" && (
+            {currentView !== "neo" && currentView !== "content" && currentView !== "editor" && (
               <div className="mb-5 md:mb-6">
                 <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight c-text">
                   {NAV.find((n) => n.id === currentView)?.label}
