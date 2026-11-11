@@ -3014,9 +3014,10 @@ function XMassPlanner({
           background: "rgba(0,0,0,0.55)",
           color: "#fff"
         }
-      }, new Date(it.scheduledAt).toLocaleTimeString([], {
+      }, new Date(it.scheduledAt).toLocaleTimeString("en-GB", {
         hour: "2-digit",
-        minute: "2-digit"
+        minute: "2-digit",
+        hourCycle: "h23"
       })), React.createElement("div", {
         className: "absolute bottom-1 left-1.5 right-1.5 fs-9 leading-snug line-clamp-2",
         style: {
@@ -3718,6 +3719,7 @@ function PlatformPostsCalendar({
     }, ts ? new Date(ts).toLocaleTimeString("cs-CZ", {
       hour: "2-digit",
       minute: "2-digit",
+      hourCycle: "h23",
       timeZone: "Europe/Prague"
     }) : "")));
   }))));
@@ -21625,7 +21627,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">cg1l0w</script>
+<script type="text/babel" id="zion-version">8utecj</script>
 <script>
 (function () {
   var last = 0;

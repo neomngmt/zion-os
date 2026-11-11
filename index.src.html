@@ -2273,7 +2273,7 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
                                   </div>
                                 )}
                                 <div className="absolute top-1.5 right-1.5 fs-9 font-mono px-1 rounded" style={{ background: "rgba(0,0,0,0.55)", color: "#fff" }}>
-                                  {new Date(it.scheduledAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                  {new Date(it.scheduledAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}
                                 </div>
                                 <div className="absolute bottom-1 left-1.5 right-1.5 fs-9 leading-snug line-clamp-2" style={{ color: "rgba(255,255,255,0.92)" }}>
                                   {it.caption}
@@ -2734,7 +2734,7 @@ function PlatformPostsCalendar({ posts, accountColor, glowRgb }) {
                   <div className="flex-1 min-w-0 fs-11 c-text truncate">{p.text || <span className="c-faint italic">No text</span>}</div>
                   <div className="flex-shrink-0 fs-10 font-mono text-right" style={{ color: isPosted ? glowRgb : "#9d9b95" }}>
                     {isPosted ? "posted" : "scheduled"}
-                    <span className="c-faint block">{ts ? new Date(ts).toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Prague" }) : ""}</span>
+                    <span className="c-faint block">{ts ? new Date(ts).toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Europe/Prague" }) : ""}</span>
                   </div>
                 </div>
               );
