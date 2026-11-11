@@ -4584,7 +4584,7 @@ function IGOverviewDashboard({
     style: {
       color: C.sub
     }
-  }, accountRows.length, " account", accountRows.length !== 1 ? "s" : "", " connected via direct Meta API"))), React.createElement("div", {
+  }, noAccounts ? "Stats are filled in automatically from the account username" : `${accountRows.length} account${accountRows.length !== 1 ? "s" : ""} connected via direct Meta API`))), React.createElement("div", {
     className: "flex items-center gap-2 flex-wrap"
   }, onMakeContentPlan && React.createElement("button", {
     onClick: onMakeContentPlan,
@@ -4659,7 +4659,7 @@ function IGOverviewDashboard({
       color: C.sub,
       background: C.card
     }
-  }, "No Instagram accounts connected yet — each model needs her own Meta Developer App + Instagram Graph API token (see Model Manager), synced hourly.") : React.createElement(React.Fragment, null, React.createElement("div", {
+  }, "No Instagram numbers yet. The account username is saved, the numbers will appear here as soon as automatic stats are switched on.") : React.createElement(React.Fragment, null, React.createElement("div", {
     className: "grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4"
   }, React.createElement("div", {
     className: "lg:col-span-5 rounded-3xl p-5 relative overflow-hidden flex flex-col",
@@ -21223,7 +21223,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1qexedo</script>
+<script type="text/babel" id="zion-version">zw5puv</script>
 <script>
 (function () {
   var last = 0;

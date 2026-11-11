@@ -3382,7 +3382,7 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
             </div>
             <div>
               <div className="text-2xl font-extrabold tracking-tight" style={{ color: C.ink, textShadow: `0 0 12px ${C.accentA}33` }}>Instagram Dashboard</div>
-              <p className="text-sm mt-0.5" style={{ color: C.sub }}>{accountRows.length} account{accountRows.length !== 1 ? "s" : ""} connected via direct Meta API</p>
+              <p className="text-sm mt-0.5" style={{ color: C.sub }}>{noAccounts ? "Stats are filled in automatically from the account username" : `${accountRows.length} account${accountRows.length !== 1 ? "s" : ""} connected via direct Meta API`}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -3435,7 +3435,7 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
 
         {noAccounts ? (
           <div className="fs-12 italic py-10 text-center rounded-2xl" style={{ border: "1px dashed rgba(255,255,255,0.14)", color: C.sub, background: C.card }}>
-            No Instagram accounts connected yet — each model needs her own Meta Developer App + Instagram Graph API token (see Model Manager), synced hourly.
+            No Instagram numbers yet. The account username is saved, the numbers will appear here as soon as automatic stats are switched on.
           </div>
         ) : (
           <>
