@@ -5618,7 +5618,8 @@ function useEditWorker(enabled = true) {
           online: true,
           claudeOk: v.claudeOk ?? null,
           freeGb: v.freeGb ?? null,
-          busy: v.busy || null
+          busy: v.busy || null,
+          tunnelUrl: v.tunnelUrl || null
         };
       } catch {}
       if (!cancelled) setState(next);
@@ -5860,6 +5861,7 @@ function EsWheel({
     }
   }, label));
 }
+const STAGE_AGENT = stage => /Transcrib|captions/i.test(stage) ? "captions-02" : /audio/i.test(stage) ? "mix-08" : /Cut|Render/i.test(stage) ? "cutter-01" : "checker-09";
 function EditorStudio({
   menuHidden,
   onToggleMenu,
@@ -5867,13 +5869,9 @@ function EditorStudio({
 }) {
   const [playing, setPlaying] = useState(false);
   const [t, setT] = useState(3.4);
-  const [live, setLive] = useState(true);
-  const [log, setLog] = useState(() => ES_LOG_SCRIPT.slice(0, 8).map((l, i) => ({
-    id: i,
-    t: esTime(2 + i * 1.7),
-    agent: l[0],
-    msg: l[1]
-  })));
+  const [phase, setPhase] = useState("idle");
+  const live = phase === "working";
+  const [log, setLog] = useState([]);
   const [selClip, setSelClip] = useState("text:0");
   const [style, setStyle] = useState("Lime Gradient");
   const [font, setFont] = useState("Helvetica Neue Bold");
@@ -5899,6 +5897,165 @@ function EditorStudio({
     y: 120 + i % 4 * 70,
     pulse: 0
   })));
+  const wk = useEditWorker();
+  const tunnel = wk.tunnelUrl;
+  const token = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("agencyos_session") || "{}").token || "";
+    } catch (e) {
+      return "";
+    }
+  })();
+  const api = (p, o = {}) => fetch(`${tunnel}${p}`, {
+    ...o,
+    headers: {
+      "x-zion-token": token,
+      ...(o.headers || {})
+    }
+  }).then(r => r.json());
+  const [lib, setLib] = useState({
+    raw: [],
+    refs: []
+  });
+  const [selRaw, setSelRaw] = useState(null);
+  const [selRef, setSelRef] = useState(null);
+  const [brief, setBrief] = useState("");
+  const [lang, setLang] = useState("cs");
+  const [up, setUp] = useState(null);
+  const [job, setJob] = useState(null);
+  const [err, setErr] = useState("");
+  const loadLib = useCallback(async () => {
+    if (!tunnel) return;
+    try {
+      const j = await api("/library");
+      if (j.raw) setLib(j);
+    } catch (e) {}
+  }, [tunnel, token]);
+  useEffect(() => {
+    loadLib();
+    const id = setInterval(loadLib, 15000);
+    return () => clearInterval(id);
+  }, [loadLib]);
+  const upload = async (file, kind) => {
+    if (!tunnel || !file) return;
+    setErr("");
+    const CH = 40 * 1024 * 1024,
+      total = Math.max(1, Math.ceil(file.size / CH)),
+      uid = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+    try {
+      let last = null;
+      for (let i = 0; i < total; i++) {
+        setUp({
+          name: file.name,
+          kind,
+          pct: Math.round(i / total * 100)
+        });
+        const r = await fetch(`${tunnel}/upload?kind=${kind}&uid=${uid}&idx=${i}&total=${total}&name=${encodeURIComponent(file.name)}`, {
+          method: "POST",
+          headers: {
+            "x-zion-token": token
+          },
+          body: file.slice(i * CH, (i + 1) * CH)
+        });
+        last = await r.json();
+        if (!r.ok) throw new Error(last.error || "Upload failed");
+      }
+      if (last && last.name) {
+        if (kind === "raw") setSelRaw(last.name);else setSelRef(last.name);
+      }
+      await loadLib();
+    } catch (e) {
+      setErr(e.message || "Upload failed");
+    }
+    setUp(null);
+  };
+  const startEdit = async () => {
+    if (!tunnel || !selRaw) return;
+    setErr("");
+    try {
+      const j = await api("/jobs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          raw: selRaw,
+          ref: selRef || "",
+          brief,
+          lang,
+          title: selRaw.replace(/\.[^.]+$/, "")
+        })
+      });
+      if (!j.id) throw new Error(j.error || "Could not start the edit");
+      setLog([]);
+      setJob({
+        id: j.id,
+        status: "queued",
+        stage: "In the queue"
+      });
+      setPhase("working");
+    } catch (e) {
+      setErr(e.message || "Could not start the edit");
+    }
+  };
+  useEffect(() => {
+    if (!job || phase !== "working") return;
+    let stop = false;
+    const poll = async () => {
+      const {
+        data
+      } = await supabaseClient.from("edit_jobs").select("id, status, stage, summary, error, final_file, source_duration").eq("id", job.id).maybeSingle();
+      if (stop || !data) return;
+      setJob(data);
+      if (data.status === "awaiting_review" || data.status === "done") setTimeout(() => setPhase("done"), 1200);
+      if (data.status === "error") {
+        setErr(data.error || "The edit failed.");
+      }
+    };
+    poll();
+    const id = setInterval(poll, 2000);
+    return () => {
+      stop = true;
+      clearInterval(id);
+    };
+  }, [job && job.id, phase]);
+  useEffect(() => {
+    if (job && job.stage) setLog(p => p.length && p[p.length - 1].msg === job.stage ? p : [...p, {
+      id: Date.now(),
+      t: new Date().toLocaleTimeString("en-GB"),
+      agent: STAGE_AGENT(job.stage),
+      msg: job.stage
+    }]);
+  }, [job && job.stage]);
+  const reset = () => {
+    setJob(null);
+    setSelRaw(null);
+    setSelRef(null);
+    setBrief("");
+    setErr("");
+    setPhase("idle");
+  };
+  const dockCursors = () => {
+    const root = rootRef.current;
+    if (!root) return;
+    const rr = root.getBoundingClientRect();
+    setCursors(cs => cs.map((c, i) => {
+      const d = root.querySelector(`[data-dot="${ES_AGENTS[i].id}"]`);
+      if (!d) return c;
+      const r = d.getBoundingClientRect();
+      return {
+        ...c,
+        x: r.left - rr.left,
+        y: r.top - rr.top
+      };
+    }));
+  };
+  useEffect(() => {
+    if (phase !== "working") {
+      const id = setTimeout(dockCursors, 60);
+      return () => clearTimeout(id);
+    }
+  }, [phase]);
   useEffect(() => {
     if (!live) return;
     const move = () => {
@@ -5930,20 +6087,6 @@ function EditorStudio({
     const id = setInterval(() => setT(x => x + 0.05 >= ES_DUR ? 0 : x + 0.05), 50);
     return () => clearInterval(id);
   }, [playing]);
-  useEffect(() => {
-    if (!live) return;
-    const id = setInterval(() => {
-      const l = ES_LOG_SCRIPT[tick.current % ES_LOG_SCRIPT.length];
-      tick.current += 1;
-      setLog(p => [...p.slice(-40), {
-        id: Date.now(),
-        t: esTime(Math.random() * ES_DUR),
-        agent: l[0],
-        msg: l[1]
-      }]);
-    }, 1800);
-    return () => clearInterval(id);
-  }, [live]);
   const wave = useMemo(() => {
     const r = esRand(7);
     return Array.from({
@@ -6092,17 +6235,18 @@ function EditorStudio({
       letterSpacing: ".12em",
       padding: "4px 8px",
       borderRadius: 99,
-      border: `1px dashed ${ES.orange}`,
-      color: ES.orange,
+      border: `1px solid ${tunnel ? ES.ac : ES.orange}66`,
+      color: tunnel ? ES.ac : ES.orange,
       fontFamily: "ui-monospace, monospace"
     }
-  }, "DEMO DATA"), React.createElement("div", {
+  }, tunnel ? "MAC CONNECTED" : wk.checked ? "MAC OFFLINE" : "CHECKING"), React.createElement("div", {
     style: {
       display: "flex",
       gap: 3
     }
   }, ES_AGENTS.map(a => React.createElement("span", {
     key: a.id,
+    "data-dot": a.id,
     title: a.name,
     onClick: () => setAgentFilter(agentFilter === a.id ? null : a.id),
     style: {
@@ -6110,14 +6254,16 @@ function EditorStudio({
       height: 11,
       borderRadius: "50%",
       background: a.color,
-      opacity: live ? agentFilter && agentFilter !== a.id ? 0.25 : 1 : 0.25,
+      opacity: live ? 0.3 : 1,
       cursor: "pointer",
-      boxShadow: live ? `0 0 6px ${a.color}` : "none"
+      boxShadow: live ? "none" : `0 0 6px ${a.color}`,
+      transition: "opacity .4s, box-shadow .4s",
+      animation: phase === "idle" ? "esBreath 3.2s ease-in-out infinite" : "none"
     }
   }))), React.createElement("div", {
-    onClick: () => setLive(!live),
     style: {
       ...btn,
+      cursor: "default",
       display: "flex",
       alignItems: "center",
       gap: 7,
@@ -6131,22 +6277,312 @@ function EditorStudio({
       background: live ? ES.ac : ES.faint,
       boxShadow: live ? `0 0 8px ${ES.ac}` : "none"
     }
-  }), liveAgents, " agents live"), onToggleMenu && React.createElement("div", {
+  }), live ? `${liveAgents} agents working` : "agents asleep"), onToggleMenu && React.createElement("div", {
     onClick: onToggleMenu,
     style: btn,
     title: "Hide or show the left menu"
   }, menuHidden ? "Show menu" : "Hide menu"), React.createElement("div", {
     style: btn
-  }, "Share"), React.createElement("div", {
-    title: "Export works once the Mac worker is connected",
+  }, "Share"), phase === "done" && job ? React.createElement("a", {
+    href: `${tunnel}/file?job=${job.id}&name=${job.final_file || "preview.mp4"}&dl=1&t=${encodeURIComponent(token)}`,
     style: {
       ...btn,
       background: ES.lime,
       color: "#10140a",
       fontWeight: 700,
-      border: "none"
+      border: "none",
+      textDecoration: "none"
     }
-  }, "Export")), React.createElement("div", {
+  }, "Export") : React.createElement("div", {
+    title: "Export is ready when the edit is done",
+    style: {
+      ...btn,
+      background: ES.panel2,
+      color: ES.faint,
+      cursor: "default"
+    }
+  }, "Export")), phase === "idle" && React.createElement("div", {
+    style: {
+      flex: 1,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      animation: "esIn .5s ease-out"
+    }
+  }, React.createElement("div", {
+    style: {
+      width: "min(980px, 100%)"
+    }
+  }, React.createElement("div", {
+    style: {
+      textAlign: "center",
+      marginBottom: 22
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 26,
+      fontWeight: 800,
+      letterSpacing: "-.02em"
+    }
+  }, "New edit"), React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: ES.dim,
+      marginTop: 4
+    }
+  }, "Drop the raw video and how it should look. The agents wake up when you press Edit.")), !tunnel && React.createElement("div", {
+    style: {
+      textAlign: "center",
+      color: ES.orange,
+      fontSize: 12,
+      marginBottom: 14
+    }
+  }, wk.checked ? "The Mac is offline. Switch it on and sign in, the worker starts by itself." : "Checking the Mac..."), React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 14
+    }
+  }, [["raw", "Raw video", "Drop the video from the shoot", selRaw, lib.raw, setSelRaw], ["ref", "Reference", "A reel that looks like you want it to look", selRef, lib.refs, setSelRef]].map(([kind, title, hint, selected, files, setSel]) => React.createElement("div", {
+    key: kind,
+    style: {
+      background: ES.panel,
+      border: `1px solid ${selected ? ES.ac + "88" : ES.line}`,
+      borderRadius: 18,
+      padding: 16,
+      display: "flex",
+      flexDirection: "column",
+      gap: 10
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 11,
+      letterSpacing: ".14em",
+      textTransform: "uppercase",
+      color: ES.dim,
+      fontFamily: "ui-monospace, monospace"
+    }
+  }, title, kind === "ref" ? " (optional)" : ""), React.createElement("label", {
+    onDragOver: e => e.preventDefault(),
+    onDrop: e => {
+      e.preventDefault();
+      upload(e.dataTransfer.files[0], kind);
+    },
+    style: {
+      border: `1.5px dashed ${selected ? ES.ac : ES.line}`,
+      borderRadius: 14,
+      padding: "26px 12px",
+      textAlign: "center",
+      cursor: tunnel ? "pointer" : "not-allowed",
+      color: selected ? ES.ac : ES.dim,
+      fontSize: 13,
+      opacity: tunnel ? 1 : 0.5
+    }
+  }, React.createElement("input", {
+    type: "file",
+    accept: "video/*,audio/*",
+    disabled: !tunnel,
+    onChange: e => upload(e.target.files[0], kind),
+    style: {
+      display: "none"
+    }
+  }), up && up.kind === kind ? `Uploading ${up.name} ${up.pct}%` : selected ? selected : hint), up && up.kind === kind && React.createElement("div", {
+    style: {
+      height: 4,
+      background: ES.panel2,
+      borderRadius: 4
+    }
+  }, React.createElement("div", {
+    style: {
+      width: `${up.pct}%`,
+      height: "100%",
+      background: ES.ac,
+      borderRadius: 4,
+      transition: "width .3s"
+    }
+  })), React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 4,
+      maxHeight: 120,
+      overflowY: "auto"
+    }
+  }, files.slice(0, 8).map(f => React.createElement("div", {
+    key: f.name,
+    onClick: () => setSel(selected === f.name ? null : f.name),
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: 11,
+      padding: "5px 9px",
+      borderRadius: 8,
+      cursor: "pointer",
+      background: selected === f.name ? "rgba(57,230,115,.12)" : "transparent",
+      color: selected === f.name ? ES.ac : ES.dim,
+      fontFamily: "ui-monospace, monospace"
+    }
+  }, React.createElement("span", {
+    style: {
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, f.name), React.createElement("span", null, f.duration ? `${Math.round(f.duration)}s` : "", " ", (f.size / 1048576).toFixed(0), " MB"))))))), React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginTop: 14,
+      alignItems: "center"
+    }
+  }, React.createElement("input", {
+    value: brief,
+    onChange: e => setBrief(e.target.value),
+    placeholder: "Short note for the agents (optional), for example: hook in the first 2 seconds",
+    style: {
+      flex: 1,
+      background: ES.panel,
+      border: `1px solid ${ES.line}`,
+      borderRadius: 12,
+      padding: "12px 14px",
+      color: ES.tx,
+      fontSize: 13
+    }
+  }), React.createElement("div", {
+    style: {
+      display: "flex",
+      background: ES.panel,
+      border: `1px solid ${ES.line}`,
+      borderRadius: 12,
+      overflow: "hidden"
+    }
+  }, [["cs", "CZ"], ["en", "EN"]].map(([k, l]) => React.createElement("span", {
+    key: k,
+    onClick: () => setLang(k),
+    style: {
+      padding: "12px 14px",
+      fontSize: 12,
+      cursor: "pointer",
+      color: lang === k ? "#10140a" : ES.dim,
+      background: lang === k ? ES.ac : "transparent",
+      fontWeight: 700
+    }
+  }, l))), React.createElement("div", {
+    onClick: selRaw && tunnel ? startEdit : undefined,
+    style: {
+      padding: "13px 38px",
+      borderRadius: 12,
+      fontWeight: 800,
+      fontSize: 15,
+      background: selRaw && tunnel ? ES.ac : ES.panel2,
+      color: selRaw && tunnel ? "#03110a" : ES.faint,
+      cursor: selRaw && tunnel ? "pointer" : "not-allowed",
+      boxShadow: selRaw && tunnel ? `0 0 24px ${ES.ac}55` : "none"
+    }
+  }, "Edit")), err && React.createElement("div", {
+    style: {
+      color: ES.red,
+      fontSize: 12,
+      marginTop: 10
+    }
+  }, err))), phase === "done" && job && React.createElement("div", {
+    style: {
+      flex: 1,
+      minHeight: 0,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 12,
+      animation: "esIn .6s ease-out"
+    }
+  }, React.createElement("div", {
+    style: {
+      flex: 1,
+      minHeight: 0,
+      aspectRatio: "9 / 16",
+      maxWidth: "100%",
+      borderRadius: 18,
+      overflow: "hidden",
+      background: "#000",
+      border: `1px solid ${ES.line}`,
+      boxShadow: `0 0 60px ${ES.ac}22`
+    }
+  }, React.createElement("video", {
+    key: job.id,
+    src: `${tunnel}/file?job=${job.id}&name=${job.final_file || "preview.mp4"}&t=${encodeURIComponent(token)}`,
+    controls: true,
+    autoPlay: true,
+    loop: true,
+    playsInline: true,
+    style: {
+      width: "100%",
+      height: "100%",
+      objectFit: "contain",
+      background: "#000"
+    }
+  })), React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      flexShrink: 0,
+      width: "min(760px, 100%)"
+    }
+  }, React.createElement("div", {
+    style: {
+      flex: 1,
+      fontSize: 12,
+      color: ES.dim,
+      lineHeight: 1.4
+    }
+  }, job.summary), React.createElement("div", {
+    onClick: reset,
+    style: btn
+  }, "New edit"), React.createElement("a", {
+    href: `${tunnel}/file?job=${job.id}&name=${job.final_file || "preview.mp4"}&dl=1&t=${encodeURIComponent(token)}`,
+    style: {
+      ...btn,
+      background: ES.lime,
+      color: "#10140a",
+      fontWeight: 800,
+      border: "none",
+      textDecoration: "none",
+      padding: "10px 34px",
+      fontSize: 14
+    }
+  }, "Export"))), phase === "working" && job && React.createElement("div", {
+    style: {
+      background: ES.panel,
+      border: `1px solid ${ES.ac}55`,
+      borderRadius: 12,
+      padding: "8px 14px",
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      fontSize: 12,
+      flexShrink: 0
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 8,
+      height: 8,
+      borderRadius: "50%",
+      background: job.status === "error" ? ES.red : ES.ac,
+      boxShadow: `0 0 10px ${job.status === "error" ? ES.red : ES.ac}`
+    }
+  }), React.createElement("span", {
+    style: {
+      fontWeight: 700
+    }
+  }, job.status === "error" ? "The edit failed" : job.stage || "Working"), React.createElement("span", {
+    style: {
+      color: ES.dim,
+      flex: 1
+    }
+  }, job.status === "error" ? err : "Everything stays on the Mac. The preview appears here when it is done."), job.status === "error" && React.createElement("div", {
+    onClick: reset,
+    style: btn
+  }, "Back")), phase === "working" && React.createElement(React.Fragment, null, React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "190px 1fr 1.1fr 260px",
@@ -6156,7 +6592,7 @@ function EditorStudio({
     }
   }, React.createElement(EsPanel, {
     title: "Pool",
-    right: `${ES_POOL.length} items`,
+    right: `${lib.raw.length + lib.refs.length || ES_POOL.length} items`,
     bodyStyle: {
       overflowY: "auto"
     }
@@ -6166,7 +6602,7 @@ function EditorStudio({
       gridTemplateColumns: "1fr 1fr",
       gap: 6
     }
-  }, ES_POOL.map(([n, d], i) => React.createElement("div", {
+  }, (tunnel && lib.raw.length + lib.refs.length ? [...lib.raw, ...lib.refs].map(f => [f.name, f.duration ? `${Math.round(f.duration)}s` : ""]) : ES_POOL).map(([n, d], i) => React.createElement("div", {
     key: n,
     "data-es": "1",
     style: {
@@ -6735,7 +7171,7 @@ function EditorStudio({
       overflow: "hidden",
       textOverflow: "ellipsis"
     }
-  }, sel ? `selected: ${sel.track.label} · ${sel.clip[2]} · ${esTime(sel.clip[0])} to ${esTime(sel.clip[0] + sel.clip[1])}` : "", "  ·  The agents, the Mac worker and Higgsfield connect in the next step, everything here is sample data."), live && cursors.map((c, i) => {
+  }, sel ? `selected: ${sel.track.label} · ${sel.clip[2]} · ${esTime(sel.clip[0])} to ${esTime(sel.clip[0] + sel.clip[1])}` : "", "  ·  The agents, the Mac worker and Higgsfield connect in the next step, everything here is sample data.")), cursors.map((c, i) => {
     const a = ES_AGENTS[i];
     return React.createElement("div", {
       key: a.id,
@@ -6743,7 +7179,9 @@ function EditorStudio({
         position: "absolute",
         left: c.x,
         top: c.y,
-        transition: "left 900ms cubic-bezier(.4,0,.2,1), top 900ms cubic-bezier(.4,0,.2,1)",
+        opacity: live ? 1 : 0,
+        transform: live ? "scale(1)" : "scale(.2)",
+        transition: "left 900ms cubic-bezier(.4,0,.2,1), top 900ms cubic-bezier(.4,0,.2,1), opacity .5s, transform .5s",
         pointerEvents: "none",
         zIndex: 30
       }
@@ -6786,7 +7224,7 @@ function EditorStudio({
         animation: "esClick .55s ease-out forwards"
       }
     }));
-  }), React.createElement("style", null, `@keyframes esClick{0%{transform:scale(.3);opacity:.95}100%{transform:scale(1.9);opacity:0}}`)));
+  }), React.createElement("style", null, `@keyframes esBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}@keyframes esIn{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}@keyframes esClick{0%{transform:scale(.3);opacity:.95}100%{transform:scale(1.9);opacity:0}}`)));
 }
 function EditorPage({
   menuHidden,
@@ -22796,7 +23234,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">16axbn2</script>
+<script type="text/babel" id="zion-version">32vv4i</script>
 <script>
 (function () {
   var last = 0;
