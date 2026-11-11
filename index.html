@@ -5768,6 +5768,7 @@ function EsPanel({
 }) {
   return React.createElement("div", {
     "data-ag": dataAg,
+    "data-roam": "1",
     style: {
       background: ES.panel,
       border: `1px solid ${ES.line}`,
@@ -5986,7 +5987,8 @@ function EditorStudio({
   const [t, setT] = useState(3.4);
   const [phase, setPhase] = useState("idle");
   const [docking, setDocking] = useState(false);
-  const live = (phase === "idle" || phase === "working") && !docking;
+  const [intro, setIntro] = useState(true);
+  const live = (phase === "idle" || phase === "working") && !docking && !intro;
   const [log, setLog] = useState([]);
   const [selClip, setSelClip] = useState("text:0");
   const [style, setStyle] = useState("Lime Gradient");
@@ -6487,6 +6489,12 @@ function EditorStudio({
     order[it.key] = i;
   });
   const cutMarks = seq.filter((it, i) => it.mark != null && i < placed);
+  useEffect(() => {
+    window.__zionBusy = phase === "working" || phase === "done" || Object.keys(ups).length > 0;
+    return () => {
+      window.__zionBusy = false;
+    };
+  }, [phase, ups]);
   const reset = () => {
     setJob(null);
     setSelRaw(null);
@@ -6519,11 +6527,35 @@ function EditorStudio({
       };
     }));
   };
+  const scatter = () => {
+    const root = rootRef.current;
+    if (!root) return;
+    const rr = root.getBoundingClientRect(),
+      zones = [...root.querySelectorAll("[data-roam]")];
+    if (!zones.length) return;
+    ES_AGENTS.forEach((_, ai) => setTimeout(() => {
+      const el = zones[Math.floor(Math.random() * zones.length)],
+        r = el.getBoundingClientRect();
+      const x = r.left - rr.left + Math.random() * Math.max(8, r.width - 8),
+        y = r.top - rr.top + Math.random() * Math.max(8, r.height - 6);
+      setCursors(cs => cs.map((c, i) => i === ai ? {
+        ...c,
+        x,
+        y
+      } : c));
+    }, ai * 110));
+  };
+  useEffect(() => {
+    const id = setTimeout(() => setIntro(false), 1100);
+    return () => clearTimeout(id);
+  }, []);
   useEffect(() => {
     if (!live) {
       const id = setTimeout(dockCursors, 60);
       return () => clearTimeout(id);
     }
+    const id = setTimeout(scatter, 160);
+    return () => clearTimeout(id);
   }, [live]);
   useEffect(() => {
     if (!live) return;
@@ -6531,10 +6563,9 @@ function EditorStudio({
       const root = rootRef.current;
       if (!root) return;
       const rr = root.getBoundingClientRect();
-      const targets = [...root.querySelectorAll("[data-es]")];
+      const targets = Math.random() < 0.55 ? [...root.querySelectorAll("[data-roam]")] : [...root.querySelectorAll("[data-es]")];
       if (!targets.length) return;
       const ai = Math.floor(Math.random() * ES_AGENTS.length);
-      if (placingRef.current) return;
       if (locks.current[ai] && locks.current[ai] > Date.now()) return;
       const el = targets[Math.floor(Math.random() * targets.length)];
       const r = el.getBoundingClientRect();
@@ -6551,7 +6582,7 @@ function EditorStudio({
           pulse: c.pulse + 1
         } : c));
         const d = el.dataset || {};
-        if (jobLiveRef.current && (d.slider || d.wheel || d.style || d.font)) return;
+        if (jobLiveRef.current) return;
         const rnd = (a, b) => Math.round(a + Math.random() * (b - a));
         const say = msg => setLog(p => [...p.slice(-60), {
           id: Date.now() + Math.random(),
@@ -7076,6 +7107,7 @@ function EditorStudio({
     autoPlay: true,
     loop: true,
     playsInline: true,
+    onError: () => setErr("The video could not be played here. Use Export to download it."),
     style: {
       width: "100%",
       height: "100%",
@@ -7094,10 +7126,10 @@ function EditorStudio({
     style: {
       flex: 1,
       fontSize: 12,
-      color: ES.dim,
+      color: err ? ES.orange : ES.dim,
       lineHeight: 1.4
     }
-  }, job.summary), React.createElement("div", {
+  }, err || job.summary), React.createElement("div", {
     onClick: reset,
     style: btn
   }, "New edit"), React.createElement("a", {
@@ -7951,14 +7983,71 @@ function EditorStudio({
     }));
   }), React.createElement("style", null, `@keyframes esPop{0%{opacity:0;transform:scale(.6)}100%{opacity:1;transform:scale(1)}}@keyframes esBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}@keyframes esOut{0%{opacity:1;transform:none;filter:none}100%{opacity:0;transform:scale(.96) translateY(8px);filter:blur(2px)}}@keyframes esIn{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}@keyframes esClick{0%{transform:scale(.3);opacity:.95}100%{transform:scale(1.9);opacity:0}}`)));
 }
+class EsBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      err: null
+    };
+  }
+  static getDerivedStateFromError(err) {
+    return {
+      err
+    };
+  }
+  componentDidCatch(err) {
+    try {
+      console.error("Editor crashed", err);
+    } catch (e) {}
+  }
+  render() {
+    if (!this.state.err) return this.props.children;
+    return React.createElement("div", {
+      style: {
+        padding: 28,
+        borderRadius: 18,
+        border: "1px solid rgba(255,107,92,.5)",
+        background: "#101514",
+        color: "#e8efe9"
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 18,
+        fontWeight: 800,
+        marginBottom: 6
+      }
+    }, "The Editor hit an error"), React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "#8a968e",
+        marginBottom: 14,
+        fontFamily: "ui-monospace, monospace",
+        wordBreak: "break-word"
+      }
+    }, String(this.state.err && this.state.err.message || this.state.err)), React.createElement("div", {
+      onClick: () => this.setState({
+        err: null
+      }),
+      style: {
+        display: "inline-block",
+        padding: "9px 20px",
+        borderRadius: 10,
+        background: "#39e673",
+        color: "#03110a",
+        fontWeight: 800,
+        cursor: "pointer"
+      }
+    }, "Reload the Editor"));
+  }
+}
 function EditorPage({
   menuHidden,
   onToggleMenu
 }) {
-  return React.createElement(EditorStudio, {
+  return React.createElement(EsBoundary, null, React.createElement(EditorStudio, {
     menuHidden: menuHidden,
     onToggleMenu: onToggleMenu
-  });
+  }));
 }
 function EditorLauncher() {
   const worker = useEditWorker();
@@ -23959,7 +24048,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1jg40o9</script>
+<script type="text/babel" id="zion-version">1at94vx</script>
 <script>
 (function () {
   var last = 0;
@@ -23975,6 +24064,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(
       var m = t.match(/<script type="text\/babel" id="zion-version">([\s\S]*?)<\/script>/);
       var cur = mine();
       if (!m || cur === null || m[1].trim() === cur) return;
+      if (window.__zionBusy) return; // never reload the page in the middle of an edit, an upload or a finished preview
       var prev = 0;
       try { prev = Number(sessionStorage.getItem("zionReloadAt")) || 0; } catch (e) {}
       if (Date.now() - prev < 30000) return;
