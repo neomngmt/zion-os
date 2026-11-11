@@ -1045,6 +1045,8 @@ const modelsToJS = (r) => ({
   inspoProfiles: Array.isArray(r.inspo_profiles) ? r.inspo_profiles : (r.inspo_profiles ? JSON.parse(r.inspo_profiles) : []),
   monthlyGoal: r.monthly_goal != null ? Number(r.monthly_goal) : null,
   goalNote: r.goal_note || "",
+  about: r.about || "",
+  notifPrefs: r.notif_prefs || null,
   goalAuto: r.goal_auto_value != null && r.monthly_goal != null && Number(r.goal_auto_value) === Number(r.monthly_goal),
   igConnectedAt: r.ig_connected_at ? new Date(r.ig_connected_at).getTime() : null,
   disabledPlatforms: Array.isArray(r.disabled_platforms) ? r.disabled_platforms : [],
@@ -9482,19 +9484,219 @@ function LoginScreen({ models, onLogin }) {
 
 // ---------- settings (admin pin) ----------
 
-function CreatorSettingsPanel() {
-  return (
-    <div className="max-w-lg">
-      <p className="fs-12 c-faint font-mono mb-6">Your personal account connections.</p>
+// ---------- model growth card (only platforms with real numbers) ----------
+function CreatorGrowth({ model, bufferDailyStats, bufferTopPosts, igGraphStats }) {
+  const platformLabel = { ig: "Instagram", x: "X", tiktok: "TikTok", fb: "Facebook", threads: "Threads", snapchat: "Snapchat" };
+  const dayKey = (offset) => { const d = new Date(); d.setDate(d.getDate() - offset); return toISO(d); };
+  const rows = (bufferDailyStats || []).filter((r) => r.model === model);
+  const byPlatform = {};
+  rows.forEach((r) => { (byPlatform[r.platform] = byPlatform[r.platform] || []).push(r); });
 
-      <div className="c-bg-surface border c-border rounded-xl p-5">
-        <div className="flex items-center gap-2 mb-2">
-          <Sparkles size={16} className="c-accent" />
-          <span className="font-semibold c-text text-sm">Nothing to connect here</span>
+  const sumRange = (list, fromOff, toOff, field) => list
+    .filter((r) => r.statDate <= dayKey(fromOff) && r.statDate > dayKey(toOff))
+    .reduce((t, r) => t + (Number(r[field]) || 0), 0);
+
+  const cards = Object.entries(byPlatform).map(([platform, list]) => {
+    const w1 = sumRange(list, 0, 7, "impressions"), w0 = sumRange(list, 7, 14, "impressions");
+    const m1 = sumRange(list, 0, 30, "impressions"), m0 = sumRange(list, 30, 60, "impressions");
+    const e1 = sumRange(list, 0, 7, "reactions") + sumRange(list, 0, 7, "comments");
+    const posts = sumRange(list, 0, 7, "postCount");
+    return { platform, w1, w0, m1, m0, e1, posts };
+  }).filter((c) => c.w1 > 0 || c.m1 > 0);
+
+  const igRows = (igGraphStats || []).filter((r) => r.model === model);
+  const ig = igRows.length ? { views7: igRows.reduce((t, r) => t + (r.views7d || 0), 0), reach7: igRows.reduce((t, r) => t + (r.reach7d || 0), 0), views30: igRows.reduce((t, r) => t + (r.views30d || 0), 0) } : null;
+
+  const weekAgo = Date.now() - 7 * 86400000;
+  const best = (bufferTopPosts || []).filter((p) => p.model === model && p.sentAt && p.sentAt >= weekAgo).sort((a, b) => b.impressions - a.impressions)[0];
+
+  if (!cards.length && !ig) return null;
+
+  const delta = (cur, prev) => {
+    if (!prev) return cur > 0 ? { txt: "new", up: true } : null;
+    const p = Math.round(((cur - prev) / prev) * 100);
+    return { txt: `${p >= 0 ? "+" : ""}${p}%`, up: p >= 0 };
+  };
+  const fmtN = (n) => Number(n).toLocaleString("en-US");
+  const chip = (d) => d ? <span className="fs-11 font-mono" style={{ color: d.up ? "#39e673" : "#ff8a6b" }}>{d.txt}</span> : null;
+
+  return (
+    <div className="c-bg-surface border c-border rounded-xl p-5 mb-6">
+      <div className="fs-11 uppercase tracking-widest c-muted font-mono">My growth</div>
+      <div className="fs-12 c-muted mt-1">What the team's work on your accounts brings. Only accounts with real numbers are shown.</div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+        {cards.map((c) => (
+          <div key={c.platform} className="rounded-lg p-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(57,230,115,0.14)" }}>
+            <div className="fs-12 font-semibold c-text mb-1.5">{platformLabel[c.platform] || c.platform}</div>
+            <div className="flex items-baseline justify-between fs-12 c-muted"><span>Views this week</span><span className="c-text font-mono">{fmtN(c.w1)} {chip(delta(c.w1, c.w0))}</span></div>
+            <div className="flex items-baseline justify-between fs-12 c-muted mt-1"><span>Views last 30 days</span><span className="c-text font-mono">{fmtN(c.m1)} {chip(delta(c.m1, c.m0))}</span></div>
+            <div className="flex items-baseline justify-between fs-12 c-muted mt-1"><span>Reactions + comments (7d)</span><span className="c-text font-mono">{fmtN(c.e1)}</span></div>
+            <div className="flex items-baseline justify-between fs-12 c-muted mt-1"><span>Posts this week</span><span className="c-text font-mono">{fmtN(c.posts)}</span></div>
+          </div>
+        ))}
+        {ig && (
+          <div className="rounded-lg p-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(57,230,115,0.14)" }}>
+            <div className="fs-12 font-semibold c-text mb-1.5">Instagram</div>
+            <div className="flex items-baseline justify-between fs-12 c-muted"><span>Views this week</span><span className="c-text font-mono">{fmtN(ig.views7)}</span></div>
+            <div className="flex items-baseline justify-between fs-12 c-muted mt-1"><span>Reach this week</span><span className="c-text font-mono">{fmtN(ig.reach7)}</span></div>
+            <div className="flex items-baseline justify-between fs-12 c-muted mt-1"><span>Views last 30 days</span><span className="c-text font-mono">{fmtN(ig.views30)}</span></div>
+          </div>
+        )}
+      </div>
+      {best && (
+        <div className="mt-4 rounded-lg p-3" style={{ border: "1px solid rgba(240,190,60,0.4)" }}>
+          <div className="fs-10 font-mono uppercase tracking-widest" style={{ color: "#f0be3c" }}>Best post of the week, {platformLabel[best.platform] || best.platform}</div>
+          <div className="fs-12 c-text mt-1.5" style={{ whiteSpace: "pre-wrap", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{best.text || "(no text)"}</div>
+          <div className="fs-11 c-muted font-mono mt-1.5">{fmtN(best.impressions)} views, {fmtN(best.reactions)} reactions, {fmtN(best.comments)} comments</div>
+          {(best.externalLink || best.sourceUrl) && <a href={best.externalLink || best.sourceUrl} target="_blank" rel="noopener noreferrer" className="fs-11 font-mono c-accent mt-1 inline-block">Open the post &rarr;</a>}
         </div>
-        <p className="fs-11 c-muted">
-          Your OnlyFans, Instagram, X, and TikTok stats are all connected by your agency team on their end — you don't need to do anything for those.
-        </p>
+      )}
+    </div>
+  );
+}
+
+// ---------- model settings ----------
+function SettingsSwitch({ on, onChange, label, hint }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-2.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+      <div style={{ minWidth: 0 }}>
+        <div className="fs-13 c-text">{label}</div>
+        {hint && <div className="fs-11 c-muted">{hint}</div>}
+      </div>
+      <div onClick={() => onChange(!on)} role="switch" aria-checked={on}
+        style={{ width: 42, height: 24, borderRadius: 14, background: on ? "#39e673" : "rgba(255,255,255,0.14)", position: "relative", cursor: "pointer", flexShrink: 0, transition: "background .15s" }}>
+        <div style={{ position: "absolute", top: 3, left: on ? 21 : 3, width: 18, height: 18, borderRadius: "50%", background: on ? "#03110a" : "#c9d1cc", transition: "left .15s" }} />
+      </div>
+    </div>
+  );
+}
+
+const DEFAULT_NOTIF_PREFS = { sale: true, custom: true, task: true, goal: true, news: true, quiet: { on: false, from: "22:00", to: "08:00" } };
+
+function CreatorSettingsPanel({ model, record }) {
+  const card = "c-bg-surface border c-border rounded-xl p-5 mb-5";
+  const label = "fs-11 uppercase tracking-widest c-muted font-mono mb-3";
+  const field = "w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent";
+  const stored = (record && record.notifPrefs) || {};
+  const [prefs, setPrefs] = useState({ ...DEFAULT_NOTIF_PREFS, ...stored, quiet: { ...DEFAULT_NOTIF_PREFS.quiet, ...(stored.quiet || {}) } });
+  const [prefsMsg, setPrefsMsg] = useState("");
+
+  const savePrefs = async (next) => {
+    setPrefs(next); setPrefsMsg("");
+    const { error } = await supabaseClient.from("models").update({ notif_prefs: next }).eq("name", model);
+    setPrefsMsg(error ? "Could not save, try again." : "Saved");
+    setTimeout(() => setPrefsMsg(""), 2000);
+  };
+  const setKind = (k, v) => savePrefs({ ...prefs, [k]: v });
+  const setQuiet = (patch) => savePrefs({ ...prefs, quiet: { ...prefs.quiet, ...patch } });
+
+  // profile
+  const [pf, setPf] = useState({
+    of_url: (record && record.ofUrl) || "", ig_handle: (record && record.igHandle) || "", x_handle: (record && record.xHandle) || "",
+    tiktok_handle: (record && record.tiktokHandle) || "", drive_url: (record && record.driveUrl) || "", about: (record && record.about) || "",
+  });
+  const [pfMsg, setPfMsg] = useState("");
+  const saveProfile = async () => {
+    setPfMsg("");
+    const clean = { ...pf, ig_handle: pf.ig_handle.replace(/^@/, "").trim(), x_handle: pf.x_handle.replace(/^@/, "").trim(), tiktok_handle: pf.tiktok_handle.replace(/^@/, "").trim(), of_url: pf.of_url.trim(), drive_url: pf.drive_url.trim(), about: pf.about.trim().slice(0, 600) };
+    const { error } = await supabaseClient.from("models").update(clean).eq("name", model);
+    setPfMsg(error ? "Could not save, try again." : "Profile saved");
+  };
+
+  // password
+  const [pw, setPw] = useState({ cur: "", next: "", again: "" });
+  const [pwMsg, setPwMsg] = useState({ text: "", ok: false });
+  const changePassword = async () => {
+    if (pw.next.length < 6) { setPwMsg({ text: "The new password needs at least 6 characters.", ok: false }); return; }
+    if (pw.next !== pw.again) { setPwMsg({ text: "The two new passwords are not the same.", ok: false }); return; }
+    try {
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/auth-verify`, {
+        method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ type: "creator-change-password", name: model, password: pw.cur, newPassword: pw.next }),
+      });
+      const j = await r.json();
+      if (j.ok) { setPw({ cur: "", next: "", again: "" }); setPwMsg({ text: "Password changed.", ok: true }); }
+      else setPwMsg({ text: j.reason === "wrong" ? "The current password is not correct." : "Could not change the password.", ok: false });
+    } catch (e) { setPwMsg({ text: "Could not reach the server, try again.", ok: false }); }
+  };
+
+  // message to the manager
+  const [msg, setMsg] = useState("");
+  const [msgState, setMsgState] = useState({ text: "", ok: false });
+  const sendMessage = async () => {
+    if (msg.trim().length < 2) { setMsgState({ text: "Write your message first.", ok: false }); return; }
+    try {
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/manager-message`, {
+        method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ model, text: msg }),
+      });
+      const j = await r.json();
+      if (r.ok && j.ok) { setMsg(""); setMsgState({ text: "Sent. Your manager got a notification.", ok: true }); }
+      else setMsgState({ text: j.error || "Could not send.", ok: false });
+    } catch (e) { setMsgState({ text: "Could not reach the server, try again.", ok: false }); }
+  };
+
+  return (
+    <div className="max-w-xl">
+      <p className="fs-12 c-faint font-mono mb-6">Your notifications, profile and account.</p>
+
+      <div className={card}>
+        <div className={label}>Notifications</div>
+        <PushToggle />
+        <div className="mt-1">
+          <SettingsSwitch on={prefs.sale} onChange={(v) => setKind("sale", v)} label="New sales" hint="Tips, PPVs, new subscribers" />
+          <SettingsSwitch on={prefs.custom} onChange={(v) => setKind("custom", v)} label="Custom requests" hint="A new custom to make, a custom sold" />
+          <SettingsSwitch on={prefs.task} onChange={(v) => setKind("task", v)} label="New tasks" hint="Tasks from your manager" />
+          <SettingsSwitch on={prefs.goal} onChange={(v) => setKind("goal", v)} label="Monthly goal" hint="Your goal at the start of the month" />
+          <SettingsSwitch on={prefs.news} onChange={(v) => setKind("news", v)} label="News" hint="OnlyFans news in Zion OS" />
+          <SettingsSwitch on={prefs.quiet.on} onChange={(v) => setQuiet({ on: v })} label="Quiet hours" hint="No notifications at night (Prague time)" />
+          {prefs.quiet.on && (
+            <div className="flex items-center gap-2 pt-2.5 fs-12 c-muted flex-wrap">
+              From <input type="time" value={prefs.quiet.from} onChange={(e) => setQuiet({ from: e.target.value })} className="c-bg-app border c-border rounded-lg px-2 py-1 text-sm c-text" />
+              to <input type="time" value={prefs.quiet.to} onChange={(e) => setQuiet({ to: e.target.value })} className="c-bg-app border c-border rounded-lg px-2 py-1 text-sm c-text" />
+            </div>
+          )}
+        </div>
+        {prefsMsg && <div className="fs-11 c-accent font-mono mt-2">{prefsMsg}</div>}
+      </div>
+
+      <div className={card}>
+        <div className={label}>My profile</div>
+        <div className="space-y-2.5">
+          <input value={pf.of_url} onChange={(e) => setPf({ ...pf, of_url: e.target.value })} placeholder="OnlyFans link" className={field} />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <input value={pf.ig_handle} onChange={(e) => setPf({ ...pf, ig_handle: e.target.value })} placeholder="Instagram @" className={field} />
+            <input value={pf.x_handle} onChange={(e) => setPf({ ...pf, x_handle: e.target.value })} placeholder="X @" className={field} />
+            <input value={pf.tiktok_handle} onChange={(e) => setPf({ ...pf, tiktok_handle: e.target.value })} placeholder="TikTok @" className={field} />
+          </div>
+          <input value={pf.drive_url} onChange={(e) => setPf({ ...pf, drive_url: e.target.value })} placeholder="Link to your Drive folder for content" className={field} />
+          <textarea value={pf.about} onChange={(e) => setPf({ ...pf, about: e.target.value })} rows={4} maxLength={600} placeholder="A few lines about you and your persona (tone, topics, what fans love)" className={field} />
+        </div>
+        <button onClick={saveProfile} className="mt-3 px-3 py-2 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase font-semibold">Save profile</button>
+        {pfMsg && <span className="fs-11 c-accent font-mono ml-3">{pfMsg}</span>}
+      </div>
+
+      <div className={card}>
+        <div className={label}>Password</div>
+        <div className="space-y-2.5">
+          <input type="password" value={pw.cur} onChange={(e) => setPw({ ...pw, cur: e.target.value })} placeholder="Current password" className={field} autoComplete="current-password" />
+          <input type="password" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} placeholder="New password (at least 6 characters)" className={field} autoComplete="new-password" />
+          <input type="password" value={pw.again} onChange={(e) => setPw({ ...pw, again: e.target.value })} placeholder="New password again" className={field} autoComplete="new-password" />
+        </div>
+        <button onClick={changePassword} className="mt-3 px-3 py-2 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase font-semibold">Change password</button>
+        {pwMsg.text && <div className="fs-12 mt-2" style={{ color: pwMsg.ok ? "#39e673" : "#ff6b6b" }}>{pwMsg.text}</div>}
+      </div>
+
+      <div className={card}>
+        <div className={label}>Help</div>
+        <div className="fs-13 c-text font-semibold mb-1">Add Zion OS to your phone's home screen</div>
+        <div className="fs-12 c-muted leading-relaxed mb-1"><span className="c-text">iPhone (Safari):</span> open Zion OS in Safari, tap the Share button, choose Add to Home Screen, then Add. Open it from the new icon.</div>
+        <div className="fs-12 c-muted leading-relaxed mb-4"><span className="c-text">Android (Chrome):</span> tap the three dots, choose Add to Home screen or Install app.</div>
+        <div className="fs-12 c-muted mb-4">Then turn on notifications above, so you never miss a sale or a custom.</div>
+        <div className="fs-13 c-text font-semibold mb-1.5">Write to my manager</div>
+        <textarea value={msg} onChange={(e) => setMsg(e.target.value)} rows={3} maxLength={1000} placeholder="Your question or message" className={field} />
+        <button onClick={sendMessage} className="mt-3 px-3 py-2 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase font-semibold">Send</button>
+        {msgState.text && <div className="fs-12 mt-2" style={{ color: msgState.ok ? "#39e673" : "#ff6b6b" }}>{msgState.text}</div>}
       </div>
     </div>
   );
@@ -12253,7 +12455,7 @@ function CreatorMoney({ model, record, rows, children }) {
   );
 }
 
-function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDailyStats, bufferTopPosts, ofDailyStats, inflowwDailyStats, modelRecord }) {
+function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDailyStats, bufferTopPosts, ofDailyStats, inflowwDailyStats, modelRecord, igGraphStats }) {
   const mine = stats.filter((s) => s.model === restrictModel).sort((a, b) => b.weekOf.localeCompare(a.weekOf));
   const latest = mine[0];
   const prev = mine[1];
@@ -12329,6 +12531,7 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
     return (
       <div className="creator-glow-scope">
         <CreatorMoney model={restrictModel} record={modelRecord} rows={inflowwDailyStats}>{inflowwSectionEmbedded}</CreatorMoney>
+      <CreatorGrowth model={restrictModel} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} igGraphStats={igGraphStats} />
         <ThisWeeksAsks tasks={tasks} restrictModel={restrictModel} onNavigate={onNavigate} />
         <CreatorInsightsSection models={[{ name: restrictModel }]} inflowwDailyStats={inflowwDailyStats} days={30} periodLabel="30d" />
         <XStatsSection models={[{ name: restrictModel }]} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} restrictModel={restrictModel} />
@@ -12343,6 +12546,7 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
   return (
     <div className="creator-glow-scope">
       <CreatorMoney model={restrictModel} record={modelRecord} rows={inflowwDailyStats}>{inflowwSectionEmbedded}</CreatorMoney>
+      <CreatorGrowth model={restrictModel} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} igGraphStats={igGraphStats} />
       <GoalCard latest={latest} />
       <ThisWeeksAsks tasks={tasks} restrictModel={restrictModel} onNavigate={onNavigate} />
       <CreatorInsightsSection models={[{ name: restrictModel }]} inflowwDailyStats={inflowwDailyStats} days={30} periodLabel="30d" />
@@ -13792,7 +13996,7 @@ function CustomsCreatorPage({ model, record }) {
 function App() {
   const { value: cards, loading: cardsLoading, persist: persistCards } = useSupaTable("cards", "id", [], cardsToJS, cardsToDB);
   const { value: models, loading: modelsLoading, persist: persistModels } = useSupaTable("models", "name", [], modelsToJS, modelsToDB,
-    "name, note, onboarded, added_at, ig_handle, x_handle, tiktok_handle, of_url, drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank, disabled_platforms, agency_cut_pct");
+    "name, note, onboarded, added_at, ig_handle, x_handle, tiktok_handle, of_url, drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank, disabled_platforms, agency_cut_pct, goal_note, goal_auto_value, notif_prefs, about");
   const { value: tasks, loading: tasksLoading, persist: persistTasks } = useSupaTable("tasks", "id", [], tasksToJS, tasksToDB);
   const { value: stats, loading: statsLoading, persist: persistStats } = useSupaTable("stats", "id", [], statsToJS, statsToDB);
   const { value: reels, loading: reelsLoading, persist: persistReels } = useSupaTable("reels", "id", [], reelsToJS, reelsToDB);
@@ -14113,7 +14317,7 @@ function App() {
 
             {currentView === "dashboard" && (session.role === "admin"
               ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} inflowwDailyStats={inflowwDailyStats} inflowwSyncing={inflowwSyncing} refreshInfloww={refreshInfloww} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} settings={settings} />
-              : <CreatorDashboard modelRecord={models.find((mm) => mm.name === restrictModel)} stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} ofDailyStats={ofDailyStats} inflowwDailyStats={inflowwDailyStats} />)}
+              : <CreatorDashboard igGraphStats={igGraphStats} modelRecord={models.find((mm) => mm.name === restrictModel)} stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} ofDailyStats={ofDailyStats} inflowwDailyStats={inflowwDailyStats} />)}
             {currentView === "content" && <ContentDirector cards={isAdmin ? scopedCards : cards} persistCards={isAdmin ? scopedPersistCards : persistCards} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} forcedNetwork={contentPlatform} reels={isAdmin ? scopedReels : reels} persistReels={isAdmin ? scopedPersistReels : persistReels} xCompetitors={xCompetitors} persistXCompetitors={persistXCompetitors} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} inflowwDailyStats={inflowwDailyStats} igGraphStats={igGraphStats} igGraphMedia={igGraphMedia} igViralVariations={igViralVariations} />}
             {currentView === "editor" && isAdmin && <EditorPage />}
             {currentView === "calendar" && <CalendarView cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks} onNavigate={setView} restrictModel={restrictModel} />}
@@ -14130,7 +14334,7 @@ function App() {
             {currentView === "whatsnew" && <WhatsNewPage />}
             {currentView === "settings" && (isAdmin
               ? <SettingsPanel settings={settings} persistSettings={persistSettings} />
-              : <CreatorSettingsPanel />)}
+              : <CreatorSettingsPanel model={restrictModel} record={models.find((mm) => mm.name === restrictModel)} />)}
           </main>
         </div>
       </div>
