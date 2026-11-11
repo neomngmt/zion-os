@@ -6495,6 +6495,44 @@ function EditorStudio({
       window.__zionBusy = false;
     };
   }, [phase, ups]);
+  const exportReady = !!(job && job.status === "done" && job.final_file === "final.mp4");
+  const exportBusy = !!(job && (job.status === "approved" || job.status === "rendering_final"));
+  const exportPct = job && job.stage ? (/(\d{1,3})%\s*$/.exec(job.stage) || [])[1] : null;
+  const requestExport = async () => {
+    if (!job || !tunnel || exportBusy) return;
+    setErr("");
+    try {
+      await api("/export", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          id: job.id
+        })
+      });
+      setJob(j => ({
+        ...j,
+        status: "approved",
+        stage: "Waiting for the full quality export"
+      }));
+    } catch (e) {
+      setErr("Could not start the export.");
+    }
+  };
+  useEffect(() => {
+    if (phase !== "done" || !job || !(job.status === "approved" || job.status === "rendering_final")) return;
+    const id = setInterval(async () => {
+      const {
+        data
+      } = await supabaseClient.from("edit_jobs").select("status, stage, final_file, error").eq("id", job.id).maybeSingle();
+      if (data) setJob(j => ({
+        ...j,
+        ...data
+      }));
+    }, 3000);
+    return () => clearInterval(id);
+  }, [phase, job && job.id, job && job.status]);
   const reset = () => {
     setJob(null);
     setSelRaw(null);
@@ -6847,8 +6885,8 @@ function EditorStudio({
     title: "Hide or show the left menu"
   }, menuHidden ? "Show menu" : "Hide menu"), React.createElement("div", {
     style: btn
-  }, "Share"), phase === "done" && job ? React.createElement("a", {
-    href: `${tunnel}/file?job=${job.id}&name=${job.final_file || "preview.mp4"}&dl=1&t=${encodeURIComponent(token)}`,
+  }, "Share"), phase === "done" && job ? exportReady ? React.createElement("a", {
+    href: `${tunnel}/file?job=${job.id}&name=final.mp4&dl=1&t=${encodeURIComponent(token)}`,
     style: {
       ...btn,
       background: ES.lime,
@@ -6857,7 +6895,17 @@ function EditorStudio({
       border: "none",
       textDecoration: "none"
     }
-  }, "Export") : React.createElement("div", {
+  }, "Download") : React.createElement("div", {
+    onClick: requestExport,
+    style: {
+      ...btn,
+      background: exportBusy ? ES.panel2 : ES.lime,
+      color: exportBusy ? ES.ac : "#10140a",
+      fontWeight: 700,
+      border: "none",
+      cursor: exportBusy ? "default" : "pointer"
+    }
+  }, exportBusy ? `Exporting${exportPct ? " " + exportPct + "%" : "..."}` : "Export") : React.createElement("div", {
     title: "Export is ready when the edit is done",
     style: {
       ...btn,
@@ -7129,11 +7177,11 @@ function EditorStudio({
       color: err ? ES.orange : ES.dim,
       lineHeight: 1.4
     }
-  }, err || job.summary), React.createElement("div", {
+  }, err || job.summary + (exportReady ? "" : " This is the fast preview, Export renders it in full quality.")), React.createElement("div", {
     onClick: reset,
     style: btn
-  }, "New edit"), React.createElement("a", {
-    href: `${tunnel}/file?job=${job.id}&name=${job.final_file || "preview.mp4"}&dl=1&t=${encodeURIComponent(token)}`,
+  }, "New edit"), exportReady ? React.createElement("a", {
+    href: `${tunnel}/file?job=${job.id}&name=final.mp4&dl=1&t=${encodeURIComponent(token)}`,
     style: {
       ...btn,
       background: ES.lime,
@@ -7144,7 +7192,19 @@ function EditorStudio({
       padding: "10px 34px",
       fontSize: 14
     }
-  }, "Export"))), phase === "working" && job && React.createElement("div", {
+  }, "Download full quality") : React.createElement("div", {
+    onClick: requestExport,
+    style: {
+      ...btn,
+      background: exportBusy ? ES.panel2 : ES.lime,
+      color: exportBusy ? ES.ac : "#10140a",
+      fontWeight: 800,
+      border: "none",
+      padding: "10px 34px",
+      fontSize: 14,
+      cursor: exportBusy ? "default" : "pointer"
+    }
+  }, exportBusy ? `Rendering full quality${exportPct ? " " + exportPct + "%" : "..."}` : "Export in full quality"))), phase === "working" && job && React.createElement("div", {
     style: {
       position: "relative",
       overflow: "hidden",
@@ -7299,7 +7359,7 @@ function EditorStudio({
       justifyContent: "center"
     }
   }, liveOn && tunnel && React.createElement("video", {
-    src: `${tunnel}/file?kind=raw&name=${encodeURIComponent(selRaw || job.source_name || "")}&t=${encodeURIComponent(token)}`,
+    src: `${job.checker && job.checker.proxy ? `${tunnel}/file?job=${job.id}&name=proxy.mp4&t=${encodeURIComponent(token)}` : `${tunnel}/file?kind=raw&name=${encodeURIComponent(selRaw || job.source_name || "")}&t=${encodeURIComponent(token)}`}`,
     muted: true,
     autoPlay: true,
     loop: true,
@@ -7372,7 +7432,7 @@ function EditorStudio({
     }
   }, liveOn && tunnel ? React.createElement(EsLivePreview, {
     key: job.id,
-    src: `${tunnel}/file?kind=raw&name=${encodeURIComponent(selRaw || job.source_name || "")}&t=${encodeURIComponent(token)}`,
+    src: `${job.checker && job.checker.proxy ? `${tunnel}/file?job=${job.id}&name=proxy.mp4&t=${encodeURIComponent(token)}` : `${tunnel}/file?kind=raw&name=${encodeURIComponent(selRaw || job.source_name || "")}&t=${encodeURIComponent(token)}`}`,
     keep: liveKeep,
     events: liveEv,
     onOut: setT,
@@ -24048,7 +24108,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1at94vx</script>
+<script type="text/babel" id="zion-version">10jkys8</script>
 <script>
 (function () {
   var last = 0;

@@ -4278,6 +4278,20 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
   const order = {}; seq.forEach((it, i) => { order[it.key] = i; });
   const cutMarks = seq.filter((it, i) => it.mark != null && i < placed);
   useEffect(() => { window.__zionBusy = phase === "working" || phase === "done" || Object.keys(ups).length > 0; return () => { window.__zionBusy = false; }; }, [phase, ups]);
+  const exportReady = !!(job && job.status === "done" && job.final_file === "final.mp4");
+  const exportBusy = !!(job && (job.status === "approved" || job.status === "rendering_final"));
+  const exportPct = job && job.stage ? (/(\d{1,3})%\s*$/.exec(job.stage) || [])[1] : null;
+  const requestExport = async () => {
+    if (!job || !tunnel || exportBusy) return;
+    setErr("");
+    try { await api("/export", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: job.id }) }); setJob((j) => ({ ...j, status: "approved", stage: "Waiting for the full quality export" })); }
+    catch (e) { setErr("Could not start the export."); }
+  };
+  useEffect(() => {
+    if (phase !== "done" || !job || !(job.status === "approved" || job.status === "rendering_final")) return;
+    const id = setInterval(async () => { const { data } = await supabaseClient.from("edit_jobs").select("status, stage, final_file, error").eq("id", job.id).maybeSingle(); if (data) setJob((j) => ({ ...j, ...data })); }, 3000);
+    return () => clearInterval(id);
+  }, [phase, job && job.id, job && job.status]);
   const reset = () => { setJob(null); setSelRaw(null); setSelRef(null); setBrief(""); setErr(""); setPhase("prepare"); };
   const goPrepare = () => { setDocking(true); dockCursors(); setTimeout(() => { setPhase("prepare"); setDocking(false); }, 1100); };
   const cancelPrepare = () => setPhase("idle");
@@ -4380,7 +4394,9 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
           {phase === "prepare" && <div onClick={cancelPrepare} style={btn}>Cancel</div>}
           {onToggleMenu && <div onClick={onToggleMenu} style={btn} title="Hide or show the left menu">{menuHidden ? "Show menu" : "Hide menu"}</div>}
           <div style={btn}>Share</div>
-          {phase === "done" && job ? <a href={`${tunnel}/file?job=${job.id}&name=${job.final_file || "preview.mp4"}&dl=1&t=${encodeURIComponent(token)}`} style={{ ...btn, background: ES.lime, color: "#10140a", fontWeight: 700, border: "none", textDecoration: "none" }}>Export</a>
+          {phase === "done" && job ? (exportReady
+            ? <a href={`${tunnel}/file?job=${job.id}&name=final.mp4&dl=1&t=${encodeURIComponent(token)}`} style={{ ...btn, background: ES.lime, color: "#10140a", fontWeight: 700, border: "none", textDecoration: "none" }}>Download</a>
+            : <div onClick={requestExport} style={{ ...btn, background: exportBusy ? ES.panel2 : ES.lime, color: exportBusy ? ES.ac : "#10140a", fontWeight: 700, border: "none", cursor: exportBusy ? "default" : "pointer" }}>{exportBusy ? `Exporting${exportPct ? " " + exportPct + "%" : "..."}` : "Export"}</div>)
             : <div title="Export is ready when the edit is done" style={{ ...btn, background: ES.panel2, color: ES.faint, cursor: "default" }}>Export</div>}
         </div>
 
@@ -4427,9 +4443,11 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
               <video key={job.id} src={`${tunnel}/file?job=${job.id}&name=${job.final_file || "preview.mp4"}&t=${encodeURIComponent(token)}`} controls autoPlay loop playsInline onError={() => setErr("The video could not be played here. Use Export to download it.")} style={{ width: "100%", height: "100%", objectFit: "contain", background: "#000" }} />
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, width: "min(760px, 100%)" }}>
-              <div style={{ flex: 1, fontSize: 12, color: err ? ES.orange : ES.dim, lineHeight: 1.4 }}>{err || job.summary}</div>
+              <div style={{ flex: 1, fontSize: 12, color: err ? ES.orange : ES.dim, lineHeight: 1.4 }}>{err || (job.summary + (exportReady ? "" : " This is the fast preview, Export renders it in full quality."))}</div>
               <div onClick={reset} style={btn}>New edit</div>
-              <a href={`${tunnel}/file?job=${job.id}&name=${job.final_file || "preview.mp4"}&dl=1&t=${encodeURIComponent(token)}`} style={{ ...btn, background: ES.lime, color: "#10140a", fontWeight: 800, border: "none", textDecoration: "none", padding: "10px 34px", fontSize: 14 }}>Export</a>
+              {exportReady
+                ? <a href={`${tunnel}/file?job=${job.id}&name=final.mp4&dl=1&t=${encodeURIComponent(token)}`} style={{ ...btn, background: ES.lime, color: "#10140a", fontWeight: 800, border: "none", textDecoration: "none", padding: "10px 34px", fontSize: 14 }}>Download full quality</a>
+                : <div onClick={requestExport} style={{ ...btn, background: exportBusy ? ES.panel2 : ES.lime, color: exportBusy ? ES.ac : "#10140a", fontWeight: 800, border: "none", padding: "10px 34px", fontSize: 14, cursor: exportBusy ? "default" : "pointer" }}>{exportBusy ? `Rendering full quality${exportPct ? " " + exportPct + "%" : "..."}` : "Export in full quality"}</div>}
             </div>
           </div>
         )}
@@ -4464,7 +4482,7 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
 
           <EsPanel title="Source" right={liveOn ? `${job.source_name || ""}` : "take_01.mov · 16:9"} bodyStyle={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div data-es="1" style={{ flex: 1, background: "#050706", borderRadius: 10, position: "relative", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {liveOn && tunnel && <video src={`${tunnel}/file?kind=raw&name=${encodeURIComponent(selRaw || job.source_name || "")}&t=${encodeURIComponent(token)}`} muted autoPlay loop playsInline style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }} />}
+              {liveOn && tunnel && <video src={`${job.checker && job.checker.proxy ? `${tunnel}/file?job=${job.id}&name=proxy.mp4&t=${encodeURIComponent(token)}` : `${tunnel}/file?kind=raw&name=${encodeURIComponent(selRaw || job.source_name || "")}&t=${encodeURIComponent(token)}`}`} muted autoPlay loop playsInline style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }} />}
               <div style={{ width: "34%", height: "78%", borderRadius: 6, background: liveOn ? "transparent" : "linear-gradient(160deg, #2b3a31, #0e1512)", position: "relative", border: `1.5px dashed ${ES.lime}` }}>
                 <span style={{ position: "absolute", top: -9, left: 0, fontSize: 8, background: ES.lime, color: "#10140a", padding: "1px 5px", borderRadius: 4, fontWeight: 700 }}>AUTO 9:16</span>
               </div>
@@ -4476,7 +4494,7 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
 
           <EsPanel title="Program" right={esTime(t)} bodyStyle={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
             <div style={{ flex: 1, aspectRatio: "9 / 16", maxHeight: "100%", borderRadius: 12, position: "relative", overflow: "hidden", background: "linear-gradient(170deg, #3b3f38 0%, #1a1d19 55%, #0b0d0b 100%)", border: `1px solid ${ES.line}` }}>
-              {liveOn && tunnel ? <EsLivePreview key={job.id} src={`${tunnel}/file?kind=raw&name=${encodeURIComponent(selRaw || job.source_name || "")}&t=${encodeURIComponent(token)}`} keep={liveKeep} events={liveEv} onOut={setT} grade={grade} /> : (<>
+              {liveOn && tunnel ? <EsLivePreview key={job.id} src={`${job.checker && job.checker.proxy ? `${tunnel}/file?job=${job.id}&name=proxy.mp4&t=${encodeURIComponent(token)}` : `${tunnel}/file?kind=raw&name=${encodeURIComponent(selRaw || job.source_name || "")}&t=${encodeURIComponent(token)}`}`} keep={liveKeep} events={liveEv} onOut={setT} grade={grade} /> : (<>
               <div style={{ position: "absolute", left: "50%", top: "40%", width: 110, height: 110, marginLeft: -55, borderRadius: "50%", background: "radial-gradient(circle at 40% 35%, #c9a58a, #6b4d3a 70%)", filter: "blur(.4px)" }} />
               <div style={{ position: "absolute", left: "10%", right: "10%", top: "8%", height: 54, borderRadius: 8, border: `1.5px solid ${ES.lime}`, opacity: t > 6 && t < 11 ? 1 : 0, transition: "opacity .2s", background: "rgba(0,0,0,.35)" }} />
               <div style={{ position: "absolute", left: 0, right: 0, bottom: "20%", textAlign: "center", padding: "0 14px" }}>
