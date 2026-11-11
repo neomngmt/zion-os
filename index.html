@@ -6691,7 +6691,26 @@ function EditorStudio() {
   }, sel ? `selected: ${sel.track.label} · ${sel.clip[2]} · ${esTime(sel.clip[0])} to ${esTime(sel.clip[0] + sel.clip[1])}` : "", "  ·  The agents, the Mac worker and Higgsfield connect in the next step, everything here is sample data."), React.createElement("style", null, `@keyframes esFloat{from{transform:translate(0,0)}to{transform:translate(46px,0)}}`)));
 }
 function EditorPage() {
-  return React.createElement("div", null, React.createElement(EditorStudio, null), React.createElement(EditorLauncher, null));
+  const worker = useEditWorker();
+  const offline = worker.checked && !worker.online;
+  const col = !worker.checked ? "#8B93A1" : offline ? "#e07a5f" : "#39e673";
+  return React.createElement("div", null, React.createElement("div", {
+    className: "flex items-center gap-2 mb-3 flex-wrap"
+  }, React.createElement("span", {
+    className: "fs-10 font-mono uppercase px-2.5 py-1 rounded-full flex items-center gap-1.5",
+    style: {
+      color: col,
+      background: `${col}1a`,
+      border: `1px solid ${col}55`
+    }
+  }, React.createElement("span", {
+    className: "w-1.5 h-1.5 rounded-full",
+    style: {
+      background: col
+    }
+  }), !worker.checked ? "Checking the Mac" : offline ? "Mac offline" : "Mac online"), worker.freeGb != null && React.createElement("span", {
+    className: "fs-10 font-mono c-faint"
+  }, "disk free ", worker.freeGb, " GB")), React.createElement(EditorStudio, null));
 }
 function EditorLauncher() {
   const worker = useEditWorker();
@@ -22546,7 +22565,6 @@ function App() {
           const gName = session.role === "admin" ? "Boss" : session.name || "there";
           prefetchNeoGreeting(`Hi ${gName}! How can I help you today?`);
         }
-        if (n.id === "editor" && editWorker.online) window.open(`${EDIT_WORKER_URL}/app`, "_blank", "noopener");
         setView(n.id);
         setMobileNavOpen(false);
       },
@@ -22676,7 +22694,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">vrdxyv</script>
+<script type="text/babel" id="zion-version">3boozs</script>
 <script>
 (function () {
   var last = 0;

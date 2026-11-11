@@ -4236,10 +4236,18 @@ function EditorStudio() {
 }
 
 function EditorPage() {
+  const worker = useEditWorker();
+  const offline = worker.checked && !worker.online;
+  const col = !worker.checked ? "#8B93A1" : offline ? "#e07a5f" : "#39e673";
   return (
     <div>
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <span className="fs-10 font-mono uppercase px-2.5 py-1 rounded-full flex items-center gap-1.5" style={{ color: col, background: `${col}1a`, border: `1px solid ${col}55` }}>
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: col }} />{!worker.checked ? "Checking the Mac" : offline ? "Mac offline" : "Mac online"}
+        </span>
+        {worker.freeGb != null && <span className="fs-10 font-mono c-faint">disk free {worker.freeGb} GB</span>}
+      </div>
       <EditorStudio />
-      <EditorLauncher />
     </div>
   );
 }
@@ -15281,7 +15289,6 @@ function App() {
                     const gName = session.role === "admin" ? "Boss" : (session.name || "there");
                     prefetchNeoGreeting(`Hi ${gName}! How can I help you today?`);
                   }
-                  if (n.id === "editor" && editWorker.online) window.open(`${EDIT_WORKER_URL}/app`, "_blank", "noopener");
                   setView(n.id); setMobileNavOpen(false);
                 }}
                   className={`tap w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg fs-13 transition-colors ${activeNav ? "c-bg-accent-a1 c-accent" : "c-muted hover-bg-surface hover-text-primary"} ${n.id === "neo" ? "nav-neo-item" : ""}`}>
