@@ -17175,11 +17175,11 @@ function CreatorMoney({
     className: "flex items-baseline gap-2 mt-2"
   }, React.createElement("span", {
     className: "text-2xl font-extrabold c-accent"
-  }, "Top ", ins.leaderboard.topPct, "%"), React.createElement("span", {
+  }, ins.leaderboard.rank ? `Top ${ins.leaderboard.rank}` : `Top ${ins.leaderboard.topPct}%`), React.createElement("span", {
     className: "fs-12 c-muted"
-  }, "of the agency")), React.createElement("div", {
+  }, "this month")), React.createElement("div", {
     className: "fs-12 c-muted mt-1"
-  }, ins.leaderboard.tier), React.createElement("div", {
+  }, ins.leaderboard.rank ? ins.leaderboard.ahead === 0 ? "You are number one in the agency." : `${ins.leaderboard.ahead} ${ins.leaderboard.ahead === 1 ? "model is" : "models are"} ahead of you.` : ins.leaderboard.tier), React.createElement("div", {
     className: "fs-10 c-faint font-mono mt-2"
   }, "Based on this month's revenue, nobody else is named.")), ins.topFans && ins.topFans.length > 0 && React.createElement("div", {
     className: card
@@ -21392,7 +21392,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">qbwmjh</script>
+<script type="text/babel" id="zion-version">h70oyw</script>
 <script>
 (function () {
   var last = 0;
