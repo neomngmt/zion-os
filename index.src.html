@@ -14899,10 +14899,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(
       try {
         var o = document.createElement("div");
         o.style.cssText = "position:fixed;inset:0;z-index:2147483647;background:#080c0a;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;color:#39e673;font-family:Inter,-apple-system,sans-serif;";
-        o.innerHTML = '<svg viewBox="0 0 24 24" width="72" height="72" fill="none"><path d="M12 1L23 12L12 23L1 12Z" stroke="#39e673" stroke-width="1.5"/><path d="M12 7L17 12L12 17L7 12Z" fill="#39e673"/></svg><div style="font-size:15px;letter-spacing:.2em;text-transform:uppercase">Updating</div>';
+        o.innerHTML = '<svg viewBox="0 0 24 24" width="72" height="72" fill="none"><path d="M12 1L23 12L12 23L1 12Z" stroke="#39e673" stroke-width="1.5"/><path d="M12 7L17 12L12 17L7 12Z" fill="#39e673"/></svg><div style="font-size:15px;letter-spacing:.2em;text-transform:uppercase">Updating</div><div style="position:absolute;left:12%;right:12%;bottom:calc(48px + env(safe-area-inset-bottom));height:4px;border-radius:2px;background:rgba(57,230,115,.15);overflow:hidden"><div style="height:100%;width:0;background:#39e673;border-radius:2px;transition:width 1.3s cubic-bezier(.3,.7,.3,1)" id="zion-upd-bar"></div></div>';
         document.body.appendChild(o);
+        setTimeout(function () { var b = document.getElementById("zion-upd-bar"); if (b) b.style.width = "100%"; }, 30);
       } catch (e) {}
-      setTimeout(function () { location.replace(location.pathname + "?v=" + Date.now()); }, 700);
+      setTimeout(function () { location.replace(location.pathname + "?v=" + Date.now()); }, 1400);
     } catch (e) {}
   }
   window.__zionUpdateCheck = check;
