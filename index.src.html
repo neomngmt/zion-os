@@ -3230,7 +3230,7 @@ function TopCountriesCard({ countries, unit = "" }) {
 // buffer_daily_stats/buffer_top_posts, plus an audience-demographics section
 // backed by Publer's account-level chart_data endpoint (separate from
 // post_insights — see publer-demographics).
-function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphMedia, igViralVariations, onPlanPosts, onMakeContentPlan }) {
+function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphMedia, igViralVariations, onPlanPosts, onMakeContentPlan, single }) {
   const C = {
     page: "radial-gradient(ellipse 130% 100% at 10% 0%, rgba(57,230,115,0.14), transparent 55%), radial-gradient(ellipse 100% 80% at 100% 0%, rgba(56,189,248,0.10), transparent 55%), #0b0f0d",
     card: "rgba(255,255,255,0.035)", cardBorder: "1px solid rgba(255,255,255,0.08)",
@@ -3428,7 +3428,7 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
             </div>
             <div>
               <div className="text-2xl font-extrabold tracking-tight" style={{ color: C.ink, textShadow: `0 0 12px ${C.accentA}33` }}>Instagram Dashboard</div>
-              <p className="text-sm mt-0.5" style={{ color: C.sub }}>{noAccounts ? "Stats are filled in automatically from the account username" : `${accountRows.length} account${accountRows.length !== 1 ? "s" : ""} connected via direct Meta API`}</p>
+              <p className="text-sm mt-0.5" style={{ color: C.sub }}>{noAccounts ? "Stats are filled in automatically from the account username" : single ? "Your Instagram, updated every day" : `${accountRows.length} account${accountRows.length !== 1 ? "s" : ""} connected via direct Meta API`}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -3449,7 +3449,7 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
 
         {!noAccounts && (
           <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
-            <div className="flex flex-wrap gap-1.5">
+            {single ? <div /> : <div className="flex flex-wrap gap-1.5">
               <button onClick={() => setIgAccount("all")}
                 className="fs-11 font-mono uppercase px-3 py-1.5 rounded-full tap"
                 style={igAccount === "all"
@@ -3466,7 +3466,7 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
                   {accountDisplayName(a)}
                 </button>
               ))}
-            </div>
+            </div>}
             <div className="flex rounded-full p-0.5" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
               {[7, 30].map((d) => (
                 <button key={d} onClick={() => setIgRange(d)}
@@ -3523,7 +3523,7 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
                     ))}
                   </div>
                 </div>
-                {igAccount === "all" && (
+                {igAccount === "all" && !single && (
                   <div className="flex items-center gap-2 pt-3 mt-1 relative flex-wrap" style={{ borderTop: "1px solid rgba(255,255,255,0.22)" }}>
                     {accountShares.length ? accountShares.map((a) => (
                       <div key={a.name} className="flex items-center gap-1.5 rounded-full pl-1 pr-2.5 py-1" style={{ background: "rgba(0,0,0,0.16)" }}>
@@ -4153,6 +4153,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
         igGraphStats={mine}
         igGraphMedia={(igGraphMedia || []).filter((m) => mineIds.includes(m.account_id))}
         igViralVariations={[]}
+        single
       />
     );
   }

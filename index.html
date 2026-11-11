@@ -4441,7 +4441,8 @@ function IGOverviewDashboard({
   igGraphMedia,
   igViralVariations,
   onPlanPosts,
-  onMakeContentPlan
+  onMakeContentPlan,
+  single
 }) {
   const C = {
     page: "radial-gradient(ellipse 130% 100% at 10% 0%, rgba(57,230,115,0.14), transparent 55%), radial-gradient(ellipse 100% 80% at 100% 0%, rgba(56,189,248,0.10), transparent 55%), #0b0f0d",
@@ -4669,7 +4670,7 @@ function IGOverviewDashboard({
     style: {
       color: C.sub
     }
-  }, noAccounts ? "Stats are filled in automatically from the account username" : `${accountRows.length} account${accountRows.length !== 1 ? "s" : ""} connected via direct Meta API`))), React.createElement("div", {
+  }, noAccounts ? "Stats are filled in automatically from the account username" : single ? "Your Instagram, updated every day" : `${accountRows.length} account${accountRows.length !== 1 ? "s" : ""} connected via direct Meta API`))), React.createElement("div", {
     className: "flex items-center gap-2 flex-wrap"
   }, onMakeContentPlan && React.createElement("button", {
     onClick: onMakeContentPlan,
@@ -4693,7 +4694,7 @@ function IGOverviewDashboard({
     size: 14
   }), " Plan content"))), !noAccounts && React.createElement("div", {
     className: "flex items-center justify-between gap-3 flex-wrap mb-5"
-  }, React.createElement("div", {
+  }, single ? React.createElement("div", null) : React.createElement("div", {
     className: "flex flex-wrap gap-1.5"
   }, React.createElement("button", {
     onClick: () => setIgAccount("all"),
@@ -4812,7 +4813,7 @@ function IGOverviewDashboard({
     }
   }, k), React.createElement("div", {
     className: "fs-13 font-bold text-white"
-  }, v))))), igAccount === "all" && React.createElement("div", {
+  }, v))))), igAccount === "all" && !single && React.createElement("div", {
     className: "flex items-center gap-2 pt-3 mt-1 relative flex-wrap",
     style: {
       borderTop: "1px solid rgba(255,255,255,0.22)"
@@ -5948,7 +5949,8 @@ function ContentDirector({
       inflowwDailyStats: [],
       igGraphStats: mine,
       igGraphMedia: (igGraphMedia || []).filter(m => mineIds.includes(m.account_id)),
-      igViralVariations: []
+      igViralVariations: [],
+      single: true
     });
   }
   if (igMode) {
@@ -21518,7 +21520,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">m6czqb</script>
+<script type="text/babel" id="zion-version">11ingw1</script>
 <script>
 (function () {
   var last = 0;
