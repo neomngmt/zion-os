@@ -6690,7 +6690,10 @@ function EditorStudio() {
     }
   }, sel ? `selected: ${sel.track.label} · ${sel.clip[2]} · ${esTime(sel.clip[0])} to ${esTime(sel.clip[0] + sel.clip[1])}` : "", "  ·  The agents, the Mac worker and Higgsfield connect in the next step, everything here is sample data."), React.createElement("style", null, `@keyframes esFloat{from{transform:translate(0,0)}to{transform:translate(46px,0)}}`)));
 }
-function EditorPage() {
+function EditorPage({
+  menuHidden,
+  onToggleMenu
+}) {
   const worker = useEditWorker();
   const offline = worker.checked && !worker.online;
   const col = !worker.checked ? "#8B93A1" : offline ? "#e07a5f" : "#39e673";
@@ -6710,7 +6713,13 @@ function EditorPage() {
     }
   }), !worker.checked ? "Checking the Mac" : offline ? "Mac offline" : "Mac online"), worker.freeGb != null && React.createElement("span", {
     className: "fs-10 font-mono c-faint"
-  }, "disk free ", worker.freeGb, " GB")), React.createElement(EditorStudio, null));
+  }, "disk free ", worker.freeGb, " GB"), onToggleMenu && React.createElement("button", {
+    onClick: onToggleMenu,
+    className: "tap ml-auto fs-10 font-mono uppercase px-3 py-1.5 rounded-full c-muted hover-accent-text hidden sm:block",
+    style: {
+      border: "1px solid rgba(255,255,255,0.12)"
+    }
+  }, menuHidden ? "Show menu" : "Hide menu")), React.createElement(EditorStudio, null));
 }
 function EditorLauncher() {
   const worker = useEditWorker();
@@ -22175,6 +22184,20 @@ function App() {
   const [contentNavOpen, setContentNavOpen] = useState(false);
   const [contentPlatform, setContentPlatform] = useState(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [editorMenuHidden, setEditorMenuHidden] = useState(() => {
+    try {
+      return localStorage.getItem("zionEditorMenuHidden") === "1";
+    } catch (e) {
+      return false;
+    }
+  });
+  const toggleEditorMenu = () => setEditorMenuHidden(v => {
+    const n = !v;
+    try {
+      localStorage.setItem("zionEditorMenuHidden", n ? "1" : "0");
+    } catch (e) {}
+    return n;
+  });
   const [neoBooting, setNeoBooting] = useState(false);
   const prevViewRef = useRef(null);
   useEffect(() => {
@@ -22459,7 +22482,7 @@ function App() {
     onClick: () => setMobileNavOpen(false),
     className: `fixed inset-0 z-40 bg-black/60 sm:hidden transition-opacity duration-300 ${mobileNavOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`
   }), React.createElement("aside", {
-    className: `fixed inset-y-0 left-0 z-50 w-56 shadow-2xl flex c-bg-panel flex-shrink-0 flex-col transition-transform duration-300 ease-out sm:static sm:z-auto sm:shadow-none sm:translate-x-0 ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}`,
+    className: `fixed inset-y-0 left-0 z-50 w-56 shadow-2xl flex c-bg-panel flex-shrink-0 flex-col transition-transform duration-300 ease-out sm:static sm:z-auto sm:shadow-none sm:translate-x-0 ${currentView === "editor" && editorMenuHidden ? "sm:hidden" : ""} ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}`,
     style: {
       paddingTop: "env(safe-area-inset-top)"
     }
@@ -22645,7 +22668,10 @@ function App() {
     igGraphStats: igGraphStats,
     igGraphMedia: igGraphMedia,
     igViralVariations: igViralVariations
-  }), currentView === "editor" && isAdmin && React.createElement(EditorPage, null), currentView === "calendar" && React.createElement(CalendarView, {
+  }), currentView === "editor" && isAdmin && React.createElement(EditorPage, {
+    menuHidden: editorMenuHidden,
+    onToggleMenu: toggleEditorMenu
+  }), currentView === "calendar" && React.createElement(CalendarView, {
     cards: isAdmin ? scopedCards : cards,
     tasks: isAdmin ? scopedTasks : tasks,
     onNavigate: setView,
@@ -22694,7 +22720,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">3boozs</script>
+<script type="text/babel" id="zion-version">9x9guw</script>
 <script>
 (function () {
   var last = 0;

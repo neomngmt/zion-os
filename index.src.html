@@ -4235,7 +4235,7 @@ function EditorStudio() {
   );
 }
 
-function EditorPage() {
+function EditorPage({ menuHidden, onToggleMenu }) {
   const worker = useEditWorker();
   const offline = worker.checked && !worker.online;
   const col = !worker.checked ? "#8B93A1" : offline ? "#e07a5f" : "#39e673";
@@ -4246,6 +4246,7 @@ function EditorPage() {
           <span className="w-1.5 h-1.5 rounded-full" style={{ background: col }} />{!worker.checked ? "Checking the Mac" : offline ? "Mac offline" : "Mac online"}
         </span>
         {worker.freeGb != null && <span className="fs-10 font-mono c-faint">disk free {worker.freeGb} GB</span>}
+        {onToggleMenu && <button onClick={onToggleMenu} className="tap ml-auto fs-10 font-mono uppercase px-3 py-1.5 rounded-full c-muted hover-accent-text hidden sm:block" style={{ border: "1px solid rgba(255,255,255,0.12)" }}>{menuHidden ? "Show menu" : "Hide menu"}</button>}
       </div>
       <EditorStudio />
     </div>
@@ -15031,6 +15032,8 @@ function App() {
   const [contentNavOpen, setContentNavOpen] = useState(false);
   const [contentPlatform, setContentPlatform] = useState(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [editorMenuHidden, setEditorMenuHidden] = useState(() => { try { return localStorage.getItem("zionEditorMenuHidden") === "1"; } catch (e) { return false; } });
+  const toggleEditorMenu = () => setEditorMenuHidden((v) => { const n = !v; try { localStorage.setItem("zionEditorMenuHidden", n ? "1" : "0"); } catch (e) {} return n; });
   const [neoBooting, setNeoBooting] = useState(false);
   const prevViewRef = useRef(null);
   useEffect(() => {
@@ -15225,7 +15228,7 @@ function App() {
 
         {/* Sidebar — slides in from the left on phones when the top-right
             menu button is tapped; always visible (static) from sm up. */}
-        <aside className={`fixed inset-y-0 left-0 z-50 w-56 shadow-2xl flex c-bg-panel flex-shrink-0 flex-col transition-transform duration-300 ease-out sm:static sm:z-auto sm:shadow-none sm:translate-x-0 ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}`} style={{ paddingTop: "env(safe-area-inset-top)" }}>
+        <aside className={`fixed inset-y-0 left-0 z-50 w-56 shadow-2xl flex c-bg-panel flex-shrink-0 flex-col transition-transform duration-300 ease-out sm:static sm:z-auto sm:shadow-none sm:translate-x-0 ${currentView === "editor" && editorMenuHidden ? "sm:hidden" : ""} ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}`} style={{ paddingTop: "env(safe-area-inset-top)" }}>
           {mobileNavOpen && (
             <div className="sm:hidden flex items-center justify-center pt-6 pb-5">
               <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center" }}>
@@ -15328,7 +15331,7 @@ function App() {
               ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} inflowwDailyStats={inflowwDailyStats} inflowwSyncing={inflowwSyncing} refreshInfloww={refreshInfloww} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} settings={settings} />
               : <CreatorDashboard igGraphStats={igGraphStats} modelRecord={models.find((mm) => mm.name === restrictModel)} stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} ofDailyStats={ofDailyStats} inflowwDailyStats={inflowwDailyStats} />)}
             {currentView === "content" && <ContentDirector cards={isAdmin ? scopedCards : cards} persistCards={isAdmin ? scopedPersistCards : persistCards} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} forcedNetwork={contentPlatform} reels={isAdmin ? scopedReels : reels} persistReels={isAdmin ? scopedPersistReels : persistReels} xCompetitors={xCompetitors} persistXCompetitors={persistXCompetitors} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} inflowwDailyStats={inflowwDailyStats} igGraphStats={igGraphStats} igGraphMedia={igGraphMedia} igViralVariations={igViralVariations} />}
-            {currentView === "editor" && isAdmin && <EditorPage />}
+            {currentView === "editor" && isAdmin && <EditorPage menuHidden={editorMenuHidden} onToggleMenu={toggleEditorMenu} />}
             {currentView === "calendar" && <CalendarView cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks} onNavigate={setView} restrictModel={restrictModel} />}
             {currentView === "tasks" && <TaskManager tasks={isAdmin ? scopedTasks : tasks} persistTasks={isAdmin ? scopedPersistTasks : persistTasks} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} />}
             {currentView === "stats" && <StatsManager stats={scopedStats} persistStats={scopedPersistStats} models={agencyModels} reels={scopedReels} persistReels={scopedPersistReels} />}
