@@ -6018,6 +6018,19 @@ function EditorStudio({
       return n;
     });
   };
+  const removeFile = async (kind, name) => {
+    if (!tunnel || !window.confirm(`Delete ${name} from the Mac?`)) return;
+    try {
+      await api(`/library?kind=${kind}&name=${encodeURIComponent(name)}`, {
+        method: "DELETE"
+      });
+    } catch (e) {
+      setErr("Could not delete the file.");
+    }
+    if (kind === "raw" && selRaw === name) setSelRaw(null);
+    if (kind === "ref" && selRef === name) setSelRef(null);
+    loadLib();
+  };
   const startEdit = async () => {
     if (!tunnel || !selRaw) return;
     setErr("");
@@ -6515,7 +6528,32 @@ function EditorStudio({
       textOverflow: "ellipsis",
       whiteSpace: "nowrap"
     }
-  }, f.name), React.createElement("span", null, f.duration ? `${Math.round(f.duration)}s` : "", " ", (f.size / 1048576).toFixed(0), " MB"))))))), React.createElement("div", {
+  }, f.name), React.createElement("span", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, f.duration ? `${Math.round(f.duration)}s` : "", " ", (f.size / 1048576).toFixed(0), " MB", React.createElement("span", {
+    title: "Delete from the Mac",
+    onClick: e => {
+      e.stopPropagation();
+      removeFile(kind, f.name);
+    },
+    style: {
+      fontSize: 16,
+      lineHeight: 1,
+      padding: "0 4px",
+      color: ES.faint,
+      cursor: "pointer"
+    },
+    onMouseEnter: e => {
+      e.currentTarget.style.color = ES.red;
+    },
+    onMouseLeave: e => {
+      e.currentTarget.style.color = ES.faint;
+    }
+  }, "×")))))))), React.createElement("div", {
     style: {
       display: "flex",
       gap: 10,
@@ -23331,7 +23369,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1niz8gg</script>
+<script type="text/babel" id="zion-version">10kprw1</script>
 <script>
 (function () {
   var last = 0;

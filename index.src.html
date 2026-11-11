@@ -4101,6 +4101,13 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
     } catch (e) { setErr(e.message || "Upload failed"); }
     setUps((u) => { const n = { ...u }; delete n[kind]; return n; });
   };
+  const removeFile = async (kind, name) => {
+    if (!tunnel || !window.confirm(`Delete ${name} from the Mac?`)) return;
+    try { await api(`/library?kind=${kind}&name=${encodeURIComponent(name)}`, { method: "DELETE" }); } catch (e) { setErr("Could not delete the file."); }
+    if (kind === "raw" && selRaw === name) setSelRaw(null);
+    if (kind === "ref" && selRef === name) setSelRef(null);
+    loadLib();
+  };
   const startEdit = async () => {
     if (!tunnel || !selRaw) return;
     setErr("");
@@ -4224,7 +4231,7 @@ function EditorStudio({ menuHidden, onToggleMenu, worker }) {
                     <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 120, overflowY: "auto" }}>
                       {files.slice(0, 8).map((f) => (
                         <div key={f.name} onClick={() => setSel(selected === f.name ? null : f.name)} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, padding: "5px 9px", borderRadius: 8, cursor: "pointer", background: selected === f.name ? "rgba(57,230,115,.12)" : "transparent", color: selected === f.name ? ES.ac : ES.dim, fontFamily: "ui-monospace, monospace" }}>
-                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span><span>{f.duration ? `${Math.round(f.duration)}s` : ""} {(f.size / 1048576).toFixed(0)} MB</span>
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span><span style={{ display: "flex", alignItems: "center", gap: 10 }}>{f.duration ? `${Math.round(f.duration)}s` : ""} {(f.size / 1048576).toFixed(0)} MB<span title="Delete from the Mac" onClick={(e) => { e.stopPropagation(); removeFile(kind, f.name); }} style={{ fontSize: 16, lineHeight: 1, padding: "0 4px", color: ES.faint, cursor: "pointer" }} onMouseEnter={(e) => { e.currentTarget.style.color = ES.red; }} onMouseLeave={(e) => { e.currentTarget.style.color = ES.faint; }}>×</span></span>
                         </div>))}
                     </div>
                   </div>))}
