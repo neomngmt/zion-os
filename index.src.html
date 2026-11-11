@@ -3152,6 +3152,29 @@ const MANUAL_IG_DEMOGRAPHICS = {};
 // Dot-fill world silhouette — the real country outlines (flekschas/simple-world-map,
 // CC BY-SA), filled with a repeating dot pattern instead of a solid color so
 // it reads as the "hex/dot map" style from the reference, not a flat blob.
+function ReelViewsBars({ posts, color = "#a78bfa" }) {
+  const [hov, setHov] = React.useState(null);
+  const list = [...(posts || [])].sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp))).slice(-16);
+  const max = Math.max(1, ...list.map((m) => m.views || 0));
+  const fmt = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "K" : String(n || 0));
+  if (!list.length) return <div className="fs-11 italic text-center py-10" style={{ color: "#9d9b95" }}>No reels yet.</div>;
+  const h = hov != null ? list[hov] : null;
+  return (
+    <div>
+      <div className="fs-11 mb-2" style={{ color: "#9d9b95", minHeight: 18 }}>
+        {h ? `${new Date(h.timestamp).toLocaleDateString(undefined, { day: "numeric", month: "short" })}: ${(h.views || 0).toLocaleString()} views, ${h.likes || 0} likes, ${h.comments || 0} comments` : "Hover a bar to see the reel"}
+      </div>
+      <div className="flex items-end gap-1" style={{ height: 150 }} onMouseLeave={() => setHov(null)}>
+        {list.map((m, i) => (
+          <a key={m.id} href={m.permalink} target="_blank" rel="noreferrer" onMouseEnter={() => setHov(i)} className="flex-1 rounded-t-lg"
+            style={{ height: `${Math.max(4, ((m.views || 0) / max) * 100)}%`, background: hov === i ? color : `${color}66`, minWidth: 0, transition: "background .15s" }}
+            title={fmt(m.views)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function WorldDotMap({ color = "#a78bfa", height = 220 }) {
   const patId = React.useMemo(() => `worldDots${Math.random().toString(36).slice(2)}`, []);
   return (
@@ -3577,13 +3600,14 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
                   <MoreDotsIG dark />
                 </div>
                 <AgeRangeBubbles ages={demographics?.ages} colors={DONUT_COLORS.concat(["#a78bfa"])} />
+                {!(demographics?.ages || []).length && <div className="fs-10 mt-2 text-center" style={{ color: C.sub }}>Age and countries are not public. Add her Insights screenshot in IG Studio and they show up here.</div>}
               </div>
               <div className="lg:col-span-5 rounded-3xl p-5" style={{ background: C.card, border: C.cardBorder }}>
                 <div className="flex items-center justify-between mb-3">
-                  <div className="fs-13 font-semibold">Impressions</div>
+                  <div className="fs-13 font-semibold">Views per reel</div>
                   <MoreDotsIG dark />
                 </div>
-                <WorldDotMap color="#a78bfa" />
+                <ReelViewsBars posts={mediaInRange.length ? mediaInRange : (igGraphMedia || []).filter((m) => accountIds.includes(m.account_id)).slice(0, 12)} color="#a78bfa" />
               </div>
               <div className="lg:col-span-3 rounded-3xl p-5" style={{ background: C.card, border: C.cardBorder }}>
                 <div className="flex items-center justify-between mb-3">
@@ -13521,8 +13545,7 @@ function ChattersPage() {
     <div className="max-w-5xl">
       <div className="flex items-end justify-between flex-wrap gap-3 mb-5">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight c-text">Chatters</h1>
-          <p className="fs-12 c-muted mt-1">Revenue credited to each chatter, from Famee (attribution rules from Famee Settings, Sales).</p>
+          <p className="fs-12 c-muted">Revenue credited to each chatter, from Famee (attribution rules from Famee Settings, Sales).</p>
         </div>
         <button onClick={load} disabled={loading} className="fs-11 font-mono uppercase px-3 py-1.5 rounded-full tap c-muted" style={{ border: "1px solid rgba(255,255,255,0.12)" }}>
           {loading ? "loading..." : "refresh"}

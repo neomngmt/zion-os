@@ -4301,6 +4301,52 @@ const COUNTRY_NAMES = {
   SK: "Slovakia"
 };
 const MANUAL_IG_DEMOGRAPHICS = {};
+function ReelViewsBars({
+  posts,
+  color = "#a78bfa"
+}) {
+  const [hov, setHov] = React.useState(null);
+  const list = [...(posts || [])].sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp))).slice(-16);
+  const max = Math.max(1, ...list.map(m => m.views || 0));
+  const fmt = n => n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "K" : String(n || 0);
+  if (!list.length) return React.createElement("div", {
+    className: "fs-11 italic text-center py-10",
+    style: {
+      color: "#9d9b95"
+    }
+  }, "No reels yet.");
+  const h = hov != null ? list[hov] : null;
+  return React.createElement("div", null, React.createElement("div", {
+    className: "fs-11 mb-2",
+    style: {
+      color: "#9d9b95",
+      minHeight: 18
+    }
+  }, h ? `${new Date(h.timestamp).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short"
+  })}: ${(h.views || 0).toLocaleString()} views, ${h.likes || 0} likes, ${h.comments || 0} comments` : "Hover a bar to see the reel"), React.createElement("div", {
+    className: "flex items-end gap-1",
+    style: {
+      height: 150
+    },
+    onMouseLeave: () => setHov(null)
+  }, list.map((m, i) => React.createElement("a", {
+    key: m.id,
+    href: m.permalink,
+    target: "_blank",
+    rel: "noreferrer",
+    onMouseEnter: () => setHov(i),
+    className: "flex-1 rounded-t-lg",
+    style: {
+      height: `${Math.max(4, (m.views || 0) / max * 100)}%`,
+      background: hov === i ? color : `${color}66`,
+      minWidth: 0,
+      transition: "background .15s"
+    },
+    title: fmt(m.views)
+  }))));
+}
 function WorldDotMap({
   color = "#a78bfa",
   height = 220
@@ -4946,7 +4992,12 @@ function IGOverviewDashboard({
   })), React.createElement(AgeRangeBubbles, {
     ages: demographics?.ages,
     colors: DONUT_COLORS.concat(["#a78bfa"])
-  })), React.createElement("div", {
+  }), !(demographics?.ages || []).length && React.createElement("div", {
+    className: "fs-10 mt-2 text-center",
+    style: {
+      color: C.sub
+    }
+  }, "Age and countries are not public. Add her Insights screenshot in IG Studio and they show up here.")), React.createElement("div", {
     className: "lg:col-span-5 rounded-3xl p-5",
     style: {
       background: C.card,
@@ -4956,9 +5007,10 @@ function IGOverviewDashboard({
     className: "flex items-center justify-between mb-3"
   }, React.createElement("div", {
     className: "fs-13 font-semibold"
-  }, "Impressions"), React.createElement(MoreDotsIG, {
+  }, "Views per reel"), React.createElement(MoreDotsIG, {
     dark: true
-  })), React.createElement(WorldDotMap, {
+  })), React.createElement(ReelViewsBars, {
+    posts: mediaInRange.length ? mediaInRange : (igGraphMedia || []).filter(m => accountIds.includes(m.account_id)).slice(0, 12),
     color: "#a78bfa"
   })), React.createElement("div", {
     className: "lg:col-span-3 rounded-3xl p-5",
@@ -18259,10 +18311,8 @@ function ChattersPage() {
     className: "max-w-5xl"
   }, React.createElement("div", {
     className: "flex items-end justify-between flex-wrap gap-3 mb-5"
-  }, React.createElement("div", null, React.createElement("h1", {
-    className: "text-2xl font-extrabold tracking-tight c-text"
-  }, "Chatters"), React.createElement("p", {
-    className: "fs-12 c-muted mt-1"
+  }, React.createElement("div", null, React.createElement("p", {
+    className: "fs-12 c-muted"
   }, "Revenue credited to each chatter, from Famee (attribution rules from Famee Settings, Sales).")), React.createElement("button", {
     onClick: load,
     disabled: loading,
@@ -21249,7 +21299,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">bg3nkz</script>
+<script type="text/babel" id="zion-version">or8gl1</script>
 <script>
 (function () {
   var last = 0;
