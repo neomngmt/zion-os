@@ -9417,7 +9417,7 @@ function RevenueChart({
   const max = rawMax * 1.15;
   const n = data.length || 1;
   const isSparse = sparseUntil > 0 && n <= sparseUntil;
-  const stepX = n > 1 ? isSparse ? Math.min(plotW / (n - 1), 64) : plotW / (n - 1) : 0;
+  const stepX = n > 1 ? isSparse && n <= 5 ? Math.min(plotW / (n - 1), 64) : plotW / (n - 1) : 0;
   const niceStep = m => {
     const STEPS = [25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000];
     const rough = m / 4;
@@ -9526,6 +9526,20 @@ function RevenueChart({
     },
     onMouseLeave: () => setHoverIdx(null)
   }, React.createElement("defs", null, React.createElement("linearGradient", {
+    id: "revAreaFill",
+    x1: "0",
+    y1: "0",
+    x2: "0",
+    y2: "1"
+  }, React.createElement("stop", {
+    offset: "0%",
+    stopColor: "#39e673",
+    stopOpacity: "0.28"
+  }), React.createElement("stop", {
+    offset: "100%",
+    stopColor: "#39e673",
+    stopOpacity: "0"
+  })), React.createElement("linearGradient", {
     id: "revBarFill",
     x1: "0",
     y1: "0",
@@ -9606,6 +9620,10 @@ function RevenueChart({
       animationDelay: `${i / bars.length * 0.4}s`
     }
   })), linePath && (!isSparse || n > 5) && React.createElement("path", {
+    d: `${linePath} L ${points[points.length - 1].x.toFixed(1)} ${baseline} L ${points[0].x.toFixed(1)} ${baseline} Z`,
+    fill: "url(#revAreaFill)",
+    clipPath: "url(#revNoNegativeClip)"
+  }), linePath && (!isSparse || n > 5) && React.createElement("path", {
     className: "rev-line",
     d: linePath,
     fill: "none",
@@ -21374,7 +21392,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1mcalyp</script>
+<script type="text/babel" id="zion-version">qbwmjh</script>
 <script>
 (function () {
   var last = 0;

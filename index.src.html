@@ -6657,7 +6657,7 @@ function RevenueChart({ data, height = 240, sparseUntil = 0 }) {
   // Candles pack together at a fixed, readable width instead of stretching edge-to-edge
   // across the whole plot — 2 real days shouldn't look like they're straining to fill a
   // 30-day-wide chart. Left-anchored, same width the dense "forest" bars settle around.
-  const stepX = n > 1 ? (isSparse ? Math.min(plotW / (n - 1), 64) : plotW / (n - 1)) : 0;
+  const stepX = n > 1 ? (isSparse && n <= 5 ? Math.min(plotW / (n - 1), 64) : plotW / (n - 1)) : 0;
 
   // Round, human step (25/50/100/250/500/1000/2500/5000...) picked so the axis always
   // shows ~4 gridlines — a $157 month gets 0/50/100/150, a $16k month gets 0/5k/10k/15k.
@@ -6759,6 +6759,7 @@ function RevenueChart({ data, height = 240, sparseUntil = 0 }) {
     <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} style={{ overflow: "visible", display: "block" }}
       onMouseLeave={() => setHoverIdx(null)}>
       <defs>
+        <linearGradient id="revAreaFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#39e673" stopOpacity="0.28" /><stop offset="100%" stopColor="#39e673" stopOpacity="0" /></linearGradient>
         <linearGradient id="revBarFill" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#39e673" stopOpacity="0.6" />
           <stop offset="100%" stopColor="#39e673" stopOpacity="0.04" />
@@ -6802,6 +6803,9 @@ function RevenueChart({ data, height = 240, sparseUntil = 0 }) {
           trend that isn't real yet — bars/dots alone are honest until there's
           enough of the month behind them to actually connect. Only gated for
           sparseUntil-enabled charts (Month); Week's fixed 7-point line is untouched. */}
+      {linePath && (!isSparse || n > 5) && (
+        <path d={`${linePath} L ${points[points.length - 1].x.toFixed(1)} ${baseline} L ${points[0].x.toFixed(1)} ${baseline} Z`} fill="url(#revAreaFill)" clipPath="url(#revNoNegativeClip)" />
+      )}
       {linePath && (!isSparse || n > 5) && (
         <path className="rev-line" d={linePath} fill="none" stroke="#39e673" strokeWidth="2.5"
           strokeLinejoin="round" strokeLinecap="round" filter="url(#revGlowLine)" clipPath="url(#revNoNegativeClip)"
