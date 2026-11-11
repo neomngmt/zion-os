@@ -5826,6 +5826,7 @@ function EsWheel({
     }
   }, React.createElement("div", {
     ref: ref,
+    "data-es": "1",
     onMouseDown: down,
     style: {
       width: 74,
@@ -5891,6 +5892,39 @@ function EditorStudio({
   const [agentFilter, setAgentFilter] = useState(null);
   const [zoom, setZoom] = useState(1);
   const tick = useRef(0);
+  const rootRef = useRef(null);
+  const [cursors, setCursors] = useState(() => ES_AGENTS.map((a, i) => ({
+    id: a.id,
+    x: 80 + i * 110,
+    y: 120 + i % 4 * 70,
+    pulse: 0
+  })));
+  useEffect(() => {
+    if (!live) return;
+    const move = () => {
+      const root = rootRef.current;
+      if (!root) return;
+      const rr = root.getBoundingClientRect();
+      const targets = [...root.querySelectorAll("[data-es]")];
+      if (!targets.length) return;
+      const ai = Math.floor(Math.random() * ES_AGENTS.length);
+      const el = targets[Math.floor(Math.random() * targets.length)];
+      const r = el.getBoundingClientRect();
+      const x = r.left - rr.left + Math.random() * Math.max(8, r.width - 8);
+      const y = r.top - rr.top + Math.random() * Math.max(8, r.height - 6);
+      setCursors(cs => cs.map((c, i) => i === ai ? {
+        ...c,
+        x,
+        y
+      } : c));
+      setTimeout(() => setCursors(cs => cs.map((c, i) => i === ai ? {
+        ...c,
+        pulse: c.pulse + 1
+      } : c)), 950);
+    };
+    const id = setInterval(move, 360);
+    return () => clearInterval(id);
+  }, [live]);
   useEffect(() => {
     if (!playing) return;
     const id = setInterval(() => setT(x => x + 0.05 >= ES_DUR ? 0 : x + 0.05), 50);
@@ -5957,6 +5991,7 @@ function EditorStudio({
   };
   const slider = (k, min, max) => React.createElement("div", {
     key: k,
+    "data-es": "1",
     style: {
       display: "flex",
       alignItems: "center",
@@ -5996,7 +6031,9 @@ function EditorStudio({
       marginBottom: 20
     }
   }, React.createElement("div", {
+    ref: rootRef,
     style: {
+      position: "relative",
       minWidth: 1180,
       height: "calc(100vh - 126px)",
       minHeight: 600,
@@ -6131,6 +6168,7 @@ function EditorStudio({
     }
   }, ES_POOL.map(([n, d], i) => React.createElement("div", {
     key: n,
+    "data-es": "1",
     style: {
       borderRadius: 8,
       overflow: "hidden",
@@ -6181,6 +6219,7 @@ function EditorStudio({
       gap: 8
     }
   }, React.createElement("div", {
+    "data-es": "1",
     style: {
       flex: 1,
       background: "#050706",
@@ -6383,6 +6422,7 @@ function EditorStudio({
     }
   }, ES_CAPTION_STYLES.map(c => React.createElement("span", {
     key: c,
+    "data-es": "1",
     onClick: () => setStyle(c),
     style: {
       fontSize: 10,
@@ -6395,6 +6435,7 @@ function EditorStudio({
     }
   }, c))), ES_FONTS.map(f => React.createElement("div", {
     key: f,
+    "data-es": "1",
     onClick: () => setFont(f),
     style: {
       fontSize: 11,
@@ -6415,7 +6456,8 @@ function EditorStudio({
     }
   }, React.createElement(EsPanel, {
     title: "Waveform",
-    right: "Luma"
+    right: "Luma",
+    bodyStyle: {}
   }, React.createElement("svg", {
     viewBox: "0 0 160 40",
     preserveAspectRatio: "none",
@@ -6571,6 +6613,7 @@ function EditorStudio({
       position: "relative"
     }
   }, React.createElement("div", {
+    "data-es": "1",
     onClick: e => {
       const r = e.currentTarget.getBoundingClientRect();
       setT(Math.max(0, Math.min(ES_DUR, (e.clientX - r.left) / r.width * ES_DUR)));
@@ -6622,6 +6665,7 @@ function EditorStudio({
     }
   }, tr.clips.map((c, i) => React.createElement("div", {
     key: i,
+    "data-es": "1",
     onClick: () => setSelClip(`${tr.id}:${i}`),
     style: {
       position: "absolute",
@@ -6659,23 +6703,7 @@ function EditorStudio({
     height: v * 8,
     fill: c[3],
     opacity: ".8"
-  }))) : c[2]))))), live && [[ES.pink, "sfx-05", "sfx", 38], [ES.blue, "broll-04", "broll", 58], [ES.orange, "color-03", "gfx", 48]].map(([c, n,, x]) => React.createElement("span", {
-    key: n,
-    style: {
-      position: "absolute",
-      left: `calc(70px + (100% - 70px) * ${x / 100})`,
-      top: n.startsWith("sfx") ? 43 : n.startsWith("broll") ? 66 : 112,
-      fontSize: 8,
-      fontWeight: 800,
-      background: c,
-      color: "#10140a",
-      padding: "1px 6px",
-      borderRadius: 5,
-      boxShadow: `0 0 8px ${c}`,
-      animation: "esFloat 3.4s ease-in-out infinite alternate",
-      pointerEvents: "none"
-    }
-  }, n)), React.createElement("div", {
+  }))) : c[2]))))), React.createElement("div", {
     style: {
       position: "absolute",
       top: 0,
@@ -6707,7 +6735,58 @@ function EditorStudio({
       overflow: "hidden",
       textOverflow: "ellipsis"
     }
-  }, sel ? `selected: ${sel.track.label} · ${sel.clip[2]} · ${esTime(sel.clip[0])} to ${esTime(sel.clip[0] + sel.clip[1])}` : "", "  ·  The agents, the Mac worker and Higgsfield connect in the next step, everything here is sample data."), React.createElement("style", null, `@keyframes esFloat{from{transform:translate(0,0)}to{transform:translate(46px,0)}}`)));
+  }, sel ? `selected: ${sel.track.label} · ${sel.clip[2]} · ${esTime(sel.clip[0])} to ${esTime(sel.clip[0] + sel.clip[1])}` : "", "  ·  The agents, the Mac worker and Higgsfield connect in the next step, everything here is sample data."), live && cursors.map((c, i) => {
+    const a = ES_AGENTS[i];
+    return React.createElement("div", {
+      key: a.id,
+      style: {
+        position: "absolute",
+        left: c.x,
+        top: c.y,
+        transition: "left 900ms cubic-bezier(.4,0,.2,1), top 900ms cubic-bezier(.4,0,.2,1)",
+        pointerEvents: "none",
+        zIndex: 30
+      }
+    }, React.createElement("svg", {
+      width: "16",
+      height: "18",
+      viewBox: "0 0 16 18",
+      style: {
+        filter: `drop-shadow(0 0 4px ${a.color})`
+      }
+    }, React.createElement("path", {
+      d: "M1 1l12 6.5-5.2 1.6L5.6 15z",
+      fill: a.color,
+      stroke: "#0a0d0c",
+      strokeWidth: "1"
+    })), React.createElement("span", {
+      style: {
+        position: "absolute",
+        left: 12,
+        top: 13,
+        fontSize: 8.5,
+        fontWeight: 800,
+        background: a.color,
+        color: "#10140a",
+        padding: "1px 6px",
+        borderRadius: 5,
+        whiteSpace: "nowrap",
+        boxShadow: `0 0 8px ${a.color}`
+      }
+    }, a.name), c.pulse > 0 && React.createElement("span", {
+      key: c.pulse,
+      style: {
+        position: "absolute",
+        left: -8,
+        top: -8,
+        width: 20,
+        height: 20,
+        borderRadius: "50%",
+        border: `2px solid ${a.color}`,
+        animation: "esClick .55s ease-out forwards"
+      }
+    }));
+  }), React.createElement("style", null, `@keyframes esClick{0%{transform:scale(.3);opacity:.95}100%{transform:scale(1.9);opacity:0}}`)));
 }
 function EditorPage({
   menuHidden,
@@ -22717,7 +22796,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">97cwha</script>
+<script type="text/babel" id="zion-version">16axbn2</script>
 <script>
 (function () {
   var last = 0;
