@@ -1470,6 +1470,8 @@ const modelsToJS = r => ({
   addedAt: r.added_at ? new Date(r.added_at).getTime() : Date.now(),
   igHandle: r.ig_handle || "",
   fbUrl: r.fb_url || "",
+  threadsHandle: r.threads_handle || "",
+  snapHandle: r.snap_handle || "",
   xHandle: r.x_handle || "",
   tiktokHandle: r.tiktok_handle || "",
   ofUrl: r.of_url || "",
@@ -1504,6 +1506,9 @@ const modelsToDB = m => ({
   agency: m.agency || "CZ",
   added_at: m.addedAt ? new Date(m.addedAt).toISOString() : new Date().toISOString(),
   ig_handle: m.igHandle || "",
+  fb_url: m.fbUrl || "",
+  threads_handle: m.threadsHandle || "",
+  snap_handle: m.snapHandle || "",
   x_handle: m.xHandle || "",
   tiktok_handle: m.tiktokHandle || "",
   of_url: m.ofUrl || "",
@@ -5995,7 +6000,7 @@ function ContentDirector({
   const igMode = network === "ig" && !restrictModel;
   if (restrictModel && ["ig", "x", "tiktok", "threads", "snap", "fb"].includes(network)) {
     const mm = models.find(x => x.name === restrictModel) || {};
-    const connected = network === "ig" ? !!mm.igHandle : network === "x" ? !!mm.xHandle : network === "tiktok" ? !!mm.tiktokHandle : network === "fb" ? !!mm.fbUrl : network === "threads" ? (bufferDailyStats || []).some(r => r.model === restrictModel && r.platform === "threads") : false;
+    const connected = network === "ig" ? !!mm.igHandle : network === "x" ? !!mm.xHandle : network === "tiktok" ? !!mm.tiktokHandle : network === "fb" ? !!mm.fbUrl : network === "threads" ? !!mm.threadsHandle || (bufferDailyStats || []).some(r => r.model === restrictModel && r.platform === "threads") : network === "snap" ? !!mm.snapHandle : false;
     if (!connected) return React.createElement(PlatformEmpty, {
       platform: network
     });
@@ -9451,6 +9456,27 @@ function ModelDetail({
     value: form.tiktokHandle || "",
     onChange: e => set("tiktokHandle", e.target.value.replace(/^@/, "")),
     placeholder: "username, no @",
+    className: "w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono"
+  })), React.createElement("div", null, React.createElement("label", {
+    className: "block fs-10 uppercase tracking-wide c-muted font-mono mb-1"
+  }, "Threads handle"), React.createElement("input", {
+    value: form.threadsHandle || "",
+    onChange: e => set("threadsHandle", e.target.value.replace(/^@/, "")),
+    placeholder: "username, no @",
+    className: "w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono"
+  })), React.createElement("div", null, React.createElement("label", {
+    className: "block fs-10 uppercase tracking-wide c-muted font-mono mb-1"
+  }, "Snapchat username"), React.createElement("input", {
+    value: form.snapHandle || "",
+    onChange: e => set("snapHandle", e.target.value.replace(/^@/, "")),
+    placeholder: "username, no @",
+    className: "w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono"
+  })), React.createElement("div", null, React.createElement("label", {
+    className: "block fs-10 uppercase tracking-wide c-muted font-mono mb-1"
+  }, "Facebook page URL"), React.createElement("input", {
+    value: form.fbUrl || "",
+    onChange: e => set("fbUrl", e.target.value),
+    placeholder: "https://facebook.com/...",
     className: "w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono"
   })), React.createElement("div", null, React.createElement("label", {
     className: "block fs-10 uppercase tracking-wide c-muted font-mono mb-1"
@@ -20969,7 +20995,7 @@ function App() {
     value: models,
     loading: modelsLoading,
     persist: persistModels
-  } = useSupaTable("models", "name", [], modelsToJS, modelsToDB, "name, note, onboarded, added_at, ig_handle, x_handle, tiktok_handle, of_url, drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank, disabled_platforms, agency_cut_pct, goal_note, goal_auto_value, notif_prefs, about, fb_url");
+  } = useSupaTable("models", "name", [], modelsToJS, modelsToDB, "name, note, onboarded, added_at, ig_handle, x_handle, tiktok_handle, of_url, drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank, disabled_platforms, agency_cut_pct, goal_note, goal_auto_value, notif_prefs, about, fb_url, threads_handle, snap_handle");
   const {
     value: tasks,
     loading: tasksLoading,
@@ -21579,7 +21605,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">ipsz1x</script>
+<script type="text/babel" id="zion-version">dy030u</script>
 <script>
 (function () {
   var last = 0;
