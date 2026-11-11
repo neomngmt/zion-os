@@ -102,6 +102,19 @@ const ICON_DATA = {
   }], ["path", {
     d: "M12 5v14"
   }]],
+  Gift: [["rect", {
+    x: "3",
+    y: "8",
+    width: "18",
+    height: "4",
+    rx: "1"
+  }], ["path", {
+    d: "M12 8v13"
+  }], ["path", {
+    d: "M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"
+  }], ["path", {
+    d: "M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"
+  }]],
   X: [["path", {
     d: "M18 6 6 18"
   }], ["path", {
@@ -568,7 +581,8 @@ const {
   BarChart3,
   Shuffle,
   ExternalLink,
-  Link2
+  Link2,
+  Gift
 } = Icons;
 const SUPABASE_URL = "https://kvwwjyvkoiqsvpyzbcmn.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_LkaAa6azdXD1emOoN2rCOQ_E-4NSy7V";
@@ -1380,6 +1394,8 @@ const modelsToJS = r => ({
   notifLastSeen: r.notif_last_seen ? new Date(r.notif_last_seen).getTime() : 0,
   inspoProfiles: Array.isArray(r.inspo_profiles) ? r.inspo_profiles : r.inspo_profiles ? JSON.parse(r.inspo_profiles) : [],
   monthlyGoal: r.monthly_goal != null ? Number(r.monthly_goal) : null,
+  goalNote: r.goal_note || "",
+  goalAuto: r.goal_auto_value != null && r.monthly_goal != null && Number(r.goal_auto_value) === Number(r.monthly_goal),
   igConnectedAt: r.ig_connected_at ? new Date(r.ig_connected_at).getTime() : null,
   disabledPlatforms: Array.isArray(r.disabled_platforms) ? r.disabled_platforms : [],
   agencyCutPct: r.agency_cut_pct != null ? Number(r.agency_cut_pct) : null
@@ -16238,7 +16254,11 @@ function CreatorMoney({
     }
   })), monthNet >= goal && React.createElement("div", {
     className: "fs-11 font-mono c-accent mt-2"
-  }, "Goal reached, great month!")) : null), err && React.createElement("div", {
+  }, "Goal reached, great month!"), record && record.goalAuto && record.goalNote && React.createElement("div", {
+    className: "fs-11 c-muted mt-2"
+  }, record.goalNote, " ", React.createElement("span", {
+    className: "c-faint font-mono"
+  }, "(set automatically from your stats)"))) : null), err && React.createElement("div", {
     className: "fs-12 c-muted mb-3"
   }, "Extra insights are not available right now."), ins && ins.connected && React.createElement("div", {
     className: "grid grid-cols-1 md:grid-cols-2 gap-3"
@@ -17861,6 +17881,10 @@ const NAV_ADMIN = [{
   label: "Chatters",
   icon: DollarSign
 }, {
+  id: "customs",
+  label: "Customs",
+  icon: Gift
+}, {
   id: "weeklytrends",
   label: "Trends",
   icon: Flame
@@ -17906,6 +17930,10 @@ const NAV_CREATOR = [{
   label: "My Tasks",
   icon: CheckSquare
 }, {
+  id: "customs",
+  label: "Custom Content",
+  icon: Gift
+}, {
   id: "neo",
   label: "Neo",
   icon: Sparkles
@@ -17950,6 +17978,421 @@ function clearSavedSession() {
   try {
     localStorage.removeItem(SESSION_KEY);
   } catch {}
+}
+const CUSTOM_STATUS = {
+  requested: {
+    label: "Not paid yet",
+    color: "#e0b050"
+  },
+  sold: {
+    label: "Sold, to make",
+    color: "#39e673"
+  },
+  in_progress: {
+    label: "In progress",
+    color: "#5cc8f5"
+  },
+  delivered: {
+    label: "Delivered",
+    color: "#9aa8ff"
+  },
+  cancelled: {
+    label: "Cancelled",
+    color: "#8B93A1"
+  }
+};
+async function customNotify(id, event) {
+  try {
+    await fetch(`${SUPABASE_URL}/functions/v1/custom-notify`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({
+        id,
+        event
+      })
+    });
+  } catch (e) {}
+}
+function useCustoms(modelFilter) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const load = useCallback(async () => {
+    try {
+      let q = supabaseClient.from("customs").select("*").order("created_at", {
+        ascending: false
+      });
+      if (modelFilter) q = q.eq("model", modelFilter);
+      const {
+        data,
+        error
+      } = await q;
+      if (error) throw error;
+      setRows(data || []);
+    } catch (e) {
+      console.error("load failed for customs", e);
+    }
+    setLoading(false);
+  }, [modelFilter]);
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 20000);
+    return () => clearInterval(t);
+  }, [load]);
+  return {
+    rows,
+    loading,
+    reload: load
+  };
+}
+function CustomStatusChip({
+  status
+}) {
+  const s = CUSTOM_STATUS[status] || CUSTOM_STATUS.sold;
+  return React.createElement("span", {
+    className: "fs-9 font-mono uppercase tracking-wide px-2 py-0.5 rounded-full",
+    style: {
+      background: `${s.color}26`,
+      color: s.color
+    }
+  }, s.label);
+}
+function CustomsAdminPage({
+  models
+}) {
+  const {
+    rows,
+    loading,
+    reload
+  } = useCustoms(null);
+  const names = new Set((models || []).map(m => m.name));
+  const list = rows.filter(r => names.has(r.model));
+  const blank = {
+    model: models && models[0] && models[0].name || "",
+    fan: "",
+    description: "",
+    price: "",
+    deadline: "",
+    sold: true
+  };
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState(blank);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const set = (k, v) => setF(p => ({
+    ...p,
+    [k]: v
+  }));
+  const field = "w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent";
+  const create = async () => {
+    if (!f.model || !f.description.trim()) {
+      setErr("Choose a model and describe the custom.");
+      return;
+    }
+    setBusy(true);
+    setErr("");
+    const id = `cu_${Date.now().toString(36)}`;
+    const row = {
+      id,
+      model: f.model,
+      fan_label: f.fan.trim() || null,
+      description: f.description.trim(),
+      price: f.price !== "" ? Number(f.price) : null,
+      deadline: f.deadline || null,
+      status: f.sold ? "sold" : "requested",
+      sold_at: f.sold ? new Date().toISOString() : null
+    };
+    const {
+      error
+    } = await supabaseClient.from("customs").insert(row);
+    if (error) {
+      setErr(error.message);
+      setBusy(false);
+      return;
+    }
+    await customNotify(id, "created");
+    setF(blank);
+    setOpen(false);
+    setBusy(false);
+    reload();
+  };
+  const update = async (c, patch, event) => {
+    const {
+      error
+    } = await supabaseClient.from("customs").update(patch).eq("id", c.id);
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+    if (event) await customNotify(c.id, event);
+    reload();
+  };
+  const groups = [["sold", "To make"], ["in_progress", "In progress"], ["requested", "Not paid yet"], ["delivered", "Delivered"], ["cancelled", "Cancelled"]];
+  return React.createElement("div", {
+    className: "max-w-3xl"
+  }, React.createElement("div", {
+    className: "flex items-center justify-between mb-4 gap-3 flex-wrap"
+  }, React.createElement("p", {
+    className: "fs-13 c-muted"
+  }, "Custom content requests. When you add one, the model gets a push in the app right away."), React.createElement("button", {
+    onClick: () => setOpen(v => !v),
+    className: "px-3 py-2 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase font-semibold"
+  }, open ? "Close" : "New custom")), open && React.createElement("div", {
+    className: "c-bg-surface border c-border rounded-xl p-4 mb-5 space-y-2.5"
+  }, React.createElement("select", {
+    value: f.model,
+    onChange: e => set("model", e.target.value),
+    className: field
+  }, (models || []).map(m => React.createElement("option", {
+    key: m.name,
+    value: m.name
+  }, m.name))), React.createElement("textarea", {
+    value: f.description,
+    onChange: e => set("description", e.target.value),
+    rows: 4,
+    placeholder: "What the fan wants, as exact as possible",
+    className: field
+  }), React.createElement("div", {
+    className: "grid grid-cols-2 gap-2.5"
+  }, React.createElement("input", {
+    value: f.fan,
+    onChange: e => set("fan", e.target.value),
+    placeholder: "Fan name (only you and the model see it)",
+    className: field
+  }), React.createElement("input", {
+    type: "number",
+    value: f.price,
+    onChange: e => set("price", e.target.value),
+    placeholder: "Price in USD",
+    className: field
+  })), React.createElement("div", {
+    className: "flex items-center justify-between gap-3 flex-wrap"
+  }, React.createElement("label", {
+    className: "fs-12 c-muted flex items-center gap-2"
+  }, "Deadline ", React.createElement("input", {
+    type: "date",
+    value: f.deadline,
+    onChange: e => set("deadline", e.target.value),
+    className: "c-bg-app border c-border rounded-lg px-2 py-1.5 text-sm c-text"
+  })), React.createElement("label", {
+    className: "fs-12 c-text flex items-center gap-2"
+  }, React.createElement("input", {
+    type: "checkbox",
+    checked: f.sold,
+    onChange: e => set("sold", e.target.checked)
+  }), " Already paid (sold)")), err && React.createElement("div", {
+    className: "fs-12",
+    style: {
+      color: "#ff6b6b"
+    }
+  }, err), React.createElement("button", {
+    onClick: create,
+    disabled: busy,
+    className: "px-3 py-2 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase font-semibold"
+  }, busy ? "Saving..." : "Save and notify the model")), err && !open && React.createElement("div", {
+    className: "fs-12 mb-3",
+    style: {
+      color: "#ff6b6b"
+    }
+  }, err), loading && React.createElement("div", {
+    className: "fs-13 c-muted"
+  }, "Loading..."), !loading && list.length === 0 && React.createElement("div", {
+    className: "c-bg-surface border c-border rounded-xl px-4 py-6 text-center fs-13 c-muted"
+  }, "No customs yet."), groups.map(([st, title]) => {
+    const items = list.filter(c => c.status === st);
+    if (!items.length) return null;
+    return React.createElement("div", {
+      key: st,
+      className: "mb-5"
+    }, React.createElement("div", {
+      className: "fs-10 font-mono uppercase tracking-widest c-faint mb-2"
+    }, title, " (", items.length, ")"), React.createElement("div", {
+      className: "space-y-2.5"
+    }, items.map(c => React.createElement("div", {
+      key: c.id,
+      className: "c-bg-surface border c-border rounded-xl px-4 py-3.5"
+    }, React.createElement("div", {
+      className: "flex items-center gap-2 flex-wrap mb-1.5"
+    }, React.createElement("span", {
+      className: "fs-14 font-semibold c-text"
+    }, c.model), React.createElement(CustomStatusChip, {
+      status: c.status
+    }), c.price != null && React.createElement("span", {
+      className: "fs-12 font-mono c-accent"
+    }, "$", Number(c.price).toLocaleString("en-US")), c.deadline && React.createElement("span", {
+      className: "fs-11 font-mono c-muted"
+    }, "due ", c.deadline), React.createElement("span", {
+      className: "fs-10 font-mono c-faint ml-auto"
+    }, new Date(c.created_at).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric"
+    }))), c.fan_label && React.createElement("div", {
+      className: "fs-11 c-muted mb-1"
+    }, "Fan: ", c.fan_label), React.createElement("div", {
+      className: "fs-12 c-text leading-relaxed",
+      style: {
+        whiteSpace: "pre-wrap"
+      }
+    }, c.description), c.delivery_url && React.createElement("a", {
+      href: c.delivery_url,
+      target: "_blank",
+      rel: "noopener noreferrer",
+      className: "fs-12 font-mono c-accent mt-2 inline-block"
+    }, "Open delivered custom →"), c.delivery_note && React.createElement("div", {
+      className: "fs-11 c-muted mt-1"
+    }, "Note from the model: ", c.delivery_note), React.createElement("div", {
+      className: "flex gap-2 mt-3 flex-wrap"
+    }, c.status === "requested" && React.createElement("button", {
+      onClick: () => update(c, {
+        status: "sold",
+        sold_at: new Date().toISOString()
+      }, "sold"),
+      className: "px-3 py-1.5 rounded-lg c-bg-accent c-onaccent fs-11 font-mono uppercase font-semibold"
+    }, "Mark as sold"), (c.status === "requested" || c.status === "sold" || c.status === "in_progress") && React.createElement("button", {
+      onClick: () => update(c, {
+        status: "cancelled"
+      }),
+      className: "px-3 py-1.5 rounded-lg border c-border c-muted fs-11 font-mono uppercase"
+    }, "Cancel"))))));
+  }));
+}
+function CustomsCreatorPage({
+  model,
+  record
+}) {
+  const {
+    rows,
+    loading,
+    reload
+  } = useCustoms(model);
+  const [delivering, setDelivering] = useState(null);
+  const [link, setLink] = useState("");
+  const [note, setNote] = useState("");
+  const [err, setErr] = useState("");
+  const sharePct = record && record.agencyCutPct != null ? 100 - Number(record.agencyCutPct) : null;
+  const field = "w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent";
+  const start = async c => {
+    const {
+      error
+    } = await supabaseClient.from("customs").update({
+      status: "in_progress"
+    }).eq("id", c.id);
+    if (error) setErr(error.message);else reload();
+  };
+  const deliver = async c => {
+    if (!/^https?:\/\//i.test(link.trim())) {
+      setErr("Paste the link to the finished custom (Drive or similar).");
+      return;
+    }
+    setErr("");
+    const {
+      error
+    } = await supabaseClient.from("customs").update({
+      status: "delivered",
+      delivery_url: link.trim(),
+      delivery_note: note.trim() || null,
+      delivered_at: new Date().toISOString()
+    }).eq("id", c.id);
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+    await customNotify(c.id, "delivered");
+    setDelivering(null);
+    setLink("");
+    setNote("");
+    reload();
+  };
+  const active = rows.filter(c => ["sold", "in_progress", "requested"].includes(c.status));
+  const done = rows.filter(c => ["delivered", "cancelled"].includes(c.status));
+  const card = c => React.createElement("div", {
+    key: c.id,
+    className: "c-bg-surface border c-border rounded-xl px-4 py-3.5"
+  }, React.createElement("div", {
+    className: "flex items-center gap-2 flex-wrap mb-1.5"
+  }, React.createElement(CustomStatusChip, {
+    status: c.status
+  }), c.price != null && React.createElement("span", {
+    className: "fs-14 font-extrabold c-accent"
+  }, "$", Number(c.price).toLocaleString("en-US")), c.price != null && sharePct != null && React.createElement("span", {
+    className: "fs-11 font-mono c-muted"
+  }, "your share about $", Math.round(Number(c.price) * sharePct / 100).toLocaleString("en-US")), c.deadline && React.createElement("span", {
+    className: "fs-11 font-mono c-muted ml-auto"
+  }, "due ", c.deadline)), c.fan_label && React.createElement("div", {
+    className: "fs-11 c-muted mb-1"
+  }, "For: ", c.fan_label), React.createElement("div", {
+    className: "fs-13 c-text leading-relaxed",
+    style: {
+      whiteSpace: "pre-wrap"
+    }
+  }, c.description), c.status === "requested" && React.createElement("div", {
+    className: "fs-11 c-muted mt-2"
+  }, "The fan has not paid yet. You will get a notification when it is sold."), c.delivery_url && React.createElement("a", {
+    href: c.delivery_url,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    className: "fs-12 font-mono c-accent mt-2 inline-block"
+  }, "Your delivered custom →"), c.status === "sold" && React.createElement("button", {
+    onClick: () => start(c),
+    className: "mt-3 px-3 py-1.5 rounded-lg c-bg-accent c-onaccent fs-11 font-mono uppercase font-semibold"
+  }, "Start working"), c.status === "in_progress" && delivering !== c.id && React.createElement("button", {
+    onClick: () => {
+      setDelivering(c.id);
+      setErr("");
+    },
+    className: "mt-3 px-3 py-1.5 rounded-lg c-bg-accent c-onaccent fs-11 font-mono uppercase font-semibold"
+  }, "Deliver it"), c.status === "in_progress" && delivering === c.id && React.createElement("div", {
+    className: "mt-3 space-y-2"
+  }, React.createElement("input", {
+    value: link,
+    onChange: e => setLink(e.target.value),
+    placeholder: "Link to the finished custom (Drive, Dropbox...)",
+    className: field
+  }), React.createElement("input", {
+    value: note,
+    onChange: e => setNote(e.target.value),
+    placeholder: "Note for your manager (optional)",
+    className: field
+  }), err && React.createElement("div", {
+    className: "fs-12",
+    style: {
+      color: "#ff6b6b"
+    }
+  }, err), React.createElement("div", {
+    className: "flex gap-2"
+  }, React.createElement("button", {
+    onClick: () => deliver(c),
+    className: "px-3 py-1.5 rounded-lg c-bg-accent c-onaccent fs-11 font-mono uppercase font-semibold"
+  }, "Send to my manager"), React.createElement("button", {
+    onClick: () => {
+      setDelivering(null);
+      setErr("");
+    },
+    className: "px-3 py-1.5 rounded-lg border c-border c-muted fs-11 font-mono uppercase"
+  }, "Cancel"))));
+  return React.createElement("div", {
+    className: "max-w-2xl"
+  }, React.createElement("p", {
+    className: "fs-13 c-muted mb-5"
+  }, "Custom content requests for you. You get a notification when a new one comes in."), err && delivering == null && React.createElement("div", {
+    className: "fs-12 mb-3",
+    style: {
+      color: "#ff6b6b"
+    }
+  }, err), loading && React.createElement("div", {
+    className: "fs-13 c-muted"
+  }, "Loading..."), !loading && rows.length === 0 && React.createElement("div", {
+    className: "c-bg-surface border c-border rounded-xl px-4 py-6 text-center fs-13 c-muted"
+  }, "No custom requests right now."), active.length > 0 && React.createElement("div", {
+    className: "space-y-2.5 mb-6"
+  }, active.map(card)), done.length > 0 && React.createElement("div", null, React.createElement("div", {
+    className: "fs-10 font-mono uppercase tracking-widest c-faint mb-2"
+  }, "Done"), React.createElement("div", {
+    className: "space-y-2.5"
+  }, done.map(card))));
 }
 function App() {
   const {
@@ -18529,7 +18972,12 @@ function App() {
     models: agencyModels,
     reels: scopedReels,
     persistReels: scopedPersistReels
-  }), currentView === "chatters" && isAdmin && React.createElement(ChattersPage, null), currentView === "reelsorter" && isAdmin && React.createElement(ReelSorterPage, null), currentView === "titlegen" && isAdmin && React.createElement(TitleGeneratorPage, null), currentView === "weeklytrends" && isAdmin && React.createElement(TrendsPage, {
+  }), currentView === "chatters" && isAdmin && React.createElement(ChattersPage, null), currentView === "customs" && isAdmin && React.createElement(CustomsAdminPage, {
+    models: agencyModels
+  }), currentView === "customs" && !isAdmin && React.createElement(CustomsCreatorPage, {
+    model: restrictModel,
+    record: models.find(mm => mm.name === restrictModel)
+  }), currentView === "reelsorter" && isAdmin && React.createElement(ReelSorterPage, null), currentView === "titlegen" && isAdmin && React.createElement(TitleGeneratorPage, null), currentView === "weeklytrends" && isAdmin && React.createElement(TrendsPage, {
     weeklyTrendReels: weeklyTrendReels,
     onReload: reloadWeeklyTrendReels,
     loading: weeklyTrendReelsLoading
@@ -18553,7 +19001,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1sw673q</script>
+<script type="text/babel" id="zion-version">1dv6xft</script>
 <script>
 (function () {
   var last = 0;
