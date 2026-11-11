@@ -12093,7 +12093,147 @@ function InflowwRevenueCard({ myInflowwRows, accountType, title, last7Dates, day
   );
 }
 
-function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDailyStats, bufferTopPosts, ofDailyStats, inflowwDailyStats }) {
+function CreatorMoney({ model, record, rows }) {
+  const [ins, setIns] = useState(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/creator-insights`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+          body: JSON.stringify({ model }),
+        });
+        const j = await r.json();
+        if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+        if (!cancel) setIns(j);
+      } catch (e) { if (!cancel) setErr(e.message || "Could not load"); }
+    })();
+    return () => { cancel = true; };
+  }, [model]);
+
+  const money = (n) => `$${Math.round(Number(n) || 0).toLocaleString("en-US")}`;
+  const now = new Date();
+  const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-`;
+  const monthNet = (rows || []).filter((r) => r.model === model && r.statDate.startsWith(prefix)).reduce((t, r) => t + (r.earningsNet || 0), 0);
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const pace = monthNet / Math.max(1, now.getDate()) * daysInMonth;
+  const cut = record && record.agencyCutPct != null ? Number(record.agencyCutPct) : null;
+  const sharePct = cut != null ? 100 - cut : null;
+  const myShare = sharePct != null ? monthNet * sharePct / 100 : null;
+  const goal = record && record.monthlyGoal ? Number(record.monthlyGoal) : null;
+  const goalPct = goal ? Math.min(100, Math.round((monthNet / goal) * 100)) : 0;
+  const card = "c-bg-surface border c-border rounded-xl p-5";
+  const label = "fs-11 uppercase tracking-widest c-muted font-mono";
+  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const maxDay = ins ? Math.max(1, ...(ins.weekdays || [0])) : 1;
+
+  return (
+    <div className="mb-6">
+      <div className={`${card} mb-3`}>
+        <div className={label}>My money this month</div>
+        <div className="flex items-baseline gap-2 mt-2 flex-wrap">
+          <span className="text-3xl font-extrabold c-accent">{money(myShare != null ? myShare : monthNet)}</span>
+          <span className="fs-12 c-muted">{myShare != null ? `your share (${sharePct}%)` : "net revenue"}</span>
+        </div>
+        <div className="fs-12 c-muted mt-1">Net revenue {money(monthNet)} so far, on pace for {money(pace)} by the end of the month.</div>
+        {goal ? (
+          <div className="mt-4">
+            <div className="flex justify-between fs-11 font-mono c-muted mb-1.5"><span>Monthly goal</span><span>{money(monthNet)} / {money(goal)} ({goalPct}%)</span></div>
+            <div style={{ height: 8, borderRadius: 6, background: "rgba(255,255,255,0.07)", overflow: "hidden" }}>
+              <div style={{ width: `${goalPct}%`, height: "100%", background: "linear-gradient(90deg,#12b34c,#39e673)" }} />
+            </div>
+            {monthNet >= goal && <div className="fs-11 font-mono c-accent mt-2">Goal reached, great month!</div>}
+          </div>
+        ) : null}
+      </div>
+
+      {err && <div className="fs-12 c-muted mb-3">Extra insights are not available right now.</div>}
+
+      {ins && ins.connected && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {ins.payout && (
+            <div className={card}>
+              <div className={label}>At OnlyFans now</div>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-extrabold c-text">{money(ins.payout.available + ins.payout.pending)}</span>
+                <span className="fs-12 c-muted">balance</span>
+              </div>
+              <div className="fs-12 c-muted mt-1">{money(ins.payout.available)} available, {money(ins.payout.pending)} still pending.</div>
+              {sharePct != null && <div className="fs-12 c-text mt-2">Your share of it: about {money((ins.payout.available + ins.payout.pending) * sharePct / 100)}</div>}
+              <div className="fs-10 c-faint font-mono mt-2">Estimate. The final payout is sent by your manager.</div>
+            </div>
+          )}
+
+          {ins.leaderboard && (
+            <div className={card}>
+              <div className={label}>This month's ranking</div>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-extrabold c-accent">#{ins.leaderboard.rank}</span>
+                <span className="fs-12 c-muted">of {ins.leaderboard.of} models</span>
+              </div>
+              <div className="fs-12 c-muted mt-1">
+                {ins.leaderboard.rank === 1 ? `You lead by ${money(ins.leaderboard.leadOverNext)}.` : `${money(ins.leaderboard.gapToNext)} to reach #${ins.leaderboard.rank - 1}.`}
+              </div>
+              <div className="fs-10 c-faint font-mono mt-2">Anonymous, other models are not named.</div>
+            </div>
+          )}
+
+          {ins.topFans && ins.topFans.length > 0 && (
+            <div className={card}>
+              <div className={label}>Top fans, last 30 days</div>
+              <div className="mt-2">
+                {ins.topFans.map((f) => (
+                  <div key={f.label} className="flex items-center justify-between py-1.5 fs-12 c-text" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                    <span>{f.label} <span className="c-faint fs-10 font-mono">{f.count}x</span></span>
+                    <span className="font-mono">{money(f.net)} <span className="c-faint">({f.sharePct}%)</span></span>
+                  </div>
+                ))}
+              </div>
+              <div className="fs-11 c-muted mt-2">Your top 5 fans bring {ins.top5SharePct}% of your income. Keep them happy.</div>
+            </div>
+          )}
+
+          {(ins.bestHours && ins.bestHours.length > 0) && (
+            <div className={card}>
+              <div className={label}>When you earn most</div>
+              <div className="fs-12 c-text mt-2">
+                {ins.bestHours.map((h) => `${String(h.hour).padStart(2, "0")}:00 (${money(h.net)})`).join("   ")}
+              </div>
+              <div className="flex items-end gap-1.5 mt-3" style={{ height: 56 }}>
+                {(ins.weekdays || []).map((v, i) => (
+                  <div key={i} className="flex-1 flex flex-col items-center justify-end" style={{ height: "100%" }}>
+                    <div style={{ width: "100%", height: `${Math.max(4, (v / maxDay) * 100)}%`, background: "#39e673", opacity: 0.75, borderRadius: "4px 4px 2px 2px" }} />
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-1.5 mt-1">{days.map((d) => <span key={d} className="flex-1 text-center fs-9 c-faint font-mono">{d}</span>)}</div>
+              <div className="fs-10 c-faint font-mono mt-2">Prague time, net revenue by hour and by weekday.</div>
+            </div>
+          )}
+
+          {ins.chatters && ins.chatters.length > 0 && (
+            <div className={card}>
+              <div className={label}>Chatters on your page</div>
+              <div className="mt-2">
+                {ins.chatters.map((c) => (
+                  <div key={c.name} className="flex items-center justify-between py-1.5 fs-12 c-text" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                    <span>{c.name}</span>
+                    <span className="font-mono">{money(c.net)} <span className="c-faint fs-10">{c.count} sales</span></span>
+                  </div>
+                ))}
+              </div>
+              <div className="fs-10 c-faint font-mono mt-2">Revenue credited to each chatter, last 30 days.</div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDailyStats, bufferTopPosts, ofDailyStats, inflowwDailyStats, modelRecord }) {
   const mine = stats.filter((s) => s.model === restrictModel).sort((a, b) => b.weekOf.localeCompare(a.weekOf));
   const latest = mine[0];
   const prev = mine[1];
@@ -12162,6 +12302,7 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
   if (!latest) {
     return (
       <div className="creator-glow-scope">
+        <CreatorMoney model={restrictModel} record={modelRecord} rows={inflowwDailyStats} />
         <ThisWeeksAsks tasks={tasks} restrictModel={restrictModel} onNavigate={onNavigate} />
         {inflowwSection}
         <CreatorInsightsSection models={[{ name: restrictModel }]} inflowwDailyStats={inflowwDailyStats} days={30} periodLabel="30d" />
@@ -12176,6 +12317,7 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
 
   return (
     <div className="creator-glow-scope">
+      <CreatorMoney model={restrictModel} record={modelRecord} rows={inflowwDailyStats} />
       <GoalCard latest={latest} />
       <ThisWeeksAsks tasks={tasks} restrictModel={restrictModel} onNavigate={onNavigate} />
       {inflowwSection}
@@ -13729,7 +13871,7 @@ function App() {
 
             {currentView === "dashboard" && (session.role === "admin"
               ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} inflowwDailyStats={inflowwDailyStats} inflowwSyncing={inflowwSyncing} refreshInfloww={refreshInfloww} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} settings={settings} />
-              : <CreatorDashboard stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} ofDailyStats={ofDailyStats} inflowwDailyStats={inflowwDailyStats} />)}
+              : <CreatorDashboard modelRecord={models.find((mm) => mm.name === restrictModel)} stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} ofDailyStats={ofDailyStats} inflowwDailyStats={inflowwDailyStats} />)}
             {currentView === "content" && <ContentDirector cards={isAdmin ? scopedCards : cards} persistCards={isAdmin ? scopedPersistCards : persistCards} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} forcedNetwork={contentPlatform} reels={isAdmin ? scopedReels : reels} persistReels={isAdmin ? scopedPersistReels : persistReels} xCompetitors={xCompetitors} persistXCompetitors={persistXCompetitors} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} inflowwDailyStats={inflowwDailyStats} igGraphStats={igGraphStats} igGraphMedia={igGraphMedia} igViralVariations={igViralVariations} />}
             {currentView === "editor" && isAdmin && <EditorPage />}
             {currentView === "calendar" && <CalendarView cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks} onNavigate={setView} restrictModel={restrictModel} />}
