@@ -14509,6 +14509,122 @@ a:focus-visible, button:focus-visible{ outline:2px solid var(--lp-green); outlin
 .w-cur{ position:absolute; left:0; top:0; font-size:10px; font-weight:800; padding:2px 8px; border-radius:6px; color:#10140a; white-space:nowrap; box-shadow:0 0 12px currentColor; animation:w-fly 9s ease-in-out infinite; }
 @keyframes w-fly{ 0%{transform:translate(var(--x0),var(--y0))} 25%{transform:translate(var(--x1),var(--y1))} 50%{transform:translate(var(--x2),var(--y2))} 75%{transform:translate(var(--x3),var(--y3))} 100%{transform:translate(var(--x0),var(--y0))} }
 @media (max-width: 860px){ .widgets{ grid-template-columns:1fr; } }
+
+/* ================= Landing v2 ================= */
+.z2{ --g:#39e673; --g2:#12b34c; --lime:#c6f432; --ink:#f2f5f0; --dim:#8fa39a; --line:rgba(57,230,115,.16); --card:#0d1210; }
+.z2 .acc{ background:linear-gradient(100deg,var(--lime),var(--g) 60%,#17c58a); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.z2-hero{ position:relative; padding:150px 0 40px; text-align:center; --mx:0; --my:0; }
+.z2-kick{ display:inline-flex; align-items:center; gap:10px; font-size:11px; letter-spacing:3px; color:var(--dim); border:1px solid var(--line); border-radius:99px; padding:8px 16px; background:rgba(57,230,115,.05); }
+.z2-kick i{ width:7px; height:7px; border-radius:50%; background:var(--g); box-shadow:0 0 10px var(--g); animation:z2-blink 1.8s ease-in-out infinite; }
+@keyframes z2-blink{ 0%,100%{opacity:1} 50%{opacity:.35} }
+.z2-h1{ font-size:clamp(44px,8.2vw,112px); font-weight:900; letter-spacing:-0.045em; line-height:.95; text-transform:uppercase; margin:26px auto 0; max-width:1100px; }
+.z2-h1 .w{ display:inline-block; opacity:0; transform:translateY(60px) rotate(4deg); filter:blur(10px); animation:z2-word .9s cubic-bezier(.2,.8,.2,1) forwards; animation-delay:calc(var(--i) * 90ms + 150ms); }
+@keyframes z2-word{ to{ opacity:1; transform:none; filter:none; } }
+.z2-sub{ max-width:640px; margin:26px auto 0; font-size:18px; line-height:1.6; color:var(--dim); opacity:0; animation:z2-fade 1s ease .9s forwards; }
+@keyframes z2-fade{ to{opacity:1} }
+.z2-ctas{ display:flex; gap:12px; justify-content:center; margin-top:32px; opacity:0; animation:z2-fade 1s ease 1.1s forwards; flex-wrap:wrap; }
+.z2-pills{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:26px; opacity:0; animation:z2-fade 1s ease 1.3s forwards; }
+.z2-pills span{ font-size:10px; letter-spacing:2px; color:var(--dim); border:1px solid rgba(255,255,255,.08); border-radius:99px; padding:6px 12px; }
+.z2-pills b{ color:var(--g); font-weight:600; }
+
+/* hero product window */
+.z2-stage{ perspective:1600px; margin:70px auto 0; max-width:1120px; padding:0 20px; }
+.z2-win{ position:relative; border-radius:22px; border:1px solid var(--line); background:linear-gradient(180deg,#0f1512,#090c0b); box-shadow:0 60px 140px rgba(0,0,0,.7), 0 0 90px rgba(57,230,115,.14); transform-origin:50% 0; transform:rotateX(calc(22deg * (1 - var(--p,0)))) rotateY(calc(var(--mx) * 4deg)) scale(calc(.9 + .1 * var(--p,0))); transition:transform .25s ease-out; overflow:hidden; }
+.z2-win::before{ content:""; position:absolute; inset:0; background:radial-gradient(600px 300px at calc(50% + var(--mx) * 300px) 0, rgba(57,230,115,.14), transparent 70%); pointer-events:none; }
+.z2-bar{ display:flex; align-items:center; gap:8px; padding:12px 16px; border-bottom:1px solid rgba(255,255,255,.06); font-size:10px; letter-spacing:2px; color:var(--dim); }
+.z2-bar u{ width:10px; height:10px; border-radius:50%; background:rgba(255,255,255,.14); text-decoration:none; }
+.z2-bar em{ margin-left:auto; font-style:normal; color:#ffb020; border:1px dashed rgba(255,176,32,.5); border-radius:99px; padding:3px 9px; }
+.z2-app{ display:grid; grid-template-columns:170px 1fr 280px; min-height:420px; text-align:left; }
+.z2-side{ border-right:1px solid rgba(255,255,255,.06); padding:16px 12px; display:flex; flex-direction:column; gap:6px; }
+.z2-side span{ font-size:12px; color:var(--dim); padding:8px 10px; border-radius:9px; display:flex; gap:8px; align-items:center; }
+.z2-side span::before{ content:""; width:6px; height:6px; border-radius:2px; background:currentColor; opacity:.6; }
+.z2-side span.on{ background:rgba(57,230,115,.1); color:var(--g); animation:z2-nav 12s steps(1) infinite; }
+.z2-main{ padding:20px; }
+.z2-lab{ font-size:10px; letter-spacing:2px; color:var(--dim); }
+.z2-money{ font-size:52px; font-weight:800; letter-spacing:-2px; margin-top:6px; }
+.z2-money small{ font-size:13px; color:var(--dim); font-weight:500; letter-spacing:0; margin-left:10px; }
+.z2-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:14px; }
+.z2-mini{ border:1px solid rgba(255,255,255,.07); border-radius:12px; padding:11px 12px; background:rgba(255,255,255,.02); }
+.z2-mini b{ display:block; font-size:18px; margin-top:4px; }
+.z2-right{ border-left:1px solid rgba(255,255,255,.06); padding:16px; display:flex; flex-direction:column; gap:10px; }
+.z2-toast{ border:1px solid var(--line); border-radius:12px; padding:10px 12px; background:rgba(57,230,115,.06); font-size:12px; opacity:0; transform:translateX(30px); animation:z2-toast 9s ease-in-out infinite; }
+.z2-toast b{ display:block; color:var(--g); font-size:10px; letter-spacing:2px; margin-bottom:3px; }
+@keyframes z2-toast{ 0%{opacity:0;transform:translateX(30px)} 8%,70%{opacity:1;transform:none} 80%,100%{opacity:0;transform:translateX(30px)} }
+.z2-ring{ width:110px; height:110px; margin:6px auto 0; display:block; }
+.z2-ring circle{ fill:none; stroke-width:9; }
+.z2-ring .t{ stroke:rgba(255,255,255,.08); }
+.z2-ring .v{ stroke:var(--g); stroke-linecap:round; stroke-dasharray:283; stroke-dashoffset:283; transform:rotate(-90deg); transform-origin:50% 50%; animation:z2-ring 7s ease-in-out infinite; filter:drop-shadow(0 0 6px rgba(57,230,115,.6)); }
+@keyframes z2-ring{ 0%{stroke-dashoffset:283} 50%,85%{stroke-dashoffset:82} 100%{stroke-dashoffset:283} }
+.z2-float{ position:absolute; font-size:10px; font-weight:800; padding:3px 9px; border-radius:7px; color:#0b0f0d; white-space:nowrap; z-index:3; animation:w-fly 11s ease-in-out infinite; }
+
+/* marquee */
+.z2-marq{ margin-top:90px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); overflow:hidden; padding:18px 0; background:rgba(57,230,115,.03); }
+.z2-marq div{ display:flex; gap:44px; width:max-content; animation:z2-marq 38s linear infinite; font-size:13px; letter-spacing:3px; color:var(--dim); white-space:nowrap; }
+.z2-marq b{ color:var(--g); font-weight:600; }
+@keyframes z2-marq{ to{ transform:translateX(-50%); } }
+
+/* sections */
+.z2-sec{ padding:120px 0 0; }
+.z2-head{ max-width:760px; margin:0 auto 50px; text-align:center; }
+.z2-tag{ font-size:11px; letter-spacing:4px; color:var(--g); }
+.z2-h2{ font-size:clamp(32px,5.4vw,64px); font-weight:900; letter-spacing:-0.035em; line-height:1; text-transform:uppercase; margin-top:14px; }
+.z2-p{ color:var(--dim); font-size:16px; line-height:1.6; margin-top:16px; }
+
+/* bento */
+.z2-bento{ display:grid; grid-template-columns:repeat(12,1fr); gap:14px; }
+.z2-c{ grid-column:span 4; position:relative; border:1px solid rgba(255,255,255,.07); border-radius:20px; background:var(--card); padding:22px; overflow:hidden; min-height:210px; transition:border-color .3s, transform .3s; }
+.z2-c::after{ content:""; position:absolute; inset:0; background:radial-gradient(340px circle at var(--mx,50%) var(--my,0%), rgba(57,230,115,.13), transparent 60%); opacity:0; transition:opacity .3s; pointer-events:none; }
+.z2-c:hover{ border-color:rgba(57,230,115,.45); } .z2-c:hover::after{ opacity:1; }
+.z2-c.s6{ grid-column:span 6; } .z2-c.s8{ grid-column:span 8; } .z2-c.s3{ grid-column:span 3; }
+.z2-c h3{ font-size:19px; font-weight:800; letter-spacing:-.01em; margin-top:12px; }
+.z2-c p{ font-size:13.5px; line-height:1.55; color:var(--dim); margin-top:8px; max-width:440px; }
+.z2-ic{ width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; background:rgba(57,230,115,.1); border:1px solid var(--line); color:var(--g); font-weight:800; font-size:13px; }
+.z2-who{ position:absolute; right:16px; top:16px; font-size:9px; letter-spacing:2px; color:var(--dim); border:1px solid rgba(255,255,255,.1); border-radius:99px; padding:4px 9px; }
+.z2-viz{ position:absolute; right:18px; bottom:16px; display:flex; align-items:flex-end; gap:5px; height:64px; opacity:.9; }
+.z2-viz i{ width:9px; border-radius:4px; background:linear-gradient(180deg,var(--g),rgba(57,230,115,.15)); height:20%; animation:z2-eq 2.6s ease-in-out infinite; animation-delay:calc(var(--i) * -0.33s); }
+@keyframes z2-eq{ 0%,100%{height:18%} 50%{height:var(--h,90%)} }
+.z2-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:14px; }
+.z2-chips span{ font-size:10.5px; padding:5px 10px; border-radius:99px; border:1px solid rgba(255,255,255,.1); color:var(--dim); animation:z2-chip 6s ease-in-out infinite; animation-delay:calc(var(--i) * .35s); }
+@keyframes z2-chip{ 0%,100%{border-color:rgba(255,255,255,.1);color:var(--dim)} 12%{border-color:var(--g);color:var(--g);box-shadow:0 0 12px rgba(57,230,115,.35)} 24%{border-color:rgba(255,255,255,.1);color:var(--dim);box-shadow:none} }
+.z2-bub{ position:absolute; right:18px; bottom:18px; width:210px; display:flex; flex-direction:column; gap:6px; }
+.z2-bub span{ font-size:11px; padding:7px 11px; border-radius:12px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); opacity:0; transform:translateY(8px); animation:z2-bub 8s ease-in-out infinite; animation-delay:calc(var(--i) * 1.2s); align-self:flex-start; }
+.z2-bub span.me{ align-self:flex-end; background:rgba(57,230,115,.12); border-color:var(--line); color:var(--g); }
+@keyframes z2-bub{ 0%{opacity:0;transform:translateY(8px)} 8%,75%{opacity:1;transform:none} 88%,100%{opacity:0} }
+.z2-phone{ position:absolute; right:22px; bottom:-34px; width:120px; height:190px; border-radius:22px; border:2px solid rgba(255,255,255,.14); background:#080b0a; padding:12px 9px; animation:z2-bob 5s ease-in-out infinite; }
+.z2-phone u{ display:block; text-decoration:none; height:26px; border-radius:8px; background:rgba(57,230,115,.1); border:1px solid var(--line); margin-bottom:7px; font-size:8px; letter-spacing:1px; color:var(--g); padding:7px 8px; opacity:0; animation:z2-bub 7s ease-in-out infinite; animation-delay:calc(var(--i) * 1s); }
+@keyframes z2-bob{ 0%,100%{transform:translateY(0) rotate(4deg)} 50%{transform:translateY(-10px) rotate(2deg)} }
+.z2-lock{ position:absolute; right:22px; bottom:20px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--g); letter-spacing:2px; }
+.z2-lock b{ display:inline-block; animation:z2-scr 3s steps(1) infinite; animation-delay:calc(var(--i) * .2s); }
+@keyframes z2-scr{ 0%{opacity:.25} 50%{opacity:1} }
+
+/* two doors */
+.z2-tabs{ display:flex; justify-content:center; gap:6px; margin:0 auto 26px; padding:6px; border:1px solid var(--line); border-radius:99px; width:max-content; background:rgba(255,255,255,.02); }
+.z2-tabs button{ border:0; background:transparent; color:var(--dim); font:600 13px Inter,sans-serif; padding:11px 24px; border-radius:99px; cursor:pointer; transition:all .3s; }
+.z2-tabs button.on{ background:var(--g); color:#03110a; box-shadow:0 0 24px rgba(57,230,115,.4); }
+.z2-pane{ display:none; grid-template-columns:repeat(3,1fr); gap:12px; }
+.z2-pane.on{ display:grid; }
+.z2-pane div{ border:1px solid rgba(255,255,255,.07); border-radius:16px; padding:18px; background:var(--card); opacity:0; transform:translateY(20px) scale(.97); animation:z2-in .6s cubic-bezier(.2,.8,.2,1) forwards; animation-delay:calc(var(--i) * 60ms); }
+@keyframes z2-in{ to{ opacity:1; transform:none; } }
+.z2-pane b{ display:block; font-size:15px; } .z2-pane span{ display:block; font-size:13px; color:var(--dim); margin-top:6px; line-height:1.5; }
+
+/* a day in zion, scroll driven */
+.z2-day{ display:grid; grid-template-columns:.9fr 1.1fr; gap:60px; align-items:start; }
+.z2-sticky{ position:sticky; top:120px; }
+.z2-steps{ position:relative; padding-left:34px; }
+.z2-steps::before{ content:""; position:absolute; left:8px; top:8px; bottom:8px; width:2px; background:rgba(255,255,255,.08); }
+.z2-steps::after{ content:""; position:absolute; left:8px; top:8px; width:2px; height:calc((100% - 16px) * var(--p,0)); background:linear-gradient(180deg,var(--lime),var(--g)); box-shadow:0 0 12px var(--g); }
+.z2-step{ position:relative; padding:0 0 46px; opacity:.3; transform:translateX(14px); transition:opacity .5s, transform .5s; }
+.z2-step.in-view{ opacity:1; transform:none; }
+.z2-step::before{ content:""; position:absolute; left:-31px; top:6px; width:12px; height:12px; border-radius:50%; background:#0b0f0d; border:2px solid rgba(255,255,255,.2); transition:all .4s; }
+.z2-step.in-view::before{ border-color:var(--g); background:var(--g); box-shadow:0 0 14px var(--g); }
+.z2-step time{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--g); letter-spacing:2px; }
+.z2-step h4{ font-size:20px; font-weight:800; margin-top:6px; }
+.z2-step p{ font-size:14px; color:var(--dim); line-height:1.55; margin-top:6px; max-width:460px; }
+
+.z2-end{ text-align:center; padding:140px 0 110px; }
+.z2-end .z2-h2{ font-size:clamp(40px,7vw,92px); }
+@media (max-width:980px){ .z2-app{ grid-template-columns:1fr; } .z2-side,.z2-right{ display:none; } .z2-c,.z2-c.s6,.z2-c.s8,.z2-c.s3{ grid-column:span 12; } .z2-pane{ grid-template-columns:1fr; } .z2-day{ grid-template-columns:1fr; gap:30px; } .z2-sticky{ position:static; } .z2-hero{ padding-top:120px; } }
+@media (prefers-reduced-motion: reduce){ .z2 *{ animation-duration:.01s !important; animation-iteration-count:1 !important; transition-duration:.01s !important; } .z2-h1 .w,.z2-sub,.z2-ctas,.z2-pills{ opacity:1; transform:none; filter:none; } }
 `;
 const LANDING_PAGE_BODY = `
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -14534,8 +14650,8 @@ const LANDING_PAGE_BODY = `
         <span class="by-neo-tag">by neomngmt</span>
       </div>
       <div class="links">
-        <a href="#system">The System</a>
-        <a href="#instruments">The Instruments</a>
+        <a href="#inside">Inside</a>
+        <a href="#see">See it work</a>
       </div>
       <div class="right">
         <a class="cta" href="https://neomngmt.github.io/agencyos/">Sign in</a>
@@ -14544,60 +14660,99 @@ const LANDING_PAGE_BODY = `
   </div>
 </div>
 
+<div class="z2">
 <div class="wrap">
-  <div class="hero">
-    <div class="eyebrow mono">ZION OS · THE CREATOR COMMAND ROOM</div>
-    <h1>Run the whole roster<span class="script">from one board.</span></h1>
-    <p>The pipeline, the earnings, and the trends worth copying. One system watches all of it, syncs the numbers on its own, and answers out loud when you ask it something.</p>
-    <div class="hero-ctas">
+  <div class="z2-hero" id="z2Hero">
+    <div class="z2-kick mono"><i></i>ZION OS · THE CREATOR COMMAND ROOM</div>
+    <h1 class="z2-h1">
+      <span class="w" style="--i:0">Run</span> <span class="w" style="--i:1">the</span> <span class="w" style="--i:2">whole</span> <span class="w" style="--i:3">roster</span><br>
+      <span class="w acc" style="--i:4">from</span> <span class="w acc" style="--i:5">one</span> <span class="w acc" style="--i:6">board.</span>
+    </h1>
+    <p class="z2-sub">Money, goals, content, edits and every social account of every creator in one place. It syncs on its own, tells you what changed and puts the work in front of the right person.</p>
+    <div class="z2-ctas">
       <a class="btn-primary" href="https://neomngmt.github.io/agencyos/">Sign in</a>
-      <a class="btn-ghost" href="#system">See the system</a>
+      <a class="btn-ghost" href="#inside">See everything inside</a>
     </div>
-    <div class="hero-note mono"><b>PRIVATE.</b> BUILT FOR ONE AGENCY AND ITS ROSTER.</div>
-  </div>
-
-  <div class="floor" data-reveal>
-    <div class="floor-tilt">
-    <div class="floor-head">
-      <div class="label mono">ZION OS · LIVE FLOOR</div>
-      <div class="live mono"><span class="dot"></span>ALL SYSTEMS WATCHING</div>
-    </div>
-    <div class="floor-grid">
-      <div class="floor-cell">
-        <div class="k mono">FOLLOWERS WATCHED <span style="color:var(--lp-green)">LIVE</span></div>
-        <div class="v" data-count="340216">0</div>
-        <div class="sub">TikTok + Instagram · whole roster</div>
-      </div>
-      <div class="floor-cell">
-        <div class="k mono">REELS READ</div>
-        <div class="v" data-count="212">0</div>
-        <div class="sub">ranked before breakfast</div>
-      </div>
-      <div class="floor-cell">
-        <div class="k mono">WINNERS DETECTED</div>
-        <div class="v" data-count="18">0</div>
-        <div class="sub">proven, ready to repost</div>
-      </div>
-      <div class="floor-cell">
-        <div class="k mono">SCRIPTS WRITTEN</div>
-        <div class="v" data-count="14">0</div>
-        <div class="sub">overnight · queued to film, per model</div>
-      </div>
-    </div>
-    <div class="floor-ticker mono">
-      <div class="floor-ticker-track" id="floorTicker"></div>
-    </div>
+    <div class="z2-pills mono">
+      <span><b>6</b> PLATFORMS</span><span><b>13</b> INSTAGRAM AI AGENTS</span><span><b>10</b> EDITING AGENTS</span><span>NEWS <b>4X</b> A DAY</span><span>PRIVATE, INVITE ONLY</span>
     </div>
   </div>
 </div>
 
+<div class="z2-stage">
+  <div class="z2-win" data-prog>
+    <div class="z2-bar mono"><u></u><u></u><u></u><span style="margin-left:10px">ZIONBYNEO.COM</span><em>SAMPLE DATA</em></div>
+    <div class="z2-app">
+      <div class="z2-side">
+        <span class="on">Dashboard</span><span>Content Director</span><span>Editor</span><span>Calendar</span><span>Tasks</span><span>Chatters</span><span>Customs</span><span>Neo</span><span>OF News</span>
+      </div>
+      <div class="z2-main">
+        <div class="z2-lab mono">MY MONEY THIS MONTH</div>
+        <div class="z2-money">$<span data-count="4280">0</span><small>your share, sample</small></div>
+        <svg class="w-chart" viewBox="0 0 600 150" preserveAspectRatio="none" style="height:170px">
+          <defs><linearGradient id="z2Area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#39e673" stop-opacity=".35"/><stop offset="100%" stop-color="#39e673" stop-opacity="0"/></linearGradient></defs>
+          <path class="area" style="fill:url(#z2Area)" d="M0,120 C60,110 90,70 140,84 C190,98 220,40 280,56 C340,72 360,30 420,42 C480,54 520,20 600,14 L600,150 L0,150 Z"/>
+          <path class="line" d="M0,120 C60,110 90,70 140,84 C190,98 220,40 280,56 C340,72 360,30 420,42 C480,54 520,20 600,14"/>
+          <circle class="end" cx="598" cy="14" r="6"/>
+        </svg>
+        <div class="z2-row">
+          <div class="z2-mini"><span class="z2-lab mono">MESSAGES</span><b data-count="94">0</b></div>
+          <div class="z2-mini"><span class="z2-lab mono">TIPS</span><b data-count="31">0</b></div>
+          <div class="z2-mini"><span class="z2-lab mono">NEW SUBS</span><b data-count="238">0</b></div>
+        </div>
+      </div>
+      <div class="z2-right">
+        <div class="z2-lab mono">MONTHLY GOAL</div>
+        <svg class="z2-ring" viewBox="0 0 110 110"><circle class="t" cx="55" cy="55" r="45"/><circle class="v" cx="55" cy="55" r="45"/><text x="55" y="61" text-anchor="middle" fill="#f2f5f0" font-size="20" font-weight="800" font-family="Inter">71%</text></svg>
+        <div class="z2-toast"><b class="mono">NEW SALE</b>Tip from a fan, sample</div>
+        <div class="z2-toast" style="animation-delay:3s"><b class="mono">CUSTOM REQUEST</b>New request is waiting</div>
+        <div class="z2-toast" style="animation-delay:6s"><b class="mono">CONTENT PLAN</b>Next week is ready</div>
+      </div>
+    </div>
+    <span class="z2-float" style="background:#39e673;--x0:220px;--y0:120px;--x1:520px;--y1:260px;--x2:760px;--y2:140px;--x3:360px;--y3:330px">Cutter</span>
+    <span class="z2-float" style="background:#c6f432;animation-delay:-3s;--x0:640px;--y0:300px;--x1:300px;--y1:180px;--x2:880px;--y2:240px;--x3:480px;--y3:100px">Captions</span>
+    <span class="z2-float" style="background:#4cc3ff;animation-delay:-6s;--x0:420px;--y0:220px;--x1:820px;--y1:330px;--x2:260px;--y2:290px;--x3:700px;--y3:170px">Neo</span>
+  </div>
+</div>
+
+<div class="z2-marq mono"><div>
+  <span>DASHBOARD</span><b>◆</b><span>AUTO GOALS</span><b>◆</b><span>CONTENT DIRECTOR</span><b>◆</b><span>INSTAGRAM AI STUDIO</span><b>◆</b><span>EDITOR WITH AGENTS</span><b>◆</b><span>CUSTOM REQUESTS</span><b>◆</b><span>CHATTERS</span><b>◆</b><span>NEO ASSISTANT</span><b>◆</b><span>OF NEWS</span><b>◆</b><span>TELEGRAM BOT</span><b>◆</b><span>PUSH ALERTS</span><b>◆</b><span>PHONE APP</span><b>◆</b>
+  <span>DASHBOARD</span><b>◆</b><span>AUTO GOALS</span><b>◆</b><span>CONTENT DIRECTOR</span><b>◆</b><span>INSTAGRAM AI STUDIO</span><b>◆</b><span>EDITOR WITH AGENTS</span><b>◆</b><span>CUSTOM REQUESTS</span><b>◆</b><span>CHATTERS</span><b>◆</b><span>NEO ASSISTANT</span><b>◆</b><span>OF NEWS</span><b>◆</b><span>TELEGRAM BOT</span><b>◆</b><span>PUSH ALERTS</span><b>◆</b><span>PHONE APP</span><b>◆</b>
+</div></div>
+
+<div class="wrap" id="inside">
+  <div class="z2-sec">
+    <div class="z2-head" data-reveal>
+      <div class="z2-tag mono">EVERYTHING INSIDE</div>
+      <h2 class="z2-h2">One system. <span class="acc">Every job.</span></h2>
+      <p class="z2-p">This is the whole of Zion OS, nothing hidden behind a sales call. Each card is a real page or a real automation that runs today.</p>
+    </div>
+    <div class="z2-bento">
+      <div class="z2-c s8 z2-spot" data-reveal><span class="z2-who mono">MODEL + TEAM</span><div class="z2-ic">$</div><h3>Money dashboard</h3><p>Net revenue of the month, her share, pace to the end of the month, the payout waiting at OnlyFans and a chart for 7 or 30 days. Synced every hour.</p><div class="z2-viz"><i style="--i:0;--h:60%"></i><i style="--i:1;--h:90%"></i><i style="--i:2;--h:45%"></i><i style="--i:3;--h:100%"></i><i style="--i:4;--h:70%"></i><i style="--i:5;--h:85%"></i><i style="--i:6;--h:55%"></i><i style="--i:7;--h:95%"></i></div></div>
+      <div class="z2-c z2-spot" data-reveal><span class="z2-who mono">MODEL</span><div class="z2-ic">◎</div><h3>Goals that set themselves</h3><p>A monthly goal built from her own numbers, with a short note on how to get there.</p></div>
+      <div class="z2-c z2-spot" data-reveal><span class="z2-who mono">MODEL</span><div class="z2-ic">#</div><h3>Standing and top fans</h3><p>Her place this month without naming anyone else, her top fans of the last 30 days and the top fan of all time.</p></div>
+      <div class="z2-c z2-spot" data-reveal><span class="z2-who mono">MODEL + TEAM</span><div class="z2-ic">✎</div><h3>Custom requests</h3><p>A fan pays for a custom, the team logs what he wants and the price, she sees it in the app and gets a push.</p></div>
+      <div class="z2-c z2-spot" data-reveal><span class="z2-who mono">TEAM</span><div class="z2-ic">%</div><h3>Chatters</h3><p>Revenue credited to every chatter for any period, so the team sees who actually sells.</p></div>
+      <div class="z2-c s6 z2-spot" data-reveal><span class="z2-who mono">MODEL + TEAM</span><div class="z2-ic">▶</div><h3>Content Director</h3><p>One board per platform, from idea to posted. Dashboards with views, posts, top reels and a calendar in Prague time.</p><div class="z2-chips"><span style="--i:0">Instagram</span><span style="--i:1">X</span><span style="--i:2">TikTok</span><span style="--i:3">Threads</span><span style="--i:4">Snapchat</span><span style="--i:5">Facebook</span></div></div>
+      <div class="z2-c s6 z2-spot" data-reveal><span class="z2-who mono">TEAM</span><div class="z2-ic">AI</div><h3>Instagram AI Studio</h3><p>Thirteen agents that write in her voice. Nothing is posted for her, the team gets text to copy.</p><div class="z2-chips"><span style="--i:0">Reel</span><span style="--i:1">Week plan</span><span style="--i:2">Audit</span><span style="--i:3">Caption</span><span style="--i:4">Carousel</span><span style="--i:5">Stories</span><span style="--i:6">Profile</span><span style="--i:7">Comments</span><span style="--i:8">Reply</span><span style="--i:9">DM</span><span style="--i:10">Repurpose</span><span style="--i:11">Swipe file</span><span style="--i:12">Humanize</span></div></div>
+      <div class="z2-c s8 z2-spot" data-reveal><span class="z2-who mono">TEAM</span><div class="z2-ic">✂</div><h3>Editor with agents</h3><p>Drop a raw video and a reference, press Edit. The agents transcribe it, cut the silence, add word by word captions, zooms, cards and B-roll, then hand back a preview and a full quality export. The video never leaves the studio Mac.</p><div class="z2-chips"><span style="--i:0">Cutter</span><span style="--i:1">Captions</span><span style="--i:2">Color</span><span style="--i:3">B-roll</span><span style="--i:4">SFX</span><span style="--i:5">Music</span><span style="--i:6">Graphics</span><span style="--i:7">Audio mix</span><span style="--i:8">Checker</span><span style="--i:9">Cover</span></div></div>
+      <div class="z2-c z2-spot" data-reveal><span class="z2-who mono">MODEL + TEAM</span><div class="z2-ic">N</div><h3>Neo, the assistant</h3><p>Ask about the numbers, the plan or what to post, and it answers from the data of the agency.</p><div class="z2-bub"><span class="me" style="--i:0">How is my month?</span><span style="--i:1">71% of the goal, on pace.</span></div></div>
+      <div class="z2-c z2-spot" data-reveal><span class="z2-who mono">MODEL + TEAM</span><div class="z2-ic">✓</div><h3>Tasks and calendar</h3><p>Every ask with a deadline, per model, in one calendar next to the content.</p></div>
+      <div class="z2-c z2-spot" data-reveal><span class="z2-who mono">EVERYONE</span><div class="z2-ic">!</div><h3>OF News</h3><p>What changed in the creator economy, checked four times a day, with the platform numbers from public reports.</p></div>
+      <div class="z2-c z2-spot" data-reveal><span class="z2-who mono">TEAM</span><div class="z2-ic">T</div><h3>Telegram remote</h3><p>Daily and weekly sales digests, plus commands to set goals, add tasks and log customs without opening the app.</p><div class="z2-chips"><span style="--i:0">/goals</span><span style="--i:1">/goal</span><span style="--i:2">/task</span><span style="--i:3">/custom</span></div></div>
+      <div class="z2-c s6 z2-spot" data-reveal><span class="z2-who mono">EVERYONE</span><div class="z2-ic">◈</div><h3>An app on the phone</h3><p>Add Zion to the home screen and it behaves like an app. Push alerts for sales, customs and tasks, with quiet hours she sets herself.</p><div class="z2-phone"><u style="--i:0">NEW SALE</u><u style="--i:1">CUSTOM</u><u style="--i:2">TASK DUE</u><u style="--i:3">OF NEWS</u></div></div>
+      <div class="z2-c s3 z2-spot" data-reveal><span class="z2-who mono">TEAM</span><div class="z2-ic">M</div><h3>Model Manager</h3><p>Every account of every model on one screen. New models appear after the Creator Bible.</p></div>
+      <div class="z2-c s3 z2-spot" data-reveal><span class="z2-who mono">EVERYONE</span><div class="z2-ic">K</div><h3>Private by design</h3><p>Invite only, hashed passwords, signed writes. A model sees her own data only.</p><div class="z2-lock"><b style="--i:0">•</b><b style="--i:1">•</b><b style="--i:2">•</b><b style="--i:3">•</b><b style="--i:4">•</b><b style="--i:5">•</b></div></div>
+    </div>
+  </div>
+</div>
 
 <div class="wrap" id="see">
-  <div class="section" style="padding-bottom:40px">
-    <div class="section-head" data-reveal>
-      <div class="tag mono">SEE IT WORK</div>
-      <h2>Money, models and edits<span class="script-inline">in motion.</span></h2>
-      <p class="section-sub">Three live pieces of Zion OS. The numbers and names here are sample data, nothing real.</p>
+  <div class="z2-sec">
+    <div class="z2-head" data-reveal>
+      <div class="z2-tag mono">SEE IT WORK</div>
+      <h2 class="z2-h2">Money, models and edits <span class="acc">in motion.</span></h2>
+      <p class="z2-p">Three live pieces of Zion OS. The numbers and names here are sample data, nothing real.</p>
     </div>
     <div class="widgets">
       <div class="panel w-pad" data-reveal>
@@ -14643,356 +14798,61 @@ const LANDING_PAGE_BODY = `
   </div>
 </div>
 
-<div class="band mono">
-  <div class="band-track" id="bandTicker"></div>
-</div>
 
-<div class="wrap" id="system">
-  <div class="section">
-    <div class="section-head" data-reveal>
-      <div class="tag mono">THE SYSTEM</div>
-      <h2>Every arm of the agency<span class="script-inline">reports to Neo.</span></h2>
-      <p class="section-sub">Four instruments. One brain. Nothing moves in your agency without it being seen, ranked, and written down.</p>
+<div class="wrap">
+  <div class="z2-sec">
+    <div class="z2-head" data-reveal>
+      <div class="z2-tag mono">TWO DOORS</div>
+      <h2 class="z2-h2">Same building. <span class="acc">Two logins.</span></h2>
     </div>
-
-    <div class="connector"><svg class="connector-svg" viewBox="0 0 60 240" preserveAspectRatio="none"><path class="connector-path" d="M 30 0 L 30 240"/></svg><div class="connector-dot"></div></div>
-
-    <div class="panel map-panel" data-reveal>
-      <div class="panel-head">
-        <div class="label mono">SYSTEM MAP · LIVE</div>
-        <div class="meta mono">7 ARMS · 1 BRAIN</div>
-      </div>
-      <div class="map-body">
-        <svg class="map-lines" viewBox="0 0 1000 400" preserveAspectRatio="none">
-          <path d="M 340 28.6 C 600 28.6, 650 200, 790 200" />
-          <path d="M 340 85.7 C 600 85.7, 650 200, 790 200" />
-          <path d="M 340 142.9 C 600 142.9, 650 200, 790 200" />
-          <path d="M 340 200 C 600 200, 650 200, 790 200" />
-          <path d="M 340 257.1 C 600 257.1, 650 200, 790 200" />
-          <path d="M 340 314.3 C 600 314.3, 650 200, 790 200" />
-          <path d="M 340 371.4 C 600 371.4, 650 200, 790 200" />
-        </svg>
-        <div class="map-rows">
-          <div class="map-row"><div><div class="row-label mono">MODEL MANAGER</div><div class="row-sub mono">ROSTER · DAILY SCANS</div></div><div class="dot-node"></div></div>
-          <div class="map-row"><div><div class="row-label mono">CONTENT DIRECTOR · IG</div><div class="row-sub mono">WINNERS · SCRIPTS</div></div><div class="dot-node"></div></div>
-          <div class="map-row"><div><div class="row-label mono">CONTENT DIRECTOR · X</div><div class="row-sub mono">TRENDS · CAPTIONS</div></div><div class="dot-node"></div></div>
-          <div class="map-row"><div><div class="row-label mono">CONTENT DIRECTOR · TIKTOK</div><div class="row-sub mono">WINNERS · REACH</div></div><div class="dot-node"></div></div>
-          <div class="map-row"><div><div class="row-label mono">THE LEDGER</div><div class="row-sub mono">EARNINGS · REACH</div></div><div class="dot-node"></div></div>
-          <div class="map-row"><div><div class="row-label mono">ONLYFANS CRM</div><div class="row-sub mono">EARNINGS · FANS</div></div><div class="dot-node"></div></div>
-          <div class="map-row"><div><div class="row-label mono">VOICE COMMAND</div><div class="row-sub mono">ASK · IT ANSWERS</div></div><div class="dot-node"></div></div>
-        </div>
-        <div class="map-brain">
-          <div class="brain-ring"></div>
-          <div class="brain-orbit"><span class="brain-dot"></span></div>
-          <div class="brain-core">Neo.</div>
-        </div>
-      </div>
+    <div class="z2-tabs" data-reveal><button class="on" data-z2tab="model">For the model</button><button data-z2tab="team">For the agency</button></div>
+    <div class="z2-pane on" data-z2pane="model">
+      <div style="--i:0"><b>Her money, clearly</b><span>Share of the month, payout, pace and goal on the first screen.</span></div>
+      <div style="--i:1"><b>Her socials</b><span>Instagram, X and the rest with her own numbers, updated daily.</span></div>
+      <div style="--i:2"><b>What to do today</b><span>Tasks, custom requests and the content plan for the week.</span></div>
+      <div style="--i:3"><b>Alerts she controls</b><span>Sales, customs and tasks, with quiet hours.</span></div>
+      <div style="--i:4"><b>Her standing</b><span>Her place this month and a next push to aim for.</span></div>
+      <div style="--i:5"><b>Neo on call</b><span>Questions about her numbers answered in seconds.</span></div>
+    </div>
+    <div class="z2-pane" data-z2pane="team">
+      <div style="--i:0"><b>The whole roster</b><span>Agency revenue by week or month, every model side by side.</span></div>
+      <div style="--i:1"><b>Content on rails</b><span>Boards, planners, dashboards and the Friday content plans.</span></div>
+      <div style="--i:2"><b>AI that does the work</b><span>Thirteen Instagram agents and a video editor run by agents.</span></div>
+      <div style="--i:3"><b>Chatters and customs</b><span>Who sells, what was promised and what is still open.</span></div>
+      <div style="--i:4"><b>Remote control</b><span>Telegram digests and commands for goals, tasks and customs.</span></div>
+      <div style="--i:5"><b>Onboarding without typing</b><span>A model fills in the Creator Bible and appears in the system.</span></div>
     </div>
   </div>
 </div>
 
-<div class="wrap" id="instruments">
-  <div class="section" style="padding-top:0;">
-    <div class="section-head" data-reveal>
-      <div class="tag mono">THE INSTRUMENTS</div>
-      <h2>The menu is short.<span class="script-inline">Everything on it earns.</span></h2>
-      <p class="section-sub">Four numbered instruments, tuned daily. The arrows take you to the floor.</p>
-    </div>
-
-    <div class="connector"><svg class="connector-svg" viewBox="0 0 60 240" preserveAspectRatio="none"><path class="connector-path" d="M 30 0 L 30 240"/></svg><div class="connector-dot"></div></div>
-
-    <div class="panel instruments-grid" data-reveal>
-      <div class="instrument">
-        <div class="instrument-head">
-          <div class="instrument-no script">No. 01</div>
-          <a class="arrow-btn" href="#detail-model-manager" aria-label="Model Manager">↘</a>
-        </div>
-        <h3>Model Manager</h3>
-        <p>The roster, watched daily. Every account tracked, every gap flagged before your models notice.</p>
-        <div class="instrument-tags mono">ROSTER · DAILY SCANS</div>
+<div class="wrap">
+  <div class="z2-sec">
+    <div class="z2-day">
+      <div class="z2-sticky" data-reveal>
+        <div class="z2-tag mono">A DAY IN ZION</div>
+        <h2 class="z2-h2" style="text-align:left">It works <span class="acc">while you sleep.</span></h2>
+        <p class="z2-p">Scroll through one ordinary day. Everything here runs on its own schedule.</p>
       </div>
-      <div class="instrument">
-        <div class="instrument-head">
-          <div class="instrument-no script">No. 02</div>
-          <a class="arrow-btn" href="#detail-content-director" aria-label="Content Director">↘</a>
-        </div>
-        <h3>Content Director</h3>
-        <p>Ideas ranked, scripts written, nothing sits unclaimed. Your team stops guessing what to film next.</p>
-        <div class="instrument-tags mono">WINNERS · SCRIPTS</div>
-      </div>
-      <div class="instrument">
-        <div class="instrument-head">
-          <div class="instrument-no script">No. 03</div>
-          <a class="arrow-btn" href="#detail-ledger" aria-label="The Ledger">↘</a>
-        </div>
-        <h3>The Ledger</h3>
-        <p>Earnings and reach pulled in on their own schedule, synced from Publer. No spreadsheet at 2am.</p>
-        <div class="instrument-tags mono">EARNINGS · REACH</div>
-      </div>
-      <div class="instrument">
-        <div class="instrument-head">
-          <div class="instrument-no script">No. 04</div>
-          <a class="arrow-btn" href="#detail-neo" aria-label="Neo">↘</a>
-        </div>
-        <h3>Neo</h3>
-        <p>Ask the agency anything, out loud. It answers with your numbers, your roster, your money. Not the internet's opinion.</p>
-        <div class="instrument-tags mono">ASK · IT ANSWERS</div>
+      <div class="z2-steps" data-prog>
+        <div class="z2-step" data-reveal><time>06:30</time><h4>Instagram numbers refresh</h4><p>Followers, new reels and views of every account are pulled from the public profiles.</p></div>
+        <div class="z2-step" data-reveal><time>EVERY HOUR</time><h4>Sales sync</h4><p>Revenue, subscriptions, tips and messages land on the dashboards of the model and the team.</p></div>
+        <div class="z2-step" data-reveal><time>ANY TIME</time><h4>A sale happens</h4><p>The model and the team get a push. A custom request shows up in her app with what the fan wants.</p></div>
+        <div class="z2-step" data-reveal><time>4X A DAY</time><h4>OF News updates</h4><p>News about the platform and the creator economy is checked and summarised.</p></div>
+        <div class="z2-step" data-reveal><time>FRIDAY MORNING</time><h4>Content plans are due</h4><p>The team gets a reminder and drafts next week for each model in the AI Studio.</p></div>
+        <div class="z2-step" data-reveal><time>23:00</time><h4>Daily digest</h4><p>The sales of the day arrive on Telegram. On Monday morning the whole week follows.</p></div>
+        <div class="z2-step" data-reveal><time>1ST OF THE MONTH</time><h4>New goals</h4><p>Every model gets a fresh goal built from her last months, with a note on how to reach it.</p></div>
       </div>
     </div>
   </div>
 </div>
 
 <div class="wrap">
-  <div class="quote-section" data-reveal>
-    <blockquote>"We built this because the tools we were paying for were <em>dumber than us.</em>"</blockquote>
-    <div class="quote-attr mono">THE TEAM · STILL RUNNING IT EVERY MORNING</div>
+  <div class="z2-end" data-reveal>
+    <h2 class="z2-h2">Run the roster.<br><span class="acc">Never miss a beat.</span></h2>
+    <p class="z2-p">Built for one agency. Invite only for the models on the roster.</p>
+    <div class="z2-ctas" style="opacity:1;animation:none"><a class="btn-primary" href="https://neomngmt.github.io/agencyos/">Sign in</a></div>
   </div>
 </div>
-
-<div class="wrap" id="floor-detail">
-  <div class="section">
-    <div class="section-head" data-reveal>
-      <div class="tag mono">THE FLOOR</div>
-      <h2>Every panel does a job.<span class="script-inline">Yours is to decide.</span></h2>
-      <p class="section-sub">Up close with the four instruments. None of them is decorative.</p>
-    </div>
-
-    <div class="connector"><svg class="connector-svg" viewBox="0 0 60 240" preserveAspectRatio="none"><path class="connector-path" d="M 34 0 L 26 240"/></svg><div class="connector-dot"></div></div>
-
-    <div class="detail-block" id="detail-model-manager" data-reveal>
-      <div class="detail-text">
-        <div class="badge-pill mono">NO. 01 · MODEL MANAGER</div>
-        <h3>The roster, <span class="script-accent">watched.</span></h3>
-        <p>Every model on your books. Every Instagram, X, and TikTok account they run. Scanned daily: who posted, who didn't, who's slipping. You stop chasing screenshots. The board already knows.</p>
-        <ul class="diamond-list">
-          <li><b>Full-roster scans, daily.</b> Not when someone remembers.</li>
-          <li><b>IG + X + TikTok per model,</b> live status on one row.</li>
-          <li><b>Misses flagged</b> before they become habits.</li>
-        </ul>
-      </div>
-      <div class="detail-visual">
-        <div class="panel roster-panel tilt-card">
-          <div class="panel-head">
-            <div class="label mono">MODEL MANAGER</div>
-            <div class="meta mono">4 ON ROSTER</div>
-          </div>
-          <div class="roster-row">
-            <div class="avatar-sq">S</div>
-            <div class="roster-name"><div class="name">Sofia</div><div class="handle mono">@sofia.after.dark</div></div>
-            <div class="status-dots"><span class="sd on"></span><span class="sd on"></span></div>
-            <div class="status-pill ok mono">Posted · 2h</div>
-          </div>
-          <div class="roster-row">
-            <div class="avatar-sq">M</div>
-            <div class="roster-name"><div class="name">Mia</div><div class="handle mono">@velvet.mia</div></div>
-            <div class="status-dots"><span class="sd on"></span><span class="sd"></span></div>
-            <div class="status-pill warn mono">IG missed · nudged</div>
-          </div>
-          <div class="roster-row">
-            <div class="avatar-sq">L</div>
-            <div class="roster-name"><div class="name">Lena</div><div class="handle mono">@lena.noire</div></div>
-            <div class="status-dots"><span class="sd on"></span><span class="sd on"></span></div>
-            <div class="status-pill ok mono">Posted · 4h</div>
-          </div>
-          <div class="roster-row">
-            <div class="avatar-sq">A</div>
-            <div class="roster-name"><div class="name">Aria</div><div class="handle mono">@aria.rougee</div></div>
-            <div class="status-dots"><span class="sd on"></span><span class="sd on"></span></div>
-            <div class="status-pill ok mono">Posted · 1h</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="detail-block reverse" id="detail-content-director" data-reveal>
-      <div class="detail-text">
-          <div class="badge-pill mono">NO. 02 · CONTENT DIRECTOR · IG + X + TIKTOK</div>
-          <h3>It reads the feed.<span class="script-inline">You film the winners.</span></h3>
-          <p>The Director studies hundreds of reels across your niche, ranks what's winning right now, and writes the scripts. Hook, shots, caption. On the board every morning, ready to film.</p>
-          <ul class="diamond-list">
-            <li><b>Winners ranked daily</b> from the feeds that matter.</li>
-            <li><b>Finished scripts,</b> not "inspiration." Shot by shot.</li>
-            <li><b>All three platforms.</b> Instagram, X, and TikTok, one board.</li>
-            <li><b>Audience mapped.</b> Age range and top countries, per model.</li>
-          </ul>
-        </div>
-        <div class="detail-visual">
-          <div class="panel winner-panel tilt-card">
-            <div class="panel-head">
-              <div class="label mono">WINNER BOARD · TODAY</div>
-              <div class="meta mono">212 REELS READ</div>
-            </div>
-            <div class="winner-row">
-              <div class="rank mono">01</div>
-              <div class="thumb"></div>
-              <div class="winner-label">Mirror-check hook · slow zoom reveal<div class="bar"><span data-bar-width="94"></span></div></div>
-              <div class="score mono" data-count="94.2" data-decimals="1">0.0</div>
-            </div>
-            <div class="winner-row">
-              <div class="rank mono">02</div>
-              <div class="thumb"></div>
-              <div class="winner-label">POV caption bait · 3-cut pacing<div class="bar"><span data-bar-width="88"></span></div></div>
-              <div class="score mono" data-count="88.7" data-decimals="1">0.0</div>
-            </div>
-            <div class="winner-row">
-              <div class="rank mono">03</div>
-              <div class="thumb"></div>
-              <div class="winner-label">Outfit transition · trending audio<div class="bar"><span data-bar-width="81"></span></div></div>
-              <div class="score mono" data-count="81.3" data-decimals="1">0.0</div>
-            </div>
-            <div class="winner-stat">
-              <div class="big mono">14</div>
-              <div><div class="lead">scripts written overnight.</div><div class="sub mono">Hook, shots, caption. Point and film.</div></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="detail-block" id="detail-ledger" data-reveal>
-      <div class="detail-text">
-        <div class="badge-pill mono">NO. 03 · THE LEDGER</div>
-        <h3>Revenue that <span class="script-accent">reports to you.</span></h3>
-        <p>Passive OnlyFans capture. Earnings per model, per day, pulled straight from the source while your team works the page. Nobody fills a spreadsheet. Nobody "forgets" a number. The ledger keeps itself.</p>
-        <ul class="diamond-list">
-          <li><b>Passive capture.</b> No scraping, no risky automation.</li>
-          <li><b>Per-model, per-day</b> earnings on one screen.</li>
-          <li><b>The truth,</b> not what got reported on Friday.</li>
-          <li><b>Goal tracked live.</b> Monthly revenue vs. target, every day.</li>
-        </ul>
-      </div>
-      <div class="detail-visual">
-        <div class="panel ledger-panel tilt-card">
-          <div class="panel-head">
-            <div class="label mono">OF LEDGER · 30 DAYS</div>
-            <div class="meta mono">AUTO-SYNCED</div>
-          </div>
-          <div class="ledger-total mono">$<span data-count="16678">0</span><span class="delta up mono">+18.4% vs prior</span></div>
-          <svg class="ledger-chart" viewBox="0 0 400 90" preserveAspectRatio="none">
-            <polyline points="0,70 60,64 110,58 160,60 210,46 260,40 310,26 400,10" />
-          </svg>
-          <div class="ledger-row"><div class="who">Sofia</div><div class="pct up mono">+31%</div><div class="amt mono">$<span data-count="6208">0</span></div></div>
-          <div class="ledger-row"><div class="who">Mia</div><div class="pct down mono">−12%</div><div class="amt mono">$<span data-count="3914">0</span></div></div>
-          <div class="ledger-row"><div class="who">Lena</div><div class="pct up mono">+9%</div><div class="amt mono">$<span data-count="2167">0</span></div></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="connector small"><svg class="connector-svg" viewBox="0 0 60 120" preserveAspectRatio="none"><path class="connector-path" d="M 42 0 L 16 120"/></svg><div class="connector-dot"></div></div>
-
-    <div class="detail-block reverse" id="detail-neo" data-reveal>
-      <div class="detail-text">
-        <div class="badge-pill mono">NO. 04 · VOICE COMMAND</div>
-        <h3>Ask Neo.</h3>
-        <p>Who posted today. What earned last week. Which script goes next. Ask out loud. It answers from your own data, not the internet's opinion.</p>
-        <div class="quote-box">"Scanning 4 accounts. Instagram: 3 of 4 posted. Mia missed. Nudge sent."</div>
-      </div>
-      <div class="detail-visual">
-        <div class="orb-wrap neo-orb-wrap">
-          <div class="neo-orb-glow"></div>
-          <svg class="neo-orb-dial" viewBox="0 0 200 200">
-            <circle cx="100" cy="100" r="96" fill="none" stroke="rgba(57,230,115,0.18)" stroke-width="1"/>
-            <circle cx="100" cy="100" r="90" fill="none" stroke="rgba(57,230,115,0.14)" stroke-width="1" stroke-dasharray="1,7"/>
-            <g>
-              <line x1="176.0" y1="100.0" x2="188.0" y2="100.0" stroke="rgba(120,255,160,0.55)" stroke-width="1.6"/>
-              <line x1="178.5" y1="115.6" x2="186.3" y2="117.2" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="173.9" y1="130.6" x2="181.3" y2="133.7" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="166.5" y1="144.4" x2="173.2" y2="148.9" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="153.7" y1="153.7" x2="162.2" y2="162.2" stroke="rgba(120,255,160,0.55)" stroke-width="1.6"/>
-              <line x1="144.4" y1="166.5" x2="148.9" y2="173.2" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="130.6" y1="173.9" x2="133.7" y2="181.3" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="115.6" y1="178.5" x2="117.2" y2="186.3" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="100.0" y1="176.0" x2="100.0" y2="188.0" stroke="rgba(120,255,160,0.55)" stroke-width="1.6"/>
-              <line x1="84.4" y1="178.5" x2="82.8" y2="186.3" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="69.4" y1="173.9" x2="66.3" y2="181.3" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="55.6" y1="166.5" x2="51.1" y2="173.2" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="46.3" y1="153.7" x2="37.8" y2="162.2" stroke="rgba(120,255,160,0.55)" stroke-width="1.6"/>
-              <line x1="33.5" y1="144.4" x2="26.8" y2="148.9" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="26.1" y1="130.6" x2="18.7" y2="133.7" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="21.5" y1="115.6" x2="13.7" y2="117.2" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="24.0" y1="100.0" x2="12.0" y2="100.0" stroke="rgba(120,255,160,0.55)" stroke-width="1.6"/>
-              <line x1="21.5" y1="84.4" x2="13.7" y2="82.8" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="26.1" y1="69.4" x2="18.7" y2="66.3" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="33.5" y1="55.6" x2="26.8" y2="51.1" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="46.3" y1="46.3" x2="37.8" y2="37.8" stroke="rgba(120,255,160,0.55)" stroke-width="1.6"/>
-              <line x1="55.6" y1="33.5" x2="51.1" y2="26.8" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="69.4" y1="26.1" x2="66.3" y2="18.7" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="84.4" y1="21.5" x2="82.8" y2="13.7" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="100.0" y1="24.0" x2="100.0" y2="12.0" stroke="rgba(120,255,160,0.55)" stroke-width="1.6"/>
-              <line x1="115.6" y1="21.5" x2="117.2" y2="13.7" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="130.6" y1="26.1" x2="133.7" y2="18.7" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="144.4" y1="33.5" x2="148.9" y2="26.8" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="153.7" y1="46.3" x2="162.2" y2="37.8" stroke="rgba(120,255,160,0.55)" stroke-width="1.6"/>
-              <line x1="166.5" y1="55.6" x2="173.2" y2="51.1" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="173.9" y1="69.4" x2="181.3" y2="66.3" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-              <line x1="178.5" y1="84.4" x2="186.3" y2="82.8" stroke="rgba(18,179,76,0.35)" stroke-width="1"/>
-            </g>
-            <circle cx="100" cy="100" r="74" fill="none" stroke="rgba(57,230,115,0.22)" stroke-width="1"/>
-          </svg>
-          <div class="neo-orb-mount" style="position:absolute;inset:0;width:100%;height:100%;"></div>
-        </div>
-      </div>    </div>
-  </div>
-</div>
-
-<div class="wrap" id="protocol">
-  <div class="section" style="padding-top:0;">
-    <div class="section-head" data-reveal>
-      <div class="tag mono">PROTOCOL</div>
-      <h2>Three moves. <span class="script-accent">Then it runs.</span></h2>
-    </div>
-    <div class="connector desktop-only"><svg class="connector-svg" viewBox="0 0 60 240" preserveAspectRatio="none"><path class="connector-path" d="M 30 0 L 30 240"/></svg><div class="connector-dot"></div></div>
-    <div class="protocol-grid">
-      <div class="protocol-card" data-reveal>
-        <div class="protocol-no">01</div>
-        <h3>Seat the roster</h3>
-        <p>Add your models and the accounts they run. Ten minutes. You do this once.</p>
-      </div>
-      <div class="protocol-card" data-reveal>
-        <div class="protocol-no">02</div>
-        <h3>The board lights up</h3>
-        <p>Scans begin. Reels get ranked. The ledger starts writing itself. Nothing else is asked of you.</p>
-      </div>
-      <div class="protocol-card" data-reveal>
-        <div class="protocol-no">03</div>
-        <h3>Winners land daily</h3>
-        <p>Ranked reels and finished scripts, every morning. You point. They film. It compounds.</p>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="wrap" id="access">
-  <div class="section">
-    <div class="section-head" data-reveal>
-      <div class="tag mono">ACCESS LEVELS</div>
-      <h2>Two doors. <span class="script-accent">Same building.</span></h2>
-      <p class="section-sub">One for the team, one for the roster. Both just need a name and a password.</p>
-    </div>
-
-    <div class="connector connector-fork desktop-only"><svg class="connector-svg" viewBox="0 0 1120 240" preserveAspectRatio="none"><path class="connector-path" d="M 560 0 L 560 110 C 560 150, 448 170, 280 240"/><path class="connector-path" d="M 560 0 L 560 110 C 560 150, 672 170, 840 240"/></svg><div class="connector-dot"></div><div class="connector-dot"></div></div>
-    <div class="doors-grid">
-      <div class="door-card tilt-card" data-reveal>
-        <div class="door-label mono">DOOR 01</div>
-        <h3>Team</h3>
-        <p>You, and whoever runs the board with you. PIN access, per agency. Sees everything: the pipeline, the ledger, the whole roster.</p>
-        <div class="door-tags mono">PIN · FULL BOARD</div>
-      </div>
-      <div class="door-card tilt-card" data-reveal>
-        <div class="door-label mono">DOOR 02</div>
-        <h3>Creator</h3>
-        <p>Each model signs in with her own name and sets her password the first time. Sees her own stats, her own tasks. Nothing else.</p>
-        <div class="door-tags mono">NAME + PASSWORD · OWN DASHBOARD</div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="wrap">
-  <div class="closing" data-reveal>
-    <h2>Run the roster. Never miss a beat.</h2>
-    <p>Built for one agency. Invite-only for the models on the roster.</p>
-    <a class="btn-primary" href="https://neomngmt.github.io/agencyos/">Sign in</a>
-  </div>
 </div>
 
 <footer class="site-footer mono">
@@ -15274,6 +15134,54 @@ function LandingPage({
       window.removeEventListener("scroll", onScrollConnectors);
       window.removeEventListener("resize", updateConnectors);
     });
+    const progEls = Array.from(root.querySelectorAll("[data-prog]"));
+    let progRaf = null;
+    const updateProg = () => {
+      progRaf = null;
+      const vh = window.innerHeight;
+      progEls.forEach(el => {
+        const r = el.getBoundingClientRect();
+        const pr = el.classList.contains("z2-win") ? (vh - r.top) / (vh * 0.75) : (vh * 0.6 - r.top) / Math.max(1, r.height);
+        el.style.setProperty("--p", Math.min(1, Math.max(0, pr)).toFixed(3));
+      });
+    };
+    const onProgScroll = () => {
+      if (!progRaf) progRaf = requestAnimationFrame(updateProg);
+    };
+    updateProg();
+    window.addEventListener("scroll", onProgScroll, {
+      passive: true
+    });
+    window.addEventListener("resize", onProgScroll);
+    cleanups.push(() => {
+      window.removeEventListener("scroll", onProgScroll);
+      window.removeEventListener("resize", onProgScroll);
+      if (progRaf) cancelAnimationFrame(progRaf);
+    });
+    const z2Win = root.querySelector(".z2-win");
+    const onHeroMove = e => {
+      if (z2Win) z2Win.style.setProperty("--mx", (e.clientX / window.innerWidth - 0.5).toFixed(3));
+    };
+    window.addEventListener("mousemove", onHeroMove, {
+      passive: true
+    });
+    cleanups.push(() => window.removeEventListener("mousemove", onHeroMove));
+    const spots = Array.from(root.querySelectorAll(".z2-spot"));
+    const onSpot = e => {
+      const r = e.currentTarget.getBoundingClientRect();
+      e.currentTarget.style.setProperty("--mx", e.clientX - r.left + "px");
+      e.currentTarget.style.setProperty("--my", e.clientY - r.top + "px");
+    };
+    spots.forEach(el => el.addEventListener("mousemove", onSpot));
+    cleanups.push(() => spots.forEach(el => el.removeEventListener("mousemove", onSpot)));
+    const tabBtns = Array.from(root.querySelectorAll("[data-z2tab]"));
+    const onTab = e => {
+      const k = e.currentTarget.dataset.z2tab;
+      tabBtns.forEach(b => b.classList.toggle("on", b.dataset.z2tab === k));
+      root.querySelectorAll("[data-z2pane]").forEach(pn => pn.classList.toggle("on", pn.dataset.z2pane === k));
+    };
+    tabBtns.forEach(b => b.addEventListener("click", onTab));
+    cleanups.push(() => tabBtns.forEach(b => b.removeEventListener("click", onTab)));
     const mainContentEl = root.querySelector("#mainContent");
     const legalPages = root.querySelectorAll(".legal-page");
     function showPage(name) {
@@ -24271,7 +24179,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">lcirjn</script>
+<script type="text/babel" id="zion-version">wyehox</script>
 <script>
 (function () {
   var last = 0;
