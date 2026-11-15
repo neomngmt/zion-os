@@ -1391,6 +1391,32 @@ function CardDetail({ card, models, restrictModel, onClose, onSave, onDelete }) 
 
 // ---------- X bulk upload & auto-caption studio ----------
 
+// Which accounts are connected in OneUp (Snapchat + X post through it). One fetch per page load.
+let __oneupAccountsP = null;
+function useOneupAccounts() {
+  const [accs, setAccs] = React.useState(null);
+  React.useEffect(() => {
+    if (!__oneupAccountsP) {
+      __oneupAccountsP = fetch(`${SUPABASE_URL}/functions/v1/oneup-schedule`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_ANON_KEY}` }, body: JSON.stringify({ list: true }),
+      }).then((r) => r.json()).then((j) => (Array.isArray(j.accounts) ? j.accounts : null)).catch(() => null);
+    }
+    let alive = true;
+    __oneupAccountsP.then((a) => { if (alive) setAccs(a || false); });
+    return () => { alive = false; };
+  }, []);
+  return accs; // null = loading, false = could not check, array = accounts
+}
+function oneupLinked(accs, platform, modelName) {
+  if (!Array.isArray(accs)) return true;
+  const key = String(modelName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(/\s+/)[0];
+  return accs.some((a) => {
+    const t = String(a.type || "").toLowerCase();
+    const okType = platform === "snap" ? t.includes("snap") : (t === "x" || t.includes("twitter"));
+    return okType && String(a.name || "").toLowerCase().includes(key);
+  });
+}
+
 function XCaptionStudio({ models, restrictModel, filterModel, onBackToModels, platform = "x", platformLabel = "X", PlatformLogo = XLogo }) {
   const scopedModels = restrictModel ? models.filter((m) => m.name === restrictModel) : models;
   const [selectedModel, setSelectedModel] = React.useState(
@@ -1402,6 +1428,8 @@ function XCaptionStudio({ models, restrictModel, filterModel, onBackToModels, pl
   }, [filterModel, restrictModel]);
 
   const model = scopedModels.find((m) => m.name === selectedModel);
+  const oneupAccs = useOneupAccounts();
+  const linked = !(platform === "snap" || platform === "x") || oneupLinked(oneupAccs, platform, model?.name);
 
   return (
     <>
@@ -1421,7 +1449,11 @@ function XCaptionStudio({ models, restrictModel, filterModel, onBackToModels, pl
         ))}
       </div>
     )}
-    {model && <XMassPlanner models={models} lockedModel={model.name} defaultOpen={true} platform={platform} platformLabel={platformLabel} PlatformLogo={PlatformLogo} />}
+    {model && linked && <XMassPlanner models={models} lockedModel={model.name} defaultOpen={true} platform={platform} platformLabel={platformLabel} PlatformLogo={PlatformLogo} />}
+    {model && !linked && (
+      <PlatformEmpty platform={platform} title={`${platformLabel} not linked`}
+        message={`${model.name} has no ${platformLabel} account linked yet. Connect it in OneUp and the planner shows up here.`} />
+    )}
     </>
   );
 }
@@ -4712,7 +4744,7 @@ function EditorLauncher() {
   );
 }
 
-function PlatformEmpty({ platform }) {
+function PlatformEmpty({ platform, title, message }) {
   const meta = { ig: ["Instagram", Instagram, "#ff2e78"], x: ["X", XLogo, "#ffffff"], tiktok: ["TikTok", TikTokLogo, "#5B8FA8"], threads: ["Threads", ThreadsLogo, "#E4E4E4"], snap: ["Snapchat", SnapchatLogo, "#FFFC00"], fb: ["Facebook", FacebookLogo, "#4C8BF5"] }[platform] || ["", Instagram, "#39e673"];
   const Icon = meta[1];
   return (
@@ -4721,11 +4753,11 @@ function PlatformEmpty({ platform }) {
         <div className="rounded-2xl flex items-center justify-center flex-shrink-0" style={{ width: 44, height: 44, background: "rgba(255,255,255,0.06)", border: `1px solid ${meta[2]}66` }}><Icon size={20} color={meta[2]} /></div>
         <div>
           <div className="text-2xl font-extrabold tracking-tight c-text">{meta[0]} Dashboard</div>
-          <p className="text-sm mt-0.5" style={{ color: "#9d9b95" }}>Not set up yet</p>
+          <p className="text-sm mt-0.5" style={{ color: "#9d9b95" }}>{title || "Not set up yet"}</p>
         </div>
       </div>
       <div className="fs-12 italic py-10 text-center rounded-2xl" style={{ border: "1px dashed rgba(255,255,255,0.14)", color: "#9d9b95", background: "rgba(255,255,255,0.035)" }}>
-        You have no {meta[0]} account with us yet. When your manager adds it, your numbers show up here automatically.
+        {message || `You have no ${meta[0]} account with us yet. When your manager adds it, your numbers show up here automatically.`}
       </div>
     </div>
   );

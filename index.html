@@ -1939,6 +1939,41 @@ function CardDetail({
     className: "flex-1 py-2 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold hover-bg-accent2"
   }, "Save changes"))));
 }
+let __oneupAccountsP = null;
+function useOneupAccounts() {
+  const [accs, setAccs] = React.useState(null);
+  React.useEffect(() => {
+    if (!__oneupAccountsP) {
+      __oneupAccountsP = fetch(`${SUPABASE_URL}/functions/v1/oneup-schedule`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          list: true
+        })
+      }).then(r => r.json()).then(j => Array.isArray(j.accounts) ? j.accounts : null).catch(() => null);
+    }
+    let alive = true;
+    __oneupAccountsP.then(a => {
+      if (alive) setAccs(a || false);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return accs;
+}
+function oneupLinked(accs, platform, modelName) {
+  if (!Array.isArray(accs)) return true;
+  const key = String(modelName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(/\s+/)[0];
+  return accs.some(a => {
+    const t = String(a.type || "").toLowerCase();
+    const okType = platform === "snap" ? t.includes("snap") : t === "x" || t.includes("twitter");
+    return okType && String(a.name || "").toLowerCase().includes(key);
+  });
+}
 function XCaptionStudio({
   models,
   restrictModel,
@@ -1958,6 +1993,8 @@ function XCaptionStudio({
     if (filterModel && filterModel !== "all") setSelectedModel(filterModel);
   }, [filterModel, restrictModel]);
   const model = scopedModels.find(m => m.name === selectedModel);
+  const oneupAccs = useOneupAccounts();
+  const linked = !(platform === "snap" || platform === "x") || oneupLinked(oneupAccs, platform, model?.name);
   return React.createElement(React.Fragment, null, onBackToModels && React.createElement("button", {
     onClick: onBackToModels,
     className: "flex items-center gap-1 fs-10 font-mono uppercase c-faint hover-accent-text mb-3 transition-colors"
@@ -1969,13 +2006,17 @@ function XCaptionStudio({
     key: m.name,
     onClick: () => setSelectedModel(m.name),
     className: `fs-11 font-mono uppercase px-2.5 py-1 rounded-lg border ${selectedModel === m.name ? "c-border-accent c-accent c-bg-accent-a2" : "c-border c-muted hover-bg-surface"}`
-  }, m.name))), model && React.createElement(XMassPlanner, {
+  }, m.name))), model && linked && React.createElement(XMassPlanner, {
     models: models,
     lockedModel: model.name,
     defaultOpen: true,
     platform: platform,
     platformLabel: platformLabel,
     PlatformLogo: PlatformLogo
+  }), model && !linked && React.createElement(PlatformEmpty, {
+    platform: platform,
+    title: `${platformLabel} not linked`,
+    message: `${model.name} has no ${platformLabel} account linked yet. Connect it in OneUp and the planner shows up here.`
   }));
 }
 const MASS_PLANNER_COLORS = ["#39e673", "#38bdf8", "#f472b6", "#fbbf24", "#a78bfa", "#fb923c"];
@@ -8296,7 +8337,9 @@ function EditorLauncher() {
   })))))));
 }
 function PlatformEmpty({
-  platform
+  platform,
+  title,
+  message
 }) {
   const meta = {
     ig: ["Instagram", Instagram, "#ff2e78"],
@@ -8333,14 +8376,14 @@ function PlatformEmpty({
     style: {
       color: "#9d9b95"
     }
-  }, "Not set up yet"))), React.createElement("div", {
+  }, title || "Not set up yet"))), React.createElement("div", {
     className: "fs-12 italic py-10 text-center rounded-2xl",
     style: {
       border: "1px dashed rgba(255,255,255,0.14)",
       color: "#9d9b95",
       background: "rgba(255,255,255,0.035)"
     }
-  }, "You have no ", meta[0], " account with us yet. When your manager adds it, your numbers show up here automatically."));
+  }, message || `You have no ${meta[0]} account with us yet. When your manager adds it, your numbers show up here automatically.`));
 }
 function FacebookPagesPanel({
   models,
@@ -24178,7 +24221,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1r03ol6</script>
+<script type="text/babel" id="zion-version">1wmhuq9</script>
 <script>
 (function () {
   var last = 0;
