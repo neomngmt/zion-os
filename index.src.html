@@ -1981,13 +1981,14 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
       if (itemStates[item.id]?.status === "done") continue;
       setItemState(item.id, { status: "uploading", error: "" });
       try {
-        // Snapchat goes through OneUp (not Publer): one function uploads the file
-        // and schedules it to this model's Snapchat account in a single call.
-        if (platform === "snap") {
+        // Snapchat and X go through OneUp (not Publer): one function uploads the file
+        // and schedules it to this model's account in a single call.
+        if (platform === "snap" || platform === "x") {
           setItemState(item.id, { status: "scheduling" });
           const snapForm = new FormData();
           snapForm.append("file", item.photo.file, item.photo.name);
           snapForm.append("modelName", item.model);
+          snapForm.append("platform", platform);
           snapForm.append("text", item.caption);
           snapForm.append("scheduledAt", item.scheduledAt);
           snapForm.append("mediaKind", item.mediaKind === "video" ? "video" : "photo");

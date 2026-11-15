@@ -2576,13 +2576,14 @@ function XMassPlanner({
         error: ""
       });
       try {
-        if (platform === "snap") {
+        if (platform === "snap" || platform === "x") {
           setItemState(item.id, {
             status: "scheduling"
           });
           const snapForm = new FormData();
           snapForm.append("file", item.photo.file, item.photo.name);
           snapForm.append("modelName", item.model);
+          snapForm.append("platform", platform);
           snapForm.append("text", item.caption);
           snapForm.append("scheduledAt", item.scheduledAt);
           snapForm.append("mediaKind", item.mediaKind === "video" ? "video" : "photo");
@@ -24177,7 +24178,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">13bwlla</script>
+<script type="text/babel" id="zion-version">1r03ol6</script>
 <script>
 (function () {
   var last = 0;
