@@ -2008,7 +2008,47 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
     const list = Array.isArray(itemsArg) ? itemsArg : plan;
     if (!list || !list.length) return;
     setRunningAll(true);
+    window.__zionBusy = true; // no auto-update reload while posts are uploading
     let allSucceeded = true;
+    // Snapchat / X (OneUp): the browser uploads files straight to storage, 3 at a
+    // time, while scheduling runs one by one as each upload finishes.
+    const oneupUploads = {};
+    if (platform === "snap" || platform === "x") {
+      const pending = list.filter((it) => itemStates[it.id]?.status !== "done");
+      const uploadOne = async (it) => {
+        const ext = (it.photo.name.split(".").pop() || (it.mediaKind === "video" ? "mp4" : "jpg")).toLowerCase();
+        const sr = await fetch(`${SUPABASE_URL}/functions/v1/oneup-schedule`, {
+          method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+          body: JSON.stringify({ signUpload: true, ext, platform }),
+        });
+        const sj = await sr.json();
+        if (!sr.ok || sj.error) throw new Error(sj.error || "Could not prepare upload");
+        for (let attempt = 1; ; attempt++) {
+          try {
+            const pr = await fetch(sj.uploadUrl, { method: "PUT", headers: { "Content-Type": it.photo.file.type || (it.mediaKind === "video" ? "video/mp4" : "image/jpeg") }, body: it.photo.file });
+            if (!pr.ok) {
+              const t = await pr.text().catch(() => "");
+              throw new Error(/size|too large|413/i.test(t) || pr.status === 413 ? "File too large for upload" : `Upload failed (${pr.status})`);
+            }
+            return sj.fileUrl;
+          } catch (e) {
+            if (attempt >= 3 || /too large/.test(e.message)) throw e;
+            await new Promise((r) => setTimeout(r, 1500 * attempt));
+          }
+        }
+      };
+      let next = 0;
+      const gates = {};
+      pending.forEach((it) => { gates[it.id] = {}; oneupUploads[it.id] = new Promise((res, rej) => { gates[it.id].res = res; gates[it.id].rej = rej; }); oneupUploads[it.id].catch(() => {}); });
+      const worker = async () => {
+        while (next < pending.length) {
+          const it = pending[next++];
+          setItemState(it.id, { status: "uploading", error: "" });
+          try { gates[it.id].res(await uploadOne(it)); } catch (e) { gates[it.id].rej(e); }
+        }
+      };
+      for (let w = 0; w < 3; w++) worker();
+    }
     for (const item of list) {
       if (itemStates[item.id]?.status === "done") continue;
       setItemState(item.id, { status: "uploading", error: "" });
@@ -2016,17 +2056,14 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
         // Snapchat and X go through OneUp (not Publer): one function uploads the file
         // and schedules it to this model's account in a single call.
         if (platform === "snap" || platform === "x") {
+          const fileUrl = await oneupUploads[item.id];
           setItemState(item.id, { status: "scheduling" });
-          const snapForm = new FormData();
-          snapForm.append("file", item.photo.file, item.photo.name);
-          snapForm.append("modelName", item.model);
-          snapForm.append("platform", platform);
-          snapForm.append("text", item.caption);
-          snapForm.append("scheduledAt", item.scheduledAt);
-          snapForm.append("mediaKind", item.mediaKind === "video" ? "video" : "photo");
-          snapForm.append("spotlight", String(snapKind === "spotlight" && item.mediaKind === "video"));
           const snapResp = await fetch(`${SUPABASE_URL}/functions/v1/oneup-schedule`, {
-            method: "POST", headers: { Authorization: `Bearer ${SUPABASE_ANON_KEY}` }, body: snapForm,
+            method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+            body: JSON.stringify({
+              schedule: true, modelName: item.model, platform, text: item.caption, scheduledAt: item.scheduledAt, fileUrl,
+              mediaKind: item.mediaKind === "video" ? "video" : "photo", spotlight: snapKind === "spotlight" && item.mediaKind === "video",
+            }),
           });
           const snapJson = await snapResp.json();
           if (!snapResp.ok || snapJson.error) throw new Error(snapJson.error || "Scheduling failed");
@@ -2059,6 +2096,7 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
       }
     }
     setRunningAll(false);
+    window.__zionBusy = false;
     // Clear the batch once every photo is genuinely posted — otherwise a
     // second "Generate captions" run on a later add would re-plan (and
     // re-upload/re-schedule) photos that already went out, since the fresh
