@@ -6451,6 +6451,179 @@ function TikTokContentHub({ models, cards, selectedModelName, onBackToModels }) 
 
 // ---------- model manager ----------
 
+// ---------- Model Manager roster: animated cards (network status + what is still missing) ----------
+const MM_NETS = [
+  { key: "ig", label: "Instagram", color: "#ff2e78", get: (m) => m.igHandle },
+  { key: "x", label: "X", color: "#ffffff", get: (m) => m.xHandle },
+  { key: "tiktok", label: "TikTok", color: "#5BD9E8", get: (m) => m.tiktokHandle },
+  { key: "threads", label: "Threads", color: "#E4E4E4", get: (m) => m.threadsHandle },
+  { key: "snap", label: "Snapchat", color: "#FFFC00", get: (m) => m.snapHandle },
+  { key: "fb", label: "Facebook", color: "#4C8BF5", get: (m) => (m.fbUrl ? m.fbUrl.replace(/^https?:\/\/(www\.)?facebook\.com\//i, "").replace(/\/$/, "") : "") },
+];
+const MM_SETUP = [
+  { label: "OnlyFans link", ok: (m) => !!m.ofUrl },
+  { label: "Infloww ID", ok: (m) => !!(m.inflowwCreatorIdFree || m.inflowwCreatorIdPaid) },
+  { label: "Monthly goal", ok: (m) => m.monthlyGoal != null && m.monthlyGoal > 0 },
+  { label: "Agency cut", ok: (m) => m.agencyCutPct != null },
+  { label: "Drive folder", ok: (m) => !!m.driveUrl },
+];
+function mmNetIcon(key, size, color) {
+  if (key === "ig") return <Instagram size={size} color={color} />;
+  if (key === "x") return <XLogo size={size} color={color} style={{ color }} />;
+  if (key === "tiktok") return <TikTokLogo size={size} color={color} style={{ color }} />;
+  if (key === "threads") return <ThreadsLogo size={size} color={color} style={{ color }} />;
+  if (key === "snap") return <SnapchatLogo size={size} color={color} style={{ color }} />;
+  return <FacebookLogo size={size} color={color} style={{ color }} />;
+}
+const MM_CSS = `
+.mm-wrap{ position:relative; }
+.mm-bg{ position:absolute; inset:-28px; pointer-events:none; overflow:hidden; border-radius:24px; z-index:0; }
+.mm-bg i{ position:absolute; border-radius:50%; filter:blur(70px); opacity:.5; will-change:transform; }
+.mm-bg i:nth-child(1){ width:420px; height:420px; left:-80px; top:-120px; background:rgba(57,230,115,.20); animation:mmDriftA 19s ease-in-out infinite alternate; }
+.mm-bg i:nth-child(2){ width:380px; height:380px; right:-60px; top:20%; background:rgba(56,189,248,.13); animation:mmDriftB 23s ease-in-out infinite alternate; }
+.mm-bg i:nth-child(3){ width:340px; height:340px; left:35%; bottom:-160px; background:rgba(167,139,250,.12); animation:mmDriftA 27s ease-in-out infinite alternate-reverse; }
+.mm-bg b{ position:absolute; inset:0; background-image:linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px); background-size:44px 44px; -webkit-mask-image:radial-gradient(ellipse 80% 70% at 50% 30%, #000 20%, transparent 75%); mask-image:radial-gradient(ellipse 80% 70% at 50% 30%, #000 20%, transparent 75%); animation:mmGrid 16s linear infinite; }
+@keyframes mmDriftA{ from{ transform:translate(0,0) scale(1); } to{ transform:translate(90px,60px) scale(1.18); } }
+@keyframes mmDriftB{ from{ transform:translate(0,0) scale(1.1); } to{ transform:translate(-110px,-40px) scale(.9); } }
+@keyframes mmGrid{ from{ background-position:0 0, 0 0; } to{ background-position:0 44px, 44px 0; } }
+.mm-stats{ position:relative; z-index:1; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:18px 0 22px; }
+.mm-stat{ border-radius:18px; padding:14px 16px; background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.08); backdrop-filter:blur(8px); opacity:0; animation:mmRise .7s cubic-bezier(.2,.9,.2,1) forwards; animation-delay:var(--dl,0ms); }
+.mm-stat .k{ font-family:var(--font-mono, ui-monospace, monospace); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#7f8f87; }
+.mm-stat .v{ font-size:30px; font-weight:800; letter-spacing:-.02em; color:#f2f5f3; line-height:1.1; margin-top:4px; }
+.mm-stat .v small{ font-size:14px; font-weight:600; color:#7f8f87; margin-left:4px; }
+.mm-grid{ position:relative; z-index:1; display:grid; grid-template-columns:repeat(auto-fill,minmax(310px,1fr)); gap:16px; perspective:1400px; }
+.mm-cardwrap{ opacity:0; animation:mmCardIn .85s cubic-bezier(.16,1,.3,1) forwards; animation-delay:var(--dl,0ms); transform-style:preserve-3d; }
+@keyframes mmCardIn{ from{ opacity:0; transform:translateY(34px) rotateX(-16deg) scale(.94); filter:blur(6px); } to{ opacity:1; transform:none; filter:none; } }
+@keyframes mmRise{ from{ opacity:0; transform:translateY(14px); } to{ opacity:1; transform:none; } }
+.mm-card{ position:relative; width:100%; text-align:left; cursor:pointer; border-radius:22px; padding:18px; background:linear-gradient(160deg, rgba(255,255,255,.065), rgba(255,255,255,.02) 55%), #0c120f; border:1px solid rgba(255,255,255,.09); transform:rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) translateZ(0); transform-style:preserve-3d; transition:transform .35s cubic-bezier(.2,.8,.2,1), border-color .3s, box-shadow .3s; overflow:hidden; display:block; color:inherit; }
+.mm-card.live{ transition:transform .08s linear, border-color .3s, box-shadow .3s; }
+.mm-card:hover, .mm-card:focus-visible{ border-color:color-mix(in srgb, var(--mc) 55%, transparent); box-shadow:0 24px 60px -24px color-mix(in srgb, var(--mc) 55%, transparent), 0 0 0 1px color-mix(in srgb, var(--mc) 18%, transparent) inset; outline:none; }
+.mm-card::before{ content:""; position:absolute; inset:0; pointer-events:none; background:radial-gradient(340px circle at var(--mx,50%) var(--my,0%), color-mix(in srgb, var(--mc) 26%, transparent), transparent 62%); opacity:0; transition:opacity .35s; }
+.mm-card:hover::before{ opacity:1; }
+.mm-card::after{ content:""; position:absolute; top:0; left:-60%; width:45%; height:100%; pointer-events:none; background:linear-gradient(100deg, transparent, rgba(255,255,255,.09), transparent); transform:skewX(-18deg); animation:mmSheen 1.5s ease-out both; animation-delay:calc(var(--dl,0ms) + 500ms); }
+@keyframes mmSheen{ from{ left:-60%; } to{ left:130%; } }
+.mm-head{ position:relative; display:flex; align-items:center; gap:14px; transform:translateZ(34px); }
+.mm-ava{ position:relative; width:58px; height:58px; flex-shrink:0; }
+.mm-ava svg{ position:absolute; inset:0; transform:rotate(-90deg); }
+.mm-ava .ring{ fill:none; stroke-width:3.5; stroke-linecap:round; stroke:var(--mc); stroke-dasharray:163.4; stroke-dashoffset:163.4; animation:mmRing 1.4s cubic-bezier(.2,.9,.2,1) forwards; animation-delay:calc(var(--dl,0ms) + 350ms); filter:drop-shadow(0 0 5px var(--mc)); }
+.mm-ava .track{ fill:none; stroke-width:3.5; stroke:rgba(255,255,255,.08); }
+@keyframes mmRing{ to{ stroke-dashoffset:var(--off); } }
+.mm-ava span{ position:absolute; inset:7px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:19px; color:#06110b; background:radial-gradient(circle at 30% 25%, #fff8, transparent 55%), var(--mc); }
+.mm-name{ font-size:19px; font-weight:800; letter-spacing:-.01em; color:#f2f5f3; line-height:1.15; }
+.mm-sub{ display:flex; align-items:center; gap:6px; margin-top:5px; font-family:var(--font-mono, ui-monospace, monospace); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:#7f8f87; }
+.mm-chip{ padding:2px 7px; border-radius:999px; border:1px solid rgba(255,255,255,.14); color:#c9d3ce; }
+.mm-pct{ margin-left:auto; text-align:right; }
+.mm-pct b{ display:block; font-size:22px; font-weight:800; color:#f2f5f3; line-height:1; }
+.mm-pct em{ font-style:normal; font-family:var(--font-mono, ui-monospace, monospace); font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:#7f8f87; }
+.mm-nets{ position:relative; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:16px; transform:translateZ(22px); }
+.mm-net{ border-radius:14px; padding:9px 10px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07); min-width:0; opacity:0; animation:mmPop .5s cubic-bezier(.3,1.5,.5,1) forwards; animation-delay:calc(var(--dl,0ms) + 420ms + var(--i) * 70ms); transition:transform .25s, border-color .25s, background .25s; }
+.mm-net.on{ border-color:color-mix(in srgb, var(--nc) 40%, transparent); background:color-mix(in srgb, var(--nc) 9%, transparent); }
+.mm-card:hover .mm-net.on{ transform:translateY(-2px); }
+.mm-net .top{ display:flex; align-items:center; gap:6px; }
+.mm-net .dot{ width:6px; height:6px; border-radius:50%; margin-left:auto; background:rgba(255,255,255,.16); }
+.mm-net.on .dot{ background:#39e673; box-shadow:0 0 8px #39e673; animation:mmBlink 2.6s ease-in-out infinite; animation-delay:calc(var(--i) * 300ms); }
+.mm-net .h{ margin-top:6px; font-family:var(--font-mono, ui-monospace, monospace); font-size:10.5px; color:#e6ece9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mm-net:not(.on) .h{ color:#5f6e67; }
+.mm-net:not(.on) .top svg{ opacity:.35; }
+@keyframes mmPop{ from{ opacity:0; transform:scale(.7) translateY(8px); } to{ opacity:1; transform:none; } }
+@keyframes mmBlink{ 0%,100%{ opacity:1; } 50%{ opacity:.35; } }
+.mm-foot{ position:relative; margin-top:14px; padding-top:13px; border-top:1px solid rgba(255,255,255,.07); display:flex; flex-wrap:wrap; gap:6px; align-items:center; transform:translateZ(14px); min-height:44px; }
+.mm-foot .lbl{ width:100%; font-family:var(--font-mono, ui-monospace, monospace); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#7f8f87; margin-bottom:2px; }
+.mm-miss{ font-size:11px; padding:4px 9px; border-radius:999px; color:#ffcf8a; background:rgba(255,170,60,.09); border:1px solid rgba(255,170,60,.28); opacity:0; animation:mmPop .45s cubic-bezier(.3,1.5,.5,1) forwards; animation-delay:calc(var(--dl,0ms) + 850ms + var(--i) * 60ms); }
+.mm-ok{ display:flex; align-items:center; gap:7px; font-size:12px; font-weight:600; color:#39e673; }
+.mm-ok i{ width:8px; height:8px; border-radius:50%; background:#39e673; box-shadow:0 0 10px #39e673; }
+.mm-edit{ position:absolute; top:14px; right:14px; width:30px; height:30px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#c9d3ce; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); opacity:0; transform:translateZ(40px) scale(.8); transition:opacity .25s, transform .25s; }
+.mm-card:hover .mm-edit, .mm-card:focus-visible .mm-edit{ opacity:1; transform:translateZ(40px) scale(1); }
+@media (max-width:700px){ .mm-stats{ grid-template-columns:1fr 1fr 1fr; gap:8px; } .mm-stat{ padding:10px 11px; } .mm-stat .v{ font-size:22px; } .mm-grid{ grid-template-columns:1fr; } .mm-edit{ opacity:1; transform:none; } .mm-pct{ margin-right:38px; } }
+@media (hover:none){ .mm-edit{ opacity:1; transform:none; } .mm-pct{ margin-right:38px; } }
+@media (prefers-reduced-motion: reduce){ .mm-bg i, .mm-bg b, .mm-net.on .dot{ animation:none; } .mm-cardwrap, .mm-stat, .mm-net, .mm-miss{ animation-duration:.01s; animation-delay:0s; } .mm-card::after{ display:none; } .mm-ava .ring{ animation-duration:.01s; animation-delay:0s; } .mm-card{ transform:none !important; } }
+`;
+function MMCard({ m, color, index, onEdit }) {
+  const ref = React.useRef(null);
+  const nets = MM_NETS.map((n) => ({ ...n, handle: n.get(m) || "" }));
+  const missing = MM_SETUP.filter((x) => !x.ok(m)).map((x) => x.label);
+  const linked = nets.filter((n) => n.handle).length;
+  const total = nets.length + MM_SETUP.length;
+  const done = linked + (MM_SETUP.length - missing.length);
+  const pct = Math.round((done / total) * 100);
+  const onMove = (e) => {
+    const el = ref.current; if (!el) return;
+    const r = el.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+    el.classList.add("live");
+    el.style.setProperty("--ry", `${(x - 0.5) * 11}deg`);
+    el.style.setProperty("--rx", `${(0.5 - y) * 9}deg`);
+    el.style.setProperty("--mx", `${x * 100}%`);
+    el.style.setProperty("--my", `${y * 100}%`);
+  };
+  const onLeave = () => {
+    const el = ref.current; if (!el) return;
+    el.classList.remove("live");
+    el.style.setProperty("--ry", "0deg"); el.style.setProperty("--rx", "0deg");
+  };
+  const netsMissing = nets.length - linked;
+  return (
+    <div className="mm-cardwrap" style={{ "--dl": `${120 + index * 90}ms` }}>
+      <button ref={ref} type="button" className="mm-card" style={{ "--mc": color }} onClick={() => onEdit(m.name)}
+        onMouseMove={onMove} onMouseLeave={onLeave} aria-label={`Edit ${m.name}`}>
+        <span className="mm-edit"><Pencil size={14} /></span>
+        <div className="mm-head">
+          <div className="mm-ava">
+            <svg viewBox="0 0 58 58"><circle className="track" cx="29" cy="29" r="26" /><circle className="ring" cx="29" cy="29" r="26" style={{ "--off": 163.4 * (1 - pct / 100) }} /></svg>
+            <span>{(m.name || "?").trim().charAt(0).toUpperCase()}</span>
+          </div>
+          <div className="min-w-0">
+            <div className="mm-name truncate">{m.name}</div>
+            <div className="mm-sub"><span className="mm-chip">{m.agency || "CZ"}</span><span>{linked}/{nets.length} networks</span></div>
+          </div>
+          <div className="mm-pct"><b><CountUp value={pct} duration={1300} />%</b><em>set up</em></div>
+        </div>
+        <div className="mm-nets">
+          {nets.map((n, i) => (
+            <div key={n.key} className={`mm-net ${n.handle ? "on" : ""}`} style={{ "--nc": n.color, "--i": i }} title={n.label}>
+              <div className="top">{mmNetIcon(n.key, 14, n.handle ? n.color : "#8a9690")}<span className="dot" /></div>
+              <div className="h">{n.handle ? (n.key === "fb" ? n.handle : `@${n.handle}`) : "not linked"}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mm-foot">
+          {missing.length === 0 && netsMissing === 0 ? (
+            <div className="mm-ok"><i />Everything is set up</div>
+          ) : missing.length === 0 ? (
+            <div className="mm-ok" style={{ color: "#c9d3ce", fontWeight: 500 }}><i />Profile complete, {netsMissing} network{netsMissing === 1 ? "" : "s"} not linked</div>
+          ) : (
+            <>
+              <div className="lbl">Still to fill in</div>
+              {missing.map((x, i) => <span key={x} className="mm-miss" style={{ "--i": i }}>{x}</span>)}
+            </>
+          )}
+        </div>
+      </button>
+    </div>
+  );
+}
+function MMRoster({ models, colorFor, onEdit }) {
+  const linkedTotal = models.reduce((t, m) => t + MM_NETS.filter((n) => n.get(m)).length, 0);
+  const missingTotal = models.reduce((t, m) => t + MM_SETUP.filter((x) => !x.ok(m)).length, 0);
+  return (
+    <div className="mm-wrap">
+      <style>{MM_CSS}</style>
+      <div className="mm-bg" aria-hidden="true"><i /><i /><i /><b /></div>
+      <div className="mm-stats">
+        <div className="mm-stat" style={{ "--dl": "0ms" }}><div className="k">Models</div><div className="v"><CountUp value={models.length} duration={900} /></div></div>
+        <div className="mm-stat" style={{ "--dl": "80ms" }}><div className="k">Accounts linked</div><div className="v"><CountUp value={linkedTotal} duration={1100} /><small>/ {models.length * MM_NETS.length}</small></div></div>
+        <div className="mm-stat" style={{ "--dl": "160ms" }}><div className="k">Still to fill in</div><div className="v" style={{ color: missingTotal ? "#ffcf8a" : "#39e673" }}><CountUp value={missingTotal} duration={1100} /></div></div>
+      </div>
+      {models.length === 0 && (
+        <div className="fs-12 c-faint font-mono italic py-10 text-center" style={{ position: "relative", zIndex: 1 }}>No models yet. They appear here when they fill in the Creator Bible.</div>
+      )}
+      <div className="mm-grid">
+        {models.map((m, i) => <MMCard key={m.name} m={m} color={colorFor(m.name)} index={i} onEdit={onEdit} />)}
+      </div>
+    </div>
+  );
+}
+
 function ModelManager({ models, persistModels, cards, reels, agency, bufferDailyStats, igGraphStats, igAccounts, onIgAccountSynced, inflowwDailyStats }) {
   const [adding, setAdding] = useState(false);
   const NEW_MODEL_DEFAULTS = {
@@ -6712,51 +6885,7 @@ function ModelManager({ models, persistModels, cards, reels, agency, bufferDaily
 
 
       {mmTab === "accounts" ? (
-        <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
-          <div className="hidden md:grid md:grid-cols-[1.3fr_1fr_1fr_1fr_1fr_1fr_1fr_44px] gap-2 px-4 py-2 fs-9 font-mono uppercase c-faint tracking-wide"
-            style={{ background: "rgba(255,255,255,0.02)" }}>
-            <span>Model</span><span>Instagram</span><span>X</span><span>TikTok</span><span>Threads</span><span>Snapchat</span><span>Facebook</span><span />
-          </div>
-          {models.length === 0 && (
-            <div className="fs-12 c-faint font-mono italic py-8 text-center">no models yet — add your first one</div>
-          )}
-          {models.map((m, i) => (
-            <div key={m.name} className="grid grid-cols-1 md:grid-cols-[1.3fr_1fr_1fr_1fr_1fr_1fr_1fr_44px] gap-2 px-4 py-3 items-center"
-              style={{ borderTop: i === 0 ? "none" : "1px solid rgba(255,255,255,0.06)" }}>
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: colorFor(m.name) }} />
-                <span className="c-text fs-12 font-medium truncate">{m.name}</span>
-              </div>
-              {[
-                { key: "ig", handle: m.igHandle },
-                { key: "x", handle: m.xHandle },
-                { key: "tiktok", handle: m.tiktokHandle },
-                { key: "threads", handle: m.threadsHandle },
-                { key: "snap", handle: m.snapHandle },
-                { key: "fb", handle: m.fbUrl ? m.fbUrl.replace(/^https?:\/\/(www\.)?facebook\.com\//i, "") : "" },
-              ].map(({ key, handle }) => {
-                const graphRow = key === "ig" ? (igGraphStats || []).find((g) => g.model === m.name) : null;
-                const platRows = ["ig", "snap", "fb"].includes(key) ? [] : (bufferDailyStats || []).filter((r) => r.model === m.name && r.platform === key);
-                const hasHandle = !!handle;
-                const imp7d = key === "ig" ? (graphRow?.views7d || 0) : platRows.filter((r) => r.statDate >= cutoff7dStr).reduce((t, r) => t + (r.impressions || 0), 0);
-                const sub = !hasHandle ? "not set up"
-                  : key === "ig" ? (graphRow ? `${imp7d.toLocaleString()} views · 7d` : "waiting for first sync")
-                  : platRows.length ? `${imp7d.toLocaleString()} · 7d` : "linked";
-                return (
-                  <div key={key} className="flex items-center gap-2 min-w-0">
-                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: hasHandle ? "#39e673" : "rgba(255,255,255,0.15)" }} />
-                    <div className="min-w-0">
-                      <div className="fs-11 font-mono c-text truncate" style={{ opacity: hasHandle ? 1 : 0.45 }}>{hasHandle ? (key === "fb" ? handle : `@${handle}`) : "-"}</div>
-                      <div className="fs-9 font-mono" style={{ color: hasHandle ? "#39e673" : "#5c6e65" }}>{sub}</div>
-                    </div>
-                  </div>
-                );
-              })}
-              <button onClick={() => setEditName(m.name)} title="Edit model" className="tap flex w-9 h-9 rounded-xl items-center justify-center c-muted hover-accent-text"
-                style={{ border: "1px solid rgba(255,255,255,0.1)" }}><Pencil size={15} /></button>
-            </div>
-          ))}
-        </div>
+        <MMRoster models={models} colorFor={colorFor} onEdit={setEditName} />
       ) : (
       <>
       {/* ---- 4 summary cards ---- */}
