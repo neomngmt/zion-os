@@ -8567,6 +8567,928 @@ function FacebookPagesPanel({
     }, restrictModel ? "No Facebook page yet." : "Paste the page link above."));
   })));
 }
+async function hubFn(body) {
+  let token = "";
+  try {
+    token = JSON.parse(localStorage.getItem("agencyos_session") || "{}").token || "";
+  } catch (e) {}
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/ig-hub`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      "x-zion-token": token
+    },
+    body: JSON.stringify(body)
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+}
+const HUB_CSS = `
+.hb{ color:#f2f5f0; }
+.hb-bar{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:16px; }
+.hb-chip{ padding:7px 13px; border-radius:999px; font-size:12px; font-weight:600; color:#8fa39a; border:1px solid rgba(255,255,255,.1); transition:all .2s; cursor:pointer; }
+.hb-chip:hover{ color:#f2f5f0; border-color:rgba(255,255,255,.25); }
+.hb-chip.on{ color:#03110a; background:#39e673; border-color:#39e673; }
+.hb-btn{ display:inline-flex; align-items:center; gap:7px; padding:9px 15px; border-radius:13px; font-size:13px; font-weight:600; color:#03110a; background:#39e673; transition:transform .15s, opacity .2s, box-shadow .2s; cursor:pointer; }
+.hb-btn:hover{ box-shadow:0 8px 26px -10px rgba(57,230,115,.8); }
+.hb-btn:active{ transform:scale(.97); }
+.hb-btn:disabled{ opacity:.5; cursor:default; box-shadow:none; }
+.hb-btn.ghost{ color:#d9e2dd; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12); }
+.hb-btn.ghost:hover{ box-shadow:none; background:rgba(255,255,255,.1); }
+.hb-btn.sm{ padding:6px 11px; font-size:12px; border-radius:10px; }
+.hb-card{ background:#0e1310; border:1px solid rgba(57,230,115,.16); border-radius:20px; padding:18px; }
+.hb-note{ font-size:12px; color:#8fa39a; line-height:1.5; }
+.hb-err{ font-size:12px; color:#ff8a6b; margin-bottom:12px; }
+.hb-empty{ padding:44px 20px; text-align:center; border-radius:20px; border:1px dashed rgba(255,255,255,.14); color:#8fa39a; font-size:13px; line-height:1.6; }
+.hb-empty b{ display:block; color:#f2f5f0; font-size:16px; margin-bottom:6px; }
+.hb-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:14px; }
+.hb-reel{ position:relative; border-radius:18px; overflow:hidden; background:#0e1310; border:1px solid rgba(255,255,255,.08); opacity:0; animation:hbIn .55s cubic-bezier(.16,1,.3,1) forwards; animation-delay:calc(var(--i,0) * 35ms); transition:border-color .25s, transform .25s; }
+.hb-reel:hover{ border-color:rgba(57,230,115,.45); transform:translateY(-3px); }
+@keyframes hbIn{ from{ opacity:0; transform:translateY(16px) scale(.97); } to{ opacity:1; transform:none; } }
+.hb-thumb{ position:relative; aspect-ratio:9/13; background:#080c0a center/cover no-repeat; display:block; }
+.hb-thumb::after{ content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,.45) 0%, transparent 28%, transparent 55%, rgba(5,9,7,.96) 100%); }
+.hb-mult{ position:absolute; top:10px; left:10px; z-index:1; padding:4px 9px; border-radius:999px; font-size:12px; font-weight:800; color:#03110a; background:#39e673; box-shadow:0 0 16px rgba(57,230,115,.6); }
+.hb-mult.mid{ background:#d9e2dd; box-shadow:none; }
+.hb-star{ position:absolute; top:8px; right:8px; z-index:1; width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.5); color:#fff; backdrop-filter:blur(6px); transition:transform .2s, background .2s; cursor:pointer; }
+.hb-star:hover{ transform:scale(1.12); }
+.hb-star.on{ background:#ffd166; color:#3a2a00; }
+.hb-over{ position:absolute; left:12px; right:12px; bottom:10px; z-index:1; }
+.hb-over .h{ font-size:11px; color:#c9d3ce; }
+.hb-over .v{ font-size:17px; font-weight:800; letter-spacing:-.01em; }
+.hb-over .v small{ font-size:11px; font-weight:500; color:#8fa39a; margin-left:4px; }
+.hb-body{ padding:12px; }
+.hb-fmt{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:10px; font-weight:600; color:#39e673; border:1px solid rgba(57,230,115,.35); margin-bottom:7px; }
+.hb-hook{ font-size:12.5px; line-height:1.4; color:#e6ece9; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; min-height:52px; }
+.hb-hook.dim{ color:#6f7f77; }
+.hb-acts{ display:flex; gap:6px; margin-top:10px; }
+.hb-acts > *{ flex:1; justify-content:center; }
+.hb-modal{ position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center; padding:18px; background:rgba(2,6,4,.72); backdrop-filter:blur(8px); animation:mdFade .25s ease both; }
+.hb-sheet{ width:100%; max-width:860px; max-height:90vh; overflow:auto; border-radius:24px; background:#0b100d; border:1px solid rgba(57,230,115,.22); box-shadow:0 40px 100px rgba(0,0,0,.7); animation:hbIn .45s cubic-bezier(.16,1,.3,1) both; }
+.hb-sheet-in{ display:grid; grid-template-columns:240px 1fr; gap:22px; padding:22px; }
+.hb-sec{ margin-bottom:16px; }
+.hb-sec h5{ margin:0 0 7px; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#8fa39a; font-weight:600; }
+.hb-sec p, .hb-sec li{ font-size:13.5px; line-height:1.55; color:#e6ece9; margin:0; }
+.hb-sec ul{ margin:0; padding-left:18px; list-style:disc; }
+.hb-hers ol{ list-style:decimal; }
+.hb-sec li{ margin-bottom:5px; }
+.hb-quote{ font-size:17px; font-weight:700; line-height:1.35; color:#f2f5f0; }
+.hb-hers{ border-radius:16px; padding:15px; background:linear-gradient(160deg, rgba(57,230,115,.11), rgba(57,230,115,.03)); border:1px solid rgba(57,230,115,.28); }
+.hb-fit{ display:flex; align-items:center; gap:10px; }
+.hb-fit i{ flex:1; height:6px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden; }
+.hb-fit i b{ display:block; height:100%; border-radius:99px; background:#39e673; transform-origin:left; animation:revModelBarGrow .9s cubic-bezier(.2,.9,.2,1) both; }
+.hb-row{ display:flex; align-items:center; gap:12px; padding:11px 0; border-top:1px solid rgba(255,255,255,.06); }
+.hb-row:first-child{ border-top:0; }
+.hb-ava{ width:38px; height:38px; flex-shrink:0; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; color:#03110a; background:linear-gradient(135deg,#39e673,#12b34c); }
+.hb-ava.s{ background:rgba(255,255,255,.08); color:#d9e2dd; }
+.hb-in{ flex:1; min-width:0; padding:10px 13px; border-radius:12px; font-size:14px; color:#f2f5f0; background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.1); outline:none; }
+.hb-in:focus{ border-color:rgba(57,230,115,.7); box-shadow:0 0 0 3px rgba(57,230,115,.14); }
+.hb-item{ display:grid; grid-template-columns:74px 1fr auto; gap:14px; align-items:start; padding:14px 0; border-top:1px solid rgba(255,255,255,.06); opacity:0; animation:hbIn .5s cubic-bezier(.16,1,.3,1) forwards; animation-delay:calc(var(--i,0) * 40ms); }
+.hb-item:first-child{ border-top:0; }
+.hb-item .t{ width:74px; aspect-ratio:9/13; border-radius:12px; background:#080c0a center/cover no-repeat; display:block; position:relative; overflow:hidden; }
+.hb-item .n{ position:absolute; top:5px; left:5px; min-width:20px; height:20px; padding:0 5px; border-radius:99px; background:rgba(0,0,0,.65); font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+.hb-pri{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; margin-right:6px; }
+.hb-pri.must{ color:#03110a; background:#39e673; }
+.hb-pri.good{ color:#39e673; border:1px solid rgba(57,230,115,.4); }
+.hb-pri.optional{ color:#8fa39a; border:1px solid rgba(255,255,255,.14); }
+.hb-status{ display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; font-size:11px; font-weight:600; }
+.hb-status.draft{ color:#ffcf8a; background:rgba(255,170,60,.1); border:1px solid rgba(255,170,60,.3); }
+.hb-status.sent{ color:#39e673; background:rgba(57,230,115,.1); border:1px solid rgba(57,230,115,.35); }
+.hb-spin{ width:14px; height:14px; border-radius:50%; border:2px solid rgba(255,255,255,.25); border-top-color:#39e673; animation:spin 0.8s linear infinite; display:inline-block; }
+.hb-x{ width:28px; height:28px; border-radius:9px; display:flex; align-items:center; justify-content:center; color:#8fa39a; cursor:pointer; }
+.hb-x:hover{ color:#ff8a6b; background:rgba(255,255,255,.06); }
+@media (max-width:720px){ .hb-sheet-in{ grid-template-columns:1fr; } .hb-sheet-in > .hb-thumbwrap{ max-width:180px; } .hb-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; } .hb-item{ grid-template-columns:58px 1fr; } .hb-item .t{ width:58px; } .hb-item > .hb-x{ grid-column:2; justify-self:end; } }
+@media (prefers-reduced-motion: reduce){ .hb-reel, .hb-item, .hb-sheet{ animation-duration:.01s; animation-delay:0s; } }
+`;
+const hubDate = iso => {
+  try {
+    return new Date(iso + (String(iso).length === 10 ? "T12:00:00" : "")).toLocaleDateString("cs-CZ", {
+      day: "numeric",
+      month: "numeric"
+    });
+  } catch (e) {
+    return "";
+  }
+};
+function HubReelSheet({
+  reel,
+  model,
+  onClose,
+  onChange
+}) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [copied, setCopied] = useState(false);
+  const a = reel.analysis && !reel.analysis.error ? reel.analysis : null;
+  const run = async () => {
+    setBusy(true);
+    setErr("");
+    try {
+      const j = await hubFn({
+        action: "analyze",
+        model,
+        id: reel.id
+      });
+      onChange({
+        ...reel,
+        analysis: j.analysis,
+        analyzed_at: new Date().toISOString()
+      });
+    } catch (e) {
+      setErr(e.message);
+    }
+    setBusy(false);
+  };
+  const copyHers = () => {
+    if (!a?.adapt) return;
+    const t = [a.adapt.hook && `HOOK: ${a.adapt.hook}`, a.adapt.idea, ...(a.adapt.shots || []).map((x, i) => `${i + 1}. ${x}`), a.adapt.caption && `CAPTION: ${a.adapt.caption}`, `REFERENCE: ${reel.url}`].filter(Boolean).join("\n");
+    try {
+      navigator.clipboard.writeText(t);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (e) {}
+  };
+  return React.createElement("div", {
+    className: "hb-modal",
+    onClick: onClose
+  }, React.createElement("div", {
+    className: "hb-sheet hb",
+    onClick: e => e.stopPropagation()
+  }, React.createElement("div", {
+    className: "hb-sheet-in"
+  }, React.createElement("div", {
+    className: "hb-thumbwrap"
+  }, React.createElement("a", {
+    href: reel.url,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    className: "hb-thumb",
+    style: {
+      borderRadius: 16,
+      overflow: "hidden",
+      backgroundImage: reel.thumb_url ? `url(${reel.thumb_url})` : "none"
+    }
+  }, React.createElement("span", {
+    className: `hb-mult ${reel.multiple < 1.3 ? "mid" : ""}`
+  }, reel.multiple, "x"), React.createElement("div", {
+    className: "hb-over"
+  }, React.createElement("div", {
+    className: "h"
+  }, "@", reel.handle), React.createElement("div", {
+    className: "v"
+  }, igK(reel.views), React.createElement("small", null, "views")))), React.createElement("a", {
+    href: reel.url,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    className: "hb-btn",
+    style: {
+      width: "100%",
+      justifyContent: "center",
+      marginTop: 10
+    }
+  }, "Watch the reel"), React.createElement("p", {
+    className: "hb-note",
+    style: {
+      marginTop: 10
+    }
+  }, igK(reel.likes), " likes, ", igK(reel.comments), " comments", reel.duration ? `, ${Math.round(reel.duration)} s` : "", reel.posted_at ? `, posted ${hubDate(reel.posted_at)}` : "")), React.createElement("div", {
+    style: {
+      minWidth: 0
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 10,
+      marginBottom: 14
+    }
+  }, React.createElement("div", {
+    style: {
+      flex: 1,
+      fontSize: 20,
+      fontWeight: 800,
+      letterSpacing: "-.01em"
+    }
+  }, "Why it worked"), React.createElement("button", {
+    className: "hb-x",
+    onClick: onClose,
+    "aria-label": "Close"
+  }, React.createElement(X, {
+    size: 16
+  }))), err && React.createElement("div", {
+    className: "hb-err"
+  }, err), !a ? React.createElement("div", {
+    className: "hb-empty",
+    style: {
+      padding: "30px 18px"
+    }
+  }, React.createElement("b", null, "No breakdown yet"), "The AI looks at the cover, the caption, the spoken words and the numbers, then writes how ", model, " can shoot her own version. Takes about 20 seconds.", React.createElement("div", {
+    style: {
+      marginTop: 14
+    }
+  }, React.createElement("button", {
+    className: "hb-btn",
+    onClick: run,
+    disabled: busy
+  }, busy ? React.createElement(React.Fragment, null, React.createElement("span", {
+    className: "hb-spin"
+  }), "Reading the reel") : "Break it down")), reel.analysis?.error && React.createElement("p", {
+    className: "hb-note",
+    style: {
+      marginTop: 10
+    }
+  }, "Last try failed: ", reel.analysis.error)) : React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "hb-sec"
+  }, React.createElement("span", {
+    className: "hb-fmt"
+  }, a.format), a.hook_type ? React.createElement("span", {
+    className: "hb-fmt",
+    style: {
+      marginLeft: 6,
+      color: "#c9d3ce",
+      borderColor: "rgba(255,255,255,.18)"
+    }
+  }, a.hook_type) : null, React.createElement("div", {
+    className: "hb-quote"
+  }, a.hook)), React.createElement("div", {
+    className: "hb-sec"
+  }, React.createElement("h5", null, "Why it beat the account's normal numbers"), React.createElement("ul", null, (a.why || []).map((w, i) => React.createElement("li", {
+    key: i
+  }, w)))), a.structure && React.createElement("div", {
+    className: "hb-sec"
+  }, React.createElement("h5", null, "How it is built"), React.createElement("p", null, a.structure)), React.createElement("div", {
+    className: "hb-sec"
+  }, React.createElement("h5", null, "Fit for ", model), React.createElement("div", {
+    className: "hb-fit"
+  }, React.createElement("i", null, React.createElement("b", {
+    style: {
+      width: `${a.fit || 0}%`
+    }
+  })), React.createElement("span", {
+    style: {
+      fontWeight: 700
+    }
+  }, a.fit || 0))), a.adapt && React.createElement("div", {
+    className: "hb-hers"
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      marginBottom: 10
+    }
+  }, React.createElement("h5", {
+    style: {
+      margin: 0,
+      flex: 1,
+      fontSize: 10,
+      letterSpacing: ".14em",
+      textTransform: "uppercase",
+      color: "#39e673",
+      fontWeight: 700
+    }
+  }, "Her version"), React.createElement("button", {
+    className: "hb-btn ghost sm",
+    onClick: copyHers
+  }, copied ? "Copied" : "Copy")), a.adapt.hook && React.createElement("div", {
+    className: "hb-quote",
+    style: {
+      fontSize: 16,
+      marginBottom: 8
+    }
+  }, a.adapt.hook), a.adapt.idea && React.createElement("p", {
+    style: {
+      fontSize: 13.5,
+      lineHeight: 1.55,
+      color: "#e6ece9",
+      margin: "0 0 8px"
+    }
+  }, a.adapt.idea), (a.adapt.shots || []).length > 0 && React.createElement("ol", {
+    style: {
+      margin: "0 0 8px",
+      paddingLeft: 18
+    }
+  }, a.adapt.shots.map((x, i) => React.createElement("li", {
+    key: i,
+    style: {
+      fontSize: 13,
+      lineHeight: 1.5,
+      color: "#d9e2dd",
+      marginBottom: 3
+    }
+  }, x))), a.adapt.caption && React.createElement("p", {
+    className: "hb-note"
+  }, "Caption: ", a.adapt.caption)), React.createElement("p", {
+    className: "hb-note",
+    style: {
+      marginTop: 12
+    }
+  }, "Confidence: ", a.confidence, ". ", React.createElement("button", {
+    onClick: run,
+    disabled: busy,
+    style: {
+      color: "#39e673",
+      textDecoration: "underline",
+      cursor: "pointer"
+    }
+  }, busy ? "Working" : "Run again")))))));
+}
+function IgHub({
+  models,
+  tab
+}) {
+  const list = models || [];
+  const [model, setModel] = useState(() => {
+    try {
+      const s = localStorage.getItem("zionHubModel");
+      if (s && list.some(m => m.name === s)) return s;
+    } catch (e) {}
+    return list[0]?.name || "";
+  });
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState("");
+  const [open, setOpen] = useState(null);
+  const [filter, setFilter] = useState("all");
+  const [handles, setHandles] = useState("");
+  const [copied, setCopied] = useState(false);
+  const pick = n => {
+    setModel(n);
+    try {
+      localStorage.setItem("zionHubModel", n);
+    } catch (e) {}
+  };
+  const load = useCallback(async () => {
+    if (!model) return;
+    try {
+      setData(await hubFn({
+        action: "overview",
+        model
+      }));
+      setErr("");
+    } catch (e) {
+      setErr(e.message);
+    }
+  }, [model]);
+  useEffect(() => {
+    setData(null);
+    setOpen(null);
+    setFilter("all");
+    load();
+  }, [model, load]);
+  const act = async (key, body, after) => {
+    setBusy(key);
+    setErr("");
+    try {
+      const j = await hubFn({
+        model,
+        ...body
+      });
+      if (after) await after(j);else await load();
+    } catch (e) {
+      setErr(e.message);
+    }
+    setBusy("");
+  };
+  const scanning = data?.scan?.state === "running";
+  useEffect(() => {
+    if (!scanning) return;
+    const t = setInterval(async () => {
+      try {
+        const st = await hubFn({
+          action: "scan-status",
+          model
+        });
+        if (st.state !== "running") load();
+      } catch (e) {}
+    }, 8000);
+    return () => clearInterval(t);
+  }, [scanning, model, load]);
+  if (!list.length) return React.createElement("div", {
+    className: "hb-empty"
+  }, React.createElement("b", null, "No models yet"), "Models appear here once they exist in the Model Manager.");
+  const profiles = data?.profiles || [];
+  const active = profiles.filter(p => p.status === "active");
+  const suggested = profiles.filter(p => p.status === "suggested");
+  const reels = data?.reels || [];
+  const plans = data?.plans || [];
+  const plan = plans.find(p => p.week_start === data?.nextWeek) || plans[0];
+  const shown = reels.filter(r => filter === "all" ? true : filter === "saved" ? r.saved : filter === "analyzed" ? r.analysis && !r.analysis.error : r.analysis?.format === filter).sort((x, y) => (y.multiple || 0) - (x.multiple || 0));
+  const formats = [...new Set(reels.map(r => r.analysis?.format).filter(Boolean))];
+  const scanBtn = React.createElement("button", {
+    className: "hb-btn",
+    disabled: scanning || busy === "scan" || !active.length,
+    onClick: () => act("scan", {
+      action: "scan"
+    })
+  }, scanning || busy === "scan" ? React.createElement(React.Fragment, null, React.createElement("span", {
+    className: "hb-spin"
+  }), "Scanning ", data?.scan?.profiles || active.length, " profiles") : "Scan now");
+  const planText = p => [`Reel plan, week of ${hubDate(p.week_start)}`, "", ...(p.items || []).map((i, n) => `${n + 1}. ${i.hook}\n${i.idea}\n${i.url}`)].join("\n\n");
+  return React.createElement("div", {
+    className: "hb"
+  }, React.createElement("style", null, HUB_CSS, MD_CSS), React.createElement("div", {
+    className: "hb-bar"
+  }, list.map(m => React.createElement("button", {
+    key: m.name,
+    className: `hb-chip ${m.name === model ? "on" : ""}`,
+    onClick: () => pick(m.name)
+  }, m.name))), err && React.createElement("div", {
+    className: "hb-err"
+  }, err), !data ? React.createElement("div", {
+    className: "hb-empty"
+  }, React.createElement("span", {
+    className: "hb-spin"
+  })) : tab === "swipe" ? React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "hb-bar"
+  }, [["all", `All ${reels.length}`], ["saved", "Saved"], ["analyzed", "With breakdown"], ...formats.map(f => [f, f])].map(([k, l]) => React.createElement("button", {
+    key: k,
+    className: `hb-chip ${filter === k ? "on" : ""}`,
+    onClick: () => setFilter(k)
+  }, l)), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }), data.scan?.state === "done" && React.createElement("span", {
+    className: "hb-note"
+  }, "Last scan ", timeAgo(data.scan.finishedAt), ", kept ", data.scan.kept, " of ", data.scan.scanned, " reels"), data.scan?.state === "failed" && React.createElement("span", {
+    className: "hb-note",
+    style: {
+      color: "#ff8a6b"
+    }
+  }, data.scan.error), scanBtn), !active.length ? React.createElement("div", {
+    className: "hb-empty"
+  }, React.createElement("b", null, "No tracked profiles for ", model, " yet"), "Open the Tracked profiles tab and add Instagram accounts from her niche. Their best reels land here.") : !reels.length ? React.createElement("div", {
+    className: "hb-empty"
+  }, React.createElement("b", null, "Nothing in the swipe file yet"), "Press Scan now. It reads the newest reels of ", active.length, " tracked profile", active.length === 1 ? "" : "s", " and keeps the ones that beat that account's own normal numbers. Takes 2 to 5 minutes. It also runs by itself every Thursday.") : !shown.length ? React.createElement("div", {
+    className: "hb-empty"
+  }, React.createElement("b", null, "No reels match this filter")) : React.createElement("div", {
+    className: "hb-grid"
+  }, shown.map((r, i) => {
+    const a = r.analysis && !r.analysis.error ? r.analysis : null;
+    return React.createElement("div", {
+      key: r.id,
+      className: "hb-reel",
+      style: {
+        "--i": Math.min(i, 20)
+      }
+    }, React.createElement("a", {
+      href: r.url,
+      target: "_blank",
+      rel: "noopener noreferrer",
+      className: "hb-thumb",
+      style: {
+        backgroundImage: r.thumb_url ? `url(${r.thumb_url})` : "none"
+      }
+    }, React.createElement("span", {
+      className: `hb-mult ${r.multiple < 1.3 ? "mid" : ""}`
+    }, r.multiple, "x"), React.createElement("div", {
+      className: "hb-over"
+    }, React.createElement("div", {
+      className: "h"
+    }, "@", r.handle), React.createElement("div", {
+      className: "v"
+    }, igK(r.views), React.createElement("small", null, "views")))), React.createElement("button", {
+      className: `hb-star ${r.saved ? "on" : ""}`,
+      title: r.saved ? "Saved" : "Save",
+      "aria-label": "Save",
+      onClick: () => {
+        setData(d => ({
+          ...d,
+          reels: d.reels.map(x => x.id === r.id ? {
+            ...x,
+            saved: !r.saved
+          } : x)
+        }));
+        hubFn({
+          action: "save-reel",
+          id: r.id,
+          saved: !r.saved
+        }).catch(() => {});
+      }
+    }, React.createElement(IGStar, {
+      size: 14,
+      color: r.saved ? "#3a2a00" : "#fff"
+    })), React.createElement("div", {
+      className: "hb-body"
+    }, a ? React.createElement("span", {
+      className: "hb-fmt"
+    }, a.format) : null, React.createElement("div", {
+      className: `hb-hook ${a ? "" : "dim"}`
+    }, a ? a.hook : r.caption || "No caption"), React.createElement("div", {
+      className: "hb-acts"
+    }, React.createElement("button", {
+      className: `hb-btn sm ${a ? "" : "ghost"}`,
+      onClick: () => setOpen(r.id)
+    }, a ? "Why it worked" : "Break it down"))));
+  }))) : tab === "plan" ? React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "hb-bar"
+  }, React.createElement("div", {
+    style: {
+      fontSize: 20,
+      fontWeight: 800,
+      letterSpacing: "-.01em"
+    }
+  }, plan ? `Week of ${hubDate(plan.week_start)}` : `Week of ${hubDate(data.nextWeek)}`), plan && React.createElement("span", {
+    className: `hb-status ${plan.status}`
+  }, plan.status === "sent" ? `Sent to ${model}` : "Draft, only the team sees it"), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }), plan && React.createElement("button", {
+    className: "hb-btn ghost",
+    onClick: () => {
+      try {
+        navigator.clipboard.writeText(planText(plan));
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      } catch (e) {}
+    }
+  }, copied ? "Copied" : "Copy as text"), React.createElement("button", {
+    className: "hb-btn ghost",
+    disabled: busy === "plan",
+    onClick: () => {
+      if (plan && plan.week_start === data.nextWeek && !window.confirm("Write this week's plan again? The current one is replaced.")) return;
+      act("plan", {
+        action: "plan-generate"
+      });
+    }
+  }, busy === "plan" ? React.createElement(React.Fragment, null, React.createElement("span", {
+    className: "hb-spin"
+  }), "Writing the plan") : plan && plan.week_start === data.nextWeek ? "Write again" : "Write the plan"), plan && (plan.status === "sent" ? React.createElement("button", {
+    className: "hb-btn ghost",
+    disabled: busy === "send",
+    onClick: () => act("send", {
+      action: "plan-unsend",
+      id: plan.id
+    })
+  }, "Take back") : React.createElement("button", {
+    className: "hb-btn",
+    disabled: busy === "send" || !(plan.items || []).length,
+    onClick: () => {
+      if (window.confirm(`Send this plan to ${model}? She gets a notification and sees it in her Zion.`)) act("send", {
+        action: "plan-send",
+        id: plan.id
+      });
+    }
+  }, busy === "send" ? "Sending" : `Send to ${model}`))), !plan ? React.createElement("div", {
+    className: "hb-empty"
+  }, React.createElement("b", null, "No plan yet"), "A plan is written by itself every Thursday afternoon from the swipe file, so it is ready for your Friday check. You can also write one now. It needs at least a few reels in the swipe file.") : React.createElement("div", {
+    className: "hb-card"
+  }, plan.summary && React.createElement("p", {
+    style: {
+      fontSize: 14,
+      lineHeight: 1.6,
+      color: "#d9e2dd",
+      margin: "0 0 6px"
+    }
+  }, plan.summary), React.createElement("p", {
+    className: "hb-note",
+    style: {
+      marginBottom: 6
+    }
+  }, (plan.items || []).length, " reels. ", model, " sees the hook, the idea and the link. The grey reason line is for the team only."), (plan.items || []).map((it, i) => React.createElement("div", {
+    key: it.reel_id || i,
+    className: "hb-item",
+    style: {
+      "--i": Math.min(i, 20)
+    }
+  }, React.createElement("a", {
+    href: it.url,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    className: "t",
+    style: {
+      backgroundImage: it.thumb_url ? `url(${it.thumb_url})` : "none"
+    }
+  }, React.createElement("span", {
+    className: "n"
+  }, i + 1)), React.createElement("div", {
+    style: {
+      minWidth: 0
+    }
+  }, React.createElement("div", {
+    style: {
+      marginBottom: 6
+    }
+  }, React.createElement("span", {
+    className: `hb-pri ${it.priority}`
+  }, it.priority), it.format ? React.createElement("span", {
+    className: "hb-note"
+  }, it.format, ", ") : null, React.createElement("span", {
+    className: "hb-note"
+  }, "@", it.handle, ", ", igK(it.views), " views, ", it.multiple, "x")), React.createElement("div", {
+    style: {
+      fontSize: 15.5,
+      fontWeight: 700,
+      lineHeight: 1.35,
+      marginBottom: 4
+    }
+  }, it.hook), React.createElement("div", {
+    style: {
+      fontSize: 13.5,
+      lineHeight: 1.55,
+      color: "#d9e2dd"
+    }
+  }, it.idea), it.why && React.createElement("div", {
+    className: "hb-note",
+    style: {
+      marginTop: 5
+    }
+  }, it.why), React.createElement("a", {
+    href: it.url,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    style: {
+      display: "inline-block",
+      marginTop: 7,
+      fontSize: 12,
+      fontWeight: 600,
+      color: "#39e673"
+    }
+  }, "Watch the reel")), plan.status !== "sent" && React.createElement("button", {
+    className: "hb-x",
+    title: "Remove from the plan",
+    "aria-label": "Remove",
+    onClick: () => {
+      const items = plan.items.filter((_, n) => n !== i);
+      setData(d => ({
+        ...d,
+        plans: d.plans.map(p => p.id === plan.id ? {
+          ...p,
+          items
+        } : p)
+      }));
+      hubFn({
+        action: "plan-update",
+        id: plan.id,
+        items
+      }).catch(e => setErr(e.message));
+    }
+  }, React.createElement(X, {
+    size: 15
+  }))))), plans.filter(p => p.id !== plan?.id).length > 0 && React.createElement("p", {
+    className: "hb-note",
+    style: {
+      marginTop: 14
+    }
+  }, "Earlier plans: ", plans.filter(p => p.id !== plan?.id).map(p => `week of ${hubDate(p.week_start)} (${(p.items || []).length} reels, ${p.status})`).join(", "))) : React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "hb-card",
+    style: {
+      marginBottom: 14
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "baseline",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 17,
+      fontWeight: 800
+    }
+  }, "Tracked for ", model), React.createElement("span", {
+    className: "hb-note"
+  }, active.length, " of ", data.maxActive)), React.createElement("form", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 6
+    },
+    onSubmit: e => {
+      e.preventDefault();
+      if (handles.trim()) act("add", {
+        action: "add-profile",
+        handles
+      }, async () => {
+        setHandles("");
+        await load();
+      });
+    }
+  }, React.createElement("input", {
+    className: "hb-in",
+    value: handles,
+    onChange: e => setHandles(e.target.value),
+    placeholder: "Instagram usernames or profile links, several at once"
+  }), React.createElement("button", {
+    className: "hb-btn",
+    disabled: busy === "add" || !handles.trim()
+  }, busy === "add" ? "Adding" : "Add")), React.createElement("p", {
+    className: "hb-note",
+    style: {
+      marginBottom: 8
+    }
+  }, "Accounts from her niche whose reels work. Public accounts only. Nothing logs in to Instagram."), !active.length && React.createElement("div", {
+    className: "hb-empty",
+    style: {
+      padding: "22px 16px"
+    }
+  }, "No profiles yet. Add a few above, or let the AI suggest some below."), active.map(p => React.createElement("div", {
+    key: p.id,
+    className: "hb-row"
+  }, React.createElement("div", {
+    className: "hb-ava"
+  }, p.handle.charAt(0).toUpperCase()), React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, React.createElement("a", {
+    href: `https://www.instagram.com/${p.handle}/`,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    style: {
+      fontWeight: 700,
+      fontSize: 14
+    }
+  }, "@", p.handle), React.createElement("div", {
+    className: "hb-note"
+  }, [p.followers ? `${igK(p.followers)} followers` : null, p.median_views ? `${igK(p.median_views)} median views` : null, p.last_scraped_at ? `scanned ${timeAgo(new Date(p.last_scraped_at).getTime())}` : "not scanned yet"].filter(Boolean).join(", "))), React.createElement("button", {
+    className: "hb-x",
+    title: "Stop tracking",
+    "aria-label": "Remove",
+    onClick: () => act("rm" + p.id, {
+      action: "remove-profile",
+      id: p.id
+    })
+  }, React.createElement(X, {
+    size: 15
+  }))))), React.createElement("div", {
+    className: "hb-card"
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 6
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 17,
+      fontWeight: 800,
+      flex: 1
+    }
+  }, "Suggested by AI"), React.createElement("button", {
+    className: "hb-btn ghost",
+    disabled: busy === "suggest",
+    onClick: () => act("suggest", {
+      action: "suggest"
+    })
+  }, busy === "suggest" ? React.createElement(React.Fragment, null, React.createElement("span", {
+    className: "hb-spin"
+  }), "Looking, about a minute") : "Suggest profiles")), React.createElement("p", {
+    className: "hb-note",
+    style: {
+      marginBottom: 8
+    }
+  }, "Real accounts related to the ones you track, picked by how well their bio fits the niche written in her Model Manager note. Nothing is tracked until you accept it."), !suggested.length && React.createElement("p", {
+    className: "hb-note"
+  }, "No suggestions waiting."), suggested.map(p => React.createElement("div", {
+    key: p.id,
+    className: "hb-row"
+  }, React.createElement("div", {
+    className: "hb-ava s"
+  }, p.handle.charAt(0).toUpperCase()), React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, React.createElement("a", {
+    href: `https://www.instagram.com/${p.handle}/`,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    style: {
+      fontWeight: 700,
+      fontSize: 14
+    }
+  }, "@", p.handle), React.createElement("span", {
+    className: "hb-note",
+    style: {
+      marginLeft: 8
+    }
+  }, p.followers ? `${igK(p.followers)} followers` : ""), p.reason && React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      color: "#d9e2dd",
+      lineHeight: 1.45,
+      marginTop: 2
+    }
+  }, p.reason)), React.createElement("button", {
+    className: "hb-btn sm",
+    disabled: busy === "ok" + p.id,
+    onClick: () => act("ok" + p.id, {
+      action: "set-profile",
+      id: p.id,
+      status: "active"
+    })
+  }, "Track"), React.createElement("button", {
+    className: "hb-btn ghost sm",
+    onClick: () => act("no" + p.id, {
+      action: "set-profile",
+      id: p.id,
+      status: "rejected"
+    })
+  }, "Skip"))))), open && reels.find(r => r.id === open) && React.createElement(HubReelSheet, {
+    reel: reels.find(r => r.id === open),
+    model: model,
+    onClose: () => setOpen(null),
+    onChange: nr => setData(d => ({
+      ...d,
+      reels: d.reels.map(x => x.id === nr.id ? {
+        ...x,
+        ...nr
+      } : x)
+    }))
+  }));
+}
+function CreatorReelPlan() {
+  const [plans, setPlans] = useState(null);
+  useEffect(() => {
+    hubFn({
+      action: "my-plans"
+    }).then(j => setPlans(j.plans || [])).catch(() => setPlans([]));
+  }, []);
+  const plan = (plans || [])[0];
+  if (!plan || !(plan.items || []).length) return null;
+  return React.createElement("div", {
+    className: "hb hb-card",
+    style: {
+      marginBottom: 18
+    }
+  }, React.createElement("style", null, HUB_CSS), React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "baseline",
+      gap: 10,
+      flexWrap: "wrap",
+      marginBottom: 4
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 20,
+      fontWeight: 800,
+      letterSpacing: "-.01em"
+    }
+  }, "Your reel plan"), React.createElement("span", {
+    className: "hb-note"
+  }, "week of ", hubDate(plan.week_start), ", ", plan.items.length, " ideas")), React.createElement("p", {
+    className: "hb-note",
+    style: {
+      marginBottom: 4
+    }
+  }, "Watch the reel, then film your own version with the hook below."), plan.items.map((it, i) => React.createElement("div", {
+    key: i,
+    className: "hb-item",
+    style: {
+      "--i": Math.min(i, 20),
+      gridTemplateColumns: "74px 1fr"
+    }
+  }, React.createElement("a", {
+    href: it.url,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    className: "t",
+    style: {
+      backgroundImage: it.thumb_url ? `url(${it.thumb_url})` : "none"
+    }
+  }, React.createElement("span", {
+    className: "n"
+  }, i + 1)), React.createElement("div", {
+    style: {
+      minWidth: 0
+    }
+  }, React.createElement("div", {
+    style: {
+      marginBottom: 5
+    }
+  }, React.createElement("span", {
+    className: `hb-pri ${it.priority}`
+  }, it.priority === "must" ? "first" : it.priority === "optional" ? "if you have time" : "next")), React.createElement("div", {
+    style: {
+      fontSize: 15.5,
+      fontWeight: 700,
+      lineHeight: 1.35,
+      marginBottom: 4
+    }
+  }, it.hook), React.createElement("div", {
+    style: {
+      fontSize: 13.5,
+      lineHeight: 1.55,
+      color: "#d9e2dd"
+    }
+  }, it.idea), React.createElement("a", {
+    href: it.url,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    className: "hb-btn sm",
+    style: {
+      marginTop: 9
+    }
+  }, "Watch the reel")))));
+}
 function ContentDirector({
   cards,
   persistCards,
@@ -8656,14 +9578,14 @@ function ContentDirector({
   if (network === "ig" && restrictModel) {
     const mine = (igGraphStats || []).filter(a => a.model === restrictModel);
     const mineIds = mine.map(a => a.id);
-    return React.createElement(IGOverviewDashboard, {
+    return React.createElement(React.Fragment, null, React.createElement(CreatorReelPlan, null), React.createElement(IGOverviewDashboard, {
       models: models.filter(m => m.name === restrictModel),
       inflowwDailyStats: [],
       igGraphStats: mine,
       igGraphMedia: (igGraphMedia || []).filter(m => mineIds.includes(m.account_id)),
       igViralVariations: [],
       single: true
-    });
+    }));
   }
   if (igMode) {
     if (igModelName) {
@@ -8679,35 +9601,51 @@ function ContentDirector({
         initialScreen: igEntryScreen
       });
     }
+    const igModels = models.filter(m => !(m.disabledPlatforms || []).includes("ig"));
+    const igTabBar = React.createElement("div", {
+      style: {
+        display: "flex",
+        marginBottom: 16,
+        overflowX: "auto"
+      }
+    }, React.createElement("div", {
+      style: {
+        display: "inline-flex",
+        background: "#0e1310",
+        border: "1px solid rgba(57,230,115,0.16)",
+        borderRadius: 16,
+        padding: 5,
+        gap: 4,
+        flexShrink: 0
+      }
+    }, [["dash", "Dashboard"], ["swipe", "Swipe file"], ["plan", "Weekly plan"], ["profiles", "Tracked profiles"], ["studio", "AI Studio"]].map(([k, l]) => React.createElement("button", {
+      key: k,
+      onClick: () => setIgAiStudio(k === "dash" ? false : k),
+      style: {
+        padding: "9px 16px",
+        borderRadius: 12,
+        fontSize: 13,
+        fontWeight: 600,
+        whiteSpace: "nowrap",
+        transition: "all .2s",
+        background: (igAiStudio || "dash") === k ? "#39e673" : "transparent",
+        color: (igAiStudio || "dash") === k ? "#03110a" : "#8fa39a"
+      }
+    }, l))));
+    if (igAiStudio && igAiStudio !== "studio") {
+      return React.createElement(React.Fragment, null, igTabBar, React.createElement(IgHub, {
+        models: igModels,
+        tab: igAiStudio
+      }));
+    }
     if (igAiStudio) {
-      return React.createElement(React.Fragment, null, React.createElement("button", {
-        onClick: () => setIgAiStudio(false),
-        className: "flex items-center gap-1 fs-10 font-mono uppercase c-faint hover-accent-text mb-3 transition-colors"
-      }, React.createElement(ChevronLeft, {
-        size: 12
-      }), " Instagram Dashboard"), React.createElement(IgStudioPage, {
-        models: models.filter(m => !(m.disabledPlatforms || []).includes("ig")),
+      return React.createElement(React.Fragment, null, igTabBar, React.createElement(IgStudioPage, {
+        models: igModels,
         onlyStudio: true
       }));
     }
     if (!igPlanningMode) {
-      return React.createElement(React.Fragment, null, React.createElement("div", {
-        style: {
-          display: "flex",
-          justifyContent: "flex-end",
-          marginBottom: 12
-        }
-      }, React.createElement("button", {
-        onClick: () => setIgAiStudio(true),
-        style: {
-          padding: "10px 18px",
-          borderRadius: 14,
-          background: "#3ee65a",
-          color: "#03110a",
-          fontWeight: 600,
-          fontSize: 14
-        }
-      }, "AI Studio")), React.createElement(IGOverviewDashboard, {
+      return React.createElement(React.Fragment, null, igTabBar, React.createElement(IGOverviewDashboard, {
         models: models,
         inflowwDailyStats: inflowwDailyStats,
         igGraphStats: igGraphStats,
@@ -24744,7 +25682,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1qr0az</script>
+<script type="text/babel" id="zion-version">thtlb</script>
 <script>
 (function () {
   var last = 0;
