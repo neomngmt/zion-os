@@ -10751,7 +10751,16 @@ const MM_NETS = [{
   key: "fb",
   label: "Facebook",
   color: "#4C8BF5",
-  get: m => m.fbUrl ? m.fbUrl.replace(/^https?:\/\/(www\.)?facebook\.com\//i, "").replace(/\/$/, "") : ""
+  get: m => {
+    if (!m.fbUrl) return "";
+    let h = m.fbUrl.replace(/^https?:\/\/(www\.)?facebook\.com\//i, "").replace(/[?#].*$/, "").replace(/\/$/, "");
+    const pm = h.match(/^(?:people|p)\/([^/]+)/);
+    if (pm) h = pm[1].replace(/-\d{8,}$/, "").replace(/-/g, " ");
+    try {
+      h = decodeURIComponent(h);
+    } catch (e) {}
+    return h;
+  }
 }];
 const MM_SETUP = [{
   label: "OnlyFans link",
@@ -24735,7 +24744,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">kmrsym</script>
+<script type="text/babel" id="zion-version">1qr0az</script>
 <script>
 (function () {
   var last = 0;

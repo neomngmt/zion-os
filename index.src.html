@@ -6458,7 +6458,14 @@ const MM_NETS = [
   { key: "tiktok", label: "TikTok", color: "#5BD9E8", get: (m) => m.tiktokHandle },
   { key: "threads", label: "Threads", color: "#E4E4E4", get: (m) => m.threadsHandle },
   { key: "snap", label: "Snapchat", color: "#FFFC00", get: (m) => m.snapHandle },
-  { key: "fb", label: "Facebook", color: "#4C8BF5", get: (m) => (m.fbUrl ? m.fbUrl.replace(/^https?:\/\/(www\.)?facebook\.com\//i, "").replace(/\/$/, "") : "") },
+  { key: "fb", label: "Facebook", color: "#4C8BF5", get: (m) => {
+      if (!m.fbUrl) return "";
+      let h = m.fbUrl.replace(/^https?:\/\/(www\.)?facebook\.com\//i, "").replace(/[?#].*$/, "").replace(/\/$/, "");
+      const pm = h.match(/^(?:people|p)\/([^/]+)/); // facebook.com/people/Name/123 -> Name
+      if (pm) h = pm[1].replace(/-\d{8,}$/, "").replace(/-/g, " ");
+      try { h = decodeURIComponent(h); } catch (e) {}
+      return h;
+    } },
 ];
 const MM_SETUP = [
   { label: "OnlyFans link", ok: (m) => !!m.ofUrl },
