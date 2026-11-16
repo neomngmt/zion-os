@@ -7355,6 +7355,87 @@ function ModelOfAccount({ modelName, accountId, username, onConnected }) {
   );
 }
 
+const mmColorFor = (n) => {
+  const C = ["#39e673", "#5B8FA8", "#8B7FD9", "#E2725B", "#D9B45B", "#5BD9C0", "#D95B9E", "#7FD95B"];
+  let hash = 0;
+  for (let i = 0; i < (n || "").length; i++) hash = (hash * 31 + n.charCodeAt(i)) >>> 0;
+  return C[hash % C.length];
+};
+const MD_CSS = `
+.md-back{ position:fixed; inset:0; z-index:50; display:flex; justify-content:flex-end; background:rgba(2,6,4,.62); backdrop-filter:blur(6px); animation:mdFade .3s ease both; }
+@keyframes mdFade{ from{ opacity:0; } to{ opacity:1; } }
+.md-panel{ position:relative; width:100%; max-width:600px; height:100%; display:flex; flex-direction:column; background:#0a0f0c; border-left:1px solid rgba(255,255,255,.09); box-shadow:-30px 0 80px rgba(0,0,0,.6); animation:mdSlide .5s cubic-bezier(.16,1,.3,1) both; }
+@keyframes mdSlide{ from{ transform:translateX(60px); opacity:0; } to{ transform:none; opacity:1; } }
+.md-scroll{ flex:1; overflow-y:auto; padding:0 22px 22px; }
+.md-hero{ position:relative; margin:0 -22px; padding:24px 22px 4px; overflow:hidden; }
+.md-glow{ position:absolute; inset:-80px -40px auto -40px; height:300px; pointer-events:none; background:radial-gradient(420px 220px at 18% 30%, color-mix(in srgb, var(--mc) 30%, transparent), transparent 70%), radial-gradient(360px 200px at 95% 0%, rgba(56,189,248,.12), transparent 70%); animation:mdGlow 9s ease-in-out infinite alternate; }
+@keyframes mdGlow{ from{ transform:translateX(-14px) scale(1); opacity:.85; } to{ transform:translateX(18px) scale(1.08); opacity:1; } }
+.md-x{ position:absolute; top:18px; right:18px; z-index:2; width:32px; height:32px; border-radius:11px; display:flex; align-items:center; justify-content:center; color:#c9d3ce; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); transition:background .2s, transform .2s; }
+.md-x:hover{ background:rgba(255,255,255,.12); transform:rotate(90deg); }
+.md-herorow{ position:relative; display:flex; align-items:center; gap:16px; margin-bottom:18px; padding-right:44px; }
+.md-name{ font-size:28px; font-weight:800; letter-spacing:-.02em; color:#f2f5f3; line-height:1.1; }
+.md-meta{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:7px; font-family:var(--font-mono, ui-monospace, monospace); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:#7f8f87; }
+.md-hero > .grid{ position:relative; }
+.md-sec{ margin-top:14px; padding:16px; border-radius:20px; background:linear-gradient(160deg, rgba(255,255,255,.045), rgba(255,255,255,.015)); border:1px solid rgba(255,255,255,.075); opacity:0; animation:mdRise .6s cubic-bezier(.16,1,.3,1) forwards; animation-delay:calc(140ms + var(--i) * 70ms); }
+@keyframes mdRise{ from{ opacity:0; transform:translateY(18px); } to{ opacity:1; transform:none; } }
+.md-sec h4{ display:flex; align-items:center; gap:8px; margin:0 0 14px; font-size:13px; font-weight:700; color:#f2f5f3; }
+.md-sec h4 svg{ color:var(--mc); }
+.md-sec h4 em{ margin-left:auto; font-style:normal; font-weight:500; font-family:var(--font-mono, ui-monospace, monospace); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:#7f8f87; }
+.md-f{ margin-bottom:12px; min-width:0; }
+.md-f:last-child{ margin-bottom:0; }
+.md-f > label, .md-net label{ display:block; font-size:11px; font-weight:600; color:#9fb0a8; margin-bottom:6px; }
+.md-f > p{ margin:6px 0 0; font-size:11px; line-height:1.4; color:#62726a; }
+.md-two{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+.md-two:last-child{ margin-bottom:0; }
+.md-two .md-f{ margin-bottom:0; }
+.md-in{ width:100%; padding:10px 12px; border-radius:12px; font-size:14px; color:#f2f5f3; background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.09); outline:none; transition:border-color .2s, box-shadow .2s, background .2s; }
+.md-in.mono{ font-family:var(--font-mono, ui-monospace, monospace); font-size:12.5px; }
+.md-in::placeholder{ color:#4f5d56; }
+.md-in:focus{ border-color:color-mix(in srgb, var(--mc) 70%, transparent); box-shadow:0 0 0 3px color-mix(in srgb, var(--mc) 16%, transparent); background:rgba(0,0,0,.5); }
+textarea.md-in{ resize:vertical; line-height:1.5; }
+.md-in[type=number]::-webkit-inner-spin-button{ -webkit-appearance:none; }
+.md-affix{ position:relative; display:flex; align-items:center; }
+.md-affix > span{ position:absolute; left:12px; color:#7f8f87; font-size:14px; pointer-events:none; }
+.md-affix:not(.r) .md-in{ padding-left:26px; }
+.md-affix.r > span{ left:auto; right:12px; }
+.md-affix.r .md-in{ padding-right:58px; }
+.md-open{ position:absolute; right:6px; cursor:pointer; padding:5px 10px; border-radius:9px; font-size:11px; font-weight:600; color:#06110b; background:var(--mc); }
+.md-nets{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.md-net{ display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:14px; background:rgba(0,0,0,.3); border:1px solid rgba(255,255,255,.08); transition:border-color .25s, background .25s, box-shadow .25s; min-width:0; }
+.md-net.on{ border-color:color-mix(in srgb, var(--nc) 38%, transparent); background:color-mix(in srgb, var(--nc) 7%, rgba(0,0,0,.3)); }
+.md-net:focus-within{ border-color:color-mix(in srgb, var(--nc) 70%, transparent); box-shadow:0 0 0 3px color-mix(in srgb, var(--nc) 14%, transparent); }
+.md-net .ic{ width:32px; height:32px; flex-shrink:0; border-radius:10px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.05); }
+.md-net label{ margin-bottom:1px; font-size:10px; }
+.md-net input{ width:100%; background:transparent; border:0; outline:none; padding:0; font-family:var(--font-mono, ui-monospace, monospace); font-size:12.5px; color:#f2f5f3; }
+.md-net input::placeholder{ color:#4f5d56; }
+.md-net .dot{ width:7px; height:7px; border-radius:50%; flex-shrink:0; background:rgba(255,255,255,.14); transition:background .25s, box-shadow .25s; }
+.md-net.on .dot{ background:#39e673; box-shadow:0 0 9px #39e673; }
+.md-refs{ display:flex; flex-wrap:wrap; gap:7px; }
+.md-ref{ display:inline-flex; align-items:center; gap:6px; padding:6px 8px 6px 10px; border-radius:999px; font-size:12px; color:#e6ece9; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); animation:mmPop .35s cubic-bezier(.3,1.5,.5,1) both; }
+.md-ref button{ display:flex; color:#7f8f87; }
+.md-ref button:hover{ color:#ff8a6b; }
+.md-refadd{ display:inline-flex; align-items:center; border-radius:999px; background:rgba(0,0,0,.35); border:1px dashed rgba(255,255,255,.16); padding:2px 3px 2px 12px; }
+.md-refadd input{ width:130px; background:transparent; border:0; outline:none; font-size:12px; color:#f2f5f3; }
+.md-refadd input::placeholder{ color:#4f5d56; }
+.md-refadd button{ width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#06110b; background:var(--mc); }
+.md-f > label.md-switch{ display:flex; margin:0; font-size:12px; font-weight:500; color:#c9d3ce; }
+.md-switch{ display:flex; align-items:center; gap:10px; cursor:pointer; padding:9px 0; font-size:12px; color:#c9d3ce; }
+.md-switch input{ position:absolute; opacity:0; pointer-events:none; }
+.md-switch i{ position:relative; width:36px; height:21px; flex-shrink:0; border-radius:999px; background:rgba(255,255,255,.12); transition:background .25s; }
+.md-switch i::after{ content:""; position:absolute; top:3px; left:3px; width:15px; height:15px; border-radius:50%; background:#fff; transition:transform .25s cubic-bezier(.3,1.4,.5,1); }
+.md-switch input:checked + i{ background:#39e673; }
+.md-switch input:checked + i::after{ transform:translateX(15px); }
+.md-switch input:focus-visible + i{ box-shadow:0 0 0 3px rgba(57,230,115,.3); }
+.md-bar{ display:flex; align-items:center; gap:10px; padding:14px 22px calc(14px + env(safe-area-inset-bottom, 0px)); background:rgba(10,15,12,.86); backdrop-filter:blur(14px); border-top:1px solid rgba(255,255,255,.08); }
+.md-state{ margin-right:auto; font-family:var(--font-mono, ui-monospace, monospace); font-size:10px; letter-spacing:.1em; text-transform:uppercase; transition:color .25s; }
+.md-cancel{ padding:11px 16px; border-radius:13px; font-size:13px; font-weight:600; color:#c9d3ce; border:1px solid rgba(255,255,255,.12); }
+.md-cancel:hover{ background:rgba(255,255,255,.06); }
+.md-save{ padding:11px 20px; border-radius:13px; font-size:13px; font-weight:700; color:#06110b; background:#39e673; opacity:.55; transition:opacity .25s, box-shadow .25s, transform .15s; }
+.md-save.hot{ opacity:1; box-shadow:0 8px 30px -8px rgba(57,230,115,.7); }
+.md-save:active{ transform:scale(.97); }
+@media (max-width:560px){ .md-two, .md-nets{ grid-template-columns:1fr; } .md-scroll{ padding:0 14px 14px; } .md-hero{ margin:0 -14px; padding:20px 14px 4px; } .md-bar{ padding-left:14px; padding-right:14px; } .md-name{ font-size:23px; } .md-state{ display:none; } .md-save{ flex:1; } }
+@media (prefers-reduced-motion: reduce){ .md-back, .md-panel, .md-sec, .md-ref{ animation-duration:.01s; animation-delay:0s; } .md-glow{ animation:none; } }
+`;
 function ModelDrawerStats({ model, igGraphStats, inflowwDailyStats }) {
   const g = (igGraphStats || []).find((x) => x.model === model.name);
   const now = new Date();
@@ -7395,138 +7476,173 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, 
     setNewRefHandle("");
   };
   const removeRefProfile = (id) => set("inspoProfiles", refProfiles.filter(p => p.id !== id));
+  const [newPin, setNewPin] = useState("");
+  const [pinSaved, setPinSaved] = useState(false);
+  const savePin = async () => {
+    const v = newPin.trim();
+    if (!v) return;
+    await onSetPin(model.name, v);
+    setNewPin(""); setPinSaved(true);
+  };
+
+  const mc = mmColorFor(model.name);
+  const setupTotal = MM_NETS.length + MM_SETUP.length;
+  const setupDone = MM_NETS.filter((n) => n.get(form)).length + MM_SETUP.filter((x) => x.ok(form)).length;
+  const pct = Math.round((setupDone / setupTotal) * 100);
+  const dirty = JSON.stringify(form) !== JSON.stringify(model);
+  const inp = "md-in";
+  const netField = (key, label, k, ph, isUrl) => {
+    const n = MM_NETS.find((x) => x.key === key);
+    const val = form[k] || "";
+    return (
+      <div className={`md-net ${val ? "on" : ""}`} style={{ "--nc": n.color }}>
+        <span className="ic">{mmNetIcon(key, 15, val ? n.color : "#7f8f87")}</span>
+        <div className="min-w-0 flex-1">
+          <label>{label}</label>
+          <input value={val} onChange={(e) => set(k, isUrl ? e.target.value : e.target.value.replace(/^@/, ""))} placeholder={ph} />
+        </div>
+        <span className="dot" />
+      </div>
+    );
+  };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex justify-end z-50" onClick={onClose}>
-      <div className="c-bg-surface border-l c-border w-full max-w-xl p-5 h-full overflow-y-auto" onClick={(e) => e.stopPropagation()} style={{ boxShadow: "-24px 0 60px rgba(0,0,0,.5)" }}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <UserCircle2 size={22} className="c-accent" />
-            <div>
-              <div className="text-xl font-extrabold tracking-tight c-text leading-tight">{model.name}</div>
-              <div className="fs-10 font-mono uppercase c-faint">{model.agency || "CZ"} agency{model.addedAt ? ` · since ${new Date(model.addedAt).toLocaleDateString("cs-CZ")}` : ""}</div>
-            </div>
-          </div>
-          <button onClick={onClose} className="c-muted hover-text-primary"><X size={18} /></button>
-        </div>
-        <ModelDrawerStats model={model} igGraphStats={igGraphStats} inflowwDailyStats={inflowwDailyStats} />
-
-        <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Niche / persona note</label>
-        <input value={form.note || ""} onChange={(e) => set("note", e.target.value)}
-          className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text mb-3 outline-none focus-border-accent" />
-
-        <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Monthly revenue goal ($) — shown to her on the Neo page instead of the agency-wide default</label>
-        <input type="number" value={form.monthlyGoal ?? ""} onChange={(e) => set("monthlyGoal", e.target.value === "" ? null : e.target.value)} placeholder="leave blank to use the agency default"
-          className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text mb-3 outline-none focus-border-accent" />
-
-        <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Agency cut (%) — your share of her net, used for Pure profit in the weekly views</label>
-        <input type="number" min="0" max="100" value={form.agencyCutPct ?? ""} onChange={(e) => set("agencyCutPct", e.target.value === "" ? null : e.target.value)} placeholder="e.g. 50"
-          className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text mb-3 outline-none focus-border-accent" />
-
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          <div>
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Google Drive folder</label>
-            <input value={form.driveUrl || ""} onChange={(e) => set("driveUrl", e.target.value)} placeholder="https://drive.google.com/..."
-              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent" />
-          </div>
-          <div>
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Instagram handle</label>
-            <input value={form.igHandle || ""} onChange={(e) => set("igHandle", e.target.value.replace(/^@/, ""))} placeholder="username, no @"
-              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
-          </div>
-          <div>
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">X handle</label>
-            <input value={form.xHandle || ""} onChange={(e) => set("xHandle", e.target.value.replace(/^@/, ""))} placeholder="username, no @"
-              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
-          </div>
-          <div>
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">TikTok handle</label>
-            <input value={form.tiktokHandle || ""} onChange={(e) => set("tiktokHandle", e.target.value.replace(/^@/, ""))} placeholder="username, no @"
-              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
-          </div>
-          <div>
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Threads handle</label>
-            <input value={form.threadsHandle || ""} onChange={(e) => set("threadsHandle", e.target.value.replace(/^@/, ""))} placeholder="username, no @"
-              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
-          </div>
-          <div>
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Snapchat username</label>
-            <input value={form.snapHandle || ""} onChange={(e) => set("snapHandle", e.target.value.replace(/^@/, ""))} placeholder="username, no @"
-              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
-          </div>
-          <div>
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Facebook page URL</label>
-            <input value={form.fbUrl || ""} onChange={(e) => set("fbUrl", e.target.value)} placeholder="https://facebook.com/..."
-              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
-          </div>
-          <div>
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">OnlyFans URL</label>
-            <input value={form.ofUrl || ""} onChange={(e) => set("ofUrl", e.target.value)} placeholder="https://onlyfans.com/..."
-              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
-          </div>
-          <div>
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Infloww Creator ID (Free OF)</label>
-            <input value={form.inflowwCreatorIdFree || ""} onChange={(e) => set("inflowwCreatorIdFree", e.target.value)} placeholder="id from /v1/creators, free profile"
-              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
-          </div>
-          <div>
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Infloww Creator ID (Paid OF)</label>
-            <input value={form.inflowwCreatorIdPaid || ""} onChange={(e) => set("inflowwCreatorIdPaid", e.target.value)} placeholder="id from /v1/creators, paid profile"
-              className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent font-mono" />
-          </div>
-        </div>
-
-        <ModelOfAccount modelName={model.name} accountId={form.onlyfansAccountId} username={form.onlyfansUsername}
-          onConnected={(accId, uname) => { set("onlyfansAccountId", accId); set("onlyfansUsername", uname); }} />
-
-        <div className="flex gap-3 mb-4 fs-11 font-mono">
-          {form.driveUrl && <a href={form.driveUrl} target="_blank" rel="noopener noreferrer" className="c-accent hover-accent-text">Open Drive →</a>}
-        </div>
-
-        <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1.5">Reference profiles (for Viral Feed scan)</label>
-        <div className="c-bg-app border c-border rounded-lg p-2.5 mb-4">
-          {refProfiles.length === 0 && <p className="fs-11 c-faint font-mono italic mb-2">None yet</p>}
-          <div className="space-y-1 mb-2">
-            {refProfiles.map(p => (
-              <div key={p.id} className="flex items-center justify-between py-1 border-b c-border last:border-0">
-                <div className="flex items-center gap-1.5"><Instagram size={11} className="c-muted" /><span className="fs-12 c-text">@{p.igHandle}</span></div>
-                <button onClick={() => removeRefProfile(p.id)} className="c-muted hover-warn ml-2"><X size={12} /></button>
+    <div className="md-back" onClick={onClose}>
+      <style>{MD_CSS}</style>
+      <div className="md-panel" onClick={(e) => e.stopPropagation()} style={{ "--mc": mc }}>
+        <div className="md-scroll">
+          <div className="md-hero">
+            <div className="md-glow" aria-hidden="true" />
+            <button onClick={onClose} className="md-x" aria-label="Close"><X size={16} /></button>
+            <div className="md-herorow">
+              <div className="mm-ava" style={{ width: 66, height: 66 }}>
+                <svg viewBox="0 0 58 58"><circle className="track" cx="29" cy="29" r="26" /><circle className="ring" cx="29" cy="29" r="26" style={{ "--off": 163.4 * (1 - pct / 100), stroke: mc, "--dl": "0ms" }} /></svg>
+                <span style={{ background: `radial-gradient(circle at 30% 25%, #fff8, transparent 55%), ${mc}`, fontSize: 22 }}>{(model.name || "?").trim().charAt(0).toUpperCase()}</span>
               </div>
-            ))}
+              <div className="min-w-0">
+                <div className="md-name truncate">{model.name}</div>
+                <div className="md-meta">
+                  <span className="mm-chip">{model.agency || "CZ"}</span>
+                  {model.addedAt ? <span>since {new Date(model.addedAt).toLocaleDateString("cs-CZ")}</span> : null}
+                  <span style={{ color: pct === 100 ? "#39e673" : "#ffcf8a" }}>{pct}% set up</span>
+                </div>
+              </div>
+            </div>
+            <ModelDrawerStats model={model} igGraphStats={igGraphStats} inflowwDailyStats={inflowwDailyStats} />
           </div>
-          <div className="flex gap-1.5">
-            <input value={newRefHandle} onChange={(e) => setNewRefHandle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addRefProfile()} onBlur={addRefProfile}
-              placeholder="@handle or link" className="flex-1 c-bg-surface border c-border rounded-lg px-2 py-1.5 fs-12 c-text outline-none focus-border-accent" />
-            <button onClick={addRefProfile} className="px-2.5 py-1.5 rounded-lg c-bg-accent c-onaccent font-mono font-semibold"><Plus size={13} /></button>
-          </div>
+
+          <section className="md-sec" style={{ "--i": 0 }}>
+            <h4><Sparkles size={13} />Profile</h4>
+            <div className="md-f">
+              <label>Niche / persona</label>
+              <input className={inp} value={form.note || ""} onChange={(e) => set("note", e.target.value)} placeholder="Who she is in one line" />
+            </div>
+            <div className="md-two">
+              <div className="md-f">
+                <label>Monthly goal</label>
+                <div className="md-affix"><span>$</span><input className={inp} type="number" value={form.monthlyGoal ?? ""} onChange={(e) => set("monthlyGoal", e.target.value === "" ? null : e.target.value)} placeholder="agency default" /></div>
+                <p>Shown to her as her revenue goal.</p>
+              </div>
+              <div className="md-f">
+                <label>Agency cut</label>
+                <div className="md-affix r"><input className={inp} type="number" min="0" max="100" value={form.agencyCutPct ?? ""} onChange={(e) => set("agencyCutPct", e.target.value === "" ? null : e.target.value)} placeholder="50" /><span>%</span></div>
+                <p>Your share of her net, used for pure profit.</p>
+              </div>
+            </div>
+          </section>
+
+          <section className="md-sec" style={{ "--i": 1 }}>
+            <h4><Link2 size={13} />Socials<em>{MM_NETS.filter((n) => n.get(form)).length}/{MM_NETS.length} linked</em></h4>
+            <div className="md-nets">
+              {netField("ig", "Instagram", "igHandle", "username")}
+              {netField("x", "X", "xHandle", "username")}
+              {netField("tiktok", "TikTok", "tiktokHandle", "username")}
+              {netField("threads", "Threads", "threadsHandle", "username")}
+              {netField("snap", "Snapchat", "snapHandle", "username")}
+              {netField("fb", "Facebook page", "fbUrl", "facebook.com/...", true)}
+            </div>
+          </section>
+
+          <section className="md-sec" style={{ "--i": 2 }}>
+            <h4><DollarSign size={13} />OnlyFans and Infloww</h4>
+            <div className="md-f">
+              <label>OnlyFans link</label>
+              <input className={`${inp} mono`} value={form.ofUrl || ""} onChange={(e) => set("ofUrl", e.target.value)} placeholder="https://onlyfans.com/..." />
+            </div>
+            <div className="md-two">
+              <div className="md-f">
+                <label>Infloww ID, free page</label>
+                <input className={`${inp} mono`} value={form.inflowwCreatorIdFree || ""} onChange={(e) => set("inflowwCreatorIdFree", e.target.value)} placeholder="creator id" />
+              </div>
+              <div className="md-f">
+                <label>Infloww ID, paid page</label>
+                <input className={`${inp} mono`} value={form.inflowwCreatorIdPaid || ""} onChange={(e) => set("inflowwCreatorIdPaid", e.target.value)} placeholder="creator id" />
+              </div>
+            </div>
+            <ModelOfAccount modelName={model.name} accountId={form.onlyfansAccountId} username={form.onlyfansUsername}
+              onConnected={(accId, uname) => { set("onlyfansAccountId", accId); set("onlyfansUsername", uname); }} />
+          </section>
+
+          <section className="md-sec" style={{ "--i": 3 }}>
+            <h4><Flame size={13} />Content</h4>
+            <div className="md-f">
+              <label>Google Drive folder</label>
+              <div className="md-affix r">
+                <input className={`${inp} mono`} value={form.driveUrl || ""} onChange={(e) => set("driveUrl", e.target.value)} placeholder="https://drive.google.com/..." />
+                {form.driveUrl ? <a href={form.driveUrl} target="_blank" rel="noopener noreferrer" className="md-open">Open</a> : null}
+              </div>
+            </div>
+            <div className="md-f">
+              <label>Reference profiles</label>
+              <div className="md-refs">
+                {refProfiles.map((p) => (
+                  <span key={p.id} className="md-ref"><Instagram size={11} />@{p.igHandle}<button onClick={() => removeRefProfile(p.id)} aria-label="Remove"><X size={11} /></button></span>
+                ))}
+                <span className="md-refadd">
+                  <input value={newRefHandle} onChange={(e) => setNewRefHandle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addRefProfile()} onBlur={addRefProfile} placeholder="@handle or link" />
+                  <button onClick={addRefProfile} aria-label="Add"><Plus size={12} /></button>
+                </span>
+              </div>
+              <p>Instagram profiles used for the Viral Feed scan.</p>
+            </div>
+          </section>
+
+          <section className="md-sec" style={{ "--i": 4 }}>
+            <h4><Pencil size={13} />Creator Bible
+              <em style={{ color: model.bioReceivedAt ? "#39e673" : undefined }}>{model.bioReceivedAt ? `received ${fmtDay(toISO(new Date(model.bioReceivedAt)))}` : "not received yet"}</em>
+            </h4>
+            <textarea className={`${inp} mono`} value={form.bio || ""} onChange={(e) => set("bio", e.target.value)} rows={7}
+              placeholder="Her Creator Bible answers land here by themselves. You can also paste them in." />
+          </section>
+
+          <section className="md-sec" style={{ "--i": 5 }}>
+            <h4><Lock size={13} />Login</h4>
+            <div className="md-two">
+              <div className="md-f">
+                <label>Password</label>
+                <div className="md-affix r">
+                  <input className={`${inp} mono`} value={newPin} onChange={(e) => { setNewPin(e.target.value); setPinSaved(false); }} placeholder="new password"
+                    onKeyDown={(e) => { if (e.key === "Enter") savePin(); }} style={{ paddingRight: 62 }} />
+                  {newPin.trim() ? <button type="button" onClick={savePin} className="md-open">Set</button> : null}
+                </div>
+                <p style={pinSaved ? { color: "#39e673" } : undefined}>{pinSaved ? "New password saved." : "The current one is never shown. Type a new one and press Set."}</p>
+              </div>
+              <div className="md-f">
+                <label>Testing</label>
+                <label className="md-switch">
+                  <input type="checkbox" checked={!!model.alwaysOnboard} onChange={() => onToggleAlwaysOnboard(model.name)} />
+                  <i /><span>Show Creator Bible on every login</span>
+                </label>
+              </div>
+            </div>
+          </section>
         </div>
 
-        <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Questionnaire / bio</label>
-        {model.bioReceivedAt ? (
-          <p className="fs-10 c-success font-mono mb-1">Auto-filled from her Creator Bible submission, {fmtDay(toISO(new Date(model.bioReceivedAt)))}</p>
-        ) : (
-          <p className="fs-10 c-faint font-mono mb-1">Not received yet — paste it manually from the Formspree email if needed.</p>
-        )}
-        <textarea value={form.bio || ""} onChange={(e) => set("bio", e.target.value)} rows={8}
-          placeholder="Paste her completed Creator Bible answers here once you get the Formspree email..."
-          className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text mb-4 outline-none focus-border-accent resize-none font-mono" />
-
-        <div className="flex items-center gap-1.5 mb-2">
-          <Lock size={11} className="c-faint" />
-          <input value={model.pin || ""} onChange={(e) => onSetPin(model.name, e.target.value)} placeholder="no password set"
-            className="w-32 c-bg-app border c-border rounded-lg px-2 py-1 text-xs c-text outline-none focus-border-accent font-mono" />
-          <span className="fs-10 c-faint font-mono">password</span>
+        <div className="md-bar">
+          <span className="md-state" style={{ color: dirty ? "#ffcf8a" : "#7f8f87" }}>{dirty ? "Unsaved changes" : "No changes"}</span>
+          <button onClick={onClose} className="md-cancel">Close</button>
+          <button onClick={() => onSave(form)} className={`md-save ${dirty ? "hot" : ""}`}>Save changes</button>
         </div>
-
-        <label className="flex items-center gap-1.5 fs-10 font-mono uppercase c-faint mb-4 cursor-pointer">
-          <input type="checkbox" checked={!!model.alwaysOnboard} onChange={() => onToggleAlwaysOnboard(model.name)} />
-          Always show Creator Bible on login (testing)
-        </label>
-
-        <button onClick={() => onSave(form)}
-          className="w-full py-2.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold hover-bg-accent2">
-          Save changes
-        </button>
       </div>
     </div>
   );
