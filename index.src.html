@@ -8269,7 +8269,9 @@ function RevenueChart({ data, height = 240, sparseUntil = 0 }) {
       })();
   // capped at the same width bars normally are (roughly what Week shows) so day 1 of a new
   // month reads as one normal bar, not one giant blown-up blob filling the whole chart
-  const barWidth = Math.min(14, Math.max(2, (plotW / bars.length) * 0.62));
+  // With one candle per day (sparse) the column grows with the room it has, so 7 days on a wide screen
+  // read as soft columns under the line, not seven thin posts.
+  const barWidth = isSparse ? Math.min(54, Math.max(14, stepX * 0.2)) : Math.min(14, Math.max(2, (plotW / bars.length) * 0.62));
 
   // Ideally every dot gets its own date — but "7. 8." is wide enough that on a narrow
   // phone screen even every-other-dot doesn't fit. Falls back to a compact "day number
@@ -8295,7 +8297,7 @@ function RevenueChart({ data, height = 240, sparseUntil = 0 }) {
     <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} style={{ overflow: "visible", display: "block" }}
       onMouseLeave={() => setHoverIdx(null)}>
       <defs>
-        <linearGradient id="revAreaFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#39e673" stopOpacity="0.28" /><stop offset="100%" stopColor="#39e673" stopOpacity="0" /></linearGradient>
+        <linearGradient id="revAreaFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#39e673" stopOpacity="0.36" /><stop offset="55%" stopColor="#39e673" stopOpacity="0.1" /><stop offset="100%" stopColor="#39e673" stopOpacity="0" /></linearGradient>
         <linearGradient id="revBarFill" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#39e673" stopOpacity="0.6" />
           <stop offset="100%" stopColor="#39e673" stopOpacity="0.04" />
@@ -8331,7 +8333,7 @@ function RevenueChart({ data, height = 240, sparseUntil = 0 }) {
 
       {bars.map((p, i) => (
         <rect key={`bar-${i}`} className="rev-bar" x={p.x - barWidth / 2} y={p.y} width={barWidth}
-          height={Math.max(baseline - p.y, 0)} rx={barWidth / 2} fill="url(#revBarFill)"
+          height={Math.max(baseline - p.y, 0)} rx={isSparse ? Math.min(12, barWidth / 3) : barWidth / 2} fill="url(#revBarFill)" opacity={isSparse && n > 5 ? 0.55 : 1}
           style={{ animationDelay: `${(i / bars.length) * 0.4}s` }} />
       ))}
 
@@ -8343,7 +8345,7 @@ function RevenueChart({ data, height = 240, sparseUntil = 0 }) {
         <path d={`${linePath} L ${points[points.length - 1].x.toFixed(1)} ${baseline} L ${points[0].x.toFixed(1)} ${baseline} Z`} fill="url(#revAreaFill)" clipPath="url(#revNoNegativeClip)" />
       )}
       {linePath && (!isSparse || n > 5) && (
-        <path className="rev-line" d={linePath} fill="none" stroke="#39e673" strokeWidth="2.5"
+        <path className="rev-line" d={linePath} fill="none" stroke="#39e673" strokeWidth="3"
           strokeLinejoin="round" strokeLinecap="round" filter="url(#revGlowLine)" clipPath="url(#revNoNegativeClip)"
           pathLength="1000" strokeDasharray="1000" />
       )}
@@ -8352,8 +8354,13 @@ function RevenueChart({ data, height = 240, sparseUntil = 0 }) {
           onMouseEnter={() => setHoverIdx(i)}
           style={{ cursor: "pointer" }}>
           <rect x={p.x - stepX / 2} y={padTop} width={Math.max(stepX, 6)} height={plotH} fill="transparent" />
-          <circle className="rev-dot" cx={p.x} cy={p.y} r={hoverIdx === i ? 5 : (n > 10 ? 2.2 : 3.5)} fill="#39e673" stroke="#07090a" strokeWidth={n > 10 ? 1 : 1.5} filter={n > 10 && hoverIdx !== i ? undefined : "url(#revGlowDot)"}
+          <circle className="rev-dot" cx={p.x} cy={p.y} r={hoverIdx === i ? 6 : (n > 10 ? 2.2 : 4.5)} fill={n > 10 ? "#39e673" : "#0b0f0d"} stroke={n > 10 ? "#07090a" : "#39e673"} strokeWidth={n > 10 ? 1 : 2.5} filter={n > 10 && hoverIdx !== i ? undefined : "url(#revGlowDot)"}
             style={{ animationDelay: `${0.15 + (i / Math.max(n - 1, 1)) * 1.0}s` }} />
+          {n <= 8 && p.value > 0 && hoverIdx !== i && (
+            <text x={p.x} y={p.y - 13} textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"} fontSize={11 * fontScale} fontWeight="700" fill="#e6ece9" style={{ pointerEvents: "none" }}>
+              {fmtTick(p.value)}
+            </text>
+          )}
           {(n - 1 - i) % labelEvery === 0 && (() => {
             const d = new Date(p.date + "T00:00:00");
             let label;
@@ -14001,7 +14008,7 @@ function InflowwRevenueCard({ myInflowwRows, accountType, title, last7Dates, day
       {embedded
         ? <div className="fs-12 c-muted mb-1">${Math.round(rangeTotal).toLocaleString("en-US")} net revenue in the last {range} days</div>
         : <div className="text-2xl font-extrabold c-accent mb-1">$<CountUp value={rangeTotal} /></div>}
-      <div className="mb-2"><RevenueChart data={chartData} height={range === 30 ? (embedded ? 280 : 330) : (embedded ? 160 : 200)} sparseUntil={range === 7 ? 7 : 0} /></div>
+      <div className="mb-2"><RevenueChart data={chartData} height={range === 30 ? (embedded ? 300 : 330) : (embedded ? 250 : 260)} sparseUntil={range === 7 ? 7 : 0} /></div>
       <div className="flex flex-wrap gap-4 fs-10 font-mono c-faint uppercase">
         <span><CountUp value={sumInfloww(rangeRows, "messagesCount")} /> messages</span>
         <span><CountUp value={sumInfloww(rangeRows, "tipsCount")} /> tips</span>
