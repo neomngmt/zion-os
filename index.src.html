@@ -8356,11 +8356,6 @@ function RevenueChart({ data, height = 240, sparseUntil = 0 }) {
           <rect x={p.x - stepX / 2} y={padTop} width={Math.max(stepX, 6)} height={plotH} fill="transparent" />
           <circle className="rev-dot" cx={p.x} cy={p.y} r={hoverIdx === i ? 6 : (n > 10 ? 2.2 : 4.5)} fill={n > 10 ? "#39e673" : "#0b0f0d"} stroke={n > 10 ? "#07090a" : "#39e673"} strokeWidth={n > 10 ? 1 : 2.5} filter={n > 10 && hoverIdx !== i ? undefined : "url(#revGlowDot)"}
             style={{ animationDelay: `${0.15 + (i / Math.max(n - 1, 1)) * 1.0}s` }} />
-          {n <= 8 && p.value > 0 && hoverIdx !== i && (
-            <text x={p.x} y={p.y - 13} textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"} fontSize={11 * fontScale} fontWeight="700" fill="#e6ece9" style={{ pointerEvents: "none" }}>
-              {fmtTick(p.value)}
-            </text>
-          )}
           {(n - 1 - i) % labelEvery === 0 && (() => {
             const d = new Date(p.date + "T00:00:00");
             let label;

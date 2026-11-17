@@ -14084,17 +14084,7 @@ function RevenueChart({
     style: {
       animationDelay: `${0.15 + i / Math.max(n - 1, 1) * 1.0}s`
     }
-  }), n <= 8 && p.value > 0 && hoverIdx !== i && React.createElement("text", {
-    x: p.x,
-    y: p.y - 13,
-    textAnchor: i === 0 ? "start" : i === n - 1 ? "end" : "middle",
-    fontSize: 11 * fontScale,
-    fontWeight: "700",
-    fill: "#e6ece9",
-    style: {
-      pointerEvents: "none"
-    }
-  }, fmtTick(p.value)), (n - 1 - i) % labelEvery === 0 && (() => {
+  }), (n - 1 - i) % labelEvery === 0 && (() => {
     const d = new Date(p.date + "T00:00:00");
     let label;
     if (labelFormat === "full") {
@@ -25937,7 +25927,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1m5qu6u</script>
+<script type="text/babel" id="zion-version">zcn1oc</script>
 <script>
 (function () {
   var last = 0;
