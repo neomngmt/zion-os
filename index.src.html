@@ -1082,7 +1082,7 @@ function useSupaBufferTopPosts() {
 const modelsToJS = (r) => ({
   name: r.name, note: r.note || "", onboarded: !!r.onboarded,
   agency: r.agency || "CZ", addedAt: r.added_at ? new Date(r.added_at).getTime() : Date.now(),
-  igHandle: r.ig_handle || "", fbUrl: r.fb_url || "", threadsHandle: r.threads_handle || "", snapHandle: r.snap_handle || "", xHandle: r.x_handle || "", tiktokHandle: r.tiktok_handle || "",
+  igHandle: r.ig_handle || "", igExtraHandles: Array.isArray(r.ig_extra_handles) ? r.ig_extra_handles : [], fbUrl: r.fb_url || "", threadsHandle: r.threads_handle || "", snapHandle: r.snap_handle || "", xHandle: r.x_handle || "", tiktokHandle: r.tiktok_handle || "",
   ofUrl: r.of_url || "", driveUrl: r.drive_url || "", bio: r.bio || "",
   bioReceivedAt: r.bio_received_at ? new Date(r.bio_received_at).getTime() : null,
   alwaysOnboard: !!r.always_onboard,
@@ -1105,7 +1105,7 @@ const modelsToJS = (r) => ({
 const modelsToDB = (m) => ({
   name: m.name, note: m.note || "", onboarded: !!m.onboarded,
   agency: m.agency || "CZ", added_at: m.addedAt ? new Date(m.addedAt).toISOString() : new Date().toISOString(),
-  ig_handle: m.igHandle || "", fb_url: m.fbUrl || "", threads_handle: m.threadsHandle || "", snap_handle: m.snapHandle || "", x_handle: m.xHandle || "", tiktok_handle: m.tiktokHandle || "",
+  ig_handle: m.igHandle || "", ig_extra_handles: Array.isArray(m.igExtraHandles) ? m.igExtraHandles : [], fb_url: m.fbUrl || "", threads_handle: m.threadsHandle || "", snap_handle: m.snapHandle || "", x_handle: m.xHandle || "", tiktok_handle: m.tiktokHandle || "",
   of_url: m.ofUrl || "", drive_url: m.driveUrl || "", bio: m.bio || "",
   bio_received_at: m.bioReceivedAt ? new Date(m.bioReceivedAt).toISOString() : null,
   always_onboard: !!m.alwaysOnboard,
@@ -3529,7 +3529,7 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
 
         {!noAccounts && (
           <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
-            {single ? <div /> : <div className="flex flex-wrap gap-1.5">
+            {single && accountRows.length < 2 ? <div /> : <div className="flex flex-wrap gap-1.5">
               <button onClick={() => setIgAccount("all")}
                 className="fs-11 font-mono uppercase px-3 py-1.5 rounded-full tap"
                 style={igAccount === "all"
@@ -3543,7 +3543,7 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
                   style={igAccount === a.id
                     ? { background: C.accentSoft, color: C.accentIcon, border: `1px solid ${C.accentA}66` }
                     : { background: "transparent", color: C.sub, border: "1px solid rgba(255,255,255,0.1)" }}>
-                  {accountDisplayName(a)}
+                  {single ? (a.igUsername ? `@${a.igUsername}` : a.label) : accountDisplayName(a)}
                 </button>
               ))}
             </div>}
@@ -6861,7 +6861,6 @@ const MM_NETS = [
 ];
 const MM_SETUP = [
   { label: "OnlyFans link", ok: (m) => !!m.ofUrl },
-  { label: "Infloww ID", ok: (m) => !!(m.inflowwCreatorIdFree || m.inflowwCreatorIdPaid) },
   { label: "Monthly goal", ok: (m) => m.monthlyGoal != null && m.monthlyGoal > 0 },
   { label: "Agency cut", ok: (m) => m.agencyCutPct != null },
   { label: "Drive folder", ok: (m) => !!m.driveUrl },
@@ -6981,7 +6980,7 @@ function MMCard({ m, color, index, onEdit }) {
           {nets.map((n, i) => (
             <div key={n.key} className={`mm-net ${n.handle ? "on" : ""}`} style={{ "--nc": n.color, "--i": i }} title={n.label}>
               <div className="top">{mmNetIcon(n.key, 14, n.handle ? n.color : "#8a9690")}<span className="dot" /></div>
-              <div className="h">{n.handle ? (n.key === "fb" ? n.handle : `@${n.handle}`) : "not linked"}</div>
+              <div className="h">{n.handle ? (n.key === "fb" ? n.handle : `@${n.handle}`) : "not linked"}{n.key === "ig" && n.handle && (m.igExtraHandles || []).length ? ` +${m.igExtraHandles.length}` : ""}</div>
             </div>
           ))}
         </div>
@@ -7875,6 +7874,14 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, 
     setNewRefHandle("");
   };
   const removeRefProfile = (id) => set("inspoProfiles", refProfiles.filter(p => p.id !== id));
+  const [newIg, setNewIg] = useState("");
+  const addIg = () => {
+    const h = newIg.trim().replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/[/?#].*$/, "").replace(/^@/, "");
+    if (!h) return;
+    const cur = form.igExtraHandles || [];
+    if (h.toLowerCase() !== String(form.igHandle || "").toLowerCase() && !cur.some((x) => x.toLowerCase() === h.toLowerCase())) set("igExtraHandles", [...cur, h]);
+    setNewIg("");
+  };
   const [newPin, setNewPin] = useState("");
   const [pinSaved, setPinSaved] = useState(false);
   const savePin = async () => {
@@ -7960,26 +7967,28 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, 
               {netField("snap", "Snapchat", "snapHandle", "username")}
               {netField("fb", "Facebook page", "fbUrl", "facebook.com/...", true)}
             </div>
+            <div className="md-f" style={{ marginTop: 12 }}>
+              <label>More Instagram accounts</label>
+              <div className="md-refs">
+                {(form.igExtraHandles || []).map((h) => (
+                  <span key={h} className="md-ref"><Instagram size={11} />@{h}<button onClick={() => set("igExtraHandles", (form.igExtraHandles || []).filter((x) => x !== h))} aria-label="Remove"><X size={11} /></button></span>
+                ))}
+                <span className="md-refadd">
+                  <input value={newIg} onChange={(e) => setNewIg(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addIg(); } }} onBlur={addIg} placeholder="another username" />
+                  <button type="button" onClick={addIg} aria-label="Add"><Plus size={12} /></button>
+                </span>
+              </div>
+              <p>The Instagram field above is her main account. Add the others here, each gets its own stats on the Instagram dashboard after the next daily update.</p>
+            </div>
           </section>
 
           <section className="md-sec" style={{ "--i": 2 }}>
-            <h4><DollarSign size={13} />OnlyFans and Infloww</h4>
+            <h4><DollarSign size={13} />OnlyFans</h4>
             <div className="md-f">
               <label>OnlyFans link</label>
               <input className={`${inp} mono`} value={form.ofUrl || ""} onChange={(e) => set("ofUrl", e.target.value)} placeholder="https://onlyfans.com/..." />
+              <p>Revenue comes in by itself, nothing to connect here.</p>
             </div>
-            <div className="md-two">
-              <div className="md-f">
-                <label>Infloww ID, free page</label>
-                <input className={`${inp} mono`} value={form.inflowwCreatorIdFree || ""} onChange={(e) => set("inflowwCreatorIdFree", e.target.value)} placeholder="creator id" />
-              </div>
-              <div className="md-f">
-                <label>Infloww ID, paid page</label>
-                <input className={`${inp} mono`} value={form.inflowwCreatorIdPaid || ""} onChange={(e) => set("inflowwCreatorIdPaid", e.target.value)} placeholder="creator id" />
-              </div>
-            </div>
-            <ModelOfAccount modelName={model.name} accountId={form.onlyfansAccountId} username={form.onlyfansUsername}
-              onConnected={(accId, uname) => { set("onlyfansAccountId", accId); set("onlyfansUsername", uname); }} />
           </section>
 
           <section className="md-sec" style={{ "--i": 3 }}>
@@ -16092,7 +16101,7 @@ function IgStudioPage({ models, onlyStudio }) {
 function App() {
   const { value: cards, loading: cardsLoading, persist: persistCards } = useSupaTable("cards", "id", [], cardsToJS, cardsToDB);
   const { value: models, loading: modelsLoading, persist: persistModels } = useSupaTable("models", "name", [], modelsToJS, modelsToDB,
-    "name, note, onboarded, added_at, ig_handle, x_handle, tiktok_handle, of_url, drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank, disabled_platforms, agency_cut_pct, goal_note, goal_auto_value, notif_prefs, about, fb_url, threads_handle, snap_handle");
+    "name, note, onboarded, added_at, ig_handle, ig_extra_handles, x_handle, tiktok_handle, of_url, drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank, disabled_platforms, agency_cut_pct, goal_note, goal_auto_value, notif_prefs, about, fb_url, threads_handle, snap_handle");
   const { value: tasks, loading: tasksLoading, persist: persistTasks } = useSupaTable("tasks", "id", [], tasksToJS, tasksToDB);
   const { value: stats, loading: statsLoading, persist: persistStats } = useSupaTable("stats", "id", [], statsToJS, statsToDB);
   const { value: reels, loading: reelsLoading, persist: persistReels } = useSupaTable("reels", "id", [], reelsToJS, reelsToDB);

@@ -1478,6 +1478,7 @@ const modelsToJS = r => ({
   agency: r.agency || "CZ",
   addedAt: r.added_at ? new Date(r.added_at).getTime() : Date.now(),
   igHandle: r.ig_handle || "",
+  igExtraHandles: Array.isArray(r.ig_extra_handles) ? r.ig_extra_handles : [],
   fbUrl: r.fb_url || "",
   threadsHandle: r.threads_handle || "",
   snapHandle: r.snap_handle || "",
@@ -1515,6 +1516,7 @@ const modelsToDB = m => ({
   agency: m.agency || "CZ",
   added_at: m.addedAt ? new Date(m.addedAt).toISOString() : new Date().toISOString(),
   ig_handle: m.igHandle || "",
+  ig_extra_handles: Array.isArray(m.igExtraHandles) ? m.igExtraHandles : [],
   fb_url: m.fbUrl || "",
   threads_handle: m.threadsHandle || "",
   snap_handle: m.snapHandle || "",
@@ -4832,7 +4834,7 @@ function IGOverviewDashboard({
     size: 14
   }), " Plan content"))), !noAccounts && React.createElement("div", {
     className: "flex items-center justify-between gap-3 flex-wrap mb-5"
-  }, single ? React.createElement("div", null) : React.createElement("div", {
+  }, single && accountRows.length < 2 ? React.createElement("div", null) : React.createElement("div", {
     className: "flex flex-wrap gap-1.5"
   }, React.createElement("button", {
     onClick: () => setIgAccount("all"),
@@ -4859,7 +4861,7 @@ function IGOverviewDashboard({
       color: C.sub,
       border: "1px solid rgba(255,255,255,0.1)"
     }
-  }, accountDisplayName(a)))), React.createElement("div", {
+  }, single ? a.igUsername ? `@${a.igUsername}` : a.label : accountDisplayName(a)))), React.createElement("div", {
     className: "flex rounded-full p-0.5",
     style: {
       background: "rgba(255,255,255,0.05)",
@@ -11704,9 +11706,6 @@ const MM_SETUP = [{
   label: "OnlyFans link",
   ok: m => !!m.ofUrl
 }, {
-  label: "Infloww ID",
-  ok: m => !!(m.inflowwCreatorIdFree || m.inflowwCreatorIdPaid)
-}, {
   label: "Monthly goal",
   ok: m => m.monthlyGoal != null && m.monthlyGoal > 0
 }, {
@@ -11924,7 +11923,7 @@ function MMCard({
     className: "dot"
   })), React.createElement("div", {
     className: "h"
-  }, n.handle ? n.key === "fb" ? n.handle : `@${n.handle}` : "not linked")))), React.createElement("div", {
+  }, n.handle ? n.key === "fb" ? n.handle : `@${n.handle}` : "not linked", n.key === "ig" && n.handle && (m.igExtraHandles || []).length ? ` +${m.igExtraHandles.length}` : "")))), React.createElement("div", {
     className: "mm-foot"
   }, missing.length === 0 && netsMissing === 0 ? React.createElement("div", {
     className: "mm-ok"
@@ -13230,6 +13229,14 @@ function ModelDetail({
     setNewRefHandle("");
   };
   const removeRefProfile = id => set("inspoProfiles", refProfiles.filter(p => p.id !== id));
+  const [newIg, setNewIg] = useState("");
+  const addIg = () => {
+    const h = newIg.trim().replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/[/?#].*$/, "").replace(/^@/, "");
+    if (!h) return;
+    const cur = form.igExtraHandles || [];
+    if (h.toLowerCase() !== String(form.igHandle || "").toLowerCase() && !cur.some(x => x.toLowerCase() === h.toLowerCase())) set("igExtraHandles", [...cur, h]);
+    setNewIg("");
+  };
   const [newPin, setNewPin] = useState("");
   const [pinSaved, setPinSaved] = useState(false);
   const savePin = async () => {
@@ -13380,45 +13387,57 @@ function ModelDetail({
     size: 13
   }), "Socials", React.createElement("em", null, MM_NETS.filter(n => n.get(form)).length, "/", MM_NETS.length, " linked")), React.createElement("div", {
     className: "md-nets"
-  }, netField("ig", "Instagram", "igHandle", "username"), netField("x", "X", "xHandle", "username"), netField("tiktok", "TikTok", "tiktokHandle", "username"), netField("threads", "Threads", "threadsHandle", "username"), netField("snap", "Snapchat", "snapHandle", "username"), netField("fb", "Facebook page", "fbUrl", "facebook.com/...", true))), React.createElement("section", {
+  }, netField("ig", "Instagram", "igHandle", "username"), netField("x", "X", "xHandle", "username"), netField("tiktok", "TikTok", "tiktokHandle", "username"), netField("threads", "Threads", "threadsHandle", "username"), netField("snap", "Snapchat", "snapHandle", "username"), netField("fb", "Facebook page", "fbUrl", "facebook.com/...", true)), React.createElement("div", {
+    className: "md-f",
+    style: {
+      marginTop: 12
+    }
+  }, React.createElement("label", null, "More Instagram accounts"), React.createElement("div", {
+    className: "md-refs"
+  }, (form.igExtraHandles || []).map(h => React.createElement("span", {
+    key: h,
+    className: "md-ref"
+  }, React.createElement(Instagram, {
+    size: 11
+  }), "@", h, React.createElement("button", {
+    onClick: () => set("igExtraHandles", (form.igExtraHandles || []).filter(x => x !== h)),
+    "aria-label": "Remove"
+  }, React.createElement(X, {
+    size: 11
+  })))), React.createElement("span", {
+    className: "md-refadd"
+  }, React.createElement("input", {
+    value: newIg,
+    onChange: e => setNewIg(e.target.value),
+    onKeyDown: e => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        addIg();
+      }
+    },
+    onBlur: addIg,
+    placeholder: "another username"
+  }), React.createElement("button", {
+    type: "button",
+    onClick: addIg,
+    "aria-label": "Add"
+  }, React.createElement(Plus, {
+    size: 12
+  })))), React.createElement("p", null, "The Instagram field above is her main account. Add the others here, each gets its own stats on the Instagram dashboard after the next daily update."))), React.createElement("section", {
     className: "md-sec",
     style: {
       "--i": 2
     }
   }, React.createElement("h4", null, React.createElement(DollarSign, {
     size: 13
-  }), "OnlyFans and Infloww"), React.createElement("div", {
+  }), "OnlyFans"), React.createElement("div", {
     className: "md-f"
   }, React.createElement("label", null, "OnlyFans link"), React.createElement("input", {
     className: `${inp} mono`,
     value: form.ofUrl || "",
     onChange: e => set("ofUrl", e.target.value),
     placeholder: "https://onlyfans.com/..."
-  })), React.createElement("div", {
-    className: "md-two"
-  }, React.createElement("div", {
-    className: "md-f"
-  }, React.createElement("label", null, "Infloww ID, free page"), React.createElement("input", {
-    className: `${inp} mono`,
-    value: form.inflowwCreatorIdFree || "",
-    onChange: e => set("inflowwCreatorIdFree", e.target.value),
-    placeholder: "creator id"
-  })), React.createElement("div", {
-    className: "md-f"
-  }, React.createElement("label", null, "Infloww ID, paid page"), React.createElement("input", {
-    className: `${inp} mono`,
-    value: form.inflowwCreatorIdPaid || "",
-    onChange: e => set("inflowwCreatorIdPaid", e.target.value),
-    placeholder: "creator id"
-  }))), React.createElement(ModelOfAccount, {
-    modelName: model.name,
-    accountId: form.onlyfansAccountId,
-    username: form.onlyfansUsername,
-    onConnected: (accId, uname) => {
-      set("onlyfansAccountId", accId);
-      set("onlyfansUsername", uname);
-    }
-  })), React.createElement("section", {
+  }), React.createElement("p", null, "Revenue comes in by itself, nothing to connect here."))), React.createElement("section", {
     className: "md-sec",
     style: {
       "--i": 3
@@ -25061,7 +25080,7 @@ function App() {
     value: models,
     loading: modelsLoading,
     persist: persistModels
-  } = useSupaTable("models", "name", [], modelsToJS, modelsToDB, "name, note, onboarded, added_at, ig_handle, x_handle, tiktok_handle, of_url, drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank, disabled_platforms, agency_cut_pct, goal_note, goal_auto_value, notif_prefs, about, fb_url, threads_handle, snap_handle");
+  } = useSupaTable("models", "name", [], modelsToJS, modelsToDB, "name, note, onboarded, added_at, ig_handle, ig_extra_handles, x_handle, tiktok_handle, of_url, drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank, disabled_platforms, agency_cut_pct, goal_note, goal_auto_value, notif_prefs, about, fb_url, threads_handle, snap_handle");
   const {
     value: tasks,
     loading: tasksLoading,
@@ -25682,7 +25701,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">thtlb</script>
+<script type="text/babel" id="zion-version">13vv82y</script>
 <script>
 (function () {
   var last = 0;
