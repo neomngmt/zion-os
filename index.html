@@ -1486,6 +1486,7 @@ const modelsToJS = r => ({
   tiktokHandle: r.tiktok_handle || "",
   ofUrl: r.of_url || "",
   driveUrl: r.drive_url || "",
+  reelsDriveUrl: r.reels_drive_url || "",
   bio: r.bio || "",
   bioReceivedAt: r.bio_received_at ? new Date(r.bio_received_at).getTime() : null,
   alwaysOnboard: !!r.always_onboard,
@@ -1524,6 +1525,7 @@ const modelsToDB = m => ({
   tiktok_handle: m.tiktokHandle || "",
   of_url: m.ofUrl || "",
   drive_url: m.driveUrl || "",
+  reels_drive_url: m.reelsDriveUrl || "",
   bio: m.bio || "",
   bio_received_at: m.bioReceivedAt ? new Date(m.bioReceivedAt).toISOString() : null,
   always_onboard: !!m.alwaysOnboard,
@@ -14296,6 +14298,20 @@ function ModelDetail({
     className: "md-open"
   }, "Open") : null)), React.createElement("div", {
     className: "md-f"
+  }, React.createElement("label", null, "Reels upload folder"), React.createElement("div", {
+    className: "md-affix r"
+  }, React.createElement("input", {
+    className: `${inp} mono`,
+    value: form.reelsDriveUrl || "",
+    onChange: e => set("reelsDriveUrl", e.target.value),
+    placeholder: "Drive folder where a new subfolder is made for every sent reel list"
+  }), form.reelsDriveUrl ? React.createElement("a", {
+    href: form.reelsDriveUrl,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    className: "md-open"
+  }, "Open") : null)), React.createElement("div", {
+    className: "md-f"
   }, React.createElement("label", null, "Reference profiles"), React.createElement("div", {
     className: "md-refs"
   }, refProfiles.map(p => React.createElement("span", {
@@ -25910,7 +25926,7 @@ function App() {
     value: models,
     loading: modelsLoading,
     persist: persistModels
-  } = useSupaTable("models", "name", [], modelsToJS, modelsToDB, "name, note, onboarded, added_at, ig_handle, ig_extra_handles, x_handle, tiktok_handle, of_url, drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank, disabled_platforms, agency_cut_pct, goal_note, goal_auto_value, notif_prefs, about, fb_url, threads_handle, snap_handle");
+  } = useSupaTable("models", "name", [], modelsToJS, modelsToDB, "name, note, onboarded, added_at, ig_handle, ig_extra_handles, x_handle, tiktok_handle, of_url, drive_url, reels_drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank, disabled_platforms, agency_cut_pct, goal_note, goal_auto_value, notif_prefs, about, fb_url, threads_handle, snap_handle");
   const {
     value: tasks,
     loading: tasksLoading,
@@ -26535,7 +26551,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">dngvz7</script>
+<script type="text/babel" id="zion-version">fpz430</script>
 <script>
 (function () {
   var last = 0;

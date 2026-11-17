@@ -1083,7 +1083,7 @@ const modelsToJS = (r) => ({
   name: r.name, note: r.note || "", onboarded: !!r.onboarded,
   agency: r.agency || "CZ", addedAt: r.added_at ? new Date(r.added_at).getTime() : Date.now(),
   igHandle: r.ig_handle || "", igExtraHandles: Array.isArray(r.ig_extra_handles) ? r.ig_extra_handles : [], fbUrl: r.fb_url || "", threadsHandle: r.threads_handle || "", snapHandle: r.snap_handle || "", xHandle: r.x_handle || "", tiktokHandle: r.tiktok_handle || "",
-  ofUrl: r.of_url || "", driveUrl: r.drive_url || "", bio: r.bio || "",
+  ofUrl: r.of_url || "", driveUrl: r.drive_url || "", reelsDriveUrl: r.reels_drive_url || "", bio: r.bio || "",
   bioReceivedAt: r.bio_received_at ? new Date(r.bio_received_at).getTime() : null,
   alwaysOnboard: !!r.always_onboard,
   bufferChannelId: r.buffer_channel_id || "", bufferChannelIdIg: r.buffer_channel_id_ig || "",
@@ -1106,7 +1106,7 @@ const modelsToDB = (m) => ({
   name: m.name, note: m.note || "", onboarded: !!m.onboarded,
   agency: m.agency || "CZ", added_at: m.addedAt ? new Date(m.addedAt).toISOString() : new Date().toISOString(),
   ig_handle: m.igHandle || "", ig_extra_handles: Array.isArray(m.igExtraHandles) ? m.igExtraHandles : [], fb_url: m.fbUrl || "", threads_handle: m.threadsHandle || "", snap_handle: m.snapHandle || "", x_handle: m.xHandle || "", tiktok_handle: m.tiktokHandle || "",
-  of_url: m.ofUrl || "", drive_url: m.driveUrl || "", bio: m.bio || "",
+  of_url: m.ofUrl || "", drive_url: m.driveUrl || "", reels_drive_url: m.reelsDriveUrl || "", bio: m.bio || "",
   bio_received_at: m.bioReceivedAt ? new Date(m.bioReceivedAt).toISOString() : null,
   always_onboard: !!m.alwaysOnboard,
   buffer_channel_id: m.bufferChannelId || "", buffer_channel_id_ig: m.bufferChannelIdIg || "",
@@ -8336,6 +8336,13 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, 
               <div className="md-affix r">
                 <input className={`${inp} mono`} value={form.driveUrl || ""} onChange={(e) => set("driveUrl", e.target.value)} placeholder="https://drive.google.com/..." />
                 {form.driveUrl ? <a href={form.driveUrl} target="_blank" rel="noopener noreferrer" className="md-open">Open</a> : null}
+              </div>
+            </div>
+            <div className="md-f">
+              <label>Reels upload folder</label>
+              <div className="md-affix r">
+                <input className={`${inp} mono`} value={form.reelsDriveUrl || ""} onChange={(e) => set("reelsDriveUrl", e.target.value)} placeholder="Drive folder where a new subfolder is made for every sent reel list" />
+                {form.reelsDriveUrl ? <a href={form.reelsDriveUrl} target="_blank" rel="noopener noreferrer" className="md-open">Open</a> : null}
               </div>
             </div>
             <div className="md-f">
@@ -16433,7 +16440,7 @@ function IgStudioPage({ models, onlyStudio }) {
 function App() {
   const { value: cards, loading: cardsLoading, persist: persistCards } = useSupaTable("cards", "id", [], cardsToJS, cardsToDB);
   const { value: models, loading: modelsLoading, persist: persistModels } = useSupaTable("models", "name", [], modelsToJS, modelsToDB,
-    "name, note, onboarded, added_at, ig_handle, ig_extra_handles, x_handle, tiktok_handle, of_url, drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank, disabled_platforms, agency_cut_pct, goal_note, goal_auto_value, notif_prefs, about, fb_url, threads_handle, snap_handle");
+    "name, note, onboarded, added_at, ig_handle, ig_extra_handles, x_handle, tiktok_handle, of_url, drive_url, reels_drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank, disabled_platforms, agency_cut_pct, goal_note, goal_auto_value, notif_prefs, about, fb_url, threads_handle, snap_handle");
   const { value: tasks, loading: tasksLoading, persist: persistTasks } = useSupaTable("tasks", "id", [], tasksToJS, tasksToDB);
   const { value: stats, loading: statsLoading, persist: persistStats } = useSupaTable("stats", "id", [], statsToJS, statsToDB);
   const { value: reels, loading: reelsLoading, persist: persistReels } = useSupaTable("reels", "id", [], reelsToJS, reelsToDB);
