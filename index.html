@@ -21694,33 +21694,17 @@ function CreatorMoney({
     className: "fs-12 c-text mt-2"
   }, "You keep about ", money((ins.payout.available + ins.payout.pending) * sharePct / 100), ". Your manager sends you an invoice for the agency share (about ", money((ins.payout.available + ins.payout.pending) * (100 - sharePct) / 100), ") after the payout reaches you."), React.createElement("div", {
     className: "fs-10 c-faint font-mono mt-2"
-  }, "Estimate from your current balance, the invoice is the exact amount.")), ins.leaderboard && React.createElement("div", {
+  }, "Estimate from your current balance, the invoice is the exact amount.")), monthNet > 0 && React.createElement("div", {
     className: card
   }, React.createElement("div", {
     className: label
-  }, "This month's standing"), React.createElement("div", {
-    className: "flex items-baseline gap-2 mt-2"
-  }, React.createElement("span", {
-    className: "text-2xl font-extrabold c-accent"
-  }, ins.leaderboard.rank ? `Top ${ins.leaderboard.rank}` : `Top ${ins.leaderboard.topPct}%`), React.createElement("span", {
-    className: "fs-12 c-muted"
-  }, "this month")), React.createElement("div", {
-    className: "fs-12 c-muted mt-1"
-  }, ins.leaderboard.rank ? ins.leaderboard.ahead === 0 ? "You are number one in the agency." : `${ins.leaderboard.ahead} ${ins.leaderboard.ahead === 1 ? "model is" : "models are"} ahead of you.` : ins.leaderboard.tier), monthNet > 0 && React.createElement("div", {
-    className: "rounded-2xl px-3 py-2.5 mt-3",
-    style: {
-      background: "rgba(57,230,115,0.08)",
-      border: "1px solid rgba(57,230,115,0.22)"
-    }
-  }, React.createElement("div", {
-    className: "fs-10 font-mono uppercase c-muted"
-  }, "Your next push"), React.createElement("div", {
-    className: "fs-13 c-text mt-0.5"
+  }, "Your next goal"), React.createElement("div", {
+    className: "fs-15 c-text mt-2"
   }, "Reach ", React.createElement("span", {
-    className: "font-extrabold c-accent"
-  }, money(Math.ceil(monthNet * 1.2 / 50) * 50)), " net this month, 20% more than you are at now.")), React.createElement("div", {
-    className: "fs-10 c-faint font-mono mt-2"
-  }, "Based on this month's revenue, nobody else is named.")), ins.topFans && ins.topFans.length > 0 && React.createElement("div", {
+    className: "text-2xl font-extrabold c-accent"
+  }, money(Math.ceil(monthNet * 1.2 / 50) * 50)), " net this month."), React.createElement("div", {
+    className: "fs-12 c-muted mt-1"
+  }, "That is 20% more than you are at now.")), ins.topFans && ins.topFans.length > 0 && React.createElement("div", {
     className: card
   }, React.createElement("div", {
     className: label
@@ -25938,7 +25922,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">k9zdfy</script>
+<script type="text/babel" id="zion-version">1t0t4n2</script>
 <script>
 (function () {
   var last = 0;
