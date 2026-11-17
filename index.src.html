@@ -5279,6 +5279,210 @@ function IgHub({ models, tab }) {
   );
 }
 
+// Shoot lists: paste reel links, tracking parameters (igsh and friends) are removed so nobody sees which account shared them,
+// links get numbers, and the AI sorts them by what has to be filmed so the model can shoot similar reels in one go.
+const shootParse = (text) => {
+  const lines = String(text || "").split(/\n/);
+  let title = "";
+  const items = [];
+  const seen = new Set();
+  const re = /https?:\/\/(?:www\.)?instagram\.com\/(?:[a-z0-9._]+\/)?(reels?|p|tv)\/([A-Za-z0-9_-]+)[^\s]*/gi;
+  for (const line of lines) {
+    const found = [...line.matchAll(re)];
+    if (!found.length) { if (!items.length && !title && line.trim()) title = line.trim().slice(0, 80); continue; }
+    found.forEach((m, k) => {
+      const end = m.index + m[0].length;
+      const next = found[k + 1] ? found[k + 1].index : line.length;
+      const note = line.slice(end, next).replace(/^[\s,.;:\-]+/, "").trim();
+      const kind = m[1].toLowerCase() === "p" ? "p" : m[1].toLowerCase() === "tv" ? "tv" : "reel";
+      if (seen.has(m[2])) return;
+      seen.add(m[2]);
+      items.push({ url: `https://www.instagram.com/${kind}/${m[2]}/`, shortcode: m[2], note });
+    });
+  }
+  return { title, items };
+};
+const shootOrdered = (list) => {
+  const groups = list.groups || [];
+  const items = list.items || [];
+  if (!groups.length) return [{ name: "", tip: "", items }];
+  const out = groups.map((g) => ({ ...g, items: items.filter((i) => i.group === g.name) }));
+  const rest = items.filter((i) => !groups.some((g) => g.name === i.group));
+  if (rest.length) out.push({ name: "Other", tip: "", items: rest });
+  return out.filter((g) => g.items.length);
+};
+const shootText = (list, withNotes) => {
+  let n = 0;
+  const parts = [list.title || "Reels to film"];
+  for (const g of shootOrdered(list)) {
+    if (g.name) parts.push("", g.name.toUpperCase());
+    for (const i of g.items) {
+      n += 1;
+      const extra = [withNotes && i.note ? `(${i.note})` : "", i.what || ""].filter(Boolean).join(" ");
+      parts.push(`${n}. ${i.url}${extra ? "\n" + extra : ""}`);
+    }
+  }
+  return parts.join("\n");
+};
+const SHOOT_CSS = `
+.sh-grp{ margin-top:16px; }
+.sh-grp:first-child{ margin-top:4px; }
+.sh-gh{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; padding-bottom:6px; border-bottom:1px solid rgba(57,230,115,.22); }
+.sh-gh b{ font-size:14px; font-weight:800; color:#39e673; letter-spacing:.01em; }
+.sh-gh span{ font-size:12px; color:#8fa39a; }
+.sh-link{ font-size:13px; color:#d9e2dd; word-break:break-all; }
+.sh-link:hover{ color:#39e673; }
+.sh-pre{ display:flex; align-items:center; gap:10px; padding:7px 0; border-top:1px solid rgba(255,255,255,.05); font-size:13px; }
+.sh-pre:first-child{ border-top:0; }
+.sh-num{ min-width:24px; height:24px; border-radius:99px; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; color:#03110a; background:#39e673; flex-shrink:0; }
+.sh-ta{ width:100%; min-height:150px; resize:vertical; padding:12px 14px; border-radius:14px; font-size:13.5px; line-height:1.5; color:#f2f5f0; background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.1); outline:none; font-family:inherit; }
+.sh-ta:focus{ border-color:rgba(57,230,115,.7); box-shadow:0 0 0 3px rgba(57,230,115,.14); }
+.sh-needs{ font-size:12px; color:#ffcf8a; margin-top:4px; }
+.sh-tnote{ font-size:12px; color:#8fa39a; margin-top:4px; font-style:normal; }
+`;
+function ShootItems({ list, showNotes }) {
+  let n = 0;
+  return (
+    <>
+      {shootOrdered(list).map((g, gi) => (
+        <div key={gi} className="sh-grp">
+          {g.name && <div className="sh-gh"><b>{g.name}</b><span>{g.items.length} reel{g.items.length === 1 ? "" : "s"}{g.tip ? `, ${g.tip}` : ""}</span></div>}
+          {g.items.map((it) => {
+            n += 1;
+            return (
+              <div key={it.shortcode} className="hb-item" style={{ "--i": Math.min(n, 20), gridTemplateColumns: "74px 1fr" }}>
+                <a href={it.url} target="_blank" rel="noopener noreferrer" className="t" style={{ backgroundImage: it.thumb_url ? `url(${it.thumb_url})` : "none" }}><span className="n">{n}</span></a>
+                <div style={{ minWidth: 0 }}>
+                  {it.what ? <div style={{ fontSize: 14, lineHeight: 1.5, color: "#e6ece9" }}>{it.what}</div> : null}
+                  {it.needs ? <div className="sh-needs">Need: {it.needs}</div> : null}
+                  {showNotes && it.note ? <div className="sh-tnote">Note: {it.note}</div> : null}
+                  {it.missing && !it.note ? null : it.missing ? <div className="sh-tnote">Instagram did not show this reel without a login, sorted by the note only.</div> : null}
+                  <a href={it.url} target="_blank" rel="noopener noreferrer" className="sh-link" style={{ display: "inline-block", marginTop: 6 }}>{it.url}</a>
+                  {it.handle ? <span className="hb-note" style={{ marginLeft: 8 }}>@{it.handle}{it.views ? `, ${igK(it.views)} views` : ""}</span> : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </>
+  );
+}
+function ShootLists({ models }) {
+  const list = models || [];
+  const [model, setModel] = useState(() => { try { const s = localStorage.getItem("zionHubModel"); if (s && list.some((m) => m.name === s)) return s; } catch (e) {} return list[0]?.name || ""; });
+  const [lists, setLists] = useState(null);
+  const [text, setText] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState("");
+  const [copied, setCopied] = useState("");
+  const pick = (n) => { setModel(n); try { localStorage.setItem("zionHubModel", n); } catch (e) {} };
+  const load = useCallback(async () => {
+    if (!model) return;
+    try { setLists((await hubFn({ action: "shoot-lists", model })).lists || []); setErr(""); } catch (e) { setErr(e.message); }
+  }, [model]);
+  useEffect(() => { setLists(null); load(); }, [model, load]);
+  const working = (lists || []).filter((l) => l.ai && ["running", "thinking"].includes(l.ai.state));
+  useEffect(() => {
+    if (!working.length) return;
+    window.__zionBusy = true;
+    const t = setInterval(async () => {
+      for (const l of working) {
+        try { const j = await hubFn({ action: "shoot-status", id: l.id }); setLists((cur) => (cur || []).map((x) => x.id === l.id ? j.list : x)); } catch (e) {}
+      }
+    }, 6000);
+    return () => { clearInterval(t); window.__zionBusy = false; };
+  }, [working.map((l) => l.id).join(",")]);
+  const act = async (key, body, after) => {
+    setBusy(key); setErr("");
+    try { const j = await hubFn(body); if (after) await after(j); else await load(); } catch (e) { setErr(e.message); }
+    setBusy("");
+  };
+  const copy = async (key, txt) => { try { await navigator.clipboard.writeText(txt); setCopied(key); setTimeout(() => setCopied(""), 1800); } catch (e) { setErr("Copy did not work, select the text by hand."); } };
+  const parsed = shootParse(text);
+  const preview = { title: parsed.title, items: parsed.items, groups: [] };
+
+  if (!list.length) return <div className="hb-empty"><b>No models yet</b>Models appear here once they exist in the Model Manager.</div>;
+  return (
+    <div className="hb">
+      <style>{HUB_CSS}{SHOOT_CSS}</style>
+      <div className="hb-bar">
+        {list.map((m) => <span key={m.name} className={`hb-chip${m.name === model ? " on" : ""}`} onClick={() => pick(m.name)}>{m.name}</span>)}
+      </div>
+      {err && <div className="hb-err">{err}</div>}
+      <div className="hb-card" style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>New list for {model}</div>
+        <p className="hb-note" style={{ marginBottom: 10 }}>Paste reel links, one per line, a note can follow the link on the same line. The first line without a link becomes the title. Tracking parts like igsh are removed, so nobody can tell which account shared the link.</p>
+        <textarea className="sh-ta" value={text} onChange={(e) => setText(e.target.value)} placeholder={"Anna ideas\nhttps://www.instagram.com/reel/... easier to film\nhttps://www.instagram.com/reel/..."} />
+        {parsed.items.length > 0 && (
+          <div style={{ marginTop: 12 }}>
+            <div className="hb-note" style={{ marginBottom: 4 }}>{parsed.items.length} clean link{parsed.items.length === 1 ? "" : "s"}{parsed.title ? `, title: ${parsed.title}` : ""}</div>
+            {parsed.items.map((it, i) => (
+              <div key={it.shortcode} className="sh-pre"><span className="sh-num">{i + 1}</span><span className="sh-link">{it.url}</span>{it.note && <span className="hb-note">({it.note})</span>}</div>
+            ))}
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+          <button className="hb-btn ghost" disabled={!parsed.items.length} onClick={() => copy("new", shootText(preview, true))}>{copied === "new" ? "Copied" : "Copy clean links"}</button>
+          <button className="hb-btn" disabled={!parsed.items.length || busy === "create"} onClick={() => act("create", { action: "shoot-create", model, title: parsed.title, items: parsed.items }, async (j) => {
+            setText("");
+            const a = await hubFn({ action: "shoot-analyze", id: j.list.id }).catch((e) => { setErr(e.message); return { list: j.list }; });
+            setLists((cur) => [a.list, ...(cur || [])]);
+          })}>{busy === "create" ? <><span className="hb-spin" />Saving</> : "Save and sort with AI"}</button>
+        </div>
+        <p className="hb-note" style={{ marginTop: 8 }}>Sorting reads each reel (cover, caption, spoken words) and costs about 2 cents per reel.</p>
+      </div>
+      {lists === null && <div className="hb-note">Loading</div>}
+      {lists && !lists.length && <div className="hb-empty"><b>No lists yet</b>Paste links above to make the first one.</div>}
+      {(lists || []).map((l) => {
+        const st = l.ai?.state;
+        const run = st === "running" || st === "thinking";
+        return (
+          <div key={l.id} className="hb-card" style={{ marginBottom: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
+              <div style={{ fontSize: 17, fontWeight: 800, flex: 1, minWidth: 160 }}>{l.title || "Reels to film"}</div>
+              <span className={`hb-status ${l.status}`}>{l.status === "sent" ? `Sent ${hubDate(String(l.sent_at || "").slice(0, 10))}` : "Draft"}</span>
+              <span className="hb-note">{(l.items || []).length} reels</span>
+            </div>
+            {run && <div className="hb-note" style={{ display: "flex", alignItems: "center", gap: 8, margin: "6px 0" }}><span className="hb-spin" />{st === "running" ? "Reading the reels from Instagram, about a minute" : "AI is sorting them by what to film"}</div>}
+            {st === "failed" && <div className="hb-err">Sorting failed: {l.ai.error}</div>}
+            <ShootItems list={l} showNotes />
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
+              <button className="hb-btn ghost sm" onClick={() => copy(l.id, shootText(l, false))}>{copied === l.id ? "Copied" : "Copy"}</button>
+              {l.status === "sent"
+                ? <button className="hb-btn ghost sm" disabled={busy === "s" + l.id} onClick={() => act("s" + l.id, { action: "shoot-unsend", id: l.id })}>Take back</button>
+                : <button className="hb-btn sm" disabled={run || busy === "s" + l.id} onClick={() => act("s" + l.id, { action: "shoot-send", id: l.id })}>Send to {l.model}</button>}
+              {!run && <button className="hb-btn ghost sm" disabled={busy === "a" + l.id} onClick={() => act("a" + l.id, { action: "shoot-analyze", id: l.id }, (j) => setLists((cur) => cur.map((x) => x.id === l.id ? j.list : x)))}>{(l.groups || []).length ? "Sort again" : "Sort with AI"}</button>}
+              <button className="hb-btn ghost sm" style={{ marginLeft: "auto" }} onClick={() => { if (confirm("Delete this list?")) act("d" + l.id, { action: "shoot-delete", id: l.id }); }}>Delete</button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+// What the model sees: the lists the team sent her, grouped by setup.
+function CreatorShootLists() {
+  const [lists, setLists] = useState(null);
+  useEffect(() => { hubFn({ action: "my-shoots" }).then((j) => setLists(j.lists || [])).catch(() => setLists([])); }, []);
+  if (!lists || !lists.length) return null;
+  return (
+    <>
+      {lists.slice(0, 2).map((l) => (
+        <div key={l.id} className="hb hb-card" style={{ marginBottom: 18 }}>
+          <style>{HUB_CSS}{SHOOT_CSS}</style>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
+            <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-.01em" }}>{l.title || "Reels to film"}</div>
+            <span className="hb-note">{(l.items || []).length} reels, sent {hubDate(String(l.sent_at || "").slice(0, 10))}</span>
+          </div>
+          <p className="hb-note" style={{ marginBottom: 4 }}>Reels in the same group need the same setup, film them in one go.</p>
+          <ShootItems list={l} />
+        </div>
+      ))}
+    </>
+  );
+}
+
 // What the model sees: the plan the team sent her, with a real reel to watch for every idea.
 function CreatorReelPlan() {
   const [plans, setPlans] = useState(null);
@@ -5384,6 +5588,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
     const mineIds = mine.map((a) => a.id);
     return (
       <>
+      <CreatorShootLists />
       <CreatorReelPlan />
       <IGOverviewDashboard
         models={models.filter((m) => m.name === restrictModel)}
@@ -5417,7 +5622,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
     const igTabBar = (
       <div style={{ display: "flex", marginBottom: 16, overflowX: "auto" }}>
         <div style={{ display: "inline-flex", background: "#0e1310", border: "1px solid rgba(57,230,115,0.16)", borderRadius: 16, padding: 5, gap: 4, flexShrink: 0 }}>
-          {[["dash", "Dashboard"], ["swipe", "Swipe file"], ["plan", "Weekly plan"], ["profiles", "Tracked profiles"], ["studio", "AI Studio"]].map(([k, l]) => (
+          {[["dash", "Dashboard"], ["shoot", "Shoot list"], ["swipe", "Swipe file"], ["plan", "Weekly plan"], ["profiles", "Tracked profiles"], ["studio", "AI Studio"]].map(([k, l]) => (
             <button key={k} onClick={() => setIgAiStudio(k === "dash" ? false : k)}
               style={{ padding: "9px 16px", borderRadius: 12, fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", transition: "all .2s",
                 background: (igAiStudio || "dash") === k ? "#39e673" : "transparent", color: (igAiStudio || "dash") === k ? "#03110a" : "#8fa39a" }}>{l}</button>
@@ -5425,6 +5630,9 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
         </div>
       </div>
     );
+    if (igAiStudio === "shoot") {
+      return <>{igTabBar}<ShootLists models={igModels} /></>;
+    }
     if (igAiStudio && igAiStudio !== "studio") {
       return <>{igTabBar}<IgHub models={igModels} tab={igAiStudio} /></>;
     }
