@@ -10027,8 +10027,23 @@ function ShootLists({
       onClick: () => act("s" + l.id, {
         action: "shoot-send",
         id: l.id
+      }, async j => {
+        await load();
+        if (j.driveError) setErr(`Sent, but the Drive folder was not created: ${j.driveError}`);
       })
-    }, "Send to ", l.model), !run && React.createElement("button", {
+    }, "Send to ", l.model), l.status === "sent" && (l.drive?.url ? React.createElement("a", {
+      href: l.drive.url,
+      target: "_blank",
+      rel: "noopener noreferrer",
+      className: "hb-btn ghost sm"
+    }, "Drive folder", l.drive.checked_at ? `, ${l.drive.videos || 0} videos` : "") : React.createElement("button", {
+      className: "hb-btn ghost sm",
+      disabled: busy === "dr" + l.id,
+      onClick: () => act("dr" + l.id, {
+        action: "shoot-drive",
+        id: l.id
+      })
+    }, busy === "dr" + l.id ? "Creating" : "Create Drive folder")), !run && React.createElement("button", {
       className: "hb-btn ghost sm",
       disabled: busy === "a" + l.id,
       onClick: () => act("a" + l.id, {
@@ -10123,15 +10138,20 @@ function CreatorShootLists({
       style: {
         marginBottom: 8
       }
-    }, "Reels in the same group need the same setup, film them in one go. When a video is ready, upload it to your Drive folder and mark it as filmed."), driveUrl && React.createElement("a", {
-      href: driveUrl,
+    }, "Reels in the same group need the same setup, film them in one go. Upload the videos to the Drive folder below. Name a video with its number, for example 3.mp4, and it is ticked off by itself within an hour."), (l.drive?.url || driveUrl) && React.createElement("a", {
+      href: l.drive?.url || driveUrl,
       target: "_blank",
       rel: "noopener noreferrer",
       className: "hb-btn sm",
       style: {
         marginBottom: 6
       }
-    }, "Open my Drive folder"), err && React.createElement("div", {
+    }, l.drive?.url ? "Upload videos to Drive" : "Open my Drive folder"), l.drive?.videos ? React.createElement("span", {
+      className: "hb-note",
+      style: {
+        marginLeft: 10
+      }
+    }, l.drive.videos, " video", l.drive.videos === 1 ? "" : "s", " uploaded") : null, err && React.createElement("div", {
       className: "hb-err"
     }, err), React.createElement(ShootItems, {
       list: l,
@@ -26515,7 +26535,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">djd1zh</script>
+<script type="text/babel" id="zion-version">dngvz7</script>
 <script>
 (function () {
   var last = 0;

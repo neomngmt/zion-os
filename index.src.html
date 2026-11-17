@@ -5454,7 +5454,10 @@ function ShootLists({ models }) {
               <button className="hb-btn ghost sm" onClick={() => copy(l.id, shootText(l, false))}>{copied === l.id ? "Copied" : "Copy"}</button>
               {l.status === "sent"
                 ? <button className="hb-btn ghost sm" disabled={busy === "s" + l.id} onClick={() => act("s" + l.id, { action: "shoot-unsend", id: l.id })}>Take back</button>
-                : <button className="hb-btn sm" disabled={run || busy === "s" + l.id} onClick={() => act("s" + l.id, { action: "shoot-send", id: l.id })}>Send to {l.model}</button>}
+                : <button className="hb-btn sm" disabled={run || busy === "s" + l.id} onClick={() => act("s" + l.id, { action: "shoot-send", id: l.id }, async (j) => { await load(); if (j.driveError) setErr(`Sent, but the Drive folder was not created: ${j.driveError}`); })}>Send to {l.model}</button>}
+              {l.status === "sent" && (l.drive?.url
+                ? <a href={l.drive.url} target="_blank" rel="noopener noreferrer" className="hb-btn ghost sm">Drive folder{l.drive.checked_at ? `, ${l.drive.videos || 0} videos` : ""}</a>
+                : <button className="hb-btn ghost sm" disabled={busy === "dr" + l.id} onClick={() => act("dr" + l.id, { action: "shoot-drive", id: l.id })}>{busy === "dr" + l.id ? "Creating" : "Create Drive folder"}</button>)}
               {!run && <button className="hb-btn ghost sm" disabled={busy === "a" + l.id} onClick={() => act("a" + l.id, { action: "shoot-analyze", id: l.id }, (j) => setLists((cur) => cur.map((x) => x.id === l.id ? j.list : x)))}>{(l.groups || []).length ? "Sort again" : "Sort with AI"}</button>}
               <button className="hb-btn ghost sm" style={{ marginLeft: "auto" }} onClick={() => { if (confirm("Delete this list?")) act("d" + l.id, { action: "shoot-delete", id: l.id }); }}>Delete</button>
             </div>
@@ -5493,8 +5496,9 @@ function CreatorShootLists({ driveUrl }) {
               <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-.01em" }}>{l.title || "Reels to film"}</div>
               <span className="hb-note">{done} of {total} filmed, sent {hubDate(String(l.sent_at || "").slice(0, 10))}</span>
             </div>
-            <p className="hb-note" style={{ marginBottom: 8 }}>Reels in the same group need the same setup, film them in one go. When a video is ready, upload it to your Drive folder and mark it as filmed.</p>
-            {driveUrl && <a href={driveUrl} target="_blank" rel="noopener noreferrer" className="hb-btn sm" style={{ marginBottom: 6 }}>Open my Drive folder</a>}
+            <p className="hb-note" style={{ marginBottom: 8 }}>Reels in the same group need the same setup, film them in one go. Upload the videos to the Drive folder below. Name a video with its number, for example 3.mp4, and it is ticked off by itself within an hour.</p>
+            {(l.drive?.url || driveUrl) && <a href={l.drive?.url || driveUrl} target="_blank" rel="noopener noreferrer" className="hb-btn sm" style={{ marginBottom: 6 }}>{l.drive?.url ? "Upload videos to Drive" : "Open my Drive folder"}</a>}
+            {l.drive?.videos ? <span className="hb-note" style={{ marginLeft: 10 }}>{l.drive.videos} video{l.drive.videos === 1 ? "" : "s"} uploaded</span> : null}
             {err && <div className="hb-err">{err}</div>}
             <ShootItems list={l} onToggle={(it) => toggle(l, it)} />
           </div>
