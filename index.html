@@ -5185,7 +5185,12 @@ function IGOverviewDashboard({
     }
   }, "Posts · ", igRange, "d"), React.createElement("span", {
     className: "fs-13 font-extrabold"
-  }, weekTotals.posts))))), !single && React.createElement(ViralVariationsPanel, {
+  }, weekTotals.posts))))), React.createElement(OurReelsPanel, {
+    media: igGraphMedia,
+    accountIds: accountIds,
+    accountById: accountById,
+    showAccount: accountIds.length > 1
+  }), !single && React.createElement(ViralVariationsPanel, {
     variations: igViralVariations,
     igGraphMedia: igGraphMedia
   }), igAccount === "all" && demoAccounts.length > 1 && React.createElement("div", {
@@ -5461,6 +5466,216 @@ const VARIATION_STATUS_STYLE = {
     color: "#e07a5f"
   }
 };
+function OurReelsPanel({
+  media,
+  accountIds,
+  accountById,
+  showAccount
+}) {
+  const [sort, setSort] = useState("new");
+  const [all, setAll] = useState(false);
+  const rows = React.useMemo(() => {
+    const mine = (media || []).filter(m => accountIds.includes(m.account_id) && m.timestamp);
+    const med = {};
+    accountIds.forEach(id => {
+      const v = mine.filter(m => m.account_id === id).map(m => Number(m.views) || 0).filter(x => x > 0).sort((a, b) => a - b);
+      med[id] = v.length ? v.length % 2 ? v[(v.length - 1) / 2] : Math.round((v[v.length / 2 - 1] + v[v.length / 2]) / 2) : 0;
+    });
+    return mine.map(m => {
+      const views = Number(m.views) || 0,
+        likes = Number(m.likes) || 0,
+        comments = Number(m.comments) || 0;
+      return {
+        ...m,
+        views,
+        likes,
+        comments,
+        fresh: Date.now() - new Date(m.timestamp).getTime() < 48 * 3600000,
+        mult: med[m.account_id] ? views / med[m.account_id] : null,
+        eng: views ? (likes + comments) / views * 100 : null
+      };
+    });
+  }, [media, accountIds.join("|")]);
+  if (!rows.length) return null;
+  const sorted = [...rows].sort((a, b) => sort === "new" ? new Date(b.timestamp) - new Date(a.timestamp) : sort === "views" ? b.views - a.views : (b.mult || 0) - (a.mult || 0));
+  const shown = all ? sorted : sorted.slice(0, 8);
+  const week = rows.filter(r => Date.now() - new Date(r.timestamp).getTime() <= 7 * 86400000);
+  const best = [...rows].sort((a, b) => b.views - a.views)[0];
+  const fmtD = t => new Date(t).toLocaleDateString("cs-CZ", {
+    day: "numeric",
+    month: "numeric",
+    timeZone: "Europe/Prague"
+  });
+  const multStyle = x => x == null ? {
+    color: "#8fa39a",
+    border: "1px solid rgba(255,255,255,.12)"
+  } : x >= 1.5 ? {
+    color: "#03110a",
+    background: "#39e673"
+  } : x >= 0.8 ? {
+    color: "#d9e2dd",
+    border: "1px solid rgba(255,255,255,.18)"
+  } : {
+    color: "#ff8a6b",
+    border: "1px solid rgba(255,138,107,.4)"
+  };
+  return React.createElement("div", {
+    className: "rounded-3xl p-5 mb-5",
+    style: {
+      background: "rgba(255,255,255,0.035)",
+      border: "1px solid rgba(255,255,255,0.08)"
+    }
+  }, React.createElement("div", {
+    className: "flex items-center gap-3 flex-wrap mb-1"
+  }, React.createElement("div", {
+    className: "text-lg font-extrabold tracking-tight",
+    style: {
+      color: "#fff"
+    }
+  }, "Our reels"), React.createElement("span", {
+    className: "fs-11 font-mono",
+    style: {
+      color: "#9d9b95"
+    }
+  }, rows.length, " stored, ", week.length, " in the last 7 days"), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }), React.createElement("div", {
+    className: "flex rounded-full p-0.5",
+    style: {
+      background: "rgba(255,255,255,0.05)",
+      border: "1px solid rgba(255,255,255,0.08)"
+    }
+  }, [["new", "Newest"], ["views", "Most views"], ["mult", "Best vs normal"]].map(([k, l]) => React.createElement("button", {
+    key: k,
+    onClick: () => setSort(k),
+    className: "fs-11 font-mono px-3 py-1 rounded-full tap",
+    style: sort === k ? {
+      background: "#39e673",
+      color: "#03110a",
+      fontWeight: 600
+    } : {
+      color: "#9d9b95"
+    }
+  }, l)))), React.createElement("p", {
+    className: "fs-11 mb-3",
+    style: {
+      color: "#9d9b95"
+    }
+  }, "The x number compares a reel with the usual views of its own account. Reels younger than 2 days show \"new\", their views are still growing. Best so far: ", igK(best.views), " views on ", fmtD(best.timestamp), "."), React.createElement("div", {
+    style: {
+      overflowX: "auto"
+    }
+  }, React.createElement("div", {
+    style: {
+      minWidth: 560
+    }
+  }, React.createElement("div", {
+    className: "grid fs-9 font-mono uppercase tracking-wide px-2 pb-2",
+    style: {
+      gridTemplateColumns: "52px 1fr 70px 80px 70px 80px 70px 70px",
+      gap: 10,
+      color: "#7f8f87"
+    }
+  }, React.createElement("span", null), React.createElement("span", null, "Reel"), React.createElement("span", null, "Posted"), React.createElement("span", {
+    style: {
+      textAlign: "right"
+    }
+  }, "Views"), React.createElement("span", {
+    style: {
+      textAlign: "right"
+    }
+  }, "Likes"), React.createElement("span", {
+    style: {
+      textAlign: "right"
+    }
+  }, "Comments"), React.createElement("span", {
+    style: {
+      textAlign: "right"
+    }
+  }, "Engage"), React.createElement("span", {
+    style: {
+      textAlign: "right"
+    }
+  }, "Vs normal")), shown.map(r => React.createElement("a", {
+    key: r.id,
+    href: r.permalink,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    className: "grid items-center px-2 py-2 rounded-xl transition-colors hover:bg-white/[0.04]",
+    style: {
+      gridTemplateColumns: "52px 1fr 70px 80px 70px 80px 70px 70px",
+      gap: 10,
+      borderTop: "1px solid rgba(255,255,255,0.06)",
+      fontVariantNumeric: "tabular-nums"
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 44,
+      height: 58,
+      borderRadius: 9,
+      background: r.thumbnail_url ? `#080c0a url(${r.thumbnail_url}) center/cover` : "#111a14",
+      display: "block"
+    }
+  }), React.createElement("span", {
+    style: {
+      minWidth: 0
+    }
+  }, React.createElement("span", {
+    className: "block truncate fs-12",
+    style: {
+      color: "#e6ece9"
+    }
+  }, (r.caption || "").split("\n")[0] || "No caption"), showAccount && accountById[r.account_id]?.igUsername ? React.createElement("span", {
+    className: "block truncate fs-10 font-mono",
+    style: {
+      color: "#7f8f87"
+    }
+  }, "@", accountById[r.account_id].igUsername) : null), React.createElement("span", {
+    className: "fs-11 font-mono",
+    style: {
+      color: "#9d9b95"
+    }
+  }, fmtD(r.timestamp)), React.createElement("span", {
+    className: "fs-13 font-bold",
+    style: {
+      color: "#fff",
+      textAlign: "right"
+    }
+  }, igK(r.views)), React.createElement("span", {
+    className: "fs-12",
+    style: {
+      color: "#d9e2dd",
+      textAlign: "right"
+    }
+  }, igK(r.likes)), React.createElement("span", {
+    className: "fs-12",
+    style: {
+      color: "#d9e2dd",
+      textAlign: "right"
+    }
+  }, igK(r.comments)), React.createElement("span", {
+    className: "fs-12",
+    style: {
+      color: "#d9e2dd",
+      textAlign: "right"
+    }
+  }, r.eng == null ? "-" : `${r.eng.toFixed(1)}%`), React.createElement("span", {
+    style: {
+      textAlign: "right"
+    }
+  }, React.createElement("span", {
+    className: "fs-11 font-bold px-2 py-0.5 rounded-full",
+    style: multStyle(r.fresh ? null : r.mult)
+  }, r.fresh ? "new" : r.mult == null ? "-" : `${r.mult >= 10 ? Math.round(r.mult) : r.mult.toFixed(1)}x`)))))), sorted.length > 8 && React.createElement("button", {
+    onClick: () => setAll(v => !v),
+    className: "fs-11 font-mono mt-3 tap",
+    style: {
+      color: "#39e673"
+    }
+  }, all ? "Show fewer" : `Show all ${sorted.length}`));
+}
 function ViralVariationsPanel({
   variations,
   igGraphMedia
@@ -25723,7 +25938,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">10x6cxt</script>
+<script type="text/babel" id="zion-version">k9zdfy</script>
 <script>
 (function () {
   var last = 0;
