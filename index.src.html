@@ -6861,6 +6861,7 @@ const MM_NETS = [
 ];
 const MM_SETUP = [
   { label: "OnlyFans link", ok: (m) => !!m.ofUrl },
+  { label: "Infloww ID", only: (m) => (m.agency || "CZ") === "US", ok: (m) => !!(m.inflowwCreatorIdFree || m.inflowwCreatorIdPaid) }, // US agency runs on Infloww, CZ on Famee
   { label: "Monthly goal", ok: (m) => m.monthlyGoal != null && m.monthlyGoal > 0 },
   { label: "Agency cut", ok: (m) => m.agencyCutPct != null },
   { label: "Drive folder", ok: (m) => !!m.driveUrl },
@@ -6939,10 +6940,11 @@ const MM_CSS = `
 function MMCard({ m, color, index, onEdit }) {
   const ref = React.useRef(null);
   const nets = MM_NETS.map((n) => ({ ...n, handle: n.get(m) || "" }));
-  const missing = MM_SETUP.filter((x) => !x.ok(m)).map((x) => x.label);
+  const missing = MM_SETUP.filter((x) => (!x.only || x.only(m)) && !x.ok(m)).map((x) => x.label);
   const linked = nets.filter((n) => n.handle).length;
-  const total = nets.length + MM_SETUP.length;
-  const done = linked + (MM_SETUP.length - missing.length);
+  const applies = MM_SETUP.filter((x) => !x.only || x.only(m)).length;
+  const total = nets.length + applies;
+  const done = linked + (applies - missing.length);
   const pct = Math.round((done / total) * 100);
   const onMove = (e) => {
     const el = ref.current; if (!el) return;
@@ -7002,7 +7004,7 @@ function MMCard({ m, color, index, onEdit }) {
 }
 function MMRoster({ models, colorFor, onEdit }) {
   const linkedTotal = models.reduce((t, m) => t + MM_NETS.filter((n) => n.get(m)).length, 0);
-  const missingTotal = models.reduce((t, m) => t + MM_SETUP.filter((x) => !x.ok(m)).length, 0);
+  const missingTotal = models.reduce((t, m) => t + MM_SETUP.filter((x) => (!x.only || x.only(m)) && !x.ok(m)).length, 0);
   return (
     <div className="mm-wrap">
       <style>{MM_CSS}</style>
@@ -7892,8 +7894,9 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, 
   };
 
   const mc = mmColorFor(model.name);
-  const setupTotal = MM_NETS.length + MM_SETUP.length;
-  const setupDone = MM_NETS.filter((n) => n.get(form)).length + MM_SETUP.filter((x) => x.ok(form)).length;
+  const setupRows = MM_SETUP.filter((x) => !x.only || x.only(form));
+  const setupTotal = MM_NETS.length + setupRows.length;
+  const setupDone = MM_NETS.filter((n) => n.get(form)).length + setupRows.filter((x) => x.ok(form)).length;
   const pct = Math.round((setupDone / setupTotal) * 100);
   const dirty = JSON.stringify(form) !== JSON.stringify(model);
   const inp = "md-in";
@@ -7987,8 +7990,20 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, 
             <div className="md-f">
               <label>OnlyFans link</label>
               <input className={`${inp} mono`} value={form.ofUrl || ""} onChange={(e) => set("ofUrl", e.target.value)} placeholder="https://onlyfans.com/..." />
-              <p>Revenue comes in by itself, nothing to connect here.</p>
+              <p>{(model.agency || "CZ") === "US" ? "US revenue comes from Infloww, through the IDs below." : "Revenue comes in from Famee by itself, nothing to connect here."}</p>
             </div>
+            {(model.agency || "CZ") === "US" && (
+              <div className="md-two">
+                <div className="md-f">
+                  <label>Infloww ID, free page</label>
+                  <input className={`${inp} mono`} value={form.inflowwCreatorIdFree || ""} onChange={(e) => set("inflowwCreatorIdFree", e.target.value)} placeholder="creator id" />
+                </div>
+                <div className="md-f">
+                  <label>Infloww ID, paid page</label>
+                  <input className={`${inp} mono`} value={form.inflowwCreatorIdPaid || ""} onChange={(e) => set("inflowwCreatorIdPaid", e.target.value)} placeholder="creator id" />
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="md-sec" style={{ "--i": 3 }}>

@@ -11706,6 +11706,10 @@ const MM_SETUP = [{
   label: "OnlyFans link",
   ok: m => !!m.ofUrl
 }, {
+  label: "Infloww ID",
+  only: m => (m.agency || "CZ") === "US",
+  ok: m => !!(m.inflowwCreatorIdFree || m.inflowwCreatorIdPaid)
+}, {
   label: "Monthly goal",
   ok: m => m.monthlyGoal != null && m.monthlyGoal > 0
 }, {
@@ -11830,10 +11834,11 @@ function MMCard({
     ...n,
     handle: n.get(m) || ""
   }));
-  const missing = MM_SETUP.filter(x => !x.ok(m)).map(x => x.label);
+  const missing = MM_SETUP.filter(x => (!x.only || x.only(m)) && !x.ok(m)).map(x => x.label);
   const linked = nets.filter(n => n.handle).length;
-  const total = nets.length + MM_SETUP.length;
-  const done = linked + (MM_SETUP.length - missing.length);
+  const applies = MM_SETUP.filter(x => !x.only || x.only(m)).length;
+  const total = nets.length + applies;
+  const done = linked + (applies - missing.length);
   const pct = Math.round(done / total * 100);
   const onMove = e => {
     const el = ref.current;
@@ -11949,7 +11954,7 @@ function MMRoster({
   onEdit
 }) {
   const linkedTotal = models.reduce((t, m) => t + MM_NETS.filter(n => n.get(m)).length, 0);
-  const missingTotal = models.reduce((t, m) => t + MM_SETUP.filter(x => !x.ok(m)).length, 0);
+  const missingTotal = models.reduce((t, m) => t + MM_SETUP.filter(x => (!x.only || x.only(m)) && !x.ok(m)).length, 0);
   return React.createElement("div", {
     className: "mm-wrap"
   }, React.createElement("style", null, MM_CSS), React.createElement("div", {
@@ -13247,8 +13252,9 @@ function ModelDetail({
     setPinSaved(true);
   };
   const mc = mmColorFor(model.name);
-  const setupTotal = MM_NETS.length + MM_SETUP.length;
-  const setupDone = MM_NETS.filter(n => n.get(form)).length + MM_SETUP.filter(x => x.ok(form)).length;
+  const setupRows = MM_SETUP.filter(x => !x.only || x.only(form));
+  const setupTotal = MM_NETS.length + setupRows.length;
+  const setupDone = MM_NETS.filter(n => n.get(form)).length + setupRows.filter(x => x.ok(form)).length;
   const pct = Math.round(setupDone / setupTotal * 100);
   const dirty = JSON.stringify(form) !== JSON.stringify(model);
   const inp = "md-in";
@@ -13437,7 +13443,23 @@ function ModelDetail({
     value: form.ofUrl || "",
     onChange: e => set("ofUrl", e.target.value),
     placeholder: "https://onlyfans.com/..."
-  }), React.createElement("p", null, "Revenue comes in by itself, nothing to connect here."))), React.createElement("section", {
+  }), React.createElement("p", null, (model.agency || "CZ") === "US" ? "US revenue comes from Infloww, through the IDs below." : "Revenue comes in from Famee by itself, nothing to connect here.")), (model.agency || "CZ") === "US" && React.createElement("div", {
+    className: "md-two"
+  }, React.createElement("div", {
+    className: "md-f"
+  }, React.createElement("label", null, "Infloww ID, free page"), React.createElement("input", {
+    className: `${inp} mono`,
+    value: form.inflowwCreatorIdFree || "",
+    onChange: e => set("inflowwCreatorIdFree", e.target.value),
+    placeholder: "creator id"
+  })), React.createElement("div", {
+    className: "md-f"
+  }, React.createElement("label", null, "Infloww ID, paid page"), React.createElement("input", {
+    className: `${inp} mono`,
+    value: form.inflowwCreatorIdPaid || "",
+    onChange: e => set("inflowwCreatorIdPaid", e.target.value),
+    placeholder: "creator id"
+  })))), React.createElement("section", {
     className: "md-sec",
     style: {
       "--i": 3
@@ -25701,7 +25723,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">13vv82y</script>
+<script type="text/babel" id="zion-version">psxvi7</script>
 <script>
 (function () {
   var last = 0;
