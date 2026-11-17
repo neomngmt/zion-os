@@ -5340,7 +5340,7 @@ const SHOOT_CSS = `
 .sh-needs{ font-size:12px; color:#ffcf8a; margin-top:4px; }
 .sh-tnote{ font-size:12px; color:#8fa39a; margin-top:4px; font-style:normal; }
 `;
-function ShootItems({ list, showNotes }) {
+function ShootItems({ list, showNotes, onToggle }) {
   let n = 0;
   return (
     <>
@@ -5350,8 +5350,8 @@ function ShootItems({ list, showNotes }) {
           {g.items.map((it) => {
             n += 1;
             return (
-              <div key={it.shortcode} className="hb-item" style={{ "--i": Math.min(n, 20), gridTemplateColumns: "74px 1fr" }}>
-                <a href={it.url} target="_blank" rel="noopener noreferrer" className="t" style={{ backgroundImage: it.thumb_url ? `url(${it.thumb_url})` : "none" }}><span className="n">{n}</span></a>
+              <div key={it.shortcode} className="hb-item" style={{ "--i": Math.min(n, 20), gridTemplateColumns: "74px 1fr", opacity: it.done ? 0.55 : undefined }}>
+                <a href={it.url} target="_blank" rel="noopener noreferrer" className="t" style={{ backgroundImage: it.thumb_url ? `url(${it.thumb_url})` : "none" }}><span className="n" style={it.done ? { background: "#39e673", color: "#03110a" } : undefined}>{it.done ? "✓" : n}</span></a>
                 <div style={{ minWidth: 0 }}>
                   {it.what ? <div style={{ fontSize: 14, lineHeight: 1.5, color: "#e6ece9" }}>{it.what}</div> : null}
                   {it.needs ? <div className="sh-needs">Need: {it.needs}</div> : null}
@@ -5359,6 +5359,9 @@ function ShootItems({ list, showNotes }) {
                   {it.missing && !it.note ? null : it.missing ? <div className="sh-tnote">Instagram did not show this reel without a login, sorted by the note only.</div> : null}
                   <a href={it.url} target="_blank" rel="noopener noreferrer" className="sh-link" style={{ display: "inline-block", marginTop: 6 }}>{it.url}</a>
                   {it.handle ? <span className="hb-note" style={{ marginLeft: 8 }}>@{it.handle}{it.views ? `, ${igK(it.views)} views` : ""}</span> : null}
+                  {onToggle
+                    ? <div style={{ marginTop: 9 }}><button className={`hb-btn sm${it.done ? " ghost" : ""}`} onClick={() => onToggle(it)}>{it.done ? "Filmed ✓, undo" : "Mark as filmed"}</button></div>
+                    : it.done ? <div className="hb-note" style={{ color: "#39e673", marginTop: 4 }}>Filmed {it.done_at ? hubDate(String(it.done_at).slice(0, 10)) : ""}</div> : null}
                 </div>
               </div>
             );
@@ -5442,7 +5445,7 @@ function ShootLists({ models }) {
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
               <div style={{ fontSize: 17, fontWeight: 800, flex: 1, minWidth: 160 }}>{l.title || "Reels to film"}</div>
               <span className={`hb-status ${l.status}`}>{l.status === "sent" ? `Sent ${hubDate(String(l.sent_at || "").slice(0, 10))}` : "Draft"}</span>
-              <span className="hb-note">{(l.items || []).length} reels</span>
+              <span className="hb-note">{l.status === "sent" ? `${(l.items || []).filter((i) => i.done).length} of ${(l.items || []).length} filmed` : `${(l.items || []).length} reels`}</span>
             </div>
             {run && <div className="hb-note" style={{ display: "flex", alignItems: "center", gap: 8, margin: "6px 0" }}><span className="hb-spin" />{st === "running" ? "Reading the reels from Instagram, about a minute" : "AI is sorting them by what to film"}</div>}
             {st === "failed" && <div className="hb-err">Sorting failed: {l.ai.error}</div>}
@@ -5461,25 +5464,64 @@ function ShootLists({ models }) {
     </div>
   );
 }
-// What the model sees: the lists the team sent her, grouped by setup.
-function CreatorShootLists() {
+// What the model sees: the lists the team sent her, grouped by setup, with a tick per filmed reel and her Drive folder for the uploads.
+function useMyShoots() {
   const [lists, setLists] = useState(null);
   useEffect(() => { hubFn({ action: "my-shoots" }).then((j) => setLists(j.lists || [])).catch(() => setLists([])); }, []);
+  return [lists, setLists];
+}
+function CreatorShootLists({ driveUrl }) {
+  const [lists, setLists] = useMyShoots();
+  const [err, setErr] = useState("");
   if (!lists || !lists.length) return null;
+  const toggle = async (l, it) => {
+    const done = !it.done;
+    const patch = (cur) => cur.map((x) => x.id === l.id ? { ...x, items: x.items.map((i) => i.shortcode === it.shortcode ? { ...i, done } : i) } : x);
+    setLists(patch);
+    try { await hubFn({ action: "shoot-done", id: l.id, shortcode: it.shortcode, done }); setErr(""); }
+    catch (e) { setErr(e.message); setLists((cur) => cur.map((x) => x.id === l.id ? { ...x, items: x.items.map((i) => i.shortcode === it.shortcode ? { ...i, done: !done } : i) } : x)); }
+  };
   return (
     <>
-      {lists.slice(0, 2).map((l) => (
-        <div key={l.id} className="hb hb-card" style={{ marginBottom: 18 }}>
-          <style>{HUB_CSS}{SHOOT_CSS}</style>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
-            <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-.01em" }}>{l.title || "Reels to film"}</div>
-            <span className="hb-note">{(l.items || []).length} reels, sent {hubDate(String(l.sent_at || "").slice(0, 10))}</span>
+      {lists.slice(0, 2).map((l) => {
+        const done = (l.items || []).filter((i) => i.done).length;
+        const total = (l.items || []).length;
+        return (
+          <div key={l.id} className="hb hb-card" style={{ marginBottom: 18 }}>
+            <style>{HUB_CSS}{SHOOT_CSS}</style>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
+              <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-.01em" }}>{l.title || "Reels to film"}</div>
+              <span className="hb-note">{done} of {total} filmed, sent {hubDate(String(l.sent_at || "").slice(0, 10))}</span>
+            </div>
+            <p className="hb-note" style={{ marginBottom: 8 }}>Reels in the same group need the same setup, film them in one go. When a video is ready, upload it to your Drive folder and mark it as filmed.</p>
+            {driveUrl && <a href={driveUrl} target="_blank" rel="noopener noreferrer" className="hb-btn sm" style={{ marginBottom: 6 }}>Open my Drive folder</a>}
+            {err && <div className="hb-err">{err}</div>}
+            <ShootItems list={l} onToggle={(it) => toggle(l, it)} />
           </div>
-          <p className="hb-note" style={{ marginBottom: 4 }}>Reels in the same group need the same setup, film them in one go.</p>
-          <ShootItems list={l} />
-        </div>
-      ))}
+        );
+      })}
     </>
+  );
+}
+// Home page card: tells the model there are reels waiting, one click opens her Instagram page with the list.
+function ShootHomeCard({ onOpen }) {
+  const [lists] = useMyShoots();
+  const all = (lists || []).slice(0, 2).flatMap((l) => l.items || []);
+  const left = all.filter((i) => !i.done).length;
+  if (!lists || !all.length || !left) return null;
+  const thumbs = all.filter((i) => !i.done && i.thumb_url).slice(0, 4);
+  return (
+    <div className="hb hb-card" style={{ marginBottom: 18, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", cursor: "pointer" }} onClick={onOpen}>
+      <style>{HUB_CSS}{SHOOT_CSS}</style>
+      <div style={{ display: "flex" }}>
+        {thumbs.map((t, i) => <span key={t.shortcode} style={{ width: 44, height: 62, borderRadius: 10, marginLeft: i ? -14 : 0, border: "2px solid #0e1310", background: `#080c0a url(${t.thumb_url}) center/cover`, transform: `rotate(${(i - 1.5) * 4}deg)` }} />)}
+      </div>
+      <div style={{ flex: 1, minWidth: 160 }}>
+        <div style={{ fontSize: 17, fontWeight: 800 }}>{left} reel{left === 1 ? "" : "s"} to film</div>
+        <div className="hb-note">{all.length - left} of {all.length} done. Your team picked these for you.</div>
+      </div>
+      <button className="hb-btn" onClick={(e) => { e.stopPropagation(); onOpen(); }}>Open the list</button>
+    </div>
   );
 }
 
@@ -5588,7 +5630,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
     const mineIds = mine.map((a) => a.id);
     return (
       <>
-      <CreatorShootLists />
+      <CreatorShootLists driveUrl={(models.find((x) => x.name === restrictModel) || {}).driveUrl} />
       <CreatorReelPlan />
       <IGOverviewDashboard
         models={models.filter((m) => m.name === restrictModel)}
@@ -14376,7 +14418,7 @@ function CreatorMoney({ model, record, rows, children }) {
   );
 }
 
-function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDailyStats, bufferTopPosts, ofDailyStats, inflowwDailyStats, modelRecord, igGraphStats }) {
+function CreatorDashboard({ onOpenIg, stats, tasks, restrictModel, onNavigate, bufferDailyStats, bufferTopPosts, ofDailyStats, inflowwDailyStats, modelRecord, igGraphStats }) {
   const mine = stats.filter((s) => s.model === restrictModel).sort((a, b) => b.weekOf.localeCompare(a.weekOf));
   const latest = mine[0];
   const prev = mine[1];
@@ -14452,6 +14494,7 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
     return (
       <div className="creator-glow-scope">
         <CreatorMoney model={restrictModel} record={modelRecord} rows={inflowwDailyStats}>{inflowwSectionEmbedded}</CreatorMoney>
+        <ShootHomeCard onOpen={onOpenIg} />
         <ThisWeeksAsks tasks={tasks} restrictModel={restrictModel} onNavigate={onNavigate} />
       </div>
     );
@@ -14460,6 +14503,7 @@ function CreatorDashboard({ stats, tasks, restrictModel, onNavigate, bufferDaily
   return (
     <div className="creator-glow-scope">
       <CreatorMoney model={restrictModel} record={modelRecord} rows={inflowwDailyStats}>{inflowwSectionEmbedded}</CreatorMoney>
+      <ShootHomeCard onOpen={onOpenIg} />
       <GoalCard latest={latest} />
       <ThisWeeksAsks tasks={tasks} restrictModel={restrictModel} onNavigate={onNavigate} />
 
@@ -16712,7 +16756,7 @@ function App() {
 
             {currentView === "dashboard" && (session.role === "admin"
               ? <Dashboard cards={scopedCards} models={agencyModels} stats={scopedStats} reels={scopedReels} onNavigate={setView} inflowwDailyStats={inflowwDailyStats} inflowwSyncing={inflowwSyncing} refreshInfloww={refreshInfloww} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} settings={settings} />
-              : <CreatorDashboard igGraphStats={igGraphStats} modelRecord={models.find((mm) => mm.name === restrictModel)} stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} ofDailyStats={ofDailyStats} inflowwDailyStats={inflowwDailyStats} />)}
+              : <CreatorDashboard onOpenIg={() => { setView("content"); setContentPlatform("ig"); }} igGraphStats={igGraphStats} modelRecord={models.find((mm) => mm.name === restrictModel)} stats={stats} tasks={tasks} restrictModel={restrictModel} onNavigate={setView} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} ofDailyStats={ofDailyStats} inflowwDailyStats={inflowwDailyStats} />)}
             {currentView === "content" && <ContentDirector cards={isAdmin ? scopedCards : cards} persistCards={isAdmin ? scopedPersistCards : persistCards} models={isAdmin ? agencyModels : models} restrictModel={restrictModel} forcedNetwork={contentPlatform} reels={isAdmin ? scopedReels : reels} persistReels={isAdmin ? scopedPersistReels : persistReels} xCompetitors={xCompetitors} persistXCompetitors={persistXCompetitors} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} inflowwDailyStats={inflowwDailyStats} igGraphStats={igGraphStats} igGraphMedia={igGraphMedia} igViralVariations={igViralVariations} />}
             {currentView === "editor" && isAdmin && <EditorPage menuHidden={editorMenuHidden} onToggleMenu={toggleEditorMenu} />}
             {currentView === "calendar" && <CalendarView cards={isAdmin ? scopedCards : cards} tasks={isAdmin ? scopedTasks : tasks} onNavigate={setView} restrictModel={restrictModel} />}
