@@ -3334,7 +3334,7 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
   accountRows.forEach((a) => { accountById[a.id] = a; });
   const modelAccountCounts = {};
   accountRows.forEach((a) => { modelAccountCounts[a.model] = (modelAccountCounts[a.model] || 0) + 1; });
-  const accountDisplayName = (a) => (modelAccountCounts[a.model] > 1 ? `${a.model} (${a.label})` : a.model);
+  const accountDisplayName = (a) => (a.igUsername ? `${a.model} (@${a.igUsername})` : modelAccountCounts[a.model] > 1 ? `${a.model} (${a.label})` : a.model);
   const noAccounts = accountRows.length === 0;
   const demoAccountId = igAccount !== "all" ? igAccount : accountRows[0]?.id;
   const accountIds = igAccount === "all" ? accountRows.map((a) => a.id) : [igAccount];
@@ -3508,7 +3508,7 @@ function IGOverviewDashboard({ models, inflowwDailyStats, igGraphStats, igGraphM
             </div>
             <div>
               <div className="text-2xl font-extrabold tracking-tight" style={{ color: C.ink, textShadow: `0 0 12px ${C.accentA}33` }}>Instagram Dashboard</div>
-              <p className="text-sm mt-0.5" style={{ color: C.sub }}>{noAccounts ? "Stats are filled in automatically from the account username" : single ? "Your Instagram, updated every day" : `${accountRows.length} account${accountRows.length !== 1 ? "s" : ""} connected via direct Meta API`}</p>
+              <p className="text-sm mt-0.5" style={{ color: C.sub }}>{noAccounts ? "Stats are filled in automatically from the account username" : single ? "Your Instagram, updated every day" : `${accountRows.length} account${accountRows.length !== 1 ? "s" : ""}, updated every day from the username`}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">

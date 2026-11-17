@@ -4607,7 +4607,7 @@ function IGOverviewDashboard({
   accountRows.forEach(a => {
     modelAccountCounts[a.model] = (modelAccountCounts[a.model] || 0) + 1;
   });
-  const accountDisplayName = a => modelAccountCounts[a.model] > 1 ? `${a.model} (${a.label})` : a.model;
+  const accountDisplayName = a => a.igUsername ? `${a.model} (@${a.igUsername})` : modelAccountCounts[a.model] > 1 ? `${a.model} (${a.label})` : a.model;
   const noAccounts = accountRows.length === 0;
   const demoAccountId = igAccount !== "all" ? igAccount : accountRows[0]?.id;
   const accountIds = igAccount === "all" ? accountRows.map(a => a.id) : [igAccount];
@@ -4810,7 +4810,7 @@ function IGOverviewDashboard({
     style: {
       color: C.sub
     }
-  }, noAccounts ? "Stats are filled in automatically from the account username" : single ? "Your Instagram, updated every day" : `${accountRows.length} account${accountRows.length !== 1 ? "s" : ""} connected via direct Meta API`))), React.createElement("div", {
+  }, noAccounts ? "Stats are filled in automatically from the account username" : single ? "Your Instagram, updated every day" : `${accountRows.length} account${accountRows.length !== 1 ? "s" : ""}, updated every day from the username`))), React.createElement("div", {
     className: "flex items-center gap-2 flex-wrap"
   }, onMakeContentPlan && React.createElement("button", {
     onClick: onMakeContentPlan,
@@ -25723,7 +25723,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">psxvi7</script>
+<script type="text/babel" id="zion-version">10x6cxt</script>
 <script>
 (function () {
   var last = 0;
