@@ -9139,6 +9139,37 @@ const ACQ_CSS = `
 .aq-panel{ width:min(520px,100%); height:100%; overflow:auto; background:#0b100d; border-left:1px solid rgba(57,230,115,.25); padding:22px; animation:hbIn .35s cubic-bezier(.16,1,.3,1) both; }
 .aq-stage{ display:flex; gap:6px; flex-wrap:wrap; margin:12px 0; }
 `;
+// Meta lead downloads are UTF-16 with tabs, other exports UTF-8 with commas: read both.
+function acqParseCsv(buf) {
+  const u8 = new Uint8Array(buf);
+  let text = (u8[0] === 0xff && u8[1] === 0xfe) ? new TextDecoder("utf-16le").decode(u8) : (u8[0] === 0xfe && u8[1] === 0xff) ? new TextDecoder("utf-16be").decode(u8) : new TextDecoder("utf-8").decode(u8);
+  text = text.replace(/^\uFEFF/, "");
+  const first = text.split(/\r?\n/)[0] || "";
+  const delim = (first.match(/\t/g) || []).length > (first.match(/,/g) || []).length ? "\t" : (first.match(/;/g) || []).length > (first.match(/,/g) || []).length ? ";" : ",";
+  const rows = []; let row = [], cell = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; continue; }
+    if (c === '"') q = true;
+    else if (c === delim) { row.push(cell); cell = ""; }
+    else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(cell); cell = ""; if (row.some((x) => x.trim())) rows.push(row); row = []; }
+    else cell += c;
+  }
+  row.push(cell); if (row.some((x) => x.trim())) rows.push(row);
+  if (rows.length < 2) return [];
+  const head = rows[0].map((h) => h.trim().toLowerCase());
+  // exact column names first, in the order given, then a loose match (so "ad_name" never wins over "full_name")
+  const find = (...names) => { for (const n of names) { const k = head.indexOf(n); if (k >= 0) return k; } for (const n of names) { const k = head.findIndex((h) => n.length > 4 && h.includes(n)); if (k >= 0) return k; } return -1; };
+  const iName = find("full_name", "full name", "jméno a příjmení", "jméno", "name"), iEmail = find("email", "e-mail"), iPhone = find("phone_number", "phone", "telefon"),
+    iCreated = find("created_time", "created"), iCamp = find("campaign_name", "adset_name", "ad_name", "form_name");
+  const skip = new Set(["id", "ad_id", "ad_name", "adset_id", "adset_name", "campaign_id", "campaign_name", "form_id", "form_name", "is_organic", "platform", "lead_status"]);
+  return rows.slice(1).map((r) => {
+    const answers = {};
+    head.forEach((h, k) => { if (![iName, iEmail, iPhone, iCreated, iCamp].includes(k) && !skip.has(h) && (r[k] || "").trim()) answers[rows[0][k].trim()] = r[k].trim(); });
+    return { name: (r[iName] || "").trim(), email: (r[iEmail] || "").trim(), phone: (r[iPhone] || "").replace(/^p:/, "").trim(), created: (r[iCreated] || "").trim(), campaign: (r[iCamp] || "").trim(), answers, source: "ads" };
+  }).filter((x) => x.name || x.email || x.phone);
+}
+
 function AcquisitionPage() {
   const [agency, setAgency] = useState(() => { try { return localStorage.getItem("zionAcqAgency") || "CZ"; } catch (e) { return "CZ"; } });
   const [leads, setLeads] = useState(null);
@@ -9150,6 +9181,20 @@ function AcquisitionPage() {
   const [busy, setBusy] = useState("");
   const [showCfg, setShowCfg] = useState(false);
   const [addText, setAddText] = useState("");
+  const [ref, setRef] = useState({ name: "", phone: "", ig: "", referred_by: "", notes: "" });
+  const [importMsg, setImportMsg] = useState("");
+  const importFile = async (file) => {
+    if (!file) return;
+    setBusy("import"); setErr(""); setImportMsg("");
+    try {
+      const rows = acqParseCsv(await file.arrayBuffer());
+      if (!rows.length) throw new Error("No leads found in that file. Download the leads from Ads Manager as CSV and try again.");
+      const j = await acqFn({ action: "import", agency, rows });
+      setImportMsg(`${j.added} new lead${j.added === 1 ? "" : "s"} added${j.duplicates ? `, ${j.duplicates} already in Zion` : ""}.`);
+      await load();
+    } catch (e) { setErr(e.message); }
+    setBusy("");
+  };
   const pickAgency = (a) => { setAgency(a); try { localStorage.setItem("zionAcqAgency", a); } catch (e) {} };
   const load = useCallback(async () => {
     try {
@@ -9171,11 +9216,11 @@ function AcquisitionPage() {
   };
   const all = leads || [];
   const now = Date.now();
-  const due = all.filter((l) => l.next_followup_at && Date.parse(l.next_followup_at) <= now + 12 * 3600000 && l.status === "messaged");
+  const due = all.filter((l) => l.next_followup_at && Date.parse(l.next_followup_at) <= now + 12 * 3600000 && !["signed", "lost", "skip"].includes(l.status));
   const fresh = all.filter((l) => l.status === "new");
   const week = (k) => all.filter((l) => l[k] && now - Date.parse(l[k]) < 7 * 86400000).length;
   const lists = {
-    todo: [...due, ...fresh.filter((l) => (l.score || 0) >= 50)].slice(0, 60),
+    todo: [...due, ...fresh.filter((l) => !due.includes(l) && ((l.score || 0) >= 50 || l.source === "ads" || l.source === "referral"))].slice(0, 80),
     new: fresh,
     pipeline: all.filter((l) => ["messaged", "replied", "call"].includes(l.status)),
     signed: all.filter((l) => l.status === "signed"),
@@ -9192,7 +9237,7 @@ function AcquisitionPage() {
       <style>{HUB_CSS}{SHOOT_CSS}{ACQ_CSS}</style>
       <div className="aq-top">
         <div style={{ flex: 1, minWidth: 220 }}>
-          <div className="hb-note">Find creators who already do OF but weakly, judge them, and give the scouts a DM for each. Sending stays with a person.</div>
+          <div className="hb-note">{agency === "CZ" ? "Leads from paid ads and from contacts, with every call and follow-up in one place." : "Find creators who already do OF but weakly, judge them, and give the scouts a DM for each. Sending stays with a person."}</div>
         </div>
         <div className="oo-tabs" style={{ display: "inline-flex", padding: 4, gap: 4, borderRadius: 12, background: "rgba(0,0,0,.35)", border: "1px solid rgba(255,255,255,.08)" }}>
           {["CZ", "US"].map((a) => <button key={a} onClick={() => pickAgency(a)} style={{ padding: "6px 14px", borderRadius: 9, fontSize: 12, fontWeight: 700, color: agency === a ? "#03110a" : "#8fa39a", background: agency === a ? "#39e673" : "transparent" }}>{a} agency</button>)}
@@ -9201,11 +9246,35 @@ function AcquisitionPage() {
       {err && <div className="hb-err">{err}</div>}
       <div className="aq-kpis">
         <div className="aq-kpi hot"><b>{due.length}</b><span>follow-ups due</span></div>
-        <div className="aq-kpi"><b>{fresh.filter((l) => (l.score || 0) >= 50).length}</b><span>good new leads</span></div>
-        <div className="aq-kpi"><b>{week("messaged_at")}</b><span>messaged this week</span></div>
+        <div className="aq-kpi"><b>{agency === "CZ" ? fresh.length : fresh.filter((l) => (l.score || 0) >= 50).length}</b><span>{agency === "CZ" ? "new leads" : "good new leads"}</span></div>
+        <div className="aq-kpi"><b>{agency === "CZ" ? week("lead_at") : week("messaged_at")}</b><span>{agency === "CZ" ? "leads this week" : "messaged this week"}</span></div>
         <div className="aq-kpi"><b>{all.filter((l) => l.status === "replied" || l.status === "call").length}</b><span>talking now</span></div>
         <div className="aq-kpi"><b>{lists.signed.length}</b><span>signed</span></div>
       </div>
+      {agency === "CZ" && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 14, marginBottom: 16 }}>
+          <label className="hb-card" style={{ cursor: "pointer", display: "block", borderStyle: "dashed" }}
+            onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); importFile(e.dataTransfer.files[0]); }}>
+            <div style={{ fontWeight: 800, marginBottom: 4 }}>Leads from paid ads</div>
+            <div className="hb-note" style={{ marginBottom: 10 }}>In Ads Manager open the lead form, Download leads as CSV, then drop the file here. Name, phone, email, campaign and all answers come in, duplicates are skipped.</div>
+            <span className="hb-btn">{busy === "import" ? <><span className="hb-spin" />Importing</> : "Choose CSV file"}</span>
+            <input type="file" accept=".csv,.tsv,text/csv" style={{ display: "none" }} onChange={(e) => { importFile(e.target.files[0]); e.target.value = ""; }} />
+            {importMsg && <div className="hb-note" style={{ marginTop: 8, color: "#39e673" }}>{importMsg}</div>}
+          </label>
+          <form className="hb-card" onSubmit={(e) => { e.preventDefault(); if (!ref.name.trim()) return; act("ref", { action: "import", rows: [{ name: ref.name, phone: ref.phone, email: "", source: "referral", referred_by: ref.referred_by, notes: [ref.ig ? `IG: ${ref.ig}` : "", ref.notes].filter(Boolean).join("\n") }] }, async () => { setRef({ name: "", phone: "", ig: "", referred_by: "", notes: "" }); await load(); }); }}>
+            <div style={{ fontWeight: 800, marginBottom: 8 }}>Recommended by a contact</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <input className="hb-in" placeholder="Her name" value={ref.name} onChange={(e) => setRef({ ...ref, name: e.target.value })} />
+              <input className="hb-in" placeholder="Phone" value={ref.phone} onChange={(e) => setRef({ ...ref, phone: e.target.value })} />
+              <input className="hb-in" placeholder="Instagram" value={ref.ig} onChange={(e) => setRef({ ...ref, ig: e.target.value })} />
+              <input className="hb-in" placeholder="Recommended by" value={ref.referred_by} onChange={(e) => setRef({ ...ref, referred_by: e.target.value })} />
+            </div>
+            <input className="hb-in" style={{ width: "100%", marginTop: 8 }} placeholder="Note" value={ref.notes} onChange={(e) => setRef({ ...ref, notes: e.target.value })} />
+            <button className="hb-btn" style={{ marginTop: 10 }} disabled={busy === "ref" || !ref.name.trim()}>{busy === "ref" ? "Adding" : "Add contact"}</button>
+          </form>
+        </div>
+      )}
+      {agency === "US" && (<>
       <div className="hb-card" style={{ marginBottom: 16, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontWeight: 800 }}>{running ? runText : run?.state === "done" ? `Last search ${timeAgo(run.finishedAt)}: ${run.added || 0} new leads from ${run.read || 0} profiles read` : run?.state === "failed" ? `Last search failed: ${run.error}` : "No search yet"}</div>
@@ -9223,6 +9292,7 @@ function AcquisitionPage() {
           <button className="hb-btn" disabled={busy === "add" || !addText.trim()}>{busy === "add" ? "Adding" : "Add"}</button>
         </div>
       </form>
+      </>)}
       <div className="hb-bar">
         {[["todo", `To do ${lists.todo.length}`], ["new", `All new ${lists.new.length}`], ["pipeline", `In talks ${lists.pipeline.length}`], ["signed", `Signed ${lists.signed.length}`], ["archive", `Archive ${lists.archive.length}`]].map(([k, l]) => (
           <button key={k} className={`hb-chip ${view === k ? "on" : ""}`} onClick={() => setView(k)}>{l}</button>
@@ -9232,12 +9302,12 @@ function AcquisitionPage() {
         {leads === null ? <div className="hb-note" style={{ padding: 12 }}>Loading</div> : !shown.length ? (
           <div className="hb-empty" style={{ margin: 8 }}><b>{view === "todo" ? "Nothing to do right now" : "No leads here"}</b>{view === "todo" ? "Press Find new leads, or add some by hand above." : ""}</div>
         ) : shown.map((l) => {
-          const isDue = l.status === "messaged" && l.next_followup_at && Date.parse(l.next_followup_at) <= now + 12 * 3600000;
+          const isDue = !["signed", "lost", "skip"].includes(l.status) && l.next_followup_at && Date.parse(l.next_followup_at) <= now + 12 * 3600000;
           return (
             <div key={l.id} className="aq-row" onClick={() => setOpen(l.id)}>
               <div className="aq-ava" style={{ backgroundImage: l.thumb_url ? `url(${l.thumb_url})` : "none" }}>{l.thumb_url ? "" : l.handle.charAt(0).toUpperCase()}</div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.source === "manual" && !l.followers ? l.source_detail || l.handle : `@${l.handle}`} <span className="hb-note" style={{ fontWeight: 400 }}>{l.full_name || ""}</span></div>
+                <div style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.contact_name || (l.source === "manual" && !l.followers ? l.source_detail || l.handle : `@${l.handle}`)} <span className="hb-note" style={{ fontWeight: 400 }}>{l.contact_name ? [l.phone, l.source === "referral" ? `via ${l.referred_by || "contact"}` : l.campaign].filter(Boolean).join(", ") : l.full_name || ""}</span></div>
                 <div style={{ marginTop: 3 }}>
                   {isDue && <span className="aq-tag fu">Follow up</span>}
                   {l.of_status === "yes" && <span className="aq-tag of">OF</span>}
@@ -9292,14 +9362,14 @@ function AcqLeadSheet({ lead, onClose, onPatch, onDeleted }) {
     try { await acqFn({ action: "update", id: lead.id, patch, ...extra }); } catch (e) {}
   };
   const copy = async (k, t) => { try { await navigator.clipboard.writeText(t); setCopied(k); setTimeout(() => setCopied(""), 1500); } catch (e) {} };
-  const igUrl = lead.followers != null || !/\./.test(lead.handle) ? `https://www.instagram.com/${lead.handle}/` : lead.source_detail;
+  const igUrl = lead.contact_name ? undefined : lead.followers != null || !/\./.test(lead.handle) ? `https://www.instagram.com/${lead.handle}/` : lead.source_detail;
   return (
     <div className="aq-sheet" onClick={onClose}>
       <div className="aq-panel hb" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <div className="aq-ava" style={{ width: 56, height: 56, backgroundImage: lead.thumb_url ? `url(${lead.thumb_url})` : "none" }}>{lead.thumb_url ? "" : lead.handle.charAt(0).toUpperCase()}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <a href={igUrl} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 800, fontSize: 18 }}>{lead.followers != null ? `@${lead.handle}` : lead.handle}</a>
+            <a href={igUrl} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 800, fontSize: 18 }}>{lead.contact_name || (lead.followers != null ? `@${lead.handle}` : lead.handle)}</a>
             <div className="hb-note">{lead.full_name || ""}{lead.source ? ` · found via ${lead.source}${lead.source_detail && lead.source !== "manual" ? ` (${lead.source_detail})` : ""}` : ""}</div>
           </div>
           <button className="hb-x" onClick={onClose} aria-label="Close"><X size={16} /></button>
@@ -9310,6 +9380,19 @@ function AcqLeadSheet({ lead, onClose, onPatch, onDeleted }) {
             <div className="aq-kpi"><b>{lead.reels_30d ?? "?"}</b><span>reels in 30d</span></div>
             <div className="aq-kpi"><b>{lead.median_views ? igK(lead.median_views) : "?"}</b><span>median views</span></div>
             <div className="aq-kpi"><b>{lead.score ?? "?"}</b><span>score</span></div>
+          </div>
+        )}
+        {(lead.phone || lead.email) && (
+          <div className="hb-card" style={{ padding: 12, margin: "12px 0" }}>
+            {lead.phone && <div style={{ fontSize: 15, fontWeight: 700 }}><a href={`tel:${lead.phone}`}>{lead.phone}</a></div>}
+            {lead.email && <div style={{ fontSize: 13 }}><a href={`mailto:${lead.email}`}>{lead.email}</a></div>}
+            <div className="hb-note" style={{ marginTop: 4 }}>{lead.source === "referral" ? `Recommended by ${lead.referred_by || "a contact"}` : lead.campaign || "Meta lead form"}{lead.lead_at ? `, came in ${new Date(lead.lead_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : ""}</div>
+          </div>
+        )}
+        {lead.answers && Object.keys(lead.answers).length > 0 && (
+          <div className="hb-card" style={{ padding: 12, marginBottom: 10 }}>
+            <div className="hb-note" style={{ marginBottom: 6 }}>Her answers in the form</div>
+            {Object.entries(lead.answers).map(([q, a]) => <div key={q} style={{ fontSize: 13, marginBottom: 6 }}><span className="hb-note">{q.replace(/_/g, " ")}</span><div>{String(a)}</div></div>)}
           </div>
         )}
         {lead.bio && <p style={{ fontSize: 13, color: "#d9e2dd", lineHeight: 1.5, whiteSpace: "pre-wrap", margin: "4px 0 10px" }}>{lead.bio}</p>}
@@ -9345,6 +9428,11 @@ function AcqLeadSheet({ lead, onClose, onPatch, onDeleted }) {
                 <button className="hb-btn ghost sm" style={{ marginTop: 6 }} onClick={() => copy("b", parts[1])}>{copied === "b" ? "Copied" : "Copy follow-up"}</button></>}
             </>
           ) : <div className="hb-note">A personal first message and a follow-up, about half a cent.</div>}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <span style={{ fontSize: 12, fontWeight: 700 }}>Remind me on</span>
+          <input type="date" className="hb-in" style={{ maxWidth: 170 }} value={lead.next_followup_at ? lead.next_followup_at.slice(0, 10) : ""}
+            onChange={(e) => up({ next_followup_at: e.target.value ? new Date(e.target.value + "T09:00:00").toISOString() : null })} />
         </div>
         <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Notes</div>
         <textarea className="sh-ta" style={{ minHeight: 80 }} value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={() => notes !== (lead.notes || "") && up({ notes })} placeholder="What she said, her OF earnings, country, anything that matters" />

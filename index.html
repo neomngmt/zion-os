@@ -15597,6 +15597,75 @@ const ACQ_CSS = `
 .aq-panel{ width:min(520px,100%); height:100%; overflow:auto; background:#0b100d; border-left:1px solid rgba(57,230,115,.25); padding:22px; animation:hbIn .35s cubic-bezier(.16,1,.3,1) both; }
 .aq-stage{ display:flex; gap:6px; flex-wrap:wrap; margin:12px 0; }
 `;
+function acqParseCsv(buf) {
+  const u8 = new Uint8Array(buf);
+  let text = u8[0] === 0xff && u8[1] === 0xfe ? new TextDecoder("utf-16le").decode(u8) : u8[0] === 0xfe && u8[1] === 0xff ? new TextDecoder("utf-16be").decode(u8) : new TextDecoder("utf-8").decode(u8);
+  text = text.replace(/^\uFEFF/, "");
+  const first = text.split(/\r?\n/)[0] || "";
+  const delim = (first.match(/\t/g) || []).length > (first.match(/,/g) || []).length ? "\t" : (first.match(/;/g) || []).length > (first.match(/,/g) || []).length ? ";" : ",";
+  const rows = [];
+  let row = [],
+    cell = "",
+    q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"') {
+        if (text[i + 1] === '"') {
+          cell += '"';
+          i++;
+        } else q = false;
+      } else cell += c;
+      continue;
+    }
+    if (c === '"') q = true;else if (c === delim) {
+      row.push(cell);
+      cell = "";
+    } else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      row.push(cell);
+      cell = "";
+      if (row.some(x => x.trim())) rows.push(row);
+      row = [];
+    } else cell += c;
+  }
+  row.push(cell);
+  if (row.some(x => x.trim())) rows.push(row);
+  if (rows.length < 2) return [];
+  const head = rows[0].map(h => h.trim().toLowerCase());
+  const find = (...names) => {
+    for (const n of names) {
+      const k = head.indexOf(n);
+      if (k >= 0) return k;
+    }
+    for (const n of names) {
+      const k = head.findIndex(h => n.length > 4 && h.includes(n));
+      if (k >= 0) return k;
+    }
+    return -1;
+  };
+  const iName = find("full_name", "full name", "jméno a příjmení", "jméno", "name"),
+    iEmail = find("email", "e-mail"),
+    iPhone = find("phone_number", "phone", "telefon"),
+    iCreated = find("created_time", "created"),
+    iCamp = find("campaign_name", "adset_name", "ad_name", "form_name");
+  const skip = new Set(["id", "ad_id", "ad_name", "adset_id", "adset_name", "campaign_id", "campaign_name", "form_id", "form_name", "is_organic", "platform", "lead_status"]);
+  return rows.slice(1).map(r => {
+    const answers = {};
+    head.forEach((h, k) => {
+      if (![iName, iEmail, iPhone, iCreated, iCamp].includes(k) && !skip.has(h) && (r[k] || "").trim()) answers[rows[0][k].trim()] = r[k].trim();
+    });
+    return {
+      name: (r[iName] || "").trim(),
+      email: (r[iEmail] || "").trim(),
+      phone: (r[iPhone] || "").replace(/^p:/, "").trim(),
+      created: (r[iCreated] || "").trim(),
+      campaign: (r[iCamp] || "").trim(),
+      answers,
+      source: "ads"
+    };
+  }).filter(x => x.name || x.email || x.phone);
+}
 function AcquisitionPage() {
   const [agency, setAgency] = useState(() => {
     try {
@@ -15614,6 +15683,34 @@ function AcquisitionPage() {
   const [busy, setBusy] = useState("");
   const [showCfg, setShowCfg] = useState(false);
   const [addText, setAddText] = useState("");
+  const [ref, setRef] = useState({
+    name: "",
+    phone: "",
+    ig: "",
+    referred_by: "",
+    notes: ""
+  });
+  const [importMsg, setImportMsg] = useState("");
+  const importFile = async file => {
+    if (!file) return;
+    setBusy("import");
+    setErr("");
+    setImportMsg("");
+    try {
+      const rows = acqParseCsv(await file.arrayBuffer());
+      if (!rows.length) throw new Error("No leads found in that file. Download the leads from Ads Manager as CSV and try again.");
+      const j = await acqFn({
+        action: "import",
+        agency,
+        rows
+      });
+      setImportMsg(`${j.added} new lead${j.added === 1 ? "" : "s"} added${j.duplicates ? `, ${j.duplicates} already in Zion` : ""}.`);
+      await load();
+    } catch (e) {
+      setErr(e.message);
+    }
+    setBusy("");
+  };
   const pickAgency = a => {
     setAgency(a);
     try {
@@ -15672,11 +15769,11 @@ function AcquisitionPage() {
   };
   const all = leads || [];
   const now = Date.now();
-  const due = all.filter(l => l.next_followup_at && Date.parse(l.next_followup_at) <= now + 12 * 3600000 && l.status === "messaged");
+  const due = all.filter(l => l.next_followup_at && Date.parse(l.next_followup_at) <= now + 12 * 3600000 && !["signed", "lost", "skip"].includes(l.status));
   const fresh = all.filter(l => l.status === "new");
   const week = k => all.filter(l => l[k] && now - Date.parse(l[k]) < 7 * 86400000).length;
   const lists = {
-    todo: [...due, ...fresh.filter(l => (l.score || 0) >= 50)].slice(0, 60),
+    todo: [...due, ...fresh.filter(l => !due.includes(l) && ((l.score || 0) >= 50 || l.source === "ads" || l.source === "referral"))].slice(0, 80),
     new: fresh,
     pipeline: all.filter(l => ["messaged", "replied", "call"].includes(l.status)),
     signed: all.filter(l => l.status === "signed"),
@@ -15705,7 +15802,7 @@ function AcquisitionPage() {
     }
   }, React.createElement("div", {
     className: "hb-note"
-  }, "Find creators who already do OF but weakly, judge them, and give the scouts a DM for each. Sending stays with a person.")), React.createElement("div", {
+  }, agency === "CZ" ? "Leads from paid ads and from contacts, with every call and follow-up in one place." : "Find creators who already do OF but weakly, judge them, and give the scouts a DM for each. Sending stays with a person.")), React.createElement("div", {
     className: "oo-tabs",
     style: {
       display: "inline-flex",
@@ -15734,13 +15831,149 @@ function AcquisitionPage() {
     className: "aq-kpi hot"
   }, React.createElement("b", null, due.length), React.createElement("span", null, "follow-ups due")), React.createElement("div", {
     className: "aq-kpi"
-  }, React.createElement("b", null, fresh.filter(l => (l.score || 0) >= 50).length), React.createElement("span", null, "good new leads")), React.createElement("div", {
+  }, React.createElement("b", null, agency === "CZ" ? fresh.length : fresh.filter(l => (l.score || 0) >= 50).length), React.createElement("span", null, agency === "CZ" ? "new leads" : "good new leads")), React.createElement("div", {
     className: "aq-kpi"
-  }, React.createElement("b", null, week("messaged_at")), React.createElement("span", null, "messaged this week")), React.createElement("div", {
+  }, React.createElement("b", null, agency === "CZ" ? week("lead_at") : week("messaged_at")), React.createElement("span", null, agency === "CZ" ? "leads this week" : "messaged this week")), React.createElement("div", {
     className: "aq-kpi"
   }, React.createElement("b", null, all.filter(l => l.status === "replied" || l.status === "call").length), React.createElement("span", null, "talking now")), React.createElement("div", {
     className: "aq-kpi"
-  }, React.createElement("b", null, lists.signed.length), React.createElement("span", null, "signed"))), React.createElement("div", {
+  }, React.createElement("b", null, lists.signed.length), React.createElement("span", null, "signed"))), agency === "CZ" && React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))",
+      gap: 14,
+      marginBottom: 16
+    }
+  }, React.createElement("label", {
+    className: "hb-card",
+    style: {
+      cursor: "pointer",
+      display: "block",
+      borderStyle: "dashed"
+    },
+    onDragOver: e => e.preventDefault(),
+    onDrop: e => {
+      e.preventDefault();
+      importFile(e.dataTransfer.files[0]);
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      marginBottom: 4
+    }
+  }, "Leads from paid ads"), React.createElement("div", {
+    className: "hb-note",
+    style: {
+      marginBottom: 10
+    }
+  }, "In Ads Manager open the lead form, Download leads as CSV, then drop the file here. Name, phone, email, campaign and all answers come in, duplicates are skipped."), React.createElement("span", {
+    className: "hb-btn"
+  }, busy === "import" ? React.createElement(React.Fragment, null, React.createElement("span", {
+    className: "hb-spin"
+  }), "Importing") : "Choose CSV file"), React.createElement("input", {
+    type: "file",
+    accept: ".csv,.tsv,text/csv",
+    style: {
+      display: "none"
+    },
+    onChange: e => {
+      importFile(e.target.files[0]);
+      e.target.value = "";
+    }
+  }), importMsg && React.createElement("div", {
+    className: "hb-note",
+    style: {
+      marginTop: 8,
+      color: "#39e673"
+    }
+  }, importMsg)), React.createElement("form", {
+    className: "hb-card",
+    onSubmit: e => {
+      e.preventDefault();
+      if (!ref.name.trim()) return;
+      act("ref", {
+        action: "import",
+        rows: [{
+          name: ref.name,
+          phone: ref.phone,
+          email: "",
+          source: "referral",
+          referred_by: ref.referred_by,
+          notes: [ref.ig ? `IG: ${ref.ig}` : "", ref.notes].filter(Boolean).join("\n")
+        }]
+      }, async () => {
+        setRef({
+          name: "",
+          phone: "",
+          ig: "",
+          referred_by: "",
+          notes: ""
+        });
+        await load();
+      });
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      marginBottom: 8
+    }
+  }, "Recommended by a contact"), React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 8
+    }
+  }, React.createElement("input", {
+    className: "hb-in",
+    placeholder: "Her name",
+    value: ref.name,
+    onChange: e => setRef({
+      ...ref,
+      name: e.target.value
+    })
+  }), React.createElement("input", {
+    className: "hb-in",
+    placeholder: "Phone",
+    value: ref.phone,
+    onChange: e => setRef({
+      ...ref,
+      phone: e.target.value
+    })
+  }), React.createElement("input", {
+    className: "hb-in",
+    placeholder: "Instagram",
+    value: ref.ig,
+    onChange: e => setRef({
+      ...ref,
+      ig: e.target.value
+    })
+  }), React.createElement("input", {
+    className: "hb-in",
+    placeholder: "Recommended by",
+    value: ref.referred_by,
+    onChange: e => setRef({
+      ...ref,
+      referred_by: e.target.value
+    })
+  })), React.createElement("input", {
+    className: "hb-in",
+    style: {
+      width: "100%",
+      marginTop: 8
+    },
+    placeholder: "Note",
+    value: ref.notes,
+    onChange: e => setRef({
+      ...ref,
+      notes: e.target.value
+    })
+  }), React.createElement("button", {
+    className: "hb-btn",
+    style: {
+      marginTop: 10
+    },
+    disabled: busy === "ref" || !ref.name.trim()
+  }, busy === "ref" ? "Adding" : "Add contact"))), agency === "US" && React.createElement(React.Fragment, null, React.createElement("div", {
     className: "hb-card",
     style: {
       marginBottom: 16,
@@ -15816,7 +16049,7 @@ function AcquisitionPage() {
   }), React.createElement("button", {
     className: "hb-btn",
     disabled: busy === "add" || !addText.trim()
-  }, busy === "add" ? "Adding" : "Add"))), React.createElement("div", {
+  }, busy === "add" ? "Adding" : "Add")))), React.createElement("div", {
     className: "hb-bar"
   }, [["todo", `To do ${lists.todo.length}`], ["new", `All new ${lists.new.length}`], ["pipeline", `In talks ${lists.pipeline.length}`], ["signed", `Signed ${lists.signed.length}`], ["archive", `Archive ${lists.archive.length}`]].map(([k, l]) => React.createElement("button", {
     key: k,
@@ -15838,7 +16071,7 @@ function AcquisitionPage() {
       margin: 8
     }
   }, React.createElement("b", null, view === "todo" ? "Nothing to do right now" : "No leads here"), view === "todo" ? "Press Find new leads, or add some by hand above." : "") : shown.map(l => {
-    const isDue = l.status === "messaged" && l.next_followup_at && Date.parse(l.next_followup_at) <= now + 12 * 3600000;
+    const isDue = !["signed", "lost", "skip"].includes(l.status) && l.next_followup_at && Date.parse(l.next_followup_at) <= now + 12 * 3600000;
     return React.createElement("div", {
       key: l.id,
       className: "aq-row",
@@ -15859,12 +16092,12 @@ function AcquisitionPage() {
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
       }
-    }, l.source === "manual" && !l.followers ? l.source_detail || l.handle : `@${l.handle}`, " ", React.createElement("span", {
+    }, l.contact_name || (l.source === "manual" && !l.followers ? l.source_detail || l.handle : `@${l.handle}`), " ", React.createElement("span", {
       className: "hb-note",
       style: {
         fontWeight: 400
       }
-    }, l.full_name || "")), React.createElement("div", {
+    }, l.contact_name ? [l.phone, l.source === "referral" ? `via ${l.referred_by || "contact"}` : l.campaign].filter(Boolean).join(", ") : l.full_name || "")), React.createElement("div", {
       style: {
         marginTop: 3
       }
@@ -16052,7 +16285,7 @@ function AcqLeadSheet({
       setTimeout(() => setCopied(""), 1500);
     } catch (e) {}
   };
-  const igUrl = lead.followers != null || !/\./.test(lead.handle) ? `https://www.instagram.com/${lead.handle}/` : lead.source_detail;
+  const igUrl = lead.contact_name ? undefined : lead.followers != null || !/\./.test(lead.handle) ? `https://www.instagram.com/${lead.handle}/` : lead.source_detail;
   return React.createElement("div", {
     className: "aq-sheet",
     onClick: onClose
@@ -16085,7 +16318,7 @@ function AcqLeadSheet({
       fontWeight: 800,
       fontSize: 18
     }
-  }, lead.followers != null ? `@${lead.handle}` : lead.handle), React.createElement("div", {
+  }, lead.contact_name || (lead.followers != null ? `@${lead.handle}` : lead.handle)), React.createElement("div", {
     className: "hb-note"
   }, lead.full_name || "", lead.source ? ` · found via ${lead.source}${lead.source_detail && lead.source !== "manual" ? ` (${lead.source_detail})` : ""}` : "")), React.createElement("button", {
     className: "hb-x",
@@ -16106,7 +16339,53 @@ function AcqLeadSheet({
     className: "aq-kpi"
   }, React.createElement("b", null, lead.median_views ? igK(lead.median_views) : "?"), React.createElement("span", null, "median views")), React.createElement("div", {
     className: "aq-kpi"
-  }, React.createElement("b", null, lead.score ?? "?"), React.createElement("span", null, "score"))), lead.bio && React.createElement("p", {
+  }, React.createElement("b", null, lead.score ?? "?"), React.createElement("span", null, "score"))), (lead.phone || lead.email) && React.createElement("div", {
+    className: "hb-card",
+    style: {
+      padding: 12,
+      margin: "12px 0"
+    }
+  }, lead.phone && React.createElement("div", {
+    style: {
+      fontSize: 15,
+      fontWeight: 700
+    }
+  }, React.createElement("a", {
+    href: `tel:${lead.phone}`
+  }, lead.phone)), lead.email && React.createElement("div", {
+    style: {
+      fontSize: 13
+    }
+  }, React.createElement("a", {
+    href: `mailto:${lead.email}`
+  }, lead.email)), React.createElement("div", {
+    className: "hb-note",
+    style: {
+      marginTop: 4
+    }
+  }, lead.source === "referral" ? `Recommended by ${lead.referred_by || "a contact"}` : lead.campaign || "Meta lead form", lead.lead_at ? `, came in ${new Date(lead.lead_at).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short"
+  })}` : "")), lead.answers && Object.keys(lead.answers).length > 0 && React.createElement("div", {
+    className: "hb-card",
+    style: {
+      padding: 12,
+      marginBottom: 10
+    }
+  }, React.createElement("div", {
+    className: "hb-note",
+    style: {
+      marginBottom: 6
+    }
+  }, "Her answers in the form"), Object.entries(lead.answers).map(([q, a]) => React.createElement("div", {
+    key: q,
+    style: {
+      fontSize: 13,
+      marginBottom: 6
+    }
+  }, React.createElement("span", {
+    className: "hb-note"
+  }, q.replace(/_/g, " ")), React.createElement("div", null, String(a))))), lead.bio && React.createElement("p", {
     style: {
       fontSize: 13,
       color: "#d9e2dd",
@@ -16266,6 +16545,28 @@ function AcqLeadSheet({
   }, copied === "b" ? "Copied" : "Copy follow-up"))) : React.createElement("div", {
     className: "hb-note"
   }, "A personal first message and a follow-up, about half a cent.")), React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 12
+    }
+  }, React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, "Remind me on"), React.createElement("input", {
+    type: "date",
+    className: "hb-in",
+    style: {
+      maxWidth: 170
+    },
+    value: lead.next_followup_at ? lead.next_followup_at.slice(0, 10) : "",
+    onChange: e => up({
+      next_followup_at: e.target.value ? new Date(e.target.value + "T09:00:00").toISOString() : null
+    })
+  })), React.createElement("div", {
     style: {
       fontSize: 12,
       fontWeight: 700,
@@ -28582,7 +28883,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">hm6cqx</script>
+<script type="text/babel" id="zion-version">1slvteb</script>
 <script>
 (function () {
   var last = 0;
