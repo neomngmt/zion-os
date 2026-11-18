@@ -23719,6 +23719,441 @@ function ChattersPage() {
     className: "fs-10 c-faint font-mono mt-3"
   }, "Click a chatter to see the split by model. Covers ", data?.models?.join(", ") || "connected models", "; revenue not credited to anyone is not listed."));
 }
+function TrendsHub() {
+  const T = "__trends";
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState("");
+  const [tab, setTab] = useState("reels");
+  const [niche, setNiche] = useState("all");
+  const [fmt, setFmt] = useState("all");
+  const [open, setOpen] = useState(null);
+  const [handles, setHandles] = useState("");
+  const [newNiche, setNewNiche] = useState("");
+  const load = useCallback(async () => {
+    try {
+      setData(await hubFn({
+        action: "overview",
+        model: T
+      }));
+      setErr("");
+    } catch (e) {
+      setErr(e.message);
+    }
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+  const act = async (key, body, after) => {
+    setBusy(key);
+    setErr("");
+    setNote("");
+    try {
+      const j = await hubFn({
+        model: T,
+        ...body
+      });
+      if (after) await after(j);else await load();
+    } catch (e) {
+      setErr(e.message);
+    }
+    setBusy("");
+  };
+  const scanning = data?.scan?.state === "running";
+  useEffect(() => {
+    if (!scanning) return;
+    window.__zionBusy = true;
+    const t = setInterval(async () => {
+      try {
+        const st = await hubFn({
+          action: "scan-status",
+          model: T
+        });
+        if (st.state !== "running") load();
+      } catch (e) {}
+    }, 8000);
+    return () => {
+      clearInterval(t);
+      window.__zionBusy = false;
+    };
+  }, [scanning, load]);
+  const profiles = data?.profiles || [];
+  const active = profiles.filter(p => p.status === "active");
+  const suggested = profiles.filter(p => p.status === "suggested");
+  const nicheOf = new Map(profiles.map(p => [p.handle, p.niche || "Other"]));
+  const reels = (data?.reels || []).map(r => ({
+    ...r,
+    niche: nicheOf.get(r.handle) || "Other"
+  }));
+  const niches = [...new Set(active.map(p => p.niche || "Other"))].sort();
+  const formats = [...new Set(reels.map(r => r.analysis?.format).filter(Boolean))];
+  const shown = reels.filter(r => (niche === "all" || r.niche === niche) && (fmt === "all" || (fmt === "saved" ? r.saved : r.analysis?.format === fmt))).sort((a, b) => (b.multiple || 0) - (a.multiple || 0));
+  const cost = Math.max(0.1, Math.round(active.length * 0.03 * 10) / 10);
+  return React.createElement("div", {
+    className: "hb"
+  }, React.createElement("style", null, HUB_CSS), React.createElement("div", {
+    className: "hb-bar",
+    style: {
+      alignItems: "flex-end"
+    }
+  }, React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 220
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 26,
+      fontWeight: 800,
+      letterSpacing: "-.02em"
+    }
+  }, "Trends"), React.createElement("div", {
+    className: "hb-note"
+  }, "Reels that beat their own account's normal views, from ", active.length, " public OFM accounts across ", niches.length, " niches. Ideas for any model.")), [["reels", "Reels"], ["profiles", `Profiles ${active.length}`]].map(([k, l]) => React.createElement("button", {
+    key: k,
+    className: `hb-chip ${tab === k ? "on" : ""}`,
+    onClick: () => setTab(k)
+  }, l))), err && React.createElement("div", {
+    className: "hb-err"
+  }, err), note && React.createElement("div", {
+    className: "hb-note",
+    style: {
+      marginBottom: 12,
+      color: "#ffcf8a"
+    }
+  }, note), !data ? React.createElement("div", {
+    className: "hb-empty"
+  }, React.createElement("span", {
+    className: "hb-spin"
+  })) : tab === "reels" ? React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "hb-card",
+    style: {
+      marginBottom: 14,
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      flexWrap: "wrap"
+    }
+  }, React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 200
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 700
+    }
+  }, scanning ? `Scanning ${data.scan.profiles} accounts` : data.scan?.state === "done" ? `Last scan ${timeAgo(data.scan.finishedAt)}` : "Not scanned yet"), React.createElement("div", {
+    className: "hb-note"
+  }, scanning ? "Takes 2 to 5 minutes, you can leave this page." : data.scan?.state === "done" ? `Kept ${data.scan.kept} standout reels of ${data.scan.scanned} read. A scan costs about ${cost} USD of Apify credit.` : `Runs only when you press it, about ${cost} USD of Apify credit.`), data.scan?.state === "failed" && React.createElement("div", {
+    className: "hb-note",
+    style: {
+      color: "#ff8a6b"
+    }
+  }, data.scan.error)), React.createElement("button", {
+    className: "hb-btn",
+    disabled: scanning || busy === "scan" || !active.length,
+    onClick: () => {
+      if (window.confirm(`Scan ${active.length} accounts now? About ${cost} USD of Apify credit.`)) act("scan", {
+        action: "scan"
+      });
+    }
+  }, scanning || busy === "scan" ? React.createElement(React.Fragment, null, React.createElement("span", {
+    className: "hb-spin"
+  }), "Scanning") : "Scan now")), React.createElement("div", {
+    className: "hb-bar"
+  }, [["all", `All niches ${reels.length}`], ...niches.map(n => [n, `${n} ${reels.filter(r => r.niche === n).length}`])].map(([k, l]) => React.createElement("button", {
+    key: k,
+    className: `hb-chip ${niche === k ? "on" : ""}`,
+    onClick: () => setNiche(k)
+  }, l))), (formats.length > 0 || reels.some(r => r.saved)) && React.createElement("div", {
+    className: "hb-bar"
+  }, [["all", "Any format"], ["saved", "Saved"], ...formats.map(f => [f, f])].map(([k, l]) => React.createElement("button", {
+    key: k,
+    className: `hb-chip ${fmt === k ? "on" : ""}`,
+    onClick: () => setFmt(k)
+  }, l))), !reels.length ? React.createElement("div", {
+    className: "hb-empty"
+  }, React.createElement("b", null, "No trending reels yet"), "Press Scan now. It reads the newest reels of every tracked account and keeps the ones doing better than that account usually does.") : !shown.length ? React.createElement("div", {
+    className: "hb-empty"
+  }, React.createElement("b", null, "No reels match this filter")) : React.createElement("div", {
+    className: "hb-grid"
+  }, shown.map((r, i) => {
+    const a = r.analysis && !r.analysis.error ? r.analysis : null;
+    return React.createElement("div", {
+      key: r.id,
+      className: "hb-reel",
+      style: {
+        "--i": Math.min(i, 20)
+      }
+    }, React.createElement("a", {
+      href: r.url,
+      target: "_blank",
+      rel: "noopener noreferrer",
+      className: "hb-thumb",
+      style: {
+        backgroundImage: r.thumb_url ? `url(${r.thumb_url})` : "none"
+      }
+    }, React.createElement("span", {
+      className: `hb-mult ${r.multiple < 1.3 ? "mid" : ""}`
+    }, r.multiple, "x"), React.createElement("div", {
+      className: "hb-over"
+    }, React.createElement("div", {
+      className: "h"
+    }, "@", r.handle, ", ", r.niche), React.createElement("div", {
+      className: "v"
+    }, igK(r.views), React.createElement("small", null, "views")))), React.createElement("button", {
+      className: `hb-star ${r.saved ? "on" : ""}`,
+      title: r.saved ? "Saved" : "Save",
+      "aria-label": "Save",
+      onClick: () => {
+        setData(d => ({
+          ...d,
+          reels: d.reels.map(x => x.id === r.id ? {
+            ...x,
+            saved: !r.saved
+          } : x)
+        }));
+        hubFn({
+          action: "save-reel",
+          id: r.id,
+          saved: !r.saved
+        }).catch(() => {});
+      }
+    }, React.createElement(IGStar, {
+      size: 14,
+      color: r.saved ? "#3a2a00" : "#fff"
+    })), React.createElement("div", {
+      className: "hb-body"
+    }, a ? React.createElement("span", {
+      className: "hb-fmt"
+    }, a.format) : null, React.createElement("div", {
+      className: `hb-hook ${a ? "" : "dim"}`
+    }, a ? a.hook : r.caption || "No caption"), React.createElement("div", {
+      className: "hb-acts"
+    }, React.createElement("button", {
+      className: `hb-btn sm ${a ? "" : "ghost"}`,
+      onClick: () => setOpen(r.id)
+    }, a ? "Why it worked" : "Break it down"))));
+  }))) : React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "hb-card",
+    style: {
+      marginBottom: 14
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      flexWrap: "wrap",
+      marginBottom: 8
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 17,
+      fontWeight: 800,
+      flex: 1
+    }
+  }, "Find more accounts"), React.createElement("button", {
+    className: "hb-btn",
+    disabled: busy === "suggest" || active.length >= data.maxActive,
+    onClick: () => act("suggest", {
+      action: "suggest"
+    }, async j => {
+      await load();
+      setNote(j.added ? `${j.added} new accounts suggested below.` : j.note || "Nothing new found.");
+    })
+  }, busy === "suggest" ? React.createElement(React.Fragment, null, React.createElement("span", {
+    className: "hb-spin"
+  }), "Looking, about two minutes") : "Suggest accounts")), React.createElement("p", {
+    className: "hb-note"
+  }, "Takes accounts Instagram itself shows as similar to the ones tracked here, keeps the public ones and the AI sorts them into niches. Accounts that are 18+ restricted or banned cannot be read without a login and are left out. The free Apify plan allows this about once a day."), React.createElement("form", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      marginTop: 12
+    },
+    onSubmit: e => {
+      e.preventDefault();
+      if (handles.trim()) act("add", {
+        action: "add-profile",
+        handles,
+        niche: newNiche
+      }, async () => {
+        setHandles("");
+        await load();
+      });
+    }
+  }, React.createElement("input", {
+    className: "hb-in",
+    style: {
+      minWidth: 220
+    },
+    value: handles,
+    onChange: e => setHandles(e.target.value),
+    placeholder: "Add by hand: usernames or profile links"
+  }), React.createElement("input", {
+    className: "hb-in",
+    style: {
+      maxWidth: 200,
+      flex: "0 1 200px"
+    },
+    value: newNiche,
+    onChange: e => setNewNiche(e.target.value),
+    placeholder: "Niche, e.g. Gym and fitness",
+    list: "trend-niches"
+  }), React.createElement("datalist", {
+    id: "trend-niches"
+  }, niches.map(n => React.createElement("option", {
+    key: n,
+    value: n
+  }))), React.createElement("button", {
+    className: "hb-btn",
+    disabled: busy === "add" || !handles.trim()
+  }, "Add"))), suggested.length > 0 && React.createElement("div", {
+    className: "hb-card",
+    style: {
+      marginBottom: 14
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 4
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 17,
+      fontWeight: 800,
+      flex: 1
+    }
+  }, "Suggested ", suggested.length), React.createElement("button", {
+    className: "hb-btn sm",
+    disabled: busy === "all",
+    onClick: async () => {
+      setBusy("all");
+      for (const p of suggested.slice(0, Math.max(0, data.maxActive - active.length))) {
+        try {
+          await hubFn({
+            action: "set-profile",
+            id: p.id,
+            status: "active"
+          });
+        } catch (e) {}
+      }
+      setBusy("");
+      load();
+    }
+  }, "Track all")), suggested.map(p => React.createElement("div", {
+    key: p.id,
+    className: "hb-row"
+  }, React.createElement("div", {
+    className: "hb-ava s"
+  }, p.handle.charAt(0).toUpperCase()), React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, React.createElement("a", {
+    href: `https://www.instagram.com/${p.handle}/`,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    style: {
+      fontWeight: 700,
+      fontSize: 14
+    }
+  }, "@", p.handle), React.createElement("span", {
+    className: "hb-note",
+    style: {
+      marginLeft: 8
+    }
+  }, [p.niche, p.followers ? `${igK(p.followers)} followers` : null].filter(Boolean).join(", ")), p.reason && React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      color: "#d9e2dd",
+      lineHeight: 1.45,
+      marginTop: 2
+    }
+  }, p.reason)), React.createElement("button", {
+    className: "hb-btn sm",
+    onClick: () => act("ok" + p.id, {
+      action: "set-profile",
+      id: p.id,
+      status: "active"
+    })
+  }, "Track"), React.createElement("button", {
+    className: "hb-btn ghost sm",
+    onClick: () => act("no" + p.id, {
+      action: "set-profile",
+      id: p.id,
+      status: "rejected"
+    })
+  }, "Skip")))), niches.map(n => React.createElement("div", {
+    key: n,
+    className: "hb-card",
+    style: {
+      marginBottom: 14
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "baseline",
+      gap: 10,
+      marginBottom: 4
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 16,
+      fontWeight: 800
+    }
+  }, n), React.createElement("span", {
+    className: "hb-note"
+  }, active.filter(p => (p.niche || "Other") === n).length, " accounts")), active.filter(p => (p.niche || "Other") === n).map(p => React.createElement("div", {
+    key: p.id,
+    className: "hb-row"
+  }, React.createElement("div", {
+    className: "hb-ava"
+  }, p.handle.charAt(0).toUpperCase()), React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, React.createElement("a", {
+    href: `https://www.instagram.com/${p.handle}/`,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    style: {
+      fontWeight: 700,
+      fontSize: 14
+    }
+  }, "@", p.handle), React.createElement("div", {
+    className: "hb-note"
+  }, [p.followers ? `${igK(p.followers)} followers` : null, p.median_views ? `${igK(p.median_views)} median views` : null, p.last_scraped_at ? `scanned ${timeAgo(new Date(p.last_scraped_at).getTime())}` : "not scanned yet"].filter(Boolean).join(", "))), React.createElement("button", {
+    className: "hb-x",
+    title: "Stop tracking",
+    "aria-label": "Remove",
+    onClick: () => act("rm" + p.id, {
+      action: "remove-profile",
+      id: p.id
+    })
+  }, React.createElement(X, {
+    size: 15
+  }))))))), open && reels.find(r => r.id === open) && React.createElement(HubReelSheet, {
+    reel: reels.find(r => r.id === open),
+    model: T,
+    onClose: () => setOpen(null),
+    onChange: nr => setData(d => ({
+      ...d,
+      reels: d.reels.map(x => x.id === nr.id ? {
+        ...x,
+        ...nr
+      } : x)
+    }))
+  }));
+}
 function TrendsPage({
   weeklyTrendReels,
   onReload,
@@ -26572,11 +27007,7 @@ function App() {
   }), currentView === "customs" && !isAdmin && React.createElement(CustomsCreatorPage, {
     model: restrictModel,
     record: models.find(mm => mm.name === restrictModel)
-  }), currentView === "reelsorter" && isAdmin && React.createElement(ReelSorterPage, null), currentView === "titlegen" && isAdmin && React.createElement(TitleGeneratorPage, null), currentView === "weeklytrends" && isAdmin && React.createElement(TrendsPage, {
-    weeklyTrendReels: weeklyTrendReels,
-    onReload: reloadWeeklyTrendReels,
-    loading: weeklyTrendReelsLoading
-  }), currentView === "trending" && React.createElement(CreatorTrending, {
+  }), currentView === "reelsorter" && isAdmin && React.createElement(ReelSorterPage, null), currentView === "titlegen" && isAdmin && React.createElement(TitleGeneratorPage, null), currentView === "weeklytrends" && isAdmin && React.createElement(TrendsHub, null), currentView === "trending" && React.createElement(CreatorTrending, {
     trends: trends,
     agency: session.agency
   }), currentView === "models" && React.createElement(ModelManager, {
@@ -26600,7 +27031,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">14f49uj</script>
+<script type="text/babel" id="zion-version">1nekm0j</script>
 <script>
 (function () {
   var last = 0;
