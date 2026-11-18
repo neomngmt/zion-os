@@ -23950,6 +23950,7 @@ function TrendsHub() {
   const [open, setOpen] = useState(null);
   const [handles, setHandles] = useState("");
   const [newNiche, setNewNiche] = useState("");
+  const [findNiche, setFindNiche] = useState("Gothic");
   const load = useCallback(async () => {
     try {
       setData(await hubFn({
@@ -24023,7 +24024,7 @@ function TrendsHub() {
     }
   }, React.createElement("div", {
     className: "hb-note"
-  }, "Reels that beat their own account's normal views, from ", active.length, " public OFM accounts across ", niches.length, " niches. Ideas for any model.")), [["reels", "Reels"], ["profiles", `Profiles ${active.length}`]].map(([k, l]) => React.createElement("button", {
+  }, "What took off in the last 7 days: reels that beat their own account's normal views, from ", active.length, " public OFM accounts across ", niches.length, " niches.")), [["reels", "Reels"], ["profiles", `Profiles ${active.length}`]].map(([k, l]) => React.createElement("button", {
     key: k,
     className: `hb-chip ${tab === k ? "on" : ""}`,
     onClick: () => setTab(k)
@@ -24168,7 +24169,9 @@ function TrendsHub() {
       fontWeight: 800,
       flex: 1
     }
-  }, "Find more accounts"), React.createElement("button", {
+  }, "Find more accounts"), React.createElement("span", {
+    className: "hb-note"
+  }, active.length, " of ", data.maxActive, " tracked"), React.createElement("button", {
     className: "hb-btn",
     disabled: busy === "suggest" || active.length >= data.maxActive,
     onClick: () => act("suggest", {
@@ -24181,7 +24184,42 @@ function TrendsHub() {
     className: "hb-spin"
   }), "Looking, about two minutes") : "Suggest accounts")), React.createElement("p", {
     className: "hb-note"
-  }, "Takes accounts Instagram itself shows as similar to the ones tracked here, keeps the public ones and the AI sorts them into niches. Accounts that are 18+ restricted or banned cannot be read without a login and are left out. The free Apify plan allows this about once a day."), React.createElement("form", {
+  }, "Takes accounts Instagram itself shows as similar to the ones tracked here, keeps the public ones and the AI sorts them into niches. Accounts that are 18+ restricted or banned cannot be read without a login and are left out."), React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      alignItems: "center",
+      marginTop: 12
+    }
+  }, React.createElement("span", {
+    className: "hb-note"
+  }, "Or search one niche:"), React.createElement("select", {
+    className: "hb-in",
+    style: {
+      maxWidth: 220,
+      flex: "0 1 220px"
+    },
+    value: findNiche,
+    onChange: e => setFindNiche(e.target.value)
+  }, ["Gothic", "Asian", "Gym and fitness", "MILF and moms", "Feet", "Couples", "Cosplay", "Alt and tattooed", "Skits and humor", "Girl next door"].map(n => React.createElement("option", {
+    key: n,
+    value: n
+  }, n))), React.createElement("button", {
+    className: "hb-btn ghost",
+    disabled: busy === "niche",
+    onClick: () => act("niche", {
+      action: "suggest",
+      niche: findNiche
+    }, async j => {
+      await load();
+      setNote(j.added ? `${j.added} new ${findNiche} accounts suggested below.` : j.note || `Nothing new found for ${findNiche}.`);
+    })
+  }, busy === "niche" ? React.createElement(React.Fragment, null, React.createElement("span", {
+    className: "hb-spin"
+  }), "Searching") : `Find ${findNiche} accounts`), React.createElement("span", {
+    className: "hb-note"
+  }, "about 0.15 USD")), React.createElement("form", {
     style: {
       display: "flex",
       gap: 8,
@@ -27244,7 +27282,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1jiumtj</script>
+<script type="text/babel" id="zion-version">1tuijon</script>
 <script>
 (function () {
   var last = 0;
