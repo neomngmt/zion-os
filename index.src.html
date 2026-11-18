@@ -4048,15 +4048,15 @@ function MoreDotsIG({ dark }) {
 // just the way in: Mac status, one button, and a list of recent cuts that open the editor on that cut.
 const EDIT_WORKER_URL = "http://127.0.0.1:4799";
 const EDIT_STATUS = {
-  uploading: { label: "Nahrává se", color: "#8B93A1", busy: true },
-  queued: { label: "Ve frontě", color: "#8B93A1", busy: true },
-  processing: { label: "Zpracovává se", color: "#39e673", busy: true },
-  awaiting_review: { label: "Čeká na tebe", color: "#D9B45B", busy: false },
-  revising: { label: "Zapracovává zpětnou vazbu", color: "#39e673", busy: true },
-  approved: { label: "Schváleno, čeká na render", color: "#39e673", busy: true },
-  rendering_final: { label: "Renderuje finál", color: "#39e673", busy: true },
-  done: { label: "Hotovo", color: "#39e673", busy: false },
-  error: { label: "Chyba", color: "#e07a5f", busy: false },
+  uploading: { label: "Uploading", color: "#8B93A1", busy: true },
+  queued: { label: "Queued", color: "#8B93A1", busy: true },
+  processing: { label: "Processing", color: "#39e673", busy: true },
+  awaiting_review: { label: "Waiting for you", color: "#D9B45B", busy: false },
+  revising: { label: "Applying your feedback", color: "#39e673", busy: true },
+  approved: { label: "Approved, waiting for render", color: "#39e673", busy: true },
+  rendering_final: { label: "Rendering final", color: "#39e673", busy: true },
+  done: { label: "Done", color: "#39e673", busy: false },
+  error: { label: "Error", color: "#e07a5f", busy: false },
 };
 
 function useEditJobs() {
@@ -4802,37 +4802,37 @@ function EditorLauncher() {
           </div>
           <div>
             <div className="text-xl font-extrabold tracking-tight c-text">Editor</div>
-            <div className="fs-12 c-muted">Nahraj raw video, Mac ho ostříhá a v Editoru ho schválíš, nebo vrátíš s připomínkami.</div>
+            <div className="fs-12 c-muted">Upload a raw video, the Mac cuts it, then approve it in the Editor or send it back with notes.</div>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap my-4">
-          {!worker.checked ? chip("Zjišťuju stav Macu", "#8B93A1") : offline ? chip("Mac je offline", "#e07a5f") : chip("Mac online", "#39e673")}
-          {worker.online && worker.claudeOk === false && chip("Claude Code není přihlášený", "#e07a5f")}
-          {worker.online && worker.busy && chip("Mac právě střihá", "#39e673")}
-          {worker.freeGb != null && <span className="fs-10 font-mono" style={{ color: lowDisk ? "#e07a5f" : "#8B93A1" }}>disk volno {worker.freeGb} GB{lowDisk ? ", uvolni místo" : ""}</span>}
+          {!worker.checked ? chip("Checking the Mac", "#8B93A1") : offline ? chip("Mac is offline", "#e07a5f") : chip("Mac online", "#39e673")}
+          {worker.online && worker.claudeOk === false && chip("Claude Code is not signed in", "#e07a5f")}
+          {worker.online && worker.busy && chip("Mac is cutting now", "#39e673")}
+          {worker.freeGb != null && <span className="fs-10 font-mono" style={{ color: lowDisk ? "#e07a5f" : "#8B93A1" }}>free disk {worker.freeGb} GB{lowDisk ? ", free up space" : ""}</span>}
         </div>
         {worker.online && worker.claudeOk === false && (
-          <div className="fs-11 font-mono mb-4" style={{ color: "#e07a5f" }}>Střih bez Claude nejde. V Terminálu na Macu spusť <b>claude auth login</b> a přihlas se.</div>
+          <div className="fs-11 font-mono mb-4" style={{ color: "#e07a5f" }}>Cutting needs Claude. In Terminal on the Mac run <b>claude auth login</b> and sign in.</div>
         )}
         {offline ? (
-          <div className="fs-12" style={{ color: "#e07a5f" }}>Pracant na Macu neběží. Zapni Mac a přihlas se, spustí se sám.</div>
+          <div className="fs-12" style={{ color: "#e07a5f" }}>The worker on the Mac is not running. Turn the Mac on and sign in, it starts by itself.</div>
         ) : (
           <a href={`${EDIT_WORKER_URL}/app`} target="_blank" rel="noreferrer"
             className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-xl c-bg-accent c-onaccent text-sm font-mono uppercase tracking-wide font-bold hover-bg-accent2"
             style={{ boxShadow: "0 0 24px rgba(57,230,115,0.3)" }}>
-            <ExternalLink size={16} /> Otevřít Editor
+            <ExternalLink size={16} /> Open Editor
           </a>
         )}
-        <div className="fs-10 font-mono c-faint mt-3">Otevře se v novém okně. Funguje v prohlížeči na tom Macu, kde běží pracant, video nikdy neopustí Mac.</div>
+        <div className="fs-10 font-mono c-faint mt-3">Opens in a new window. Works in the browser on the Mac where the worker runs, the video never leaves the Mac.</div>
       </div>
 
       <div className="rounded-3xl p-5" style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.08)" }}>
         <div className="flex items-center justify-between mb-3">
-          <span className="fs-11 uppercase tracking-widest c-muted font-mono">Poslední střihy</span>
-          {waiting > 0 && <span className="fs-10 font-mono uppercase px-2 py-0.5 rounded-full" style={{ color: "#D9B45B", background: "rgba(217,180,91,0.12)", border: "1px solid rgba(217,180,91,0.4)" }}>{waiting} čeká na tebe</span>}
+          <span className="fs-11 uppercase tracking-widest c-muted font-mono">Latest cuts</span>
+          {waiting > 0 && <span className="fs-10 font-mono uppercase px-2 py-0.5 rounded-full" style={{ color: "#D9B45B", background: "rgba(217,180,91,0.12)", border: "1px solid rgba(217,180,91,0.4)" }}>{waiting} waiting for you</span>}
         </div>
-        {loading && <div className="fs-11 c-faint font-mono">Načítám…</div>}
-        {!loading && jobs.length === 0 && <div className="fs-12 c-faint font-mono italic">Zatím žádný střih. Otevři Editor a nahraj první raw video.</div>}
+        {loading && <div className="fs-11 c-faint font-mono">Loading…</div>}
+        {!loading && jobs.length === 0 && <div className="fs-12 c-faint font-mono italic">No cuts yet. Open the Editor and upload the first raw video.</div>}
         <div className="flex flex-col gap-1.5">
           {jobs.map((j) => (
             <a key={j.id} href={offline ? undefined : `${EDIT_WORKER_URL}/app#job=${encodeURIComponent(j.id)}`} target="_blank" rel="noreferrer"
@@ -6147,7 +6147,7 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
   // .txt format asked for, so the whole batch can be copied/downloaded and
   // handed straight to whoever's filming, no need to open the board.
   const exportPlanText = (justGenerated?.cards || [])
-    .map((c, i) => `Reel ${i + 1}: ${c.title}\nScénář: ${c.notes || "—"}\nOdkaz: ${c.scriptLink ? cleanIgUrl(c.scriptLink) : "—"}`)
+    .map((c, i) => `Reel ${i + 1}: ${c.title}\nScript: ${c.notes || "—"}\nLink: ${c.scriptLink ? cleanIgUrl(c.scriptLink) : "—"}`)
     .join("\n\n");
   const copyExportPlan = async () => {
     try {
@@ -6400,7 +6400,7 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
           <div className="flex items-center gap-2 mb-3">
             <span className="fs-10 uppercase tracking-wide c-faint font-mono">Script language</span>
             <div className="flex rounded-lg border c-border overflow-hidden">
-              {[["cs", "Česky"], ["en", "English"]].map(([val, label]) => (
+              {[["cs", "Czech"], ["en", "English"]].map(([val, label]) => (
                 <button key={val} onClick={() => setGenLang(val)}
                   className={`tap px-3 py-1.5 fs-11 font-mono uppercase transition-colors ${genLang === val ? "c-bg-accent c-onaccent" : "c-muted hover-bg-surface"}`}>
                   {label}
@@ -6420,10 +6420,10 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
               </div>
               <div className="flex items-center gap-2 mt-2">
                 <button onClick={copyExportPlan} className="tap px-3 py-1.5 rounded-lg border c-border fs-10 font-mono uppercase c-muted hover-bg-surface">
-                  {exportCopied ? "Zkopírováno!" : "Kopírovat jako text"}
+                  {exportCopied ? "Copied!" : "Copy as text"}
                 </button>
                 <button onClick={downloadExportPlan} className="tap px-3 py-1.5 rounded-lg border c-border fs-10 font-mono uppercase c-muted hover-bg-surface">
-                  Stáhnout .txt
+                  Download .txt
                 </button>
               </div>
             </div>
@@ -6488,7 +6488,7 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
           <div className="flex items-center gap-2 mb-3">
             <span className="fs-10 uppercase tracking-wide c-faint font-mono">Script language</span>
             <div className="flex rounded-lg border c-border overflow-hidden">
-              {[["cs", "Česky"], ["en", "English"]].map(([val, label]) => (
+              {[["cs", "Czech"], ["en", "English"]].map(([val, label]) => (
                 <button key={val} onClick={() => setGenLang(val)}
                   className={`tap px-3 py-1.5 fs-11 font-mono uppercase transition-colors ${genLang === val ? "c-bg-accent c-onaccent" : "c-muted hover-bg-surface"}`}>
                   {label}
@@ -6509,10 +6509,10 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
               </div>
               <div className="flex items-center gap-2 mt-2">
                 <button onClick={copyExportPlan} className="tap px-3 py-1.5 rounded-lg border c-border fs-10 font-mono uppercase c-muted hover-bg-surface">
-                  {exportCopied ? "Zkopírováno!" : "Kopírovat jako text"}
+                  {exportCopied ? "Copied!" : "Copy as text"}
                 </button>
                 <button onClick={downloadExportPlan} className="tap px-3 py-1.5 rounded-lg border c-border fs-10 font-mono uppercase c-muted hover-bg-surface">
-                  Stáhnout .txt
+                  Download .txt
                 </button>
               </div>
             </div>
@@ -6587,7 +6587,7 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
           <div className="flex items-center gap-2 mb-3 mt-6">
             <span className="fs-10 uppercase tracking-wide c-faint font-mono">Script language</span>
             <div className="flex rounded-lg border c-border overflow-hidden">
-              {[["cs", "Česky"], ["en", "English"]].map(([val, label]) => (
+              {[["cs", "Czech"], ["en", "English"]].map(([val, label]) => (
                 <button key={val} onClick={() => setGenLang(val)}
                   className={`tap px-3 py-1.5 fs-11 font-mono uppercase transition-colors ${genLang === val ? "c-bg-accent c-onaccent" : "c-muted hover-bg-surface"}`}>
                   {label}
@@ -6607,10 +6607,10 @@ function InstagramContentHub({ modelName, modelObj, cards, persistCards, reels, 
               </div>
               <div className="flex items-center gap-2 mt-2">
                 <button onClick={copyExportPlan} className="tap px-3 py-1.5 rounded-lg border c-border fs-10 font-mono uppercase c-muted hover-bg-surface">
-                  {exportCopied ? "Zkopírováno!" : "Kopírovat jako text"}
+                  {exportCopied ? "Copied!" : "Copy as text"}
                 </button>
                 <button onClick={downloadExportPlan} className="tap px-3 py-1.5 rounded-lg border c-border fs-10 font-mono uppercase c-muted hover-bg-surface">
-                  Stáhnout .txt
+                  Download .txt
                 </button>
               </div>
             </div>
@@ -9036,19 +9036,19 @@ function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "t
 function creatorInsight(a) {
   const notes = [];
   if (a.replyMin != null) {
-    if (a.replyMin > 60) notes.push("reply time přes hodinu — ztracený příjem");
-    else if (a.replyMin <= 30) notes.push("reply time v pohodě");
+    if (a.replyMin > 60) notes.push("reply time over an hour, lost revenue");
+    else if (a.replyMin <= 30) notes.push("reply time fine");
   }
   if (a.renewPct != null) {
-    if (a.renewPct >= 55) notes.push("silný renew");
-    else if (a.renewPct < 45) notes.push("slabý renew");
+    if (a.renewPct >= 55) notes.push("strong renew");
+    else if (a.renewPct < 45) notes.push("weak renew");
   } else if (a.accountType === "free") {
-    notes.push("free účet — velký fanoušek pool na konverzi");
+    notes.push("free account, big fan pool to convert");
   }
   if (a.activeFans > 1000 && a.avgSpend < 1) {
-    notes.push("hodně fanoušků, skoro nic neplatí — obsah/cena nekonvertuje");
+    notes.push("many fans, almost nobody pays, content or price does not convert");
   }
-  if (!notes.length) return { text: "Bez výrazných výkyvů.", tone: "neutral" };
+  if (!notes.length) return { text: "No big swings.", tone: "neutral" };
   const tone = a.replyMin > 60 || (a.renewPct != null && a.renewPct < 45) || (a.activeFans > 1000 && a.avgSpend < 1)
     ? "bad" : (a.replyMin <= 30 && a.renewPct >= 55) ? "good" : "neutral";
   return { text: notes.join(" · ") + ".", tone };
@@ -14805,24 +14805,24 @@ const REEL_SORTER_CSS = `
 
 const REEL_SORTER_BODY = `
 <header>
-  <p>Vlož odkazy na Reels, mrkni na živý náhled a jedním klikem přiřaď kategorii. Po každém kliknutí naskočí další Reel. Na konci vyexportuješ roztříděný seznam.</p>
+  <p>Paste Reel links, check the live preview and assign a category with one click. The next Reel loads after every click. At the end you export the sorted list.</p>
   <div class="sprocket"></div>
 </header>
 
 <div class="rs-setup" id="rsSetupPanel">
   <div class="rs-panel">
-    <h2>Vstup</h2>
+    <h2>Input</h2>
     <textarea id="rsUrlInput" placeholder="https://www.instagram.com/reel/AbC123.../
 https://www.instagram.com/reel/XyZ456.../
-...jeden odkaz na řádek"></textarea>
-    <button class="btn-primary btn-block" id="rsLoadBtn">Spustit</button>
+...one link per line"></textarea>
+    <button class="btn-primary btn-block" id="rsLoadBtn">Start</button>
     <div id="rsLoadError" style="display:none; color:#e07a5f; font-size:12px; margin-top:8px; text-align:center;"></div>
     <div class="cat-manager">
-      <h2>Kategorie</h2>
+      <h2>Categories</h2>
       <div class="cat-list" id="rsCatList"></div>
       <div class="add-cat-row">
-        <input type="text" id="rsNewCatInput" placeholder="Nová kategorie...">
-        <button class="btn-ghost" id="rsAddCatBtn">Přidat</button>
+        <input type="text" id="rsNewCatInput" placeholder="New category...">
+        <button class="btn-ghost" id="rsAddCatBtn">Add</button>
       </div>
     </div>
   </div>
@@ -14831,12 +14831,12 @@ https://www.instagram.com/reel/XyZ456.../
 <div class="stage-wrap" id="rsStageWrap">
   <div class="progress-row">
     <div class="progress-text" id="rsProgressText">0 / 0</div>
-    <button class="btn-ghost" id="rsExportBtn">Zobrazit výsledek</button>
+    <button class="btn-ghost" id="rsExportBtn">Show result</button>
   </div>
   <div class="progress-bar"><div class="progress-bar-fill" id="rsProgressFill"></div></div>
   <div id="rsStageContent" style="margin-top:16px;"></div>
   <div class="list-toggle">
-    <button class="btn-ghost" id="rsListToggleBtn">Zobrazit celý seznam</button>
+    <button class="btn-ghost" id="rsListToggleBtn">Show full list</button>
   </div>
   <div class="list-view" id="rsListView"></div>
 </div>
@@ -14845,15 +14845,15 @@ https://www.instagram.com/reel/XyZ456.../
   <div class="modal">
     <div class="modal-top">
       <div>
-        <h2>Roztříděný seznam</h2>
-        <div class="sub">Seskupeno podle kategorie, připraveno ke zkopírování.</div>
+        <h2>Sorted list</h2>
+        <div class="sub">Grouped by category, ready to copy.</div>
       </div>
       <button class="modal-close" id="rsModalCloseBtn">&times;</button>
     </div>
     <textarea id="rsResultText" readonly></textarea>
     <div class="modal-actions">
-      <button class="btn-primary" style="margin-top:0; flex:1;" id="rsCopyBtn">Zkopírovat</button>
-      <button class="btn-ghost" id="rsDownloadBtn">Stáhnout .txt</button>
+      <button class="btn-primary" style="margin-top:0; flex:1;" id="rsCopyBtn">Copy</button>
+      <button class="btn-ghost" id="rsDownloadBtn">Download .txt</button>
     </div>
   </div>
 </div>
@@ -14932,10 +14932,10 @@ function TitleGeneratorPage() {
   const copyExport = async () => {
     try {
       await navigator.clipboard.writeText(exportText);
-      setCopiedMsg("Zkopírováno!");
+      setCopiedMsg("Copied!");
       setTimeout(() => setCopiedMsg(""), 2000);
     } catch {
-      setCopiedMsg("Nepodařilo se zkopírovat — zkopíruj ručně níže.");
+      setCopiedMsg("Copy failed, copy it by hand below.");
     }
   };
 
@@ -14943,7 +14943,7 @@ function TitleGeneratorPage() {
     <div>
       <div className="flex items-center justify-end mb-4 flex-wrap gap-2">
         <div className="flex rounded-lg border c-border overflow-hidden">
-          {[["cs", "Česky"], ["en", "English"]].map(([val, label]) => (
+          {[["cs", "Czech"], ["en", "English"]].map(([val, label]) => (
             <button key={val} onClick={() => setLang(val)}
               className={`tap px-3 py-1.5 fs-11 font-mono uppercase transition-colors ${lang === val ? "c-bg-accent c-onaccent" : "c-muted hover-bg-surface"}`}>
               {label}
@@ -14954,7 +14954,7 @@ function TitleGeneratorPage() {
 
       <div className="c-bg-surface border c-border rounded-xl p-5 mb-5">
         <label className="block fs-11 uppercase tracking-widest c-muted font-mono mb-2">
-          IG Reel odkazy (jeden na řádek)
+          IG Reel links (one per line)
         </label>
         <textarea value={linksText} onChange={(e) => setLinksText(e.target.value)}
           placeholder={"https://www.instagram.com/reel/.../?igsh=...\nhttps://www.instagram.com/reel/.../?igsh=..."}
@@ -14962,7 +14962,7 @@ function TitleGeneratorPage() {
         <div className="flex gap-2 mt-3">
           <button onClick={runGenerate} disabled={running || !linksText.trim()}
             className="tap px-4 py-2 rounded-lg c-bg-accent c-onaccent fs-12 font-bold disabled:opacity-40">
-            {running ? "Zpracovávám…" : "Vygenerovat scénáře"}
+            {running ? "Working…" : "Generate scripts"}
           </button>
           {running && (
             <button onClick={() => { stopRequestedRef.current = true; }}
@@ -14975,12 +14975,12 @@ function TitleGeneratorPage() {
 
       {results.length > 0 && (
         <div className="c-bg-surface border c-border rounded-xl p-5 mb-5">
-          <div className="fs-11 uppercase tracking-widest c-muted font-mono mb-3">Výsledky</div>
+          <div className="fs-11 uppercase tracking-widest c-muted font-mono mb-3">Results</div>
           <div className="flex flex-col gap-3">
             {results.map((r, i) => (
               <div key={i} className="c-bg-app border c-border rounded-lg p-3">
                 <div className="fs-11 font-mono c-muted mb-1 truncate">{r.url}</div>
-                {r.status === "pending" && <div className="fs-12 c-muted italic">zpracovávám…</div>}
+                {r.status === "pending" && <div className="fs-12 c-muted italic">working…</div>}
                 {r.status === "error" && <div className="fs-12" style={{ color: "#e07a5f" }}>chyba: {r.error}</div>}
                 {r.status === "done" && <div className="fs-13 c-text whitespace-pre-wrap">{r.script}</div>}
               </div>
@@ -14994,7 +14994,7 @@ function TitleGeneratorPage() {
           <div className="flex items-center justify-between mb-3">
             <div className="fs-11 uppercase tracking-widest c-muted font-mono">Export</div>
             <button onClick={copyExport} className="tap px-3 py-1.5 rounded-lg c-bg-accent c-onaccent fs-11 font-bold">
-              {copiedMsg || "Zkopírovat"}
+              {copiedMsg || "Copy"}
             </button>
           </div>
           <pre className="fs-12 c-text whitespace-pre-wrap font-mono c-bg-app border c-border rounded-lg p-3" style={{ maxHeight: 300, overflowY: "auto" }}>
@@ -15021,7 +15021,7 @@ function ReelSorterPage() {
       document.body.appendChild(s);
     }
 
-    const DEFAULT_CATEGORIES = ["Text on screen", "POV skit", "Talking head", "Omegle", "Ragebait", "Half text format", "Ostatní"];
+    const DEFAULT_CATEGORIES = ["Text on screen", "POV skit", "Talking head", "Omegle", "Ragebait", "Half text format", "Other"];
     let categories = DEFAULT_CATEGORIES.slice();
     let items = [];
     let seq = 0;
@@ -15087,7 +15087,7 @@ function ReelSorterPage() {
         items.push({ id: ++seq, url, category: null });
       });
       if (items.length === 0) {
-        if (loadError) { loadError.textContent = "Nezadal jsi žádný platný odkaz."; loadError.style.display = "block"; }
+        if (loadError) { loadError.textContent = "No valid link entered."; loadError.style.display = "block"; }
         return;
       }
       if (loadError) loadError.style.display = "none";
@@ -15117,8 +15117,8 @@ function ReelSorterPage() {
           clearInterval(interval);
           wrapEl.innerHTML =
             '<div style="padding:26px 14px;text-align:center;color:var(--rs-text-dim);font-size:13px;">' +
-            "Náhled se nepodařilo načíst (soukromé, smazané nebo omezené video).<br><br>" +
-            '<a href="' + item.url + '" target="_blank" rel="noopener" style="color:var(--rs-accent);">Otevřít Reel v nové kartě ↗</a>' +
+            "Preview could not load (private, deleted or restricted video).<br><br>" +
+            '<a href="' + item.url + '" target="_blank" rel="noopener" style="color:var(--rs-accent);">Open the Reel in a new tab ↗</a>' +
             "</div>";
         }
       }, 300);
@@ -15127,7 +15127,7 @@ function ReelSorterPage() {
     function updateProgress() {
       const total = items.length;
       const assigned = items.filter((i) => i.category).length;
-      progressText.innerHTML = `<b>${Math.min(currentIndex + 1, total)}</b> / ${total} &middot; zařazeno ${assigned}`;
+      progressText.innerHTML = `<b>${Math.min(currentIndex + 1, total)}</b> / ${total} &middot; sorted ${assigned}`;
       progressFill.style.width = total ? (assigned / total) * 100 + "%" : "0%";
     }
 
@@ -15160,8 +15160,8 @@ function ReelSorterPage() {
         done.className = "done-screen";
         const assigned = items.filter((i) => i.category).length;
         done.innerHTML = `
-          <h2 class="rs-display">Hotovo</h2>
-          <p>Zařazeno ${assigned} z ${items.length}. Můžeš zobrazit výsledek, nebo se vrátit a doplnit zbytek.</p>
+          <h2 class="rs-display">Done</h2>
+          <p>Sorted ${assigned} of ${items.length}. Show the result, or go back and finish the rest.</p>
         `;
         const btnRow = document.createElement("div");
         btnRow.style.display = "flex";
@@ -15169,11 +15169,11 @@ function ReelSorterPage() {
         btnRow.style.justifyContent = "center";
         const backBtn = document.createElement("button");
         backBtn.className = "btn-ghost";
-        backBtn.textContent = "Zpět na poslední";
+        backBtn.textContent = "Back to the last one";
         backBtn.addEventListener("click", () => goTo(items.length - 1));
         const resultBtn = document.createElement("button");
         resultBtn.className = "btn-primary";
-        resultBtn.textContent = "Zobrazit výsledek";
+        resultBtn.textContent = "Show result";
         resultBtn.addEventListener("click", openResults);
         btnRow.appendChild(backBtn);
         btnRow.appendChild(resultBtn);
@@ -15195,7 +15195,7 @@ function ReelSorterPage() {
       placeholder.className = "embed-placeholder";
       placeholder.style.color = "var(--rs-text-dim)";
       placeholder.style.fontSize = "13px";
-      placeholder.textContent = "Načítám náhled...";
+      placeholder.textContent = "Loading preview...";
       embedWrap.appendChild(placeholder);
       const blockquote = document.createElement("blockquote");
       blockquote.className = "instagram-media";
@@ -15211,7 +15211,7 @@ function ReelSorterPage() {
       manualLink.href = item.url;
       manualLink.target = "_blank";
       manualLink.rel = "noopener";
-      manualLink.textContent = "Nejde přehrát? Otevřít v Instagramu ↗";
+      manualLink.textContent = "Will not play? Open in Instagram ↗";
       manualLink.style.display = "block";
       manualLink.style.textAlign = "center";
       manualLink.style.fontSize = "11px";
@@ -15227,12 +15227,12 @@ function ReelSorterPage() {
       const currentCat = document.createElement("div");
       currentCat.className = "stage-current-cat" + (item.category ? "" : " empty");
       if (item.category) {
-        currentCat.appendChild(document.createTextNode("Zařazeno: "));
+        currentCat.appendChild(document.createTextNode("Sorted: "));
         const b = document.createElement("b");
         b.textContent = item.category;
         currentCat.appendChild(b);
       } else {
-        currentCat.textContent = "Zatím nezařazeno, vyber kategorii";
+        currentCat.textContent = "Not sorted yet, pick a category";
       }
       card.appendChild(currentCat);
 
@@ -15253,12 +15253,12 @@ function ReelSorterPage() {
       navLeft.className = "stage-nav-left";
       const prevBtn = document.createElement("button");
       prevBtn.className = "btn-ghost";
-      prevBtn.textContent = "← Zpět";
+      prevBtn.textContent = "← Back";
       prevBtn.disabled = currentIndex === 0;
       prevBtn.addEventListener("click", () => goTo(currentIndex - 1));
       const skipBtn = document.createElement("button");
       skipBtn.className = "btn-ghost";
-      skipBtn.textContent = "Přeskočit";
+      skipBtn.textContent = "Skip";
       skipBtn.addEventListener("click", () => goTo(currentIndex + 1));
       navLeft.appendChild(prevBtn);
       navLeft.appendChild(skipBtn);
@@ -15291,10 +15291,10 @@ function ReelSorterPage() {
         url.textContent = item.url;
         const cat = document.createElement("span");
         cat.className = "lcat" + (item.category ? "" : " empty");
-        cat.textContent = item.category || "nezařazeno";
+        cat.textContent = item.category || "unsorted";
         const editBtn = document.createElement("button");
         editBtn.className = "btn-ghost";
-        editBtn.textContent = "Upravit";
+        editBtn.textContent = "Edit";
         editBtn.addEventListener("click", () => goTo(idx));
         row.appendChild(url);
         row.appendChild(cat);
@@ -15324,10 +15324,10 @@ function ReelSorterPage() {
         out += "\n";
       });
       if (unassigned.length) {
-        out += `## Nezařazeno (${unassigned.length})\n`;
+        out += `## Unsorted (${unassigned.length})\n`;
         unassigned.forEach((u) => (out += u + "\n"));
       }
-      return out.trim() || "Zatím nic k exportu.";
+      return out.trim() || "Nothing to export yet.";
     }
 
     function openResults() {
@@ -15354,15 +15354,15 @@ function ReelSorterPage() {
     exportBtn.addEventListener("click", openResults);
     listToggleBtn.addEventListener("click", () => {
       listView.classList.toggle("open");
-      listToggleBtn.textContent = listView.classList.contains("open") ? "Skrýt seznam" : "Zobrazit celý seznam";
+      listToggleBtn.textContent = listView.classList.contains("open") ? "Hide list" : "Show full list";
     });
     modalCloseBtn.addEventListener("click", () => modalOverlay.classList.remove("open"));
     modalOverlay.addEventListener("click", (e) => { if (e.target === modalOverlay) modalOverlay.classList.remove("open"); });
     copyBtn.addEventListener("click", () => {
       resultText.select();
       document.execCommand("copy");
-      copyBtn.textContent = "Zkopírováno!";
-      setTimeout(() => (copyBtn.textContent = "Zkopírovat"), 1500);
+      copyBtn.textContent = "Copied!";
+      setTimeout(() => (copyBtn.textContent = "Copy"), 1500);
     });
     downloadBtn.addEventListener("click", () => {
       const blob = new Blob([resultText.value], { type: "text/plain" });
