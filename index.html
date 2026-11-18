@@ -15219,14 +15219,16 @@ function OfExtrasSection({
       const refundsWindow = windowRows.reduce((s, r) => s + (r.refundsNet || 0), 0);
       const chatRevenue = windowRows.reduce((s, r) => s + (r.messagesNet || 0) + (r.tipsNet || 0), 0);
       const subRevenue = windowRows.reduce((s, r) => s + (r.subsNet || 0), 0);
-      const latest = [...acctRows].sort((a, b) => (b.statDate || "").localeCompare(a.statDate || ""))[0];
+      const replies = windowRows.map(r => r.replyTimeMs).filter(x => x != null && x > 0);
       rows.push({
         name: m.name,
         accountType,
         refundsWindow,
-        fansChatted: latest.fansChatted || 0,
-        replyMin: latest.replyTimeMs ? Math.round(latest.replyTimeMs / 60000) : null,
-        chattingRatio: subRevenue > 0 ? chatRevenue / subRevenue : chatRevenue > 0 ? Infinity : null
+        fansChatted: windowRows.reduce((t, r) => t + (r.fansChatted || 0), 0),
+        replyMin: replies.length ? Math.round(replies.reduce((a, b) => a + b, 0) / replies.length / 60000) : null,
+        chatRevenue,
+        subRevenue,
+        chatShare: chatRevenue + subRevenue > 0 ? Math.round(chatRevenue / (chatRevenue + subRevenue) * 100) : null
       });
     });
   });
@@ -15245,7 +15247,7 @@ function OfExtrasSection({
       color: "#8B93A1",
       background: "rgba(139,147,161,0.12)"
     }
-  }, "refunds · ", periodLabel, " — rest · latest snapshot")), React.createElement("div", {
+  }, periodLabel)), React.createElement("div", {
     className: "overflow-x-auto"
   }, React.createElement("table", {
     className: "w-full text-xs"
@@ -15257,12 +15259,12 @@ function OfExtrasSection({
     className: "text-right py-2 px-3"
   }, "Refunds (", periodLabel, ")"), React.createElement("th", {
     className: "text-right py-2 px-3"
-  }, "Fans chatted"), React.createElement("th", {
+  }, "Fans chatted (", periodLabel, ")"), React.createElement("th", {
     className: "text-right py-2 px-3"
-  }, "Reply time"), React.createElement("th", {
+  }, "Avg reply time"), React.createElement("th", {
     className: "text-right py-2 pl-3",
-    title: "Chat/message revenue (PPVs, tips, customs) : subscription revenue. Informational only — easy to game, and a healthier page (more renewals) can show a 'worse' ratio while earning more overall."
-  }, "Chatting ratio"))), React.createElement("tbody", null, rows.map(r => React.createElement("tr", {
+    title: "Share of revenue that comes from chats (PPVs, tips, customs) versus subscriptions, in the same window."
+  }, "Chat share"))), React.createElement("tbody", null, rows.map(r => React.createElement("tr", {
     key: `${r.name}-${r.accountType}`,
     className: "border-b c-border c-text"
   }, React.createElement("td", {
@@ -15277,8 +15279,11 @@ function OfExtrasSection({
   }, r.fansChatted.toLocaleString()), React.createElement("td", {
     className: "py-2 px-3 text-right font-mono"
   }, r.replyMin != null ? `${r.replyMin} min` : "—"), React.createElement("td", {
-    className: "py-2 pl-3 text-right font-mono"
-  }, r.chattingRatio == null ? "—" : r.chattingRatio === Infinity ? "1:0" : `1:${Math.round(r.chattingRatio)}`)))))));
+    className: "py-2 pl-3 text-right font-mono",
+    title: `Chats $${Math.round(r.chatRevenue)}, subscriptions $${Math.round(r.subRevenue)}`
+  }, r.chatShare == null ? "-" : `${r.chatShare}%`, " ", React.createElement("span", {
+    className: "c-faint"
+  }, "($", Math.round(r.chatRevenue), " / $", Math.round(r.subRevenue), ")"))))))));
 }
 function creatorInsight(a) {
   const notes = [];
@@ -27239,7 +27244,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1acip9b</script>
+<script type="text/babel" id="zion-version">1jiumtj</script>
 <script>
 (function () {
   var last = 0;

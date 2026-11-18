@@ -8973,13 +8973,16 @@ function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "t
       // syncedAt" pick an effectively random day instead of the real latest
       // one, silently showing 0 for snapshot fields (fans chatted, etc.) that
       // only ever get written onto today's row.
-      const latest = [...acctRows].sort((a, b) => (b.statDate || "").localeCompare(a.statDate || ""))[0];
+      // Fans chatted and reply time are per day values: today's row is still empty in the morning, so the
+      // table used to show 0 and a dash. Sum the fans chatted over the window and average the reply time of the days that have one.
+      const replies = windowRows.map((r) => r.replyTimeMs).filter((x) => x != null && x > 0);
       rows.push({
         name: m.name, accountType,
         refundsWindow,
-        fansChatted: latest.fansChatted || 0,
-        replyMin: latest.replyTimeMs ? Math.round(latest.replyTimeMs / 60000) : null,
-        chattingRatio: subRevenue > 0 ? chatRevenue / subRevenue : (chatRevenue > 0 ? Infinity : null),
+        fansChatted: windowRows.reduce((t, r) => t + (r.fansChatted || 0), 0),
+        replyMin: replies.length ? Math.round(replies.reduce((a, b) => a + b, 0) / replies.length / 60000) : null,
+        chatRevenue, subRevenue,
+        chatShare: chatRevenue + subRevenue > 0 ? Math.round((chatRevenue / (chatRevenue + subRevenue)) * 100) : null,
       });
     });
   });
@@ -8993,7 +8996,7 @@ function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "t
       <div className="flex items-center justify-between mb-3">
         <span className="fs-11 uppercase tracking-widest c-muted font-mono">OF extras</span>
         <span className="fs-9 uppercase tracking-widest font-mono px-1.5 py-0.5 rounded"
-          style={{ color: "#8B93A1", background: "rgba(139,147,161,0.12)" }}>refunds · {periodLabel} — rest · latest snapshot</span>
+          style={{ color: "#8B93A1", background: "rgba(139,147,161,0.12)" }}>{periodLabel}</span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
@@ -9001,10 +9004,10 @@ function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "t
             <tr className="c-muted font-mono uppercase fs-10 border-b c-border">
               <th className="text-left py-2 pr-3">Model</th>
               <th className="text-right py-2 px-3">Refunds ({periodLabel})</th>
-              <th className="text-right py-2 px-3">Fans chatted</th>
-              <th className="text-right py-2 px-3">Reply time</th>
-              <th className="text-right py-2 pl-3" title="Chat/message revenue (PPVs, tips, customs) : subscription revenue. Informational only — easy to game, and a healthier page (more renewals) can show a 'worse' ratio while earning more overall.">
-                Chatting ratio
+              <th className="text-right py-2 px-3">Fans chatted ({periodLabel})</th>
+              <th className="text-right py-2 px-3">Avg reply time</th>
+              <th className="text-right py-2 pl-3" title="Share of revenue that comes from chats (PPVs, tips, customs) versus subscriptions, in the same window.">
+                Chat share
               </th>
             </tr>
           </thead>
@@ -9017,8 +9020,8 @@ function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "t
                 </td>
                 <td className="py-2 px-3 text-right font-mono">{r.fansChatted.toLocaleString()}</td>
                 <td className="py-2 px-3 text-right font-mono">{r.replyMin != null ? `${r.replyMin} min` : "—"}</td>
-                <td className="py-2 pl-3 text-right font-mono">
-                  {r.chattingRatio == null ? "—" : r.chattingRatio === Infinity ? "1:0" : `1:${Math.round(r.chattingRatio)}`}
+                <td className="py-2 pl-3 text-right font-mono" title={`Chats $${Math.round(r.chatRevenue)}, subscriptions $${Math.round(r.subRevenue)}`}>
+                  {r.chatShare == null ? "-" : `${r.chatShare}%`} <span className="c-faint">(${Math.round(r.chatRevenue)} / ${Math.round(r.subRevenue)})</span>
                 </td>
               </tr>
             ))}
