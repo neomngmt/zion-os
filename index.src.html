@@ -8713,7 +8713,12 @@ function RevenueChart({ data, height = 240, sparseUntil = 0 }) {
           const dl = new Date(hp.date + "T12:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
           const vl = `$${Math.round(hp.value).toLocaleString("en-US")}`;
           const gl = g !== null ? `${g >= 0 ? "+" : ""}${Math.round(g)}%` : "";
-          const boxW = Math.max(120, (dl.length + vl.length + gl.length) * 6.4 + 40);
+          // measure the real text width (the font is proportional), so the date and the amount never overlap
+          const fam = (containerRef.current && getComputedStyle(containerRef.current).fontFamily) || "sans-serif";
+          const ctx = (RevenueChart.__c || (RevenueChart.__c = document.createElement("canvas"))).getContext("2d");
+          ctx.font = `11.5px ${fam}`; const wDate = ctx.measureText(dl).width;
+          ctx.font = `700 12.5px ${fam}`; const wVal = ctx.measureText(vl).width + (gl ? ctx.measureText(gl).width + 7 : 0);
+          const boxW = Math.min(width - 4, Math.ceil(wDate + wVal + 12 + 12 + 14));
           const boxX = Math.min(Math.max(hp.x - boxW / 2, padLeft - 6), width - boxW - 2);
           return (
             <g style={{ pointerEvents: "none" }}>
