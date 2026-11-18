@@ -9132,6 +9132,8 @@ function IgHub({
   const [filter, setFilter] = useState("all");
   const [handles, setHandles] = useState("");
   const [copied, setCopied] = useState(false);
+  const [swipeText, setSwipeText] = useState("");
+  const [showProfiles, setShowProfiles] = useState(false);
   const pick = n => {
     setModel(n);
     try {
@@ -9184,6 +9186,20 @@ function IgHub({
     }, 8000);
     return () => clearInterval(t);
   }, [scanning, model, load]);
+  const adding = data?.swipeAdd?.state === "running";
+  useEffect(() => {
+    if (!adding) return;
+    const t = setInterval(async () => {
+      try {
+        const st = await hubFn({
+          action: "swipe-add-status",
+          model
+        });
+        if (st.state !== "running") load();
+      } catch (e) {}
+    }, 6000);
+    return () => clearInterval(t);
+  }, [adding, model, load]);
   if (!list.length) return React.createElement("div", {
     className: "hb-empty"
   }, React.createElement("b", null, "No models yet"), "Models appear here once they exist in the Model Manager.");
@@ -9193,7 +9209,8 @@ function IgHub({
   const reels = data?.reels || [];
   const plans = data?.plans || [];
   const plan = plans.find(p => p.week_start === data?.nextWeek) || plans[0];
-  const shown = reels.filter(r => filter === "all" ? true : filter === "saved" ? r.saved : filter === "analyzed" ? r.analysis && !r.analysis.error : r.analysis?.format === filter).sort((x, y) => (y.multiple || 0) - (x.multiple || 0));
+  const mine = reels.filter(r => r.source === "manual");
+  const shown = mine.filter(r => filter === "all" ? true : filter === "saved" ? r.saved : filter === "analyzed" ? r.analysis && !r.analysis.error : r.analysis?.format === filter).sort((x, y) => (y.multiple || 0) - (x.multiple || 0));
   const formats = [...new Set(reels.map(r => r.analysis?.format).filter(Boolean))];
   const scanBtn = React.createElement("button", {
     className: "hb-btn",
@@ -9205,254 +9222,7 @@ function IgHub({
     className: "hb-spin"
   }), "Scanning ", data?.scan?.profiles || active.length, " profiles") : "Scan now");
   const planText = p => [`Reel plan, week of ${hubDate(p.week_start)}`, "", ...(p.items || []).map((i, n) => `${n + 1}. ${i.hook}\n${i.idea}\n${i.url}`)].join("\n\n");
-  return React.createElement("div", {
-    className: "hb"
-  }, React.createElement("style", null, HUB_CSS, MD_CSS), React.createElement("div", {
-    className: "hb-bar"
-  }, list.map(m => React.createElement("button", {
-    key: m.name,
-    className: `hb-chip ${m.name === model ? "on" : ""}`,
-    onClick: () => pick(m.name)
-  }, m.name))), err && React.createElement("div", {
-    className: "hb-err"
-  }, err), !data ? React.createElement("div", {
-    className: "hb-empty"
-  }, React.createElement("span", {
-    className: "hb-spin"
-  })) : tab === "swipe" ? React.createElement(React.Fragment, null, React.createElement("div", {
-    className: "hb-bar"
-  }, [["all", `All ${reels.length}`], ["saved", "Saved"], ["analyzed", "With breakdown"], ...formats.map(f => [f, f])].map(([k, l]) => React.createElement("button", {
-    key: k,
-    className: `hb-chip ${filter === k ? "on" : ""}`,
-    onClick: () => setFilter(k)
-  }, l)), React.createElement("span", {
-    style: {
-      flex: 1
-    }
-  }), data.scan?.state === "done" && React.createElement("span", {
-    className: "hb-note"
-  }, "Last scan ", timeAgo(data.scan.finishedAt), ", kept ", data.scan.kept, " of ", data.scan.scanned, " reels"), data.scan?.state === "failed" && React.createElement("span", {
-    className: "hb-note",
-    style: {
-      color: "#ff8a6b"
-    }
-  }, data.scan.error), scanBtn), !active.length ? React.createElement("div", {
-    className: "hb-empty"
-  }, React.createElement("b", null, "No tracked profiles for ", model, " yet"), "Open the Tracked profiles tab and add Instagram accounts from her niche. Their best reels land here.") : !reels.length ? React.createElement("div", {
-    className: "hb-empty"
-  }, React.createElement("b", null, "Nothing in the swipe file yet"), "Press Scan now. It reads the newest reels of ", active.length, " tracked profile", active.length === 1 ? "" : "s", " and keeps the ones that beat that account's own normal numbers. Takes 2 to 5 minutes.") : !shown.length ? React.createElement("div", {
-    className: "hb-empty"
-  }, React.createElement("b", null, "No reels match this filter")) : React.createElement("div", {
-    className: "hb-grid"
-  }, shown.map((r, i) => {
-    const a = r.analysis && !r.analysis.error ? r.analysis : null;
-    return React.createElement("div", {
-      key: r.id,
-      className: "hb-reel",
-      style: {
-        "--i": Math.min(i, 20)
-      }
-    }, React.createElement("a", {
-      href: r.url,
-      target: "_blank",
-      rel: "noopener noreferrer",
-      className: "hb-thumb",
-      style: {
-        backgroundImage: r.thumb_url ? `url(${r.thumb_url})` : "none"
-      }
-    }, React.createElement("span", {
-      className: `hb-mult ${r.multiple < 1.3 ? "mid" : ""}`
-    }, r.multiple, "x"), React.createElement("div", {
-      className: "hb-over"
-    }, React.createElement("div", {
-      className: "h"
-    }, "@", r.handle), React.createElement("div", {
-      className: "v"
-    }, igK(r.views), React.createElement("small", null, "views")))), React.createElement("button", {
-      className: `hb-star ${r.saved ? "on" : ""}`,
-      title: r.saved ? "Saved" : "Save",
-      "aria-label": "Save",
-      onClick: () => {
-        setData(d => ({
-          ...d,
-          reels: d.reels.map(x => x.id === r.id ? {
-            ...x,
-            saved: !r.saved
-          } : x)
-        }));
-        hubFn({
-          action: "save-reel",
-          id: r.id,
-          saved: !r.saved
-        }).catch(() => {});
-      }
-    }, React.createElement(IGStar, {
-      size: 14,
-      color: r.saved ? "#3a2a00" : "#fff"
-    })), React.createElement("div", {
-      className: "hb-body"
-    }, a ? React.createElement("span", {
-      className: "hb-fmt"
-    }, a.format) : null, React.createElement("div", {
-      className: `hb-hook ${a ? "" : "dim"}`
-    }, a ? a.hook : r.caption || "No caption"), React.createElement("div", {
-      className: "hb-acts"
-    }, React.createElement("button", {
-      className: `hb-btn sm ${a ? "" : "ghost"}`,
-      onClick: () => setOpen(r.id)
-    }, a ? "Why it worked" : "Break it down"))));
-  }))) : tab === "plan" ? React.createElement(React.Fragment, null, React.createElement("div", {
-    className: "hb-bar"
-  }, React.createElement("div", {
-    style: {
-      fontSize: 20,
-      fontWeight: 800,
-      letterSpacing: "-.01em"
-    }
-  }, plan ? `Week of ${hubDate(plan.week_start)}` : `Week of ${hubDate(data.nextWeek)}`), plan && React.createElement("span", {
-    className: `hb-status ${plan.status}`
-  }, plan.status === "sent" ? `Sent to ${model}` : "Draft, only the team sees it"), React.createElement("span", {
-    style: {
-      flex: 1
-    }
-  }), plan && React.createElement("button", {
-    className: "hb-btn ghost",
-    onClick: () => {
-      try {
-        navigator.clipboard.writeText(planText(plan));
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      } catch (e) {}
-    }
-  }, copied ? "Copied" : "Copy as text"), React.createElement("button", {
-    className: "hb-btn ghost",
-    disabled: busy === "plan",
-    onClick: () => {
-      if (plan && plan.week_start === data.nextWeek && !window.confirm("Write this week's plan again? The current one is replaced.")) return;
-      act("plan", {
-        action: "plan-generate"
-      });
-    }
-  }, busy === "plan" ? React.createElement(React.Fragment, null, React.createElement("span", {
-    className: "hb-spin"
-  }), "Writing the plan") : plan && plan.week_start === data.nextWeek ? "Write again" : "Write the plan"), plan && (plan.status === "sent" ? React.createElement("button", {
-    className: "hb-btn ghost",
-    disabled: busy === "send",
-    onClick: () => act("send", {
-      action: "plan-unsend",
-      id: plan.id
-    })
-  }, "Take back") : React.createElement("button", {
-    className: "hb-btn",
-    disabled: busy === "send" || !(plan.items || []).length,
-    onClick: () => {
-      if (window.confirm(`Send this plan to ${model}? She gets a notification and sees it in her Zion.`)) act("send", {
-        action: "plan-send",
-        id: plan.id
-      });
-    }
-  }, busy === "send" ? "Sending" : `Send to ${model}`))), !plan ? React.createElement("div", {
-    className: "hb-empty"
-  }, React.createElement("b", null, "No plan yet"), "Press Scan now in the Swipe file first, then Write the plan here. Nothing runs by itself, so you only pay for what you press. It needs at least a few reels in the swipe file.") : React.createElement("div", {
-    className: "hb-card"
-  }, plan.summary && React.createElement("p", {
-    style: {
-      fontSize: 14,
-      lineHeight: 1.6,
-      color: "#d9e2dd",
-      margin: "0 0 6px"
-    }
-  }, plan.summary), React.createElement("p", {
-    className: "hb-note",
-    style: {
-      marginBottom: 6
-    }
-  }, (plan.items || []).length, " reels. ", model, " sees the hook, the idea and the link. The grey reason line is for the team only."), (plan.items || []).map((it, i) => React.createElement("div", {
-    key: it.reel_id || i,
-    className: "hb-item",
-    style: {
-      "--i": Math.min(i, 20)
-    }
-  }, React.createElement("a", {
-    href: it.url,
-    target: "_blank",
-    rel: "noopener noreferrer",
-    className: "t",
-    style: {
-      backgroundImage: it.thumb_url ? `url(${it.thumb_url})` : "none"
-    }
-  }, React.createElement("span", {
-    className: "n"
-  }, i + 1)), React.createElement("div", {
-    style: {
-      minWidth: 0
-    }
-  }, React.createElement("div", {
-    style: {
-      marginBottom: 6
-    }
-  }, React.createElement("span", {
-    className: `hb-pri ${it.priority}`
-  }, it.priority), it.format ? React.createElement("span", {
-    className: "hb-note"
-  }, it.format, ", ") : null, React.createElement("span", {
-    className: "hb-note"
-  }, "@", it.handle, ", ", igK(it.views), " views, ", it.multiple, "x")), React.createElement("div", {
-    style: {
-      fontSize: 15.5,
-      fontWeight: 700,
-      lineHeight: 1.35,
-      marginBottom: 4
-    }
-  }, it.hook), React.createElement("div", {
-    style: {
-      fontSize: 13.5,
-      lineHeight: 1.55,
-      color: "#d9e2dd"
-    }
-  }, it.idea), it.why && React.createElement("div", {
-    className: "hb-note",
-    style: {
-      marginTop: 5
-    }
-  }, it.why), React.createElement("a", {
-    href: it.url,
-    target: "_blank",
-    rel: "noopener noreferrer",
-    style: {
-      display: "inline-block",
-      marginTop: 7,
-      fontSize: 12,
-      fontWeight: 600,
-      color: "#39e673"
-    }
-  }, "Watch the reel")), plan.status !== "sent" && React.createElement("button", {
-    className: "hb-x",
-    title: "Remove from the plan",
-    "aria-label": "Remove",
-    onClick: () => {
-      const items = plan.items.filter((_, n) => n !== i);
-      setData(d => ({
-        ...d,
-        plans: d.plans.map(p => p.id === plan.id ? {
-          ...p,
-          items
-        } : p)
-      }));
-      hubFn({
-        action: "plan-update",
-        id: plan.id,
-        items
-      }).catch(e => setErr(e.message));
-    }
-  }, React.createElement(X, {
-    size: 15
-  }))))), plans.filter(p => p.id !== plan?.id).length > 0 && React.createElement("p", {
-    className: "hb-note",
-    style: {
-      marginTop: 14
-    }
-  }, "Earlier plans: ", plans.filter(p => p.id !== plan?.id).map(p => `week of ${hubDate(p.week_start)} (${(p.items || []).length} reels, ${p.status})`).join(", "))) : React.createElement(React.Fragment, null, React.createElement("div", {
+  const profilesJsx = !data ? null : React.createElement(React.Fragment, null, React.createElement("div", {
     className: "hb-card",
     style: {
       marginBottom: 14
@@ -9610,7 +9380,332 @@ function IgHub({
       id: p.id,
       status: "rejected"
     })
-  }, "Skip"))))), open && reels.find(r => r.id === open) && React.createElement(HubReelSheet, {
+  }, "Skip")))));
+  return React.createElement("div", {
+    className: "hb"
+  }, React.createElement("style", null, HUB_CSS, MD_CSS), React.createElement("div", {
+    className: "hb-bar"
+  }, list.map(m => React.createElement("button", {
+    key: m.name,
+    className: `hb-chip ${m.name === model ? "on" : ""}`,
+    onClick: () => pick(m.name)
+  }, m.name))), err && React.createElement("div", {
+    className: "hb-err"
+  }, err), !data ? React.createElement("div", {
+    className: "hb-empty"
+  }, React.createElement("span", {
+    className: "hb-spin"
+  })) : tab === "swipe" ? React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "hb-bar"
+  }, [["all", `All ${mine.length}`], ["saved", "Saved"], ["analyzed", "With breakdown"], ...formats.map(f => [f, f])].map(([k, l]) => React.createElement("button", {
+    key: k,
+    className: `hb-chip ${filter === k ? "on" : ""}`,
+    onClick: () => setFilter(k)
+  }, l))), React.createElement("form", {
+    className: "hb-card",
+    style: {
+      marginBottom: 14
+    },
+    onSubmit: e => {
+      e.preventDefault();
+      const items = shootParse(swipeText).items;
+      if (items.length) act("swadd", {
+        action: "swipe-add",
+        items
+      }, async () => {
+        setSwipeText("");
+        await load();
+      });
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 16,
+      marginBottom: 4
+    }
+  }, "Add reels you found for ", model), React.createElement("p", {
+    className: "hb-note",
+    style: {
+      marginBottom: 8
+    }
+  }, "Paste reel links from your feed, a note can follow the link on the same line. Tracking parts like igsh are removed. The weekly plan prefers these."), React.createElement("textarea", {
+    className: "sh-ta",
+    style: {
+      minHeight: 90
+    },
+    value: swipeText,
+    onChange: e => setSwipeText(e.target.value),
+    placeholder: "https://www.instagram.com/reel/... funny hook, easy to film"
+  }), React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      alignItems: "center",
+      marginTop: 10
+    }
+  }, React.createElement("button", {
+    className: "hb-btn",
+    disabled: busy === "swadd" || !shootParse(swipeText).items.length
+  }, busy === "swadd" ? "Adding" : `Add ${shootParse(swipeText).items.length || ""} reels`), data.swipeAdd?.state === "running" && React.createElement("span", {
+    className: "hb-note",
+    style: {
+      display: "flex",
+      gap: 6,
+      alignItems: "center"
+    }
+  }, React.createElement("span", {
+    className: "hb-spin"
+  }), "Reading covers and views"))), !mine.length ? React.createElement("div", {
+    className: "hb-empty"
+  }, React.createElement("b", null, "Her swipe file is empty"), "Paste reel links above. Only reels you add yourself show up here.") : !shown.length ? React.createElement("div", {
+    className: "hb-empty"
+  }, React.createElement("b", null, "No reels match this filter")) : React.createElement("div", {
+    className: "hb-grid"
+  }, shown.map((r, i) => {
+    const a = r.analysis && !r.analysis.error ? r.analysis : null;
+    return React.createElement("div", {
+      key: r.id,
+      className: "hb-reel",
+      style: {
+        "--i": Math.min(i, 20)
+      }
+    }, React.createElement("a", {
+      href: r.url,
+      target: "_blank",
+      rel: "noopener noreferrer",
+      className: "hb-thumb",
+      style: {
+        backgroundImage: r.thumb_url ? `url(${r.thumb_url})` : "none"
+      }
+    }, React.createElement("span", {
+      className: `hb-mult ${r.multiple < 1.3 ? "mid" : ""}`
+    }, r.multiple, "x"), React.createElement("div", {
+      className: "hb-over"
+    }, React.createElement("div", {
+      className: "h"
+    }, "@", r.handle), React.createElement("div", {
+      className: "v"
+    }, igK(r.views), React.createElement("small", null, "views")))), React.createElement("button", {
+      className: `hb-star ${r.saved ? "on" : ""}`,
+      title: r.saved ? "Saved" : "Save",
+      "aria-label": "Save",
+      onClick: () => {
+        setData(d => ({
+          ...d,
+          reels: d.reels.map(x => x.id === r.id ? {
+            ...x,
+            saved: !r.saved
+          } : x)
+        }));
+        hubFn({
+          action: "save-reel",
+          id: r.id,
+          saved: !r.saved
+        }).catch(() => {});
+      }
+    }, React.createElement(IGStar, {
+      size: 14,
+      color: r.saved ? "#3a2a00" : "#fff"
+    })), React.createElement("div", {
+      className: "hb-body"
+    }, a ? React.createElement("span", {
+      className: "hb-fmt"
+    }, a.format) : null, React.createElement("div", {
+      className: `hb-hook ${a ? "" : "dim"}`
+    }, a ? a.hook : r.caption || "No caption"), React.createElement("div", {
+      className: "hb-acts"
+    }, React.createElement("button", {
+      className: `hb-btn sm ${a ? "" : "ghost"}`,
+      onClick: () => setOpen(r.id)
+    }, a ? "Why it worked" : "Break it down"), React.createElement("button", {
+      className: "hb-btn ghost sm",
+      style: {
+        flex: "0 0 auto"
+      },
+      title: "Remove",
+      onClick: () => {
+        if (window.confirm("Remove this reel from her swipe file?")) act("rr" + r.id, {
+          action: "remove-reel",
+          id: r.id
+        });
+      }
+    }, React.createElement(X, {
+      size: 13
+    })))));
+  }))) : tab === "plan" ? React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "hb-bar"
+  }, React.createElement("div", {
+    style: {
+      fontSize: 20,
+      fontWeight: 800,
+      letterSpacing: "-.01em"
+    }
+  }, plan ? `Week of ${hubDate(plan.week_start)}` : `Week of ${hubDate(data.nextWeek)}`), plan && React.createElement("span", {
+    className: `hb-status ${plan.status}`
+  }, plan.status === "sent" ? `Sent to ${model}` : "Draft, only the team sees it"), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }), React.createElement("button", {
+    className: `hb-btn ghost`,
+    onClick: () => setShowProfiles(v => !v)
+  }, showProfiles ? "Hide tracked profiles" : `Tracked profiles ${active.length}`), plan && React.createElement("button", {
+    className: "hb-btn ghost",
+    onClick: () => {
+      try {
+        navigator.clipboard.writeText(planText(plan));
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      } catch (e) {}
+    }
+  }, copied ? "Copied" : "Copy as text"), React.createElement("button", {
+    className: "hb-btn ghost",
+    disabled: busy === "plan",
+    onClick: () => {
+      if (plan && plan.week_start === data.nextWeek && !window.confirm("Write this week's plan again? The current one is replaced.")) return;
+      act("plan", {
+        action: "plan-generate"
+      });
+    }
+  }, busy === "plan" ? React.createElement(React.Fragment, null, React.createElement("span", {
+    className: "hb-spin"
+  }), "Writing the plan") : plan && plan.week_start === data.nextWeek ? "Write again" : "Write the plan"), plan && (plan.status === "sent" ? React.createElement("button", {
+    className: "hb-btn ghost",
+    disabled: busy === "send",
+    onClick: () => act("send", {
+      action: "plan-unsend",
+      id: plan.id
+    })
+  }, "Take back") : React.createElement("button", {
+    className: "hb-btn",
+    disabled: busy === "send" || !(plan.items || []).length,
+    onClick: () => {
+      if (window.confirm(`Send this plan to ${model}? She gets a notification and sees it in her Zion.`)) act("send", {
+        action: "plan-send",
+        id: plan.id
+      });
+    }
+  }, busy === "send" ? "Sending" : `Send to ${model}`))), showProfiles && React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, React.createElement("div", {
+    className: "hb-card",
+    style: {
+      marginBottom: 14,
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      flexWrap: "wrap"
+    }
+  }, React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 200
+    },
+    className: "hb-note"
+  }, data.scan?.state === "done" ? `Last scan of her profiles ${timeAgo(data.scan.finishedAt)}, kept ${data.scan.kept} of ${data.scan.scanned} reels.` : "Her profiles are not scanned yet.", " Scanned reels feed the plan together with Trends and her swipe file."), scanBtn), profilesJsx), !plan ? React.createElement("div", {
+    className: "hb-empty"
+  }, React.createElement("b", null, "No plan yet"), "Write the plan picks 10 reels for her from Trends, her swipe file and her tracked profiles, judged by what works on her own account. Nothing runs by itself.") : React.createElement("div", {
+    className: "hb-card"
+  }, plan.summary && React.createElement("p", {
+    style: {
+      fontSize: 14,
+      lineHeight: 1.6,
+      color: "#d9e2dd",
+      margin: "0 0 6px"
+    }
+  }, plan.summary), React.createElement("p", {
+    className: "hb-note",
+    style: {
+      marginBottom: 6
+    }
+  }, (plan.items || []).length, " reels. ", model, " sees the hook, the idea and the link. The grey reason line is for the team only."), (plan.items || []).map((it, i) => React.createElement("div", {
+    key: it.reel_id || i,
+    className: "hb-item",
+    style: {
+      "--i": Math.min(i, 20)
+    }
+  }, React.createElement("a", {
+    href: it.url,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    className: "t",
+    style: {
+      backgroundImage: it.thumb_url ? `url(${it.thumb_url})` : "none"
+    }
+  }, React.createElement("span", {
+    className: "n"
+  }, i + 1)), React.createElement("div", {
+    style: {
+      minWidth: 0
+    }
+  }, React.createElement("div", {
+    style: {
+      marginBottom: 6
+    }
+  }, React.createElement("span", {
+    className: `hb-pri ${it.priority}`
+  }, it.priority), it.format ? React.createElement("span", {
+    className: "hb-note"
+  }, it.format, ", ") : null, React.createElement("span", {
+    className: "hb-note"
+  }, "@", it.handle, ", ", igK(it.views), " views, ", it.multiple, "x")), React.createElement("div", {
+    style: {
+      fontSize: 15.5,
+      fontWeight: 700,
+      lineHeight: 1.35,
+      marginBottom: 4
+    }
+  }, it.hook), React.createElement("div", {
+    style: {
+      fontSize: 13.5,
+      lineHeight: 1.55,
+      color: "#d9e2dd"
+    }
+  }, it.idea), it.why && React.createElement("div", {
+    className: "hb-note",
+    style: {
+      marginTop: 5
+    }
+  }, it.why), React.createElement("a", {
+    href: it.url,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    style: {
+      display: "inline-block",
+      marginTop: 7,
+      fontSize: 12,
+      fontWeight: 600,
+      color: "#39e673"
+    }
+  }, "Watch the reel")), plan.status !== "sent" && React.createElement("button", {
+    className: "hb-x",
+    title: "Remove from the plan",
+    "aria-label": "Remove",
+    onClick: () => {
+      const items = plan.items.filter((_, n) => n !== i);
+      setData(d => ({
+        ...d,
+        plans: d.plans.map(p => p.id === plan.id ? {
+          ...p,
+          items
+        } : p)
+      }));
+      hubFn({
+        action: "plan-update",
+        id: plan.id,
+        items
+      }).catch(e => setErr(e.message));
+    }
+  }, React.createElement(X, {
+    size: 15
+  }))))), plans.filter(p => p.id !== plan?.id).length > 0 && React.createElement("p", {
+    className: "hb-note",
+    style: {
+      marginTop: 14
+    }
+  }, "Earlier plans: ", plans.filter(p => p.id !== plan?.id).map(p => `week of ${hubDate(p.week_start)} (${(p.items || []).length} reels, ${p.status})`).join(", "))) : null, open && reels.find(r => r.id === open) && React.createElement(HubReelSheet, {
     reel: reels.find(r => r.id === open),
     model: model,
     onClose: () => setOpen(null),
@@ -10431,7 +10526,7 @@ function ContentDirector({
         gap: 4,
         flexShrink: 0
       }
-    }, [["dash", "Dashboard"], ["shoot", "Shoot list"], ["swipe", "Swipe file"], ["plan", "Weekly plan"], ["profiles", "Tracked profiles"], ["studio", "AI Studio"]].map(([k, l]) => React.createElement("button", {
+    }, [["dash", "Dashboard"], ["shoot", "Shoot list"], ["swipe", "Swipe file"], ["plan", "Weekly plan"], ["studio", "AI Studio"]].map(([k, l]) => React.createElement("button", {
       key: k,
       onClick: () => setIgAiStudio(k === "dash" ? false : k),
       style: {
@@ -27144,7 +27239,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">ddvbjx</script>
+<script type="text/babel" id="zion-version">13h4jl7</script>
 <script>
 (function () {
   var last = 0;

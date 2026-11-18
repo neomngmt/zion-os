@@ -5095,6 +5095,8 @@ function IgHub({ models, tab }) {
   const [filter, setFilter] = useState("all");
   const [handles, setHandles] = useState("");
   const [copied, setCopied] = useState(false);
+  const [swipeText, setSwipeText] = useState("");
+  const [showProfiles, setShowProfiles] = useState(false);
   const pick = (n) => { setModel(n); try { localStorage.setItem("zionHubModel", n); } catch (e) {} };
   const load = useCallback(async () => {
     if (!model) return;
@@ -5117,6 +5119,12 @@ function IgHub({ models, tab }) {
     return () => clearInterval(t);
   }, [scanning, model, load]);
 
+  const adding = data?.swipeAdd?.state === "running";
+  useEffect(() => {
+    if (!adding) return;
+    const t = setInterval(async () => { try { const st = await hubFn({ action: "swipe-add-status", model }); if (st.state !== "running") load(); } catch (e) {} }, 6000);
+    return () => clearInterval(t);
+  }, [adding, model, load]);
   if (!list.length) return <div className="hb-empty"><b>No models yet</b>Models appear here once they exist in the Model Manager.</div>;
   const profiles = data?.profiles || [];
   const active = profiles.filter((p) => p.status === "active");
@@ -5124,7 +5132,8 @@ function IgHub({ models, tab }) {
   const reels = data?.reels || [];
   const plans = data?.plans || [];
   const plan = plans.find((p) => p.week_start === data?.nextWeek) || plans[0];
-  const shown = reels.filter((r) => filter === "all" ? true : filter === "saved" ? r.saved : filter === "analyzed" ? (r.analysis && !r.analysis.error) : (r.analysis?.format === filter))
+  const mine = reels.filter((r) => r.source === "manual");
+  const shown = mine.filter((r) => filter === "all" ? true : filter === "saved" ? r.saved : filter === "analyzed" ? (r.analysis && !r.analysis.error) : (r.analysis?.format === filter))
     .sort((x, y) => (y.multiple || 0) - (x.multiple || 0));
   const formats = [...new Set(reels.map((r) => r.analysis?.format).filter(Boolean))];
   const scanBtn = (
@@ -5134,98 +5143,7 @@ function IgHub({ models, tab }) {
   );
   const planText = (p) => [`Reel plan, week of ${hubDate(p.week_start)}`, "", ...(p.items || []).map((i, n) => `${n + 1}. ${i.hook}\n${i.idea}\n${i.url}`)].join("\n\n");
 
-  return (
-    <div className="hb">
-      <style>{HUB_CSS}{MD_CSS}</style>
-      <div className="hb-bar">
-        {list.map((m) => <button key={m.name} className={`hb-chip ${m.name === model ? "on" : ""}`} onClick={() => pick(m.name)}>{m.name}</button>)}
-      </div>
-      {err && <div className="hb-err">{err}</div>}
-      {!data ? <div className="hb-empty"><span className="hb-spin" /></div> : tab === "swipe" ? (
-        <>
-          <div className="hb-bar">
-            {[["all", `All ${reels.length}`], ["saved", "Saved"], ["analyzed", "With breakdown"], ...formats.map((f) => [f, f])].map(([k, l]) => (
-              <button key={k} className={`hb-chip ${filter === k ? "on" : ""}`} onClick={() => setFilter(k)}>{l}</button>
-            ))}
-            <span style={{ flex: 1 }} />
-            {data.scan?.state === "done" && <span className="hb-note">Last scan {timeAgo(data.scan.finishedAt)}, kept {data.scan.kept} of {data.scan.scanned} reels</span>}
-            {data.scan?.state === "failed" && <span className="hb-note" style={{ color: "#ff8a6b" }}>{data.scan.error}</span>}
-            {scanBtn}
-          </div>
-          {!active.length ? (
-            <div className="hb-empty"><b>No tracked profiles for {model} yet</b>Open the Tracked profiles tab and add Instagram accounts from her niche. Their best reels land here.</div>
-          ) : !reels.length ? (
-            <div className="hb-empty"><b>Nothing in the swipe file yet</b>Press Scan now. It reads the newest reels of {active.length} tracked profile{active.length === 1 ? "" : "s"} and keeps the ones that beat that account's own normal numbers. Takes 2 to 5 minutes.</div>
-          ) : !shown.length ? (
-            <div className="hb-empty"><b>No reels match this filter</b></div>
-          ) : (
-            <div className="hb-grid">
-              {shown.map((r, i) => {
-                const a = r.analysis && !r.analysis.error ? r.analysis : null;
-                return (
-                  <div key={r.id} className="hb-reel" style={{ "--i": Math.min(i, 20) }}>
-                    <a href={r.url} target="_blank" rel="noopener noreferrer" className="hb-thumb" style={{ backgroundImage: r.thumb_url ? `url(${r.thumb_url})` : "none" }}>
-                      <span className={`hb-mult ${r.multiple < 1.3 ? "mid" : ""}`}>{r.multiple}x</span>
-                      <div className="hb-over"><div className="h">@{r.handle}</div><div className="v">{igK(r.views)}<small>views</small></div></div>
-                    </a>
-                    <button className={`hb-star ${r.saved ? "on" : ""}`} title={r.saved ? "Saved" : "Save"} aria-label="Save"
-                      onClick={() => { setData((d) => ({ ...d, reels: d.reels.map((x) => x.id === r.id ? { ...x, saved: !r.saved } : x) })); hubFn({ action: "save-reel", id: r.id, saved: !r.saved }).catch(() => {}); }}>
-                      <IGStar size={14} color={r.saved ? "#3a2a00" : "#fff"} />
-                    </button>
-                    <div className="hb-body">
-                      {a ? <span className="hb-fmt">{a.format}</span> : null}
-                      <div className={`hb-hook ${a ? "" : "dim"}`}>{a ? a.hook : (r.caption || "No caption")}</div>
-                      <div className="hb-acts">
-                        <button className={`hb-btn sm ${a ? "" : "ghost"}`} onClick={() => setOpen(r.id)}>{a ? "Why it worked" : "Break it down"}</button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </>
-      ) : tab === "plan" ? (
-        <>
-          <div className="hb-bar">
-            <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-.01em" }}>{plan ? `Week of ${hubDate(plan.week_start)}` : `Week of ${hubDate(data.nextWeek)}`}</div>
-            {plan && <span className={`hb-status ${plan.status}`}>{plan.status === "sent" ? `Sent to ${model}` : "Draft, only the team sees it"}</span>}
-            <span style={{ flex: 1 }} />
-            {plan && <button className="hb-btn ghost" onClick={() => { try { navigator.clipboard.writeText(planText(plan)); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch (e) {} }}>{copied ? "Copied" : "Copy as text"}</button>}
-            <button className="hb-btn ghost" disabled={busy === "plan"} onClick={() => { if (plan && plan.week_start === data.nextWeek && !window.confirm("Write this week's plan again? The current one is replaced.")) return; act("plan", { action: "plan-generate" }); }}>
-              {busy === "plan" ? <><span className="hb-spin" />Writing the plan</> : plan && plan.week_start === data.nextWeek ? "Write again" : "Write the plan"}
-            </button>
-            {plan && (plan.status === "sent"
-              ? <button className="hb-btn ghost" disabled={busy === "send"} onClick={() => act("send", { action: "plan-unsend", id: plan.id })}>Take back</button>
-              : <button className="hb-btn" disabled={busy === "send" || !(plan.items || []).length} onClick={() => { if (window.confirm(`Send this plan to ${model}? She gets a notification and sees it in her Zion.`)) act("send", { action: "plan-send", id: plan.id }); }}>{busy === "send" ? "Sending" : `Send to ${model}`}</button>)}
-          </div>
-          {!plan ? (
-            <div className="hb-empty"><b>No plan yet</b>Press Scan now in the Swipe file first, then Write the plan here. Nothing runs by itself, so you only pay for what you press. It needs at least a few reels in the swipe file.</div>
-          ) : (
-            <div className="hb-card">
-              {plan.summary && <p style={{ fontSize: 14, lineHeight: 1.6, color: "#d9e2dd", margin: "0 0 6px" }}>{plan.summary}</p>}
-              <p className="hb-note" style={{ marginBottom: 6 }}>{(plan.items || []).length} reels. {model} sees the hook, the idea and the link. The grey reason line is for the team only.</p>
-              {(plan.items || []).map((it, i) => (
-                <div key={it.reel_id || i} className="hb-item" style={{ "--i": Math.min(i, 20) }}>
-                  <a href={it.url} target="_blank" rel="noopener noreferrer" className="t" style={{ backgroundImage: it.thumb_url ? `url(${it.thumb_url})` : "none" }}><span className="n">{i + 1}</span></a>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ marginBottom: 6 }}><span className={`hb-pri ${it.priority}`}>{it.priority}</span>{it.format ? <span className="hb-note">{it.format}, </span> : null}<span className="hb-note">@{it.handle}, {igK(it.views)} views, {it.multiple}x</span></div>
-                    <div style={{ fontSize: 15.5, fontWeight: 700, lineHeight: 1.35, marginBottom: 4 }}>{it.hook}</div>
-                    <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "#d9e2dd" }}>{it.idea}</div>
-                    {it.why && <div className="hb-note" style={{ marginTop: 5 }}>{it.why}</div>}
-                    <a href={it.url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-block", marginTop: 7, fontSize: 12, fontWeight: 600, color: "#39e673" }}>Watch the reel</a>
-                  </div>
-                  {plan.status !== "sent" && <button className="hb-x" title="Remove from the plan" aria-label="Remove"
-                    onClick={() => { const items = plan.items.filter((_, n) => n !== i); setData((d) => ({ ...d, plans: d.plans.map((p) => p.id === plan.id ? { ...p, items } : p) })); hubFn({ action: "plan-update", id: plan.id, items }).catch((e) => setErr(e.message)); }}><X size={15} /></button>}
-                </div>
-              ))}
-            </div>
-          )}
-          {plans.filter((p) => p.id !== plan?.id).length > 0 && (
-            <p className="hb-note" style={{ marginTop: 14 }}>Earlier plans: {plans.filter((p) => p.id !== plan?.id).map((p) => `week of ${hubDate(p.week_start)} (${(p.items || []).length} reels, ${p.status})`).join(", ")}</p>
-          )}
-        </>
-      ) : (
+  const profilesJsx = !data ? null : (
         <>
           <div className="hb-card" style={{ marginBottom: 14 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 12 }}>
@@ -5270,7 +5188,113 @@ function IgHub({ models, tab }) {
             ))}
           </div>
         </>
-      )}
+  );
+  return (
+    <div className="hb">
+      <style>{HUB_CSS}{MD_CSS}</style>
+      <div className="hb-bar">
+        {list.map((m) => <button key={m.name} className={`hb-chip ${m.name === model ? "on" : ""}`} onClick={() => pick(m.name)}>{m.name}</button>)}
+      </div>
+      {err && <div className="hb-err">{err}</div>}
+      {!data ? <div className="hb-empty"><span className="hb-spin" /></div> : tab === "swipe" ? (
+        <>
+          <div className="hb-bar">
+            {[["all", `All ${mine.length}`], ["saved", "Saved"], ["analyzed", "With breakdown"], ...formats.map((f) => [f, f])].map(([k, l]) => (
+              <button key={k} className={`hb-chip ${filter === k ? "on" : ""}`} onClick={() => setFilter(k)}>{l}</button>
+            ))}
+          </div>
+          <form className="hb-card" style={{ marginBottom: 14 }} onSubmit={(e) => { e.preventDefault(); const items = shootParse(swipeText).items; if (items.length) act("swadd", { action: "swipe-add", items }, async () => { setSwipeText(""); await load(); }); }}>
+            <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 4 }}>Add reels you found for {model}</div>
+            <p className="hb-note" style={{ marginBottom: 8 }}>Paste reel links from your feed, a note can follow the link on the same line. Tracking parts like igsh are removed. The weekly plan prefers these.</p>
+            <textarea className="sh-ta" style={{ minHeight: 90 }} value={swipeText} onChange={(e) => setSwipeText(e.target.value)} placeholder={"https://www.instagram.com/reel/... funny hook, easy to film"} />
+            <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 10 }}>
+              <button className="hb-btn" disabled={busy === "swadd" || !shootParse(swipeText).items.length}>{busy === "swadd" ? "Adding" : `Add ${shootParse(swipeText).items.length || ""} reels`}</button>
+              {data.swipeAdd?.state === "running" && <span className="hb-note" style={{ display: "flex", gap: 6, alignItems: "center" }}><span className="hb-spin" />Reading covers and views</span>}
+            </div>
+          </form>
+          {!mine.length ? (
+            <div className="hb-empty"><b>Her swipe file is empty</b>Paste reel links above. Only reels you add yourself show up here.</div>
+          ) : !shown.length ? (
+            <div className="hb-empty"><b>No reels match this filter</b></div>
+          ) : (
+            <div className="hb-grid">
+              {shown.map((r, i) => {
+                const a = r.analysis && !r.analysis.error ? r.analysis : null;
+                return (
+                  <div key={r.id} className="hb-reel" style={{ "--i": Math.min(i, 20) }}>
+                    <a href={r.url} target="_blank" rel="noopener noreferrer" className="hb-thumb" style={{ backgroundImage: r.thumb_url ? `url(${r.thumb_url})` : "none" }}>
+                      <span className={`hb-mult ${r.multiple < 1.3 ? "mid" : ""}`}>{r.multiple}x</span>
+                      <div className="hb-over"><div className="h">@{r.handle}</div><div className="v">{igK(r.views)}<small>views</small></div></div>
+                    </a>
+                    <button className={`hb-star ${r.saved ? "on" : ""}`} title={r.saved ? "Saved" : "Save"} aria-label="Save"
+                      onClick={() => { setData((d) => ({ ...d, reels: d.reels.map((x) => x.id === r.id ? { ...x, saved: !r.saved } : x) })); hubFn({ action: "save-reel", id: r.id, saved: !r.saved }).catch(() => {}); }}>
+                      <IGStar size={14} color={r.saved ? "#3a2a00" : "#fff"} />
+                    </button>
+                    <div className="hb-body">
+                      {a ? <span className="hb-fmt">{a.format}</span> : null}
+                      <div className={`hb-hook ${a ? "" : "dim"}`}>{a ? a.hook : (r.caption || "No caption")}</div>
+                      <div className="hb-acts">
+                        <button className={`hb-btn sm ${a ? "" : "ghost"}`} onClick={() => setOpen(r.id)}>{a ? "Why it worked" : "Break it down"}</button>
+                        <button className="hb-btn ghost sm" style={{ flex: "0 0 auto" }} title="Remove" onClick={() => { if (window.confirm("Remove this reel from her swipe file?")) act("rr" + r.id, { action: "remove-reel", id: r.id }); }}><X size={13} /></button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      ) : tab === "plan" ? (
+        <>
+          <div className="hb-bar">
+            <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-.01em" }}>{plan ? `Week of ${hubDate(plan.week_start)}` : `Week of ${hubDate(data.nextWeek)}`}</div>
+            {plan && <span className={`hb-status ${plan.status}`}>{plan.status === "sent" ? `Sent to ${model}` : "Draft, only the team sees it"}</span>}
+            <span style={{ flex: 1 }} />
+            <button className={`hb-btn ghost`} onClick={() => setShowProfiles((v) => !v)}>{showProfiles ? "Hide tracked profiles" : `Tracked profiles ${active.length}`}</button>
+            {plan && <button className="hb-btn ghost" onClick={() => { try { navigator.clipboard.writeText(planText(plan)); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch (e) {} }}>{copied ? "Copied" : "Copy as text"}</button>}
+            <button className="hb-btn ghost" disabled={busy === "plan"} onClick={() => { if (plan && plan.week_start === data.nextWeek && !window.confirm("Write this week's plan again? The current one is replaced.")) return; act("plan", { action: "plan-generate" }); }}>
+              {busy === "plan" ? <><span className="hb-spin" />Writing the plan</> : plan && plan.week_start === data.nextWeek ? "Write again" : "Write the plan"}
+            </button>
+            {plan && (plan.status === "sent"
+              ? <button className="hb-btn ghost" disabled={busy === "send"} onClick={() => act("send", { action: "plan-unsend", id: plan.id })}>Take back</button>
+              : <button className="hb-btn" disabled={busy === "send" || !(plan.items || []).length} onClick={() => { if (window.confirm(`Send this plan to ${model}? She gets a notification and sees it in her Zion.`)) act("send", { action: "plan-send", id: plan.id }); }}>{busy === "send" ? "Sending" : `Send to ${model}`}</button>)}
+          </div>
+          {showProfiles && (
+            <div style={{ marginBottom: 14 }}>
+              <div className="hb-card" style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 200 }} className="hb-note">{data.scan?.state === "done" ? `Last scan of her profiles ${timeAgo(data.scan.finishedAt)}, kept ${data.scan.kept} of ${data.scan.scanned} reels.` : "Her profiles are not scanned yet."} Scanned reels feed the plan together with Trends and her swipe file.</div>
+                {scanBtn}
+              </div>
+              {profilesJsx}
+            </div>
+          )}
+          {!plan ? (
+            <div className="hb-empty"><b>No plan yet</b>Write the plan picks 10 reels for her from Trends, her swipe file and her tracked profiles, judged by what works on her own account. Nothing runs by itself.</div>
+          ) : (
+            <div className="hb-card">
+              {plan.summary && <p style={{ fontSize: 14, lineHeight: 1.6, color: "#d9e2dd", margin: "0 0 6px" }}>{plan.summary}</p>}
+              <p className="hb-note" style={{ marginBottom: 6 }}>{(plan.items || []).length} reels. {model} sees the hook, the idea and the link. The grey reason line is for the team only.</p>
+              {(plan.items || []).map((it, i) => (
+                <div key={it.reel_id || i} className="hb-item" style={{ "--i": Math.min(i, 20) }}>
+                  <a href={it.url} target="_blank" rel="noopener noreferrer" className="t" style={{ backgroundImage: it.thumb_url ? `url(${it.thumb_url})` : "none" }}><span className="n">{i + 1}</span></a>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ marginBottom: 6 }}><span className={`hb-pri ${it.priority}`}>{it.priority}</span>{it.format ? <span className="hb-note">{it.format}, </span> : null}<span className="hb-note">@{it.handle}, {igK(it.views)} views, {it.multiple}x</span></div>
+                    <div style={{ fontSize: 15.5, fontWeight: 700, lineHeight: 1.35, marginBottom: 4 }}>{it.hook}</div>
+                    <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "#d9e2dd" }}>{it.idea}</div>
+                    {it.why && <div className="hb-note" style={{ marginTop: 5 }}>{it.why}</div>}
+                    <a href={it.url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-block", marginTop: 7, fontSize: 12, fontWeight: 600, color: "#39e673" }}>Watch the reel</a>
+                  </div>
+                  {plan.status !== "sent" && <button className="hb-x" title="Remove from the plan" aria-label="Remove"
+                    onClick={() => { const items = plan.items.filter((_, n) => n !== i); setData((d) => ({ ...d, plans: d.plans.map((p) => p.id === plan.id ? { ...p, items } : p) })); hubFn({ action: "plan-update", id: plan.id, items }).catch((e) => setErr(e.message)); }}><X size={15} /></button>}
+                </div>
+              ))}
+            </div>
+          )}
+          {plans.filter((p) => p.id !== plan?.id).length > 0 && (
+            <p className="hb-note" style={{ marginTop: 14 }}>Earlier plans: {plans.filter((p) => p.id !== plan?.id).map((p) => `week of ${hubDate(p.week_start)} (${(p.items || []).length} reels, ${p.status})`).join(", ")}</p>
+          )}
+        </>
+      ) : null}
       {open && reels.find((r) => r.id === open) && (
         <HubReelSheet reel={reels.find((r) => r.id === open)} model={model} onClose={() => setOpen(null)}
           onChange={(nr) => setData((d) => ({ ...d, reels: d.reels.map((x) => x.id === nr.id ? { ...x, ...nr } : x) }))} />
@@ -5668,7 +5692,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
     const igTabBar = (
       <div style={{ display: "flex", marginBottom: 16, overflowX: "auto" }}>
         <div style={{ display: "inline-flex", background: "#0e1310", border: "1px solid rgba(57,230,115,0.16)", borderRadius: 16, padding: 5, gap: 4, flexShrink: 0 }}>
-          {[["dash", "Dashboard"], ["shoot", "Shoot list"], ["swipe", "Swipe file"], ["plan", "Weekly plan"], ["profiles", "Tracked profiles"], ["studio", "AI Studio"]].map(([k, l]) => (
+          {[["dash", "Dashboard"], ["shoot", "Shoot list"], ["swipe", "Swipe file"], ["plan", "Weekly plan"], ["studio", "AI Studio"]].map(([k, l]) => (
             <button key={k} onClick={() => setIgAiStudio(k === "dash" ? false : k)}
               style={{ padding: "9px 16px", borderRadius: 12, fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", transition: "all .2s",
                 background: (igAiStudio || "dash") === k ? "#39e673" : "transparent", color: (igAiStudio || "dash") === k ? "#03110a" : "#8fa39a" }}>{l}</button>
