@@ -352,6 +352,19 @@ const ICON_DATA = {
   Minus: [["path", {
     d: "M5 12h14"
   }]],
+  Target: [["circle", {
+    cx: "12",
+    cy: "12",
+    r: "10"
+  }], ["circle", {
+    cx: "12",
+    cy: "12",
+    r: "6"
+  }], ["circle", {
+    cx: "12",
+    cy: "12",
+    r: "2"
+  }]],
   Flame: [["path", {
     d: "M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"
   }]],
@@ -544,6 +557,7 @@ const {
   X,
   Clapperboard,
   Users,
+  Target,
   ChevronRight,
   ChevronDown,
   MapPin,
@@ -15543,6 +15557,754 @@ const VERDICT = {
     l: "Act now"
   }
 };
+async function acqFn(body) {
+  let token = "";
+  try {
+    token = JSON.parse(localStorage.getItem("agencyos_session") || "{}").token || "";
+  } catch (e) {}
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/acquisition`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      "x-zion-token": token
+    },
+    body: JSON.stringify(body)
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+}
+const ACQ_STAGES = [["new", "New"], ["messaged", "Messaged"], ["replied", "Replied"], ["call", "Call"], ["signed", "Signed"], ["lost", "Not interested"], ["skip", "Skipped"]];
+const ACQ_CSS = `
+.aq-top{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
+.aq-kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-bottom:16px; }
+.aq-kpi{ border-radius:16px; padding:13px; background:#0e1310; border:1px solid rgba(255,255,255,.08); }
+.aq-kpi b{ display:block; font-size:24px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.aq-kpi span{ font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#8fa39a; }
+.aq-kpi.hot{ border-color:rgba(57,230,115,.45); background:linear-gradient(160deg, rgba(57,230,115,.12), #0e1310); }
+.aq-row{ display:grid; grid-template-columns:44px 1fr auto; gap:12px; align-items:center; padding:11px 12px; border-radius:14px; cursor:pointer; transition:background .2s; border-top:1px solid rgba(255,255,255,.05); }
+.aq-row:hover{ background:rgba(255,255,255,.04); }
+.aq-ava{ width:44px; height:44px; border-radius:50%; background:#1b2420 center/cover no-repeat; display:flex; align-items:center; justify-content:center; font-weight:800; color:#8fa39a; }
+.aq-score{ min-width:42px; text-align:center; padding:4px 8px; border-radius:999px; font-weight:800; font-size:13px; }
+.aq-tag{ display:inline-block; padding:1px 7px; border-radius:999px; font-size:10.5px; font-weight:600; margin-right:5px; }
+.aq-tag.of{ color:#39e673; background:rgba(57,230,115,.12); }
+.aq-tag.ofm{ color:#ffcf8a; background:rgba(255,170,60,.12); }
+.aq-tag.ag{ color:#ff8a6b; background:rgba(255,120,90,.12); }
+.aq-tag.fu{ color:#03110a; background:#39e673; }
+.aq-sheet{ position:fixed; inset:0; z-index:60; display:flex; justify-content:flex-end; background:rgba(2,6,4,.6); backdrop-filter:blur(6px); }
+.aq-panel{ width:min(520px,100%); height:100%; overflow:auto; background:#0b100d; border-left:1px solid rgba(57,230,115,.25); padding:22px; animation:hbIn .35s cubic-bezier(.16,1,.3,1) both; }
+.aq-stage{ display:flex; gap:6px; flex-wrap:wrap; margin:12px 0; }
+`;
+function AcquisitionPage() {
+  const [agency, setAgency] = useState(() => {
+    try {
+      return localStorage.getItem("zionAcqAgency") || "CZ";
+    } catch (e) {
+      return "CZ";
+    }
+  });
+  const [leads, setLeads] = useState(null);
+  const [run, setRun] = useState(null);
+  const [cfg, setCfg] = useState(null);
+  const [view, setView] = useState("todo");
+  const [open, setOpen] = useState(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState("");
+  const [showCfg, setShowCfg] = useState(false);
+  const [addText, setAddText] = useState("");
+  const pickAgency = a => {
+    setAgency(a);
+    try {
+      localStorage.setItem("zionAcqAgency", a);
+    } catch (e) {}
+  };
+  const load = useCallback(async () => {
+    try {
+      const [l, c] = await Promise.all([acqFn({
+        action: "leads",
+        agency
+      }), acqFn({
+        action: "config",
+        agency
+      })]);
+      setLeads(l.leads || []);
+      setRun(l.run);
+      setCfg(c.config || {});
+      setErr("");
+    } catch (e) {
+      setErr(e.message);
+    }
+  }, [agency]);
+  useEffect(() => {
+    setLeads(null);
+    load();
+  }, [agency, load]);
+  const running = run && !["done", "failed"].includes(run.state);
+  useEffect(() => {
+    if (!running) return;
+    const t = setInterval(async () => {
+      try {
+        const j = await acqFn({
+          action: "status",
+          agency
+        });
+        setRun(j.run);
+        if (["done", "failed"].includes(j.run?.state)) load();
+      } catch (e) {}
+    }, 8000);
+    return () => clearInterval(t);
+  }, [running, agency, load]);
+  const act = async (key, body, after) => {
+    setBusy(key);
+    setErr("");
+    try {
+      const j = await acqFn({
+        agency,
+        ...body
+      });
+      if (after) await after(j);else await load();
+    } catch (e) {
+      setErr(e.message);
+    }
+    setBusy("");
+  };
+  const all = leads || [];
+  const now = Date.now();
+  const due = all.filter(l => l.next_followup_at && Date.parse(l.next_followup_at) <= now + 12 * 3600000 && l.status === "messaged");
+  const fresh = all.filter(l => l.status === "new");
+  const week = k => all.filter(l => l[k] && now - Date.parse(l[k]) < 7 * 86400000).length;
+  const lists = {
+    todo: [...due, ...fresh.filter(l => (l.score || 0) >= 50)].slice(0, 60),
+    new: fresh,
+    pipeline: all.filter(l => ["messaged", "replied", "call"].includes(l.status)),
+    signed: all.filter(l => l.status === "signed"),
+    archive: all.filter(l => ["lost", "skip"].includes(l.status))
+  };
+  const shown = lists[view] || [];
+  const lead = open ? all.find(l => l.id === open) : null;
+  const patchLocal = (id, p) => setLeads(cur => (cur || []).map(l => l.id === id ? {
+    ...l,
+    ...p
+  } : l));
+  const scoreColor = s => s == null ? "rgba(255,255,255,.08)" : s >= 70 ? "#39e673" : s >= 45 ? "#ffcf8a" : "rgba(255,255,255,.12)";
+  const runText = run ? {
+    searching: "Searching Instagram",
+    reading: "Reading the profiles",
+    judging: "The AI is judging the leads"
+  }[run.state] || "" : "";
+  return React.createElement("div", {
+    className: "hb"
+  }, React.createElement("style", null, HUB_CSS, SHOOT_CSS, ACQ_CSS), React.createElement("div", {
+    className: "aq-top"
+  }, React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 220
+    }
+  }, React.createElement("div", {
+    className: "hb-note"
+  }, "Find creators who already do OF but weakly, judge them, and give the scouts a DM for each. Sending stays with a person.")), React.createElement("div", {
+    className: "oo-tabs",
+    style: {
+      display: "inline-flex",
+      padding: 4,
+      gap: 4,
+      borderRadius: 12,
+      background: "rgba(0,0,0,.35)",
+      border: "1px solid rgba(255,255,255,.08)"
+    }
+  }, ["CZ", "US"].map(a => React.createElement("button", {
+    key: a,
+    onClick: () => pickAgency(a),
+    style: {
+      padding: "6px 14px",
+      borderRadius: 9,
+      fontSize: 12,
+      fontWeight: 700,
+      color: agency === a ? "#03110a" : "#8fa39a",
+      background: agency === a ? "#39e673" : "transparent"
+    }
+  }, a, " agency")))), err && React.createElement("div", {
+    className: "hb-err"
+  }, err), React.createElement("div", {
+    className: "aq-kpis"
+  }, React.createElement("div", {
+    className: "aq-kpi hot"
+  }, React.createElement("b", null, due.length), React.createElement("span", null, "follow-ups due")), React.createElement("div", {
+    className: "aq-kpi"
+  }, React.createElement("b", null, fresh.filter(l => (l.score || 0) >= 50).length), React.createElement("span", null, "good new leads")), React.createElement("div", {
+    className: "aq-kpi"
+  }, React.createElement("b", null, week("messaged_at")), React.createElement("span", null, "messaged this week")), React.createElement("div", {
+    className: "aq-kpi"
+  }, React.createElement("b", null, all.filter(l => l.status === "replied" || l.status === "call").length), React.createElement("span", null, "talking now")), React.createElement("div", {
+    className: "aq-kpi"
+  }, React.createElement("b", null, lists.signed.length), React.createElement("span", null, "signed"))), React.createElement("div", {
+    className: "hb-card",
+    style: {
+      marginBottom: 16,
+      display: "flex",
+      gap: 12,
+      alignItems: "center",
+      flexWrap: "wrap"
+    }
+  }, React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 220
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 800
+    }
+  }, running ? runText : run?.state === "done" ? `Last search ${timeAgo(run.finishedAt)}: ${run.added || 0} new leads from ${run.read || 0} profiles read` : run?.state === "failed" ? `Last search failed: ${run.error}` : "No search yet"), React.createElement("div", {
+    className: "hb-note"
+  }, running ? "Takes 5 to 15 minutes, you can close the page." : `Uses ${(cfg?.hashtags || []).length} hashtags, ${(cfg?.seeds || []).length} similar accounts, ${(cfg?.follow_of || []).length} big accounts. About 1 to 2 USD per search.`)), React.createElement("button", {
+    className: "hb-btn ghost",
+    onClick: () => setShowCfg(v => !v)
+  }, showCfg ? "Hide settings" : "Search settings"), React.createElement("button", {
+    className: "hb-btn",
+    disabled: running || busy === "search",
+    onClick: () => act("search", {
+      action: "search"
+    }, j => setRun(j.run))
+  }, running ? React.createElement(React.Fragment, null, React.createElement("span", {
+    className: "hb-spin"
+  }), "Searching") : "Find new leads")), showCfg && cfg && React.createElement(AcqSettings, {
+    cfg: cfg,
+    agency: agency,
+    onSaved: () => {
+      setShowCfg(false);
+      load();
+    }
+  }), React.createElement("form", {
+    className: "hb-card",
+    style: {
+      marginBottom: 16
+    },
+    onSubmit: e => {
+      e.preventDefault();
+      if (addText.trim()) act("add", {
+        action: "add",
+        text: addText
+      }, async () => {
+        setAddText("");
+        await load();
+      });
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      marginBottom: 4
+    }
+  }, "Add leads you found anywhere"), React.createElement("div", {
+    className: "hb-note",
+    style: {
+      marginBottom: 8
+    }
+  }, "Instagram usernames or links get their numbers read and judged. Any other link (TikTok, X, Reddit, OnlyFans, a website) is saved as it is."), React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, React.createElement("input", {
+    className: "hb-in",
+    value: addText,
+    onChange: e => setAddText(e.target.value),
+    placeholder: "@username, instagram.com/..., tiktok.com/@..., onlyfans.com/..."
+  }), React.createElement("button", {
+    className: "hb-btn",
+    disabled: busy === "add" || !addText.trim()
+  }, busy === "add" ? "Adding" : "Add"))), React.createElement("div", {
+    className: "hb-bar"
+  }, [["todo", `To do ${lists.todo.length}`], ["new", `All new ${lists.new.length}`], ["pipeline", `In talks ${lists.pipeline.length}`], ["signed", `Signed ${lists.signed.length}`], ["archive", `Archive ${lists.archive.length}`]].map(([k, l]) => React.createElement("button", {
+    key: k,
+    className: `hb-chip ${view === k ? "on" : ""}`,
+    onClick: () => setView(k)
+  }, l))), React.createElement("div", {
+    className: "hb-card",
+    style: {
+      padding: 8
+    }
+  }, leads === null ? React.createElement("div", {
+    className: "hb-note",
+    style: {
+      padding: 12
+    }
+  }, "Loading") : !shown.length ? React.createElement("div", {
+    className: "hb-empty",
+    style: {
+      margin: 8
+    }
+  }, React.createElement("b", null, view === "todo" ? "Nothing to do right now" : "No leads here"), view === "todo" ? "Press Find new leads, or add some by hand above." : "") : shown.map(l => {
+    const isDue = l.status === "messaged" && l.next_followup_at && Date.parse(l.next_followup_at) <= now + 12 * 3600000;
+    return React.createElement("div", {
+      key: l.id,
+      className: "aq-row",
+      onClick: () => setOpen(l.id)
+    }, React.createElement("div", {
+      className: "aq-ava",
+      style: {
+        backgroundImage: l.thumb_url ? `url(${l.thumb_url})` : "none"
+      }
+    }, l.thumb_url ? "" : l.handle.charAt(0).toUpperCase()), React.createElement("div", {
+      style: {
+        minWidth: 0
+      }
+    }, React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, l.source === "manual" && !l.followers ? l.source_detail || l.handle : `@${l.handle}`, " ", React.createElement("span", {
+      className: "hb-note",
+      style: {
+        fontWeight: 400
+      }
+    }, l.full_name || "")), React.createElement("div", {
+      style: {
+        marginTop: 3
+      }
+    }, isDue && React.createElement("span", {
+      className: "aq-tag fu"
+    }, "Follow up"), l.of_status === "yes" && React.createElement("span", {
+      className: "aq-tag of"
+    }, "OF"), l.of_status === "maybe" && React.createElement("span", {
+      className: "aq-tag ofm"
+    }, "OF maybe"), /Agency likely/.test(l.of_note || "") && React.createElement("span", {
+      className: "aq-tag ag"
+    }, "Agency likely"), React.createElement("span", {
+      className: "hb-note"
+    }, [l.followers ? `${igK(l.followers)} followers` : null, l.reels_30d != null ? `${l.reels_30d} reels/30d` : null, l.median_views ? `${igK(l.median_views)} views` : null, l.status !== "new" ? (ACQ_STAGES.find(x => x[0] === l.status) || [])[1] : null].filter(Boolean).join(", ")))), React.createElement("span", {
+      className: "aq-score",
+      style: {
+        background: scoreColor(l.score),
+        color: (l.score || 0) >= 45 ? "#03110a" : "#c9d3ce"
+      }
+    }, l.score ?? "?"));
+  })), lead && React.createElement(AcqLeadSheet, {
+    lead: lead,
+    onClose: () => setOpen(null),
+    onPatch: p => patchLocal(lead.id, p),
+    onDeleted: () => {
+      setOpen(null);
+      load();
+    }
+  }));
+}
+function AcqSettings({
+  cfg,
+  agency,
+  onSaved
+}) {
+  const [f, setF] = useState({
+    hashtags: (cfg.hashtags || []).join(" "),
+    seeds: (cfg.seeds || []).join(" "),
+    follow_of: (cfg.follow_of || []).join(" "),
+    min_followers: cfg.min_followers || 1000,
+    max_followers: cfg.max_followers || 50000,
+    dm_template: cfg.dm_template || ""
+  });
+  const [busy, setBusy] = useState(false);
+  const set = (k, v) => setF(x => ({
+    ...x,
+    [k]: v
+  }));
+  const row = (label, k, ph, hint) => React.createElement("div", {
+    style: {
+      marginBottom: 12
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      marginBottom: 4
+    }
+  }, label), React.createElement("input", {
+    className: "hb-in",
+    style: {
+      width: "100%"
+    },
+    value: f[k],
+    onChange: e => set(k, e.target.value),
+    placeholder: ph
+  }), hint && React.createElement("div", {
+    className: "hb-note",
+    style: {
+      marginTop: 3
+    }
+  }, hint));
+  return React.createElement("div", {
+    className: "hb-card",
+    style: {
+      marginBottom: 16
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      marginBottom: 10
+    }
+  }, "Search settings, ", agency, " agency"), row("Hashtags", "hashtags", "praha brno czechgirl", "Reels posted under these hashtags. Separate with spaces."), row("Similar to these accounts", "seeds", "maminajarkaa val3ntyna.an1cka", "Instagram shows accounts similar to these, our own models work well."), row("Followers of these big accounts", "follow_of", "a big influencer or brand her audience follows", "Reads up to 150 followers of each, up to 3 accounts."), React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      marginBottom: 4
+    }
+  }, "Min followers"), React.createElement("input", {
+    className: "hb-in",
+    type: "number",
+    style: {
+      width: "100%"
+    },
+    value: f.min_followers,
+    onChange: e => set("min_followers", e.target.value)
+  })), React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      marginBottom: 4
+    }
+  }, "Max followers"), React.createElement("input", {
+    className: "hb-in",
+    type: "number",
+    style: {
+      width: "100%"
+    },
+    value: f.max_followers,
+    onChange: e => set("max_followers", e.target.value)
+  }))), React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      marginBottom: 4
+    }
+  }, "Your DM style (optional)"), React.createElement("textarea", {
+    className: "sh-ta",
+    style: {
+      minHeight: 80
+    },
+    value: f.dm_template,
+    onChange: e => set("dm_template", e.target.value),
+    placeholder: "Paste a DM that works for you, the AI writes every new one in the same style."
+  }), React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, React.createElement("button", {
+    className: "hb-btn",
+    disabled: busy,
+    onClick: async () => {
+      setBusy(true);
+      try {
+        await acqFn({
+          action: "set-config",
+          agency,
+          config: f
+        });
+        onSaved();
+      } catch (e) {}
+      setBusy(false);
+    }
+  }, busy ? "Saving" : "Save settings")));
+}
+function AcqLeadSheet({
+  lead,
+  onClose,
+  onPatch,
+  onDeleted
+}) {
+  const [busy, setBusy] = useState("");
+  const [notes, setNotes] = useState(lead.notes || "");
+  const [copied, setCopied] = useState("");
+  const parts = String(lead.dm || "").split("\n\n---\nFollow-up:\n");
+  const up = async (patch, extra = {}) => {
+    onPatch(patch);
+    try {
+      await acqFn({
+        action: "update",
+        id: lead.id,
+        patch,
+        ...extra
+      });
+    } catch (e) {}
+  };
+  const copy = async (k, t) => {
+    try {
+      await navigator.clipboard.writeText(t);
+      setCopied(k);
+      setTimeout(() => setCopied(""), 1500);
+    } catch (e) {}
+  };
+  const igUrl = lead.followers != null || !/\./.test(lead.handle) ? `https://www.instagram.com/${lead.handle}/` : lead.source_detail;
+  return React.createElement("div", {
+    className: "aq-sheet",
+    onClick: onClose
+  }, React.createElement("div", {
+    className: "aq-panel hb",
+    onClick: e => e.stopPropagation()
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 12,
+      alignItems: "center"
+    }
+  }, React.createElement("div", {
+    className: "aq-ava",
+    style: {
+      width: 56,
+      height: 56,
+      backgroundImage: lead.thumb_url ? `url(${lead.thumb_url})` : "none"
+    }
+  }, lead.thumb_url ? "" : lead.handle.charAt(0).toUpperCase()), React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, React.createElement("a", {
+    href: igUrl,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    style: {
+      fontWeight: 800,
+      fontSize: 18
+    }
+  }, lead.followers != null ? `@${lead.handle}` : lead.handle), React.createElement("div", {
+    className: "hb-note"
+  }, lead.full_name || "", lead.source ? ` · found via ${lead.source}${lead.source_detail && lead.source !== "manual" ? ` (${lead.source_detail})` : ""}` : "")), React.createElement("button", {
+    className: "hb-x",
+    onClick: onClose,
+    "aria-label": "Close"
+  }, React.createElement(X, {
+    size: 16
+  }))), lead.followers != null && React.createElement("div", {
+    className: "aq-kpis",
+    style: {
+      marginTop: 14
+    }
+  }, React.createElement("div", {
+    className: "aq-kpi"
+  }, React.createElement("b", null, igK(lead.followers)), React.createElement("span", null, "followers")), React.createElement("div", {
+    className: "aq-kpi"
+  }, React.createElement("b", null, lead.reels_30d ?? "?"), React.createElement("span", null, "reels in 30d")), React.createElement("div", {
+    className: "aq-kpi"
+  }, React.createElement("b", null, lead.median_views ? igK(lead.median_views) : "?"), React.createElement("span", null, "median views")), React.createElement("div", {
+    className: "aq-kpi"
+  }, React.createElement("b", null, lead.score ?? "?"), React.createElement("span", null, "score"))), lead.bio && React.createElement("p", {
+    style: {
+      fontSize: 13,
+      color: "#d9e2dd",
+      lineHeight: 1.5,
+      whiteSpace: "pre-wrap",
+      margin: "4px 0 10px"
+    }
+  }, lead.bio), lead.of_note && React.createElement("div", {
+    className: "hb-card",
+    style: {
+      padding: 12,
+      marginBottom: 10
+    }
+  }, React.createElement("div", {
+    className: "hb-note",
+    style: {
+      marginBottom: 3
+    }
+  }, "AI read"), React.createElement("div", {
+    style: {
+      fontSize: 13,
+      lineHeight: 1.5
+    }
+  }, lead.of_note), lead.of_link && React.createElement("a", {
+    href: lead.of_link,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    className: "hb-note",
+    style: {
+      color: "#39e673"
+    }
+  }, lead.of_link)), React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      marginTop: 6
+    }
+  }, "Checked by you"), React.createElement("div", {
+    className: "aq-stage"
+  }, [["yes", "Has OF"], ["no", "No OF"]].map(([v, l]) => React.createElement("button", {
+    key: v,
+    className: `hb-chip ${lead.of_status === v ? "on" : ""}`,
+    onClick: () => up({
+      of_status: v
+    })
+  }, l)), [["Agency likely", "Has an agency"], ["No agency", "No agency"]].map(([v, l]) => React.createElement("button", {
+    key: v,
+    className: `hb-chip ${(lead.of_note || "").startsWith(v) ? "on" : ""}`,
+    onClick: () => up({
+      of_note: `${v}. ${(lead.of_note || "").replace(/^(Agency likely|Agency maybe|No agency)\.\s*/, "")}`
+    })
+  }, l))), React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, "Stage"), React.createElement("div", {
+    className: "aq-stage"
+  }, ACQ_STAGES.map(([v, l]) => React.createElement("button", {
+    key: v,
+    className: `hb-chip ${lead.status === v ? "on" : ""}`,
+    onClick: () => up({
+      status: v
+    })
+  }, l))), lead.status === "messaged" && React.createElement("div", {
+    className: "hb-note",
+    style: {
+      marginBottom: 10
+    }
+  }, lead.next_followup_at ? `Follow-up due ${new Date(lead.next_followup_at).toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short"
+  })}` : "No more follow-ups planned", lead.followups ? `, ${lead.followups} sent` : "", lead.next_followup_at && React.createElement("button", {
+    className: "hb-btn sm",
+    style: {
+      marginLeft: 10
+    },
+    onClick: () => up({}, {
+      followedUp: true
+    })
+  }, "Follow-up sent")), React.createElement("div", {
+    className: "hb-card",
+    style: {
+      padding: 14,
+      marginBottom: 12
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      flex: 1
+    }
+  }, "DM for the scout"), React.createElement("button", {
+    className: "hb-btn ghost sm",
+    disabled: busy === "dm",
+    onClick: async () => {
+      setBusy("dm");
+      try {
+        const j = await acqFn({
+          action: "dm",
+          id: lead.id
+        });
+        onPatch({
+          dm: j.dm
+        });
+      } catch (e) {}
+      setBusy("");
+    }
+  }, busy === "dm" ? React.createElement(React.Fragment, null, React.createElement("span", {
+    className: "hb-spin"
+  }), "Writing") : lead.dm ? "Write again" : "Write DM")), lead.dm ? React.createElement(React.Fragment, null, React.createElement("div", {
+    style: {
+      fontSize: 14,
+      lineHeight: 1.55,
+      whiteSpace: "pre-wrap",
+      color: "#f2f5f0"
+    }
+  }, parts[0]), React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      margin: "8px 0 12px"
+    }
+  }, React.createElement("button", {
+    className: "hb-btn sm",
+    onClick: () => copy("a", parts[0])
+  }, copied === "a" ? "Copied" : "Copy DM"), lead.status === "new" && React.createElement("button", {
+    className: "hb-btn ghost sm",
+    onClick: () => up({
+      status: "messaged"
+    })
+  }, "Mark as messaged")), parts[1] && React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "hb-note",
+    style: {
+      marginBottom: 3
+    }
+  }, "Follow-up"), React.createElement("div", {
+    style: {
+      fontSize: 13.5,
+      lineHeight: 1.5,
+      whiteSpace: "pre-wrap",
+      color: "#d9e2dd"
+    }
+  }, parts[1]), React.createElement("button", {
+    className: "hb-btn ghost sm",
+    style: {
+      marginTop: 6
+    },
+    onClick: () => copy("b", parts[1])
+  }, copied === "b" ? "Copied" : "Copy follow-up"))) : React.createElement("div", {
+    className: "hb-note"
+  }, "A personal first message and a follow-up, about half a cent.")), React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      marginBottom: 4
+    }
+  }, "Notes"), React.createElement("textarea", {
+    className: "sh-ta",
+    style: {
+      minHeight: 80
+    },
+    value: notes,
+    onChange: e => setNotes(e.target.value),
+    onBlur: () => notes !== (lead.notes || "") && up({
+      notes
+    }),
+    placeholder: "What she said, her OF earnings, country, anything that matters"
+  }), React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginTop: 12
+    }
+  }, React.createElement("button", {
+    className: "hb-btn ghost sm",
+    style: {
+      marginLeft: "auto"
+    },
+    onClick: async () => {
+      if (!window.confirm("Delete this lead?")) return;
+      try {
+        await acqFn({
+          action: "delete",
+          id: lead.id
+        });
+      } catch (e) {}
+      onDeleted();
+    }
+  }, "Delete lead"))));
+}
 async function oopsieFn(body) {
   let token = "";
   try {
@@ -25171,6 +25933,10 @@ const NAV_ADMIN = [{
   label: "Customs",
   icon: Gift
 }, {
+  id: "acquisition",
+  label: "Acquisition",
+  icon: Target
+}, {
   id: "weeklytrends",
   label: "Trends",
   icon: Flame
@@ -27792,7 +28558,7 @@ function App() {
   }), currentView === "customs" && !isAdmin && React.createElement(CustomsCreatorPage, {
     model: restrictModel,
     record: models.find(mm => mm.name === restrictModel)
-  }), currentView === "reelsorter" && isAdmin && React.createElement(ReelSorterPage, null), currentView === "titlegen" && isAdmin && React.createElement(TitleGeneratorPage, null), currentView === "weeklytrends" && isAdmin && React.createElement(TrendsHub, null), currentView === "trending" && React.createElement(CreatorTrending, {
+  }), currentView === "reelsorter" && isAdmin && React.createElement(ReelSorterPage, null), currentView === "titlegen" && isAdmin && React.createElement(TitleGeneratorPage, null), currentView === "acquisition" && isAdmin && React.createElement(AcquisitionPage, null), currentView === "weeklytrends" && isAdmin && React.createElement(TrendsHub, null), currentView === "trending" && React.createElement(CreatorTrending, {
     trends: trends,
     agency: session.agency
   }), currentView === "models" && React.createElement(ModelManager, {
@@ -27816,7 +28582,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">xaqtg5</script>
+<script type="text/babel" id="zion-version">hm6cqx</script>
 <script>
 (function () {
   var last = 0;
