@@ -5231,7 +5231,7 @@ function IgHub({ models, tab }) {
                       <IGStar size={14} color={r.saved ? "#3a2a00" : "#fff"} />
                     </button>
                     <div className="hb-body">
-                      {a ? <span className="hb-fmt">{a.format}</span> : null}
+                      <StyleBadge reel={r} onChange={(st) => setData((d) => ({ ...d, reels: d.reels.map((x) => x.id === r.id ? { ...x, style: st } : x) }))} />
                       <div className={`hb-hook ${a ? "" : "dim"}`}>{a ? a.hook : (r.caption || "No caption")}</div>
                       <div className="hb-acts">
                         <button className={`hb-btn sm ${a ? "" : "ghost"}`} onClick={() => setOpen(r.id)}>{a ? "Why it worked" : "Break it down"}</button>
@@ -15580,6 +15580,20 @@ function ChattersPage() {
   );
 }
 
+const REEL_STYLES = ["POV skit", "Skit", "Talking head", "Text on screen", "Half text format", "Dance or trend", "Outfit or transition", "Omegle", "Ragebait", "Photo or carousel", "Other"];
+// The video style of a reel, set by the AI after a scan; a click lets the team correct it.
+function StyleBadge({ reel, onChange }) {
+  // a native select, so the list is never cut off by the card edge
+  return (
+    <select className="hb-fmt" title="Video style, change it if the AI got it wrong" value={reel.style || ""}
+      style={{ cursor: "pointer", background: "transparent", appearance: "none", WebkitAppearance: "none", paddingRight: 8, outline: "none" }}
+      onChange={(e) => { const st = e.target.value; if (!st) return; onChange(st); hubFn({ action: "set-style", id: reel.id, style: st }).catch(() => {}); }}>
+      {!reel.style && <option value="">Style pending</option>}
+      {REEL_STYLES.map((st) => <option key={st} value={st} style={{ background: "#0b100d", color: "#d9e2dd" }}>{st}</option>)}
+    </select>
+  );
+}
+
 // Trends: one shared pool of public OFM accounts across niches. Pressing Scan reads their newest reels and keeps the ones
 // that beat that account's own normal views. Nothing runs by itself, every scan costs Apify credit.
 function TrendsHub() {
@@ -15618,8 +15632,8 @@ function TrendsHub() {
   const nicheOf = new Map(profiles.map((p) => [p.handle, p.niche || "Other"]));
   const reels = (data?.reels || []).map((r) => ({ ...r, niche: nicheOf.get(r.handle) || "Other" }));
   const niches = [...new Set(active.map((p) => p.niche || "Other"))].sort();
-  const formats = [...new Set(reels.map((r) => r.analysis?.format).filter(Boolean))];
-  const shown = reels.filter((r) => (niche === "all" || r.niche === niche) && (fmt === "all" || (fmt === "saved" ? r.saved : r.analysis?.format === fmt)))
+  const formats = REEL_STYLES.filter((st) => reels.some((r) => r.style === st));
+  const shown = reels.filter((r) => (niche === "all" || r.niche === niche) && (fmt === "all" || (fmt === "saved" ? r.saved : r.style === fmt)))
     .sort((a, b) => (b.multiple || 0) - (a.multiple || 0));
   const cost = Math.max(0.1, Math.round(active.length * 0.03 * 10) / 10);
 
@@ -15651,7 +15665,7 @@ function TrendsHub() {
           </div>
           {(formats.length > 0 || reels.some((r) => r.saved)) && (
             <div className="hb-bar">
-              {[["all", "Any format"], ["saved", "Saved"], ...formats.map((f) => [f, f])].map(([k, l]) => <button key={k} className={`hb-chip ${fmt === k ? "on" : ""}`} onClick={() => setFmt(k)}>{l}</button>)}
+              {[["all", "Any style"], ["saved", "Saved"], ...formats.map((f) => [f, `${f} ${reels.filter((r) => r.style === f && (niche === "all" || r.niche === niche)).length}`])].map(([k, l]) => <button key={k} className={`hb-chip ${fmt === k ? "on" : ""}`} onClick={() => setFmt(k)}>{l}</button>)}
             </div>
           )}
           {!reels.length ? (
@@ -15671,7 +15685,7 @@ function TrendsHub() {
                       <IGStar size={14} color={r.saved ? "#3a2a00" : "#fff"} />
                     </button>
                     <div className="hb-body">
-                      {a ? <span className="hb-fmt">{a.format}</span> : null}
+                      <StyleBadge reel={r} onChange={(st) => setData((d) => ({ ...d, reels: d.reels.map((x) => x.id === r.id ? { ...x, style: st } : x) }))} />
                       <div className={`hb-hook ${a ? "" : "dim"}`}>{a ? a.hook : (r.caption || "No caption")}</div>
                       <div className="hb-acts">
                         <button className={`hb-btn sm ${a ? "" : "ghost"}`} onClick={() => setOpen(r.id)}>{a ? "Why it worked" : "Break it down"}</button>

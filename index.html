@@ -9508,9 +9508,16 @@ function IgHub({
       color: r.saved ? "#3a2a00" : "#fff"
     })), React.createElement("div", {
       className: "hb-body"
-    }, a ? React.createElement("span", {
-      className: "hb-fmt"
-    }, a.format) : null, React.createElement("div", {
+    }, React.createElement(StyleBadge, {
+      reel: r,
+      onChange: st => setData(d => ({
+        ...d,
+        reels: d.reels.map(x => x.id === r.id ? {
+          ...x,
+          style: st
+        } : x)
+      }))
+    }), React.createElement("div", {
       className: `hb-hook ${a ? "" : "dim"}`
     }, a ? a.hook : r.caption || "No caption"), React.createElement("div", {
       className: "hb-acts"
@@ -23938,6 +23945,44 @@ function ChattersPage() {
     className: "fs-10 c-faint font-mono mt-3"
   }, "Click a chatter to see the split by model. Covers ", data?.models?.join(", ") || "connected models", "; revenue not credited to anyone is not listed."));
 }
+const REEL_STYLES = ["POV skit", "Skit", "Talking head", "Text on screen", "Half text format", "Dance or trend", "Outfit or transition", "Omegle", "Ragebait", "Photo or carousel", "Other"];
+function StyleBadge({
+  reel,
+  onChange
+}) {
+  return React.createElement("select", {
+    className: "hb-fmt",
+    title: "Video style, change it if the AI got it wrong",
+    value: reel.style || "",
+    style: {
+      cursor: "pointer",
+      background: "transparent",
+      appearance: "none",
+      WebkitAppearance: "none",
+      paddingRight: 8,
+      outline: "none"
+    },
+    onChange: e => {
+      const st = e.target.value;
+      if (!st) return;
+      onChange(st);
+      hubFn({
+        action: "set-style",
+        id: reel.id,
+        style: st
+      }).catch(() => {});
+    }
+  }, !reel.style && React.createElement("option", {
+    value: ""
+  }, "Style pending"), REEL_STYLES.map(st => React.createElement("option", {
+    key: st,
+    value: st,
+    style: {
+      background: "#0b100d",
+      color: "#d9e2dd"
+    }
+  }, st)));
+}
 function TrendsHub() {
   const T = "__trends";
   const [data, setData] = useState(null);
@@ -24007,8 +24052,8 @@ function TrendsHub() {
     niche: nicheOf.get(r.handle) || "Other"
   }));
   const niches = [...new Set(active.map(p => p.niche || "Other"))].sort();
-  const formats = [...new Set(reels.map(r => r.analysis?.format).filter(Boolean))];
-  const shown = reels.filter(r => (niche === "all" || r.niche === niche) && (fmt === "all" || (fmt === "saved" ? r.saved : r.analysis?.format === fmt))).sort((a, b) => (b.multiple || 0) - (a.multiple || 0));
+  const formats = REEL_STYLES.filter(st => reels.some(r => r.style === st));
+  const shown = reels.filter(r => (niche === "all" || r.niche === niche) && (fmt === "all" || (fmt === "saved" ? r.saved : r.style === fmt))).sort((a, b) => (b.multiple || 0) - (a.multiple || 0));
   const cost = Math.max(0.1, Math.round(active.length * 0.03 * 10) / 10);
   return React.createElement("div", {
     className: "hb"
@@ -24083,7 +24128,7 @@ function TrendsHub() {
     onClick: () => setNiche(k)
   }, l))), (formats.length > 0 || reels.some(r => r.saved)) && React.createElement("div", {
     className: "hb-bar"
-  }, [["all", "Any format"], ["saved", "Saved"], ...formats.map(f => [f, f])].map(([k, l]) => React.createElement("button", {
+  }, [["all", "Any style"], ["saved", "Saved"], ...formats.map(f => [f, `${f} ${reels.filter(r => r.style === f && (niche === "all" || r.niche === niche)).length}`])].map(([k, l]) => React.createElement("button", {
     key: k,
     className: `hb-chip ${fmt === k ? "on" : ""}`,
     onClick: () => setFmt(k)
@@ -24140,9 +24185,16 @@ function TrendsHub() {
       color: r.saved ? "#3a2a00" : "#fff"
     })), React.createElement("div", {
       className: "hb-body"
-    }, a ? React.createElement("span", {
-      className: "hb-fmt"
-    }, a.format) : null, React.createElement("div", {
+    }, React.createElement(StyleBadge, {
+      reel: r,
+      onChange: st => setData(d => ({
+        ...d,
+        reels: d.reels.map(x => x.id === r.id ? {
+          ...x,
+          style: st
+        } : x)
+      }))
+    }), React.createElement("div", {
       className: `hb-hook ${a ? "" : "dim"}`
     }, a ? a.hook : r.caption || "No caption"), React.createElement("div", {
       className: "hb-acts"
@@ -27290,7 +27342,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1ibgaqx</script>
+<script type="text/babel" id="zion-version">er89if</script>
 <script>
 (function () {
   var last = 0;
