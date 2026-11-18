@@ -15600,7 +15600,6 @@ function TrendsHub() {
       <style>{HUB_CSS}</style>
       <div className="hb-bar" style={{ alignItems: "flex-end" }}>
         <div style={{ flex: 1, minWidth: 220 }}>
-          <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.02em" }}>Trends</div>
           <div className="hb-note">Reels that beat their own account's normal views, from {active.length} public OFM accounts across {niches.length} niches. Ideas for any model.</div>
         </div>
         {[["reels", "Reels"], ["profiles", `Profiles ${active.length}`]].map(([k, l]) => <button key={k} className={`hb-chip ${tab === k ? "on" : ""}`} onClick={() => setTab(k)}>{l}</button>)}
