@@ -8564,266 +8564,170 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, 
 // (0) for fixed-length windows (Week's rolling 7, Creator's rolling 7/30) where every
 // slot always has a real day and the full curve treatment is correct from the start.
 function RevenueChart({ data, height = 240, sparseUntil = 0 }) {
-  // data: [{ date: 'YYYY-MM-DD', value: number, byModel?: [{model,value}] }], oldest first
-  // The viewBox width tracks the container's real measured pixel width (not a fixed
-  // constant scaled via CSS/viewBox tricks) — so 1 SVG unit is always 1 real pixel on
-  // both axes. That's what keeps height fixed regardless of screen width, with no
-  // letterboxing gaps and no non-uniform stretch/distortion of circles or blur.
+  // data: [{ date: 'YYYY-MM-DD', value: number }], oldest first.
+  // One SVG unit is one real pixel: the width follows the container, so text and dots never stretch.
   const containerRef = useRef(null);
-  const [measuredWidth, setMeasuredWidth] = useState(700);
+  const [width, setWidth] = useState(700);
+  const [hoverIdx, setHoverIdx] = useState(null);
   useEffect(() => {
     if (!containerRef.current) return;
-    const el = containerRef.current;
-    const ro = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect?.width;
-      if (w && Math.abs(w - measuredWidth) > 1) setMeasuredWidth(w);
-    });
-    ro.observe(el);
+    const ro = new ResizeObserver((entries) => { const w = entries[0]?.contentRect?.width; if (w) setWidth((cur) => (Math.abs(w - cur) > 1 ? w : cur)); });
+    ro.observe(containerRef.current);
     return () => ro.disconnect();
-  }, [measuredWidth]);
-  // Replays the bar/dot/line entrance animation whenever the data actually changes
-  // (Week/Month toggle, a fresh sync, ...) — without a `key` remount, which in this
-  // page's React setup was leaving the previous chart's DOM behind as an orphaned
-  // sibling instead of replacing it. Toggling `animation: none` then forcing a reflow
-  // before clearing it back to '' is the standard vanilla-JS CSS-restart trick.
+  }, []);
+  // replay the draw animation when the data changes (7D / 30D switch)
   useEffect(() => {
     if (!containerRef.current) return;
-    const animated = containerRef.current.querySelectorAll(".rev-bar, .rev-dot, .rev-line");
-    animated.forEach((el) => { el.style.animation = "none"; });
+    const els = containerRef.current.querySelectorAll(".rc-anim");
+    els.forEach((el) => { el.style.animation = "none"; });
     void containerRef.current.offsetWidth;
-    animated.forEach((el) => { el.style.animation = ""; });
+    els.forEach((el) => { el.style.animation = ""; });
   }, [data]);
-  const width = measuredWidth;
-  // padTop reserves a slim strip for the hover tooltip — small enough that it
-  // doesn't waste space, but the tooltip always lives inside it, pinned to
-  // the same spot, so it can never sit on top of the line/bars.
-  const fontScale = height > 240 ? 1.2 : 1; // the 30D view gets a taller chart — scale text up to match, not just whitespace
-  const padTop = 42 * fontScale, padBottom = 28 * fontScale, padLeft = 60 * fontScale, padRight = 40 * fontScale;
-  const plotH = height - padTop - padBottom;
-  const plotW = width - padLeft - padRight;
+
+  const n = data.length;
+  const small = width < 480;
+  const fs = small ? 10 : 11;
   const rawMax = Math.max(1, ...data.map((d) => d.value));
-  const max = rawMax * 1.15; // small headroom so the tallest point isn't flush against the top edge
-  const n = data.length || 1;
-  const isSparse = sparseUntil > 0 && n <= sparseUntil;
-  // Candles pack together at a fixed, readable width instead of stretching edge-to-edge
-  // across the whole plot — 2 real days shouldn't look like they're straining to fill a
-  // 30-day-wide chart. Left-anchored, same width the dense "forest" bars settle around.
-  const stepX = n > 1 ? (isSparse && n <= 5 ? Math.min(plotW / (n - 1), 64) : plotW / (n - 1)) : 0;
+  // three round gridlines: $0, the middle and the top
+  const niceTop = (() => {
+    const STEPS = [10, 20, 30, 40, 50, 60, 80, 100, 120, 150, 200, 250, 300, 400, 500, 600, 800, 1000, 1200, 1500, 2000, 2500, 3000, 4000, 5000, 6000, 8000, 10000, 12000, 15000, 20000, 25000, 30000, 40000, 50000, 100000];
+    return STEPS.find((v) => v >= rawMax * 1.08) || Math.ceil((rawMax * 1.08) / 50000) * 50000;
+  })();
+  const fmtMoney = (v) => (v >= 10000 ? `$${Math.round(v / 1000)}k` : v >= 1000 ? `$${(v / 1000).toFixed(1).replace(/\.0$/, "")}k` : `$${Math.round(v)}`);
+  const ticks = [0, niceTop / 2, niceTop];
+  const padTop = 40, padBottom = 30, padRight = 14;
+  const padLeft = Math.max(...ticks.map((t) => fmtMoney(t).length)) * fs * 0.62 + 14;
+  const plotW = Math.max(40, width - padLeft - padRight);
+  const plotH = Math.max(40, height - padTop - padBottom);
+  const baseY = padTop + plotH;
+  const isSparse = sparseUntil > 0 && n <= Math.min(sparseUntil, 5);
+  const stepX = n > 1 ? plotW / (n - 1) : 0;
+  const pts = data.map((d, i) => ({ ...d, x: padLeft + (n > 1 ? i * stepX : plotW / 2), y: baseY - (d.value / niceTop) * plotH }));
 
-  // Round, human step (25/50/100/250/500/1000/2500/5000...) picked so the axis always
-  // shows ~4 gridlines — a $157 month gets 0/50/100/150, a $16k month gets 0/5k/10k/15k.
-  // Never a raw fraction, never an empty axis with nothing but "$0" on it. Based on the
-  // REAL max (not the padded one) — padding it first was nudging borderline values like
-  // $357 into the next step size up (e.g. 250 instead of 100) for no real reason.
-  const niceStep = (m) => {
-    const STEPS = [25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000];
-    const rough = m / 4;
-    return STEPS.find((s) => s >= rough) || Math.ceil(rough / 100000) * 100000;
-  };
-  const tickStep = niceStep(rawMax);
-  const ticks = [];
-  for (let v = 0; v <= max; v += tickStep) ticks.push(v);
-  // Ticks near the peak used to get dropped to dodge a collision with it — but the tick
-  // label sits at the far left edge while the peak can be anywhere along the width, so
-  // in most layouts they were never actually close horizontally. Always show them all.
-  const ticksFiltered = ticks;
-  const fmtTick = (v) => `$${Math.round(v).toLocaleString()}`;
+  // monotone cubic curve (Fritsch Carlson): smooth, but never swings above a peak or below $0
+  const path = (() => {
+    if (pts.length < 2) return "";
+    const dx = [], dy = [], m = [];
+    for (let i = 0; i < pts.length - 1; i++) { dx.push(pts[i + 1].x - pts[i].x); dy.push(pts[i + 1].y - pts[i].y); m.push(dy[i] / dx[i]); }
+    const t = [m[0]];
+    for (let i = 1; i < pts.length - 1; i++) t.push(m[i - 1] * m[i] <= 0 ? 0 : (3 * (dx[i - 1] + dx[i])) / ((2 * dx[i] + dx[i - 1]) / m[i - 1] + (dx[i] + 2 * dx[i - 1]) / m[i]));
+    t.push(m[m.length - 1]);
+    let d = `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const h = dx[i] / 3;
+      d += ` C${(pts[i].x + h).toFixed(1)},${(pts[i].y + h * t[i]).toFixed(1)} ${(pts[i + 1].x - h).toFixed(1)},${(pts[i + 1].y - h * t[i + 1]).toFixed(1)} ${pts[i + 1].x.toFixed(1)},${pts[i + 1].y.toFixed(1)}`;
+    }
+    return d;
+  })();
 
-  const points = data.map((d, i) => {
-    const x = padLeft + i * stepX;
-    const y = padTop + plotH - (d.value / max) * plotH;
-    return { x, y, ...d };
+  // x labels: as many as fit, evenly spread, always the last day; the month only where it changes
+  const labelW = small ? 34 : 44;
+  const every = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(plotW / labelW))));
+  const labelIdx = new Set();
+  for (let i = n - 1; i >= 0; i -= every) labelIdx.add(i);
+  const fmtDay = (iso, withMonth) => { const d = new Date(iso + "T12:00:00"); return withMonth ? d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : String(d.getDate()); };
+  let prevMonth = null;
+  const labels = [...labelIdx].sort((a, b) => a - b).map((i) => {
+    const mo = data[i].date.slice(0, 7);
+    const lbl = fmtDay(data[i].date, mo !== prevMonth && (stepX * every >= (small ? 62 : 60) || i === n - 1));
+    prevMonth = mo;
+    return { i, lbl };
   });
 
-  // Catmull-Rom -> cubic Bezier segments, so the line reads as a smooth curve instead of sharp angles.
-  // Except: a segment touching a $0 day goes straight instead — the smooth spline's tangent gets
-  // pulled by neighboring spikes and bows a phantom "hill" up out of a flat zero stretch, implying
-  // revenue that was never there. A straight line into/out of $0 can't overshoot like that.
-  const segments = [];
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[i - 1] || points[i];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = points[i + 2] || p2;
-    if (p1.value === 0 || p2.value === 0) {
-      segments.push({ p1, c1: p1, c2: p2, p2 });
-      continue;
-    }
-    const c1 = { x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6 };
-    const c2 = { x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6 };
-    segments.push({ p1, c1, c2, p2 });
-  }
-  const linePath = segments.length
-    ? `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}` + segments.map((s) =>
-        ` C ${s.c1.x.toFixed(1)} ${s.c1.y.toFixed(1)}, ${s.c2.x.toFixed(1)} ${s.c2.y.toFixed(1)}, ${s.p2.x.toFixed(1)} ${s.p2.y.toFixed(1)}`
-      ).join("")
-    : "";
-  const bezierY = (s, t) => {
-    const mt = 1 - t;
-    return mt * mt * mt * s.p1.y + 3 * mt * mt * t * s.c1.y + 3 * mt * t * t * s.c2.y + t * t * t * s.p2.y;
+  // hover and touch: the nearest day to the finger or cursor
+  const pick = (clientX) => {
+    const r = containerRef.current?.getBoundingClientRect();
+    if (!r || n < 1) return;
+    const x = clientX - r.left;
+    const idx = n > 1 ? Math.round((x - padLeft) / stepX) : 0;
+    setHoverIdx(Math.max(0, Math.min(n - 1, idx)));
   };
-  const baseline = padTop + plotH;
-
-  // dense bar "forest" under the curve — sampled along the smooth line, not 1:1 with data points.
-  // Target a roughly constant total bar count regardless of how many days are plotted (7 or 30),
-  // so bars stay visibly separated instead of blurring into a solid mass on narrow/mobile screens.
-  // Skipped while sparse: one real day should be exactly one candle, not several interpolated ones.
-  const samplesPerSeg = Math.max(1, Math.min(6, Math.round(40 / Math.max(1, n - 1))));
-  const bars = isSparse
-    ? points.map((p) => ({ x: p.x, y: p.y }))
-    : (() => {
-        const out = [];
-        segments.forEach((s) => {
-          for (let k = 0; k < samplesPerSeg; k++) {
-            const t = k / samplesPerSeg;
-            out.push({ x: s.p1.x + (s.p2.x - s.p1.x) * t, y: bezierY(s, t) });
-          }
-        });
-        out.push({ x: points[points.length - 1].x, y: points[points.length - 1].y });
-        return out;
-      })();
-  // capped at the same width bars normally are (roughly what Week shows) so day 1 of a new
-  // month reads as one normal bar, not one giant blown-up blob filling the whole chart
-  // With one candle per day (sparse) the column grows with the room it has, so 7 days on a wide screen
-  // read as soft columns under the line, not seven thin posts.
-  const barWidth = isSparse ? Math.min(54, Math.max(14, stepX * 0.2)) : Math.min(14, Math.max(2, (plotW / bars.length) * 0.62));
-
-  // Ideally every dot gets its own date — but "7. 8." is wide enough that on a narrow
-  // phone screen even every-other-dot doesn't fit. Falls back to a compact "day number
-  // only" format (which fits under nearly every dot) before resorting to skipping dots,
-  // and only ever skips as a last resort on the tightest widths.
-  const fullLabelW = 44 * fontScale;
-  const compactLabelW = 20 * fontScale;
-  let labelFormat, labelEvery;
-  if (stepX >= fullLabelW) {
-    labelFormat = "full"; labelEvery = 1;
-  } else if (stepX >= compactLabelW) {
-    labelFormat = "compact"; labelEvery = 1;
-  } else {
-    labelFormat = "compact";
-    const maxLabelsThatFit = Math.max(2, Math.floor(plotW / compactLabelW));
-    labelEvery = Math.max(1, Math.ceil(n / Math.min(n, maxLabelsThatFit)));
-  }
-  let lastShownMonth = null;
-  const [hoverIdx, setHoverIdx] = useState(null);
+  const last = pts[pts.length - 1];
+  const hp = hoverIdx !== null ? pts[hoverIdx] : null;
+  const colW = isSparse ? Math.min(46, Math.max(16, plotW / Math.max(n, 1) * 0.35)) : 0;
 
   return (
-    <div ref={containerRef} style={{ width: "100%" }}>
-    <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} style={{ overflow: "visible", display: "block" }}
-      onMouseLeave={() => setHoverIdx(null)}>
-      <defs>
-        <linearGradient id="revAreaFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#39e673" stopOpacity="0.36" /><stop offset="55%" stopColor="#39e673" stopOpacity="0.1" /><stop offset="100%" stopColor="#39e673" stopOpacity="0" /></linearGradient>
-        <linearGradient id="revBarFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#39e673" stopOpacity="0.6" />
-          <stop offset="100%" stopColor="#39e673" stopOpacity="0.04" />
-        </linearGradient>
-        <filter id="revGlowLine" x="-60%" y="-60%" width="220%" height="220%">
-          <feGaussianBlur stdDeviation="3.2" result="blur" />
-          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-        <filter id="revGlowDot" x="-250%" y="-250%" width="600%" height="600%">
-          <feGaussianBlur stdDeviation="2.4" result="blur" />
-          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-        {/* The smooth Catmull-Rom curve can overshoot past a 0 value between two higher
-            points (a real cardinal-spline artifact, not a data bug) — this clips anything
-            that would dip below the $0 line so the line never visibly crosses under it. */}
-        <clipPath id="revNoNegativeClip">
-          <rect x={-1000} y={-1000} width={width + 2000} height={baseline + 1000} />
-        </clipPath>
-      </defs>
-
-      {ticksFiltered.map((v, i) => {
-        const ty = padTop + plotH - (v / max) * plotH;
-        return (
-          <g key={`tick-${i}`}>
-            <line x1={padLeft} y1={ty} x2={width - padRight} y2={ty}
-              stroke="#ffffff" strokeOpacity={v === 0 ? 0.14 : 0.07} strokeWidth="1" strokeDasharray={v === 0 ? "0" : "2,4"} />
-            <text x={padLeft - 14} y={ty + 3} textAnchor="end" fontSize={10 * fontScale} fontFamily="'JetBrains Mono', monospace" fill="#5c6e65">
-              {fmtTick(v)}
-            </text>
+    <div ref={containerRef} style={{ width: "100%", touchAction: "pan-y" }}>
+      <style>{`
+        .rc-line{ animation:rcDraw 1.1s cubic-bezier(.4,0,.2,1) both; }
+        .rc-area{ animation:rcFade .9s ease .35s both; }
+        .rc-col{ transform-origin:bottom; transform-box:fill-box; animation:rcGrow .7s cubic-bezier(.2,.9,.2,1) both; }
+        .rc-end{ animation:rcFade .4s ease 1s both; }
+        .rc-pulse{ transform-origin:center; transform-box:fill-box; animation:rcPulse 2.2s ease-out 1.2s infinite; }
+        @keyframes rcDraw{ from{ stroke-dasharray:1 1; stroke-dashoffset:1; } to{ stroke-dasharray:1 1; stroke-dashoffset:0; } }
+        @keyframes rcFade{ from{ opacity:0; } to{ opacity:1; } }
+        @keyframes rcGrow{ from{ transform:scaleY(0); } to{ transform:scaleY(1); } }
+        @keyframes rcPulse{ 0%{ transform:scale(1); opacity:.55; } 100%{ transform:scale(3.2); opacity:0; } }
+        @media (prefers-reduced-motion: reduce){ .rc-line,.rc-area,.rc-col,.rc-end{ animation:none; opacity:1; stroke-dashoffset:0; } .rc-pulse{ animation:none; } }
+      `}</style>
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: "block", overflow: "visible" }}
+        onMouseMove={(e) => pick(e.clientX)} onMouseLeave={() => setHoverIdx(null)}
+        onTouchStart={(e) => pick(e.touches[0].clientX)} onTouchMove={(e) => pick(e.touches[0].clientX)} onTouchEnd={() => setTimeout(() => setHoverIdx(null), 1600)}>
+        <defs>
+          <linearGradient id="rcArea" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#39e673" stopOpacity="0.32" />
+            <stop offset="60%" stopColor="#39e673" stopOpacity="0.07" />
+            <stop offset="100%" stopColor="#39e673" stopOpacity="0" />
+          </linearGradient>
+          <linearGradient id="rcCol" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#39e673" stopOpacity="0.55" />
+            <stop offset="100%" stopColor="#39e673" stopOpacity="0.05" />
+          </linearGradient>
+          <filter id="rcGlow" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="4" /></filter>
+        </defs>
+        {ticks.map((v, i) => {
+          const y = baseY - (v / niceTop) * plotH;
+          return (
+            <g key={i}>
+              <line x1={padLeft} x2={width - padRight} y1={y} y2={y} stroke="#fff" strokeOpacity={i === 0 ? 0.12 : 0.05} />
+              <text x={padLeft - 10} y={y + 3.5} textAnchor="end" fontSize={fs} fill="#5f7068" style={{ fontVariantNumeric: "tabular-nums" }}>{fmtMoney(v)}</text>
+            </g>
+          );
+        })}
+        {isSparse ? (
+          pts.map((p, i) => (
+            <rect key={i} className="rc-col" x={p.x - colW / 2} y={p.y} width={colW} height={Math.max(2, baseY - p.y)} rx={Math.min(10, colW / 3)} fill="url(#rcCol)" style={{ animationDelay: `${i * 0.08}s` }} />
+          ))
+        ) : path ? (
+          <>
+            <path className="rc-area" d={`${path} L${last.x.toFixed(1)},${baseY} L${pts[0].x.toFixed(1)},${baseY} Z`} fill="url(#rcArea)" />
+            <path d={path} fill="none" stroke="#39e673" strokeOpacity="0.45" strokeWidth="6" filter="url(#rcGlow)" />
+            <path className="rc-line" d={path} pathLength="1" fill="none" stroke="#39e673" strokeWidth={small ? 2.2 : 2.6} strokeLinecap="round" strokeLinejoin="round" />
+          </>
+        ) : null}
+        {n <= 7 && !isSparse && pts.map((p, i) => <circle key={i} className="rc-end" cx={p.x} cy={p.y} r="3" fill="#0b0f0d" stroke="#39e673" strokeWidth="1.8" />)}
+        {last && !isSparse && (
+          <g className="rc-end">
+            <circle className="rc-pulse" cx={last.x} cy={last.y} r="4" fill="#39e673" />
+            <circle cx={last.x} cy={last.y} r="4.5" fill="#39e673" stroke="#0b0f0d" strokeWidth="2" />
           </g>
-        );
-      })}
-
-      {bars.map((p, i) => (
-        <rect key={`bar-${i}`} className="rev-bar" x={p.x - barWidth / 2} y={p.y} width={barWidth}
-          height={Math.max(baseline - p.y, 0)} rx={isSparse ? Math.min(12, barWidth / 3) : barWidth / 2} fill="url(#revBarFill)" opacity={isSparse && n > 5 ? 0.55 : 1}
-          style={{ animationDelay: `${(i / bars.length) * 0.4}s` }} />
-      ))}
-
-      {/* A trend line across only 1-2 points (early days of a new month) implies a
-          trend that isn't real yet — bars/dots alone are honest until there's
-          enough of the month behind them to actually connect. Only gated for
-          sparseUntil-enabled charts (Month); Week's fixed 7-point line is untouched. */}
-      {linePath && (!isSparse || n > 5) && (
-        <path d={`${linePath} L ${points[points.length - 1].x.toFixed(1)} ${baseline} L ${points[0].x.toFixed(1)} ${baseline} Z`} fill="url(#revAreaFill)" clipPath="url(#revNoNegativeClip)" />
-      )}
-      {linePath && (!isSparse || n > 5) && (
-        <path className="rev-line" d={linePath} fill="none" stroke="#39e673" strokeWidth="3"
-          strokeLinejoin="round" strokeLinecap="round" filter="url(#revGlowLine)" clipPath="url(#revNoNegativeClip)"
-          pathLength="1000" strokeDasharray="1000" />
-      )}
-      {points.map((p, i) => (
-        <g key={i}
-          onMouseEnter={() => setHoverIdx(i)}
-          style={{ cursor: "pointer" }}>
-          <rect x={p.x - stepX / 2} y={padTop} width={Math.max(stepX, 6)} height={plotH} fill="transparent" />
-          <circle className="rev-dot" cx={p.x} cy={p.y} r={hoverIdx === i ? 6 : (n > 10 ? 2.2 : 4.5)} fill={n > 10 ? "#39e673" : "#0b0f0d"} stroke={n > 10 ? "#07090a" : "#39e673"} strokeWidth={n > 10 ? 1 : 2.5} filter={n > 10 && hoverIdx !== i ? undefined : "url(#revGlowDot)"}
-            style={{ animationDelay: `${0.15 + (i / Math.max(n - 1, 1)) * 1.0}s` }} />
-          {(n - 1 - i) % labelEvery === 0 && (() => {
-            const d = new Date(p.date + "T00:00:00");
-            let label;
-            if (labelFormat === "full") {
-              label = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-            } else {
-              // Compact mode: bare day number so a label fits under nearly every dot —
-              // the month only reappears when it actually changes, so a week/month
-              // spanning a boundary (e.g. Jul 31 → Aug 1) still reads unambiguously.
-              const m = d.getMonth();
-              const showMonth = lastShownMonth === null || m !== lastShownMonth;
-              lastShownMonth = m;
-              label = showMonth ? d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) : String(d.getDate());
-            }
-            return (
-              <text x={p.x} y={height - 8} textAnchor="middle" fontSize={10 * fontScale} fontFamily="'JetBrains Mono', monospace" fill="#5c6e65">
-                {label}
+        )}
+        {labels.map(({ i, lbl }) => (
+          <text key={i} x={pts[i].x} y={height - 9} textAnchor={i === n - 1 && n > 1 ? "end" : i === 0 && n > 1 ? "start" : "middle"} fontSize={fs} fill="#5f7068">{lbl}</text>
+        ))}
+        {hp && (() => {
+          const prior = data.slice(0, hoverIdx).map((d) => d.value).filter((v) => v > 0);
+          const avg = prior.length ? prior.reduce((a, b) => a + b, 0) / prior.length : null;
+          const g = avg ? ((hp.value - avg) / avg) * 100 : null;
+          const dl = new Date(hp.date + "T12:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+          const vl = `$${Math.round(hp.value).toLocaleString("en-US")}`;
+          const gl = g !== null ? `${g >= 0 ? "+" : ""}${Math.round(g)}%` : "";
+          const boxW = Math.max(120, (dl.length + vl.length + gl.length) * 6.4 + 40);
+          const boxX = Math.min(Math.max(hp.x - boxW / 2, padLeft - 6), width - boxW - 2);
+          return (
+            <g style={{ pointerEvents: "none" }}>
+              <line x1={hp.x} x2={hp.x} y1={padTop - 4} y2={baseY} stroke="#39e673" strokeOpacity="0.35" strokeDasharray="3,4" />
+              <circle cx={hp.x} cy={hp.y} r="9" fill="#39e673" fillOpacity="0.18" />
+              <circle cx={hp.x} cy={hp.y} r="4.5" fill="#39e673" stroke="#0b0f0d" strokeWidth="2" />
+              <rect x={boxX} y={2} width={boxW} height={28} rx={14} fill="#0b100d" stroke="rgba(57,230,115,.35)" />
+              <text x={boxX + 12} y={20} fontSize="11.5" fill="#8fa39a">{dl}</text>
+              <text x={boxX + boxW - 12} y={20} textAnchor="end" fontSize="12.5" fontWeight="700" fill="#f2f5f0">
+                {vl}{gl && <tspan dx="7" fill={g >= 0 ? "#39e673" : "#E2725B"}>{gl}</tspan>}
               </text>
-            );
-          })()}
-        </g>
-      ))}
-      {hoverIdx !== null && (() => {
-        const hp = points[hoverIdx];
-        // % vs the average of every prior day in this view, not a single previous day —
-        // a lone near-zero prior day would otherwise spike this to +800% and mean nothing.
-        const priorValues = data.slice(0, hoverIdx).map((d) => d.value).filter((v) => v > 0);
-        const priorAvg = priorValues.length ? priorValues.reduce((a, b) => a + b, 0) / priorValues.length : null;
-        const growth = priorAvg ? ((hp.value - priorAvg) / priorAvg) * 100 : null;
-        const dateLabel = new Date(hp.date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
-        const valueLabel = `$${hp.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-        const growthLabel = growth !== null ? `${growth >= 0 ? "+" : ""}${growth.toFixed(1)}%` : "";
-        // rough monospace width estimate, so the pill hugs its text instead of a fixed guess
-        const charW = 7.6 * fontScale;
-        const boxW = Math.max(110 * fontScale, (dateLabel.length + valueLabel.length + growthLabel.length) * charW + 40);
-        const boxH = 28 * fontScale;
-        const boxX = Math.min(Math.max(hp.x - boxW / 2, padLeft), width - boxW - 2);
-        const boxY = 4; // pinned to the same slim strip every time — never tracks point.y, so it never overlaps the curve
-        return (
-          <g style={{ pointerEvents: "none" }}>
-            <line x1={hp.x} y1={padTop} x2={hp.x} y2={padTop + plotH} stroke="#39e673" strokeWidth="1" strokeDasharray="3,3" opacity="0.3" />
-            <rect x={boxX} y={boxY} width={boxW} height={boxH} rx={13} fill="#0b0f0d" stroke="#173425" strokeWidth="1" />
-            <text x={boxX + 12} y={boxY + 19} fontSize={12 * fontScale} fontFamily="'JetBrains Mono', monospace" fill="#8B93A1">
-              {dateLabel}
-            </text>
-            <text x={boxX + boxW - 12} y={boxY + 19} textAnchor="end" fontSize={13 * fontScale} fontFamily="'JetBrains Mono', monospace" fill="#39e673" fontWeight="700">
-              {valueLabel}
-              {growthLabel && <tspan fill={growth >= 0 ? "#39e673" : "#E2725B"} dx="8">{growthLabel}</tspan>}
-            </text>
-          </g>
-        );
-      })()}
-    </svg>
+            </g>
+          );
+        })()}
+      </svg>
     </div>
   );
 }
@@ -9293,7 +9197,7 @@ function OopsieSection({ restrictModel }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
   const [range, setRange] = useState(7);
-  useEffect(() => { oopsieFn(restrictModel ? {} : {}).then(setData).catch((e) => setErr(e.message)); }, [restrictModel]);
+  useEffect(() => { oopsieFn(restrictModel ? { model: restrictModel } : {}).then(setData).catch((e) => setErr(e.message)); }, [restrictModel]);
   if (err) return restrictModel ? null : <div className="hb hb-card" style={{ marginBottom: 24 }}><style>{HUB_CSS}</style><div className="hb-note">Link in bio stats are not available: {err}</div></div>;
   if (!data || !(data.models || []).length) return null;
   return (
@@ -14585,7 +14489,7 @@ function InflowwRevenueCard({ myInflowwRows, accountType, title, last7Dates, day
       {embedded
         ? <div className="fs-12 c-muted mb-1">${Math.round(rangeTotal).toLocaleString("en-US")} net revenue in the last {range} days</div>
         : <div className="text-2xl font-extrabold c-accent mb-1">$<CountUp value={rangeTotal} /></div>}
-      <div className="mb-2"><RevenueChart data={chartData} height={range === 30 ? (embedded ? 300 : 330) : (embedded ? 250 : 260)} sparseUntil={range === 7 ? 7 : 0} /></div>
+      <div className="mb-2"><RevenueChart data={chartData} height={range === 30 ? 240 : 220} sparseUntil={range === 7 ? 7 : 0} /></div>
       <div className="flex flex-wrap gap-4 fs-10 font-mono c-faint uppercase">
         <span><CountUp value={sumInfloww(rangeRows, "messagesCount")} /> messages</span>
         <span><CountUp value={sumInfloww(rangeRows, "tipsCount")} /> tips</span>
