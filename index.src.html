@@ -9039,7 +9039,6 @@ function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "t
               <th className="text-left py-2 pr-3">Model</th>
               <th className="text-right py-2 px-3">Refunds ({periodLabel})</th>
               <th className="text-right py-2 px-3">Fans chatted ({periodLabel})</th>
-              <th className="text-right py-2 px-3">Avg reply time</th>
               <th className="text-right py-2 pl-3" title="Share of revenue that comes from chats (PPVs, tips, customs) versus subscriptions, in the same window.">
                 Chat share
               </th>
@@ -9053,7 +9052,6 @@ function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "t
                   {r.refundsWindow > 0 ? `-$${r.refundsWindow.toFixed(2)}` : "$0"}
                 </td>
                 <td className="py-2 px-3 text-right font-mono">{r.fansChatted.toLocaleString()}</td>
-                <td className="py-2 px-3 text-right font-mono">{r.replyMin != null ? `${r.replyMin} min` : "—"}</td>
                 <td className="py-2 pl-3 text-right font-mono" title={`Chats $${Math.round(r.chatRevenue)}, subscriptions $${Math.round(r.subRevenue)}`}>
                   {r.chatShare == null ? "-" : `${r.chatShare}%`} <span className="c-faint">(${Math.round(r.chatRevenue)} / ${Math.round(r.subRevenue)})</span>
                 </td>
@@ -9166,7 +9164,7 @@ function OopsieModelCard({ m, range, i, labels }) {
     <div className="oo-m" style={{ "--i": i }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
         <div style={{ fontWeight: 800, fontSize: 16, flex: 1 }}>{m.model}</div>
-        <span className="hb-note">{m.pages.length} page{m.pages.length === 1 ? "" : "s"}</span>
+        <span className="hb-note">{m.pages.filter((p) => p.views30 > 0).length} active page{m.pages.filter((p) => p.views30 > 0).length === 1 ? "" : "s"}</span>
       </div>
       <div className="oo-big">
         <div><b>{v.toLocaleString("en-US")}</b><span>Views</span></div>
@@ -9175,7 +9173,7 @@ function OopsieModelCard({ m, range, i, labels }) {
       </div>
       <OoSpark views={views.slice(cut)} clicks={clicks.slice(cut)} />
       <div className="hb-note" style={{ display: "flex", justifyContent: "space-between", margin: "2px 0 8px" }}><span>{(labels.slice(cut)[0] || "")}</span><span>views grey, clicks green</span><span>{labels[labels.length - 1] || ""}</span></div>
-      {m.pages.map((p) => {
+      {m.pages.filter((p) => p.views30 > 0).sort((a, b) => (range === 7 ? b.views7 - a.views7 : b.views30 - a.views30)).map((p) => {
         const pv = range === 7 ? p.views7 : p.views30, pc = range === 7 ? p.clicks7 : p.clicks30;
         return (
           <div key={p.slug} className="oo-page">
@@ -9185,10 +9183,10 @@ function OopsieModelCard({ m, range, i, labels }) {
               <span style={{ marginLeft: "auto", fontVariantNumeric: "tabular-nums" }}>{pv} views, <b style={{ color: "#39e673" }}>{pc}</b> clicks</span>
             </div>
             <div className="oo-bar"><i style={{ width: `${(pv / maxV) * 100}%` }} /></div>
-            {pv === 0 && <div className="hb-note" style={{ marginTop: 4, color: "#ffcf8a" }}>No visits in this period. Is this link still in her bio?</div>}
           </div>
         );
       })}
+      {m.pages.some((p) => !p.views30) && <div className="hb-note" style={{ marginTop: 6 }}>No visits in 30 days: {m.pages.filter((p) => !p.views30).map((p) => p.source || p.slug).join(", ")}</div>}
       {topC.length > 0 && <div className="oo-flags">{topC.map(([code, n]) => <span key={code} className="oo-flag">{code} {Math.round((n / totalC) * 100)}%</span>)}<span className="hb-note">last 30 days</span></div>}
     </div>
   );

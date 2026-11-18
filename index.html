@@ -15466,8 +15466,6 @@ function OfExtrasSection({
   }, "Refunds (", periodLabel, ")"), React.createElement("th", {
     className: "text-right py-2 px-3"
   }, "Fans chatted (", periodLabel, ")"), React.createElement("th", {
-    className: "text-right py-2 px-3"
-  }, "Avg reply time"), React.createElement("th", {
     className: "text-right py-2 pl-3",
     title: "Share of revenue that comes from chats (PPVs, tips, customs) versus subscriptions, in the same window."
   }, "Chat share"))), React.createElement("tbody", null, rows.map(r => React.createElement("tr", {
@@ -15483,8 +15481,6 @@ function OfExtrasSection({
   }, r.refundsWindow > 0 ? `-$${r.refundsWindow.toFixed(2)}` : "$0"), React.createElement("td", {
     className: "py-2 px-3 text-right font-mono"
   }, r.fansChatted.toLocaleString()), React.createElement("td", {
-    className: "py-2 px-3 text-right font-mono"
-  }, r.replyMin != null ? `${r.replyMin} min` : "—"), React.createElement("td", {
     className: "py-2 pl-3 text-right font-mono",
     title: `Chats $${Math.round(r.chatRevenue)}, subscriptions $${Math.round(r.subRevenue)}`
   }, r.chatShare == null ? "-" : `${r.chatShare}%`, " ", React.createElement("span", {
@@ -15669,7 +15665,7 @@ function OopsieModelCard({
     }
   }, m.model), React.createElement("span", {
     className: "hb-note"
-  }, m.pages.length, " page", m.pages.length === 1 ? "" : "s")), React.createElement("div", {
+  }, m.pages.filter(p => p.views30 > 0).length, " active page", m.pages.filter(p => p.views30 > 0).length === 1 ? "" : "s")), React.createElement("div", {
     className: "oo-big"
   }, React.createElement("div", null, React.createElement("b", null, v.toLocaleString("en-US")), React.createElement("span", null, "Views")), React.createElement("div", null, React.createElement("b", {
     style: {
@@ -15685,7 +15681,7 @@ function OopsieModelCard({
       justifyContent: "space-between",
       margin: "2px 0 8px"
     }
-  }, React.createElement("span", null, labels.slice(cut)[0] || ""), React.createElement("span", null, "views grey, clicks green"), React.createElement("span", null, labels[labels.length - 1] || "")), m.pages.map(p => {
+  }, React.createElement("span", null, labels.slice(cut)[0] || ""), React.createElement("span", null, "views grey, clicks green"), React.createElement("span", null, labels[labels.length - 1] || "")), m.pages.filter(p => p.views30 > 0).sort((a, b) => range === 7 ? b.views7 - a.views7 : b.views30 - a.views30).map(p => {
     const pv = range === 7 ? p.views7 : p.views30,
       pc = range === 7 ? p.clicks7 : p.clicks30;
     return React.createElement("div", {
@@ -15718,14 +15714,13 @@ function OopsieModelCard({
       style: {
         width: `${pv / maxV * 100}%`
       }
-    })), pv === 0 && React.createElement("div", {
-      className: "hb-note",
-      style: {
-        marginTop: 4,
-        color: "#ffcf8a"
-      }
-    }, "No visits in this period. Is this link still in her bio?"));
-  }), topC.length > 0 && React.createElement("div", {
+    })));
+  }), m.pages.some(p => !p.views30) && React.createElement("div", {
+    className: "hb-note",
+    style: {
+      marginTop: 6
+    }
+  }, "No visits in 30 days: ", m.pages.filter(p => !p.views30).map(p => p.source || p.slug).join(", ")), topC.length > 0 && React.createElement("div", {
     className: "oo-flags"
   }, topC.map(([code, n]) => React.createElement("span", {
     key: code,
@@ -27821,7 +27816,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1xq91nq</script>
+<script type="text/babel" id="zion-version">xaqtg5</script>
 <script>
 (function () {
   var last = 0;
