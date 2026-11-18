@@ -15715,7 +15715,14 @@ function TrendsHub() {
             <div className="hb-card" style={{ marginBottom: 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
                 <div style={{ fontSize: 17, fontWeight: 800, flex: 1 }}>Suggested {suggested.length}</div>
-                <button className="hb-btn sm" disabled={busy === "all"} onClick={async () => { setBusy("all"); for (const p of suggested.slice(0, Math.max(0, data.maxActive - active.length))) { try { await hubFn({ action: "set-profile", id: p.id, status: "active" }); } catch (e) {} } setBusy(""); load(); }}>Track all</button>
+                <button className="hb-btn sm" disabled={busy === "all"} onClick={async () => {
+                  const room = Math.max(0, data.maxActive - active.length);
+                  if (!room) { setNote(`Trends already tracks the maximum of ${data.maxActive} accounts. Remove some in the list below, or press Track on a single account after removing one.`); return; }
+                  setBusy("all"); let n = 0;
+                  for (const p of suggested.slice(0, room)) { try { await hubFn({ action: "set-profile", id: p.id, status: "active" }); n += 1; } catch (e) {} }
+                  setBusy(""); await load();
+                  setNote(n < suggested.length ? `Tracked ${n}. The limit is ${data.maxActive} accounts, so ${suggested.length - n} stay suggested.` : `Tracked ${n}.`);
+                }}>{busy === "all" ? "Tracking" : `Track all (${Math.max(0, data.maxActive - active.length)} free places)`}</button>
               </div>
               {suggested.map((p) => (
                 <div key={p.id} className="hb-row">
