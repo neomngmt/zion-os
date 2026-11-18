@@ -15675,9 +15675,9 @@ function acqParseCsv(buf) {
 function AcquisitionPage() {
   const [agency, setAgency] = useState(() => {
     try {
-      return localStorage.getItem("zionAcqAgency") || "CZ";
+      return localStorage.getItem("zionAcqAgency") || "US";
     } catch (e) {
-      return "CZ";
+      return "US";
     }
   });
   const [leads, setLeads] = useState(null);
@@ -15837,7 +15837,7 @@ function AcquisitionPage() {
       background: "rgba(0,0,0,.35)",
       border: "1px solid rgba(255,255,255,.08)"
     }
-  }, ["CZ", "US"].map(a => React.createElement("button", {
+  }, ["US", "CZ"].map(a => React.createElement("button", {
     key: a,
     onClick: () => pickAgency(a),
     style: {
@@ -16116,10 +16116,13 @@ function AcquisitionPage() {
     disabled: busy === "add" || !addText.trim()
   }, busy === "add" ? "Adding" : "Add")))), React.createElement("div", {
     className: "hb-bar"
-  }, [["todo", `To do ${lists.todo.length}`], ...(agency === "US" ? [["reddit", `Reddit ${lists.reddit.length}`]] : []), ["new", `All new ${lists.new.length}`], ["pipeline", `In talks ${lists.pipeline.length}`], ["signed", `Signed ${lists.signed.length}`], ["archive", `Archive ${lists.archive.length}`]].map(([k, l]) => React.createElement("button", {
+  }, [["todo", `To do ${lists.todo.length}`], ["reddit", agency === "US" ? `Reddit ${lists.reddit.length}` : "Reddit (US)"], ["new", `All new ${lists.new.length}`], ["pipeline", `In talks ${lists.pipeline.length}`], ["signed", `Signed ${lists.signed.length}`], ["archive", `Archive ${lists.archive.length}`]].map(([k, l]) => React.createElement("button", {
     key: k,
     className: `hb-chip ${view === k ? "on" : ""}`,
-    onClick: () => setView(k)
+    onClick: () => {
+      if (k === "reddit" && agency !== "US") pickAgency("US");
+      setView(k);
+    }
   }, l))), view === "reddit" && React.createElement("div", {
     className: "hb-card",
     style: {
@@ -29033,7 +29036,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">17ke2w3</script>
+<script type="text/babel" id="zion-version">1t822gq</script>
 <script>
 (function () {
   var last = 0;

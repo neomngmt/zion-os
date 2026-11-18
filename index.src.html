@@ -9176,7 +9176,7 @@ function acqParseCsv(buf) {
 }
 
 function AcquisitionPage() {
-  const [agency, setAgency] = useState(() => { try { return localStorage.getItem("zionAcqAgency") || "CZ"; } catch (e) { return "CZ"; } });
+  const [agency, setAgency] = useState(() => { try { return localStorage.getItem("zionAcqAgency") || "US"; } catch (e) { return "US"; } });
   const [leads, setLeads] = useState(null);
   const [run, setRun] = useState(null);
   const [reddit, setReddit] = useState(null);
@@ -9254,7 +9254,7 @@ function AcquisitionPage() {
           <div className="hb-note">{agency === "CZ" ? "Leads from paid ads and from contacts, with every call and follow-up in one place." : "Find creators who already do OF but weakly, judge them, and give the scouts a DM for each. Sending stays with a person."}</div>
         </div>
         <div className="oo-tabs" style={{ display: "inline-flex", padding: 4, gap: 4, borderRadius: 12, background: "rgba(0,0,0,.35)", border: "1px solid rgba(255,255,255,.08)" }}>
-          {["CZ", "US"].map((a) => <button key={a} onClick={() => pickAgency(a)} style={{ padding: "6px 14px", borderRadius: 9, fontSize: 12, fontWeight: 700, color: agency === a ? "#03110a" : "#8fa39a", background: agency === a ? "#39e673" : "transparent" }}>{a} agency</button>)}
+          {["US", "CZ"].map((a) => <button key={a} onClick={() => pickAgency(a)} style={{ padding: "6px 14px", borderRadius: 9, fontSize: 12, fontWeight: 700, color: agency === a ? "#03110a" : "#8fa39a", background: agency === a ? "#39e673" : "transparent" }}>{a} agency</button>)}
         </div>
       </div>
       {err && <div className="hb-err">{err}</div>}
@@ -9320,8 +9320,8 @@ function AcquisitionPage() {
       </form>
       </>)}
       <div className="hb-bar">
-        {[["todo", `To do ${lists.todo.length}`], ...(agency === "US" ? [["reddit", `Reddit ${lists.reddit.length}`]] : []), ["new", `All new ${lists.new.length}`], ["pipeline", `In talks ${lists.pipeline.length}`], ["signed", `Signed ${lists.signed.length}`], ["archive", `Archive ${lists.archive.length}`]].map(([k, l]) => (
-          <button key={k} className={`hb-chip ${view === k ? "on" : ""}`} onClick={() => setView(k)}>{l}</button>
+        {[["todo", `To do ${lists.todo.length}`], ["reddit", agency === "US" ? `Reddit ${lists.reddit.length}` : "Reddit (US)"], ["new", `All new ${lists.new.length}`], ["pipeline", `In talks ${lists.pipeline.length}`], ["signed", `Signed ${lists.signed.length}`], ["archive", `Archive ${lists.archive.length}`]].map(([k, l]) => (
+          <button key={k} className={`hb-chip ${view === k ? "on" : ""}`} onClick={() => { if (k === "reddit" && agency !== "US") pickAgency("US"); setView(k); }}>{l}</button>
         ))}
       </div>
       {view === "reddit" && (
