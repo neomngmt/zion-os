@@ -9030,6 +9030,21 @@ function creatorInsight(a) {
   return { text: notes.join(" · ") + ".", tone };
 }
 
+// The morning AI read of every account (creator-analysis), team only.
+async function analysisFn(body) {
+  let token = "";
+  try { token = (JSON.parse(localStorage.getItem("agencyos_session") || "{}")).token || ""; } catch (e) {}
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/creator-analysis`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, "x-zion-token": token },
+    body: JSON.stringify(body),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+}
+const VERDICT = { good: { c: "#39e673", l: "Good" }, watch: { c: "#f0be3c", l: "Watch" }, bad: { c: "#E2725B", l: "Act now" } };
+
 const TONE_COLOR = { good: "#39e673", bad: "#E2725B", neutral: "#8B93A1" };
 
 // Revenue-by-creator bar chart + one insight card per account — the visual,
@@ -9084,6 +9099,14 @@ function CreatorInsightsSection({ models, inflowwDailyStats, embedded, days = 30
     });
   });
 
+  const [ai, setAi] = useState(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  useEffect(() => { if (restrictModel) return; analysisFn({ action: "get" }).then(setAi).catch(() => {}); }, [restrictModel]);
+  const refreshAi = async () => {
+    setAiBusy(true);
+    try { await analysisFn({ action: "run", notify: false }); setAi(await analysisFn({ action: "get" })); } catch (e) {}
+    setAiBusy(false);
+  };
   if (!accounts.length) return null;
   accounts.sort((a, b) => b.earnings30d - a.earnings30d);
   const maxEarnings = Math.max(1, ...accounts.map((a) => a.earnings30d));
@@ -9092,8 +9115,15 @@ function CreatorInsightsSection({ models, inflowwDailyStats, embedded, days = 30
     <>
       <div className="flex items-center justify-between mb-4">
         <span className="fs-11 uppercase tracking-widest c-muted font-mono">Creator performance · {periodLabel}</span>
-        <span className="fs-9 uppercase tracking-widest font-mono px-1.5 py-0.5 rounded"
-          style={{ color: "#8B93A1", background: "rgba(139,147,161,0.12)" }}>auto-generated read</span>
+        {!restrictModel && ai && ai.at ? (
+          <span className="flex items-center gap-2">
+            <span className="fs-9 uppercase tracking-widest font-mono px-1.5 py-0.5 rounded" style={{ color: "#39e673", background: "rgba(57,230,115,0.1)" }}>AI read, {timeAgo(ai.at)}</span>
+            <button onClick={refreshAi} disabled={aiBusy} className="fs-9 uppercase tracking-widest font-mono px-1.5 py-0.5 rounded c-muted" style={{ border: "1px solid rgba(255,255,255,0.12)" }}>{aiBusy ? "Reading" : "Refresh"}</button>
+          </span>
+        ) : (
+          <span className="fs-9 uppercase tracking-widest font-mono px-1.5 py-0.5 rounded"
+            style={{ color: "#8B93A1", background: "rgba(139,147,161,0.12)" }}>auto-generated read</span>
+        )}
       </div>
 
       <div className="flex flex-col gap-2.5 mb-5">
@@ -9116,7 +9146,8 @@ function CreatorInsightsSection({ models, inflowwDailyStats, embedded, days = 30
       <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
         {accounts.map((a) => {
           const insight = creatorInsight(a);
-          const color = TONE_COLOR[insight.tone];
+          const r = !restrictModel && ai && ai.accounts ? ai.accounts[`${a.model}|${a.accountType === "free" ? "free" : "paid"}`] : null;
+          const color = r ? (VERDICT[r.verdict] || VERDICT.watch).c : TONE_COLOR[insight.tone];
           return (
             <div key={`${a.model}-${a.accountType}-card`} className="rounded-lg p-3" style={{
               background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderLeft: `3px solid ${color}`,
@@ -9145,7 +9176,27 @@ function CreatorInsightsSection({ models, inflowwDailyStats, embedded, days = 30
                   <span>Avg sub length</span><span className="c-muted">{a.avgSubscriptionLengthDays != null ? `${a.avgSubscriptionLengthDays}d` : "—"}</span>
                 </div>
               </div>
-              <p className="fs-10 font-mono" style={{ color, lineHeight: 1.5, opacity: 0.9 }}>{insight.text}</p>
+              {r ? (
+                <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 8 }}>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="fs-9 uppercase tracking-widest font-mono px-1.5 py-0.5 rounded" style={{ color, background: `${color}1f` }}>{(VERDICT[r.verdict] || VERDICT.watch).l}</span>
+                  </div>
+                  <div className="fs-12 c-text font-bold" style={{ lineHeight: 1.4 }}>{r.headline}</div>
+                  {r.alert ? <div className="fs-11 mt-1.5" style={{ color: "#E2725B", lineHeight: 1.45 }}>{r.alert}</div> : null}
+                  <ul className="fs-11 c-muted mt-1.5" style={{ lineHeight: 1.5, paddingLeft: 14, listStyle: "disc" }}>
+                    {(r.findings || []).map((f, i) => <li key={i}>{f}</li>)}
+                  </ul>
+                  {(r.actions || []).length > 0 && (
+                    <div className="mt-2">
+                      <div className="fs-9 uppercase tracking-widest font-mono c-faint mb-1">Team should</div>
+                      {(r.actions || []).map((x, i) => <div key={i} className="fs-11 c-text" style={{ lineHeight: 1.45, marginBottom: 3 }}>{x}</div>)}
+                    </div>
+                  )}
+                  {r.trend ? <div className="fs-10 c-faint mt-2" style={{ lineHeight: 1.45 }}>{r.trend}</div> : null}
+                </div>
+              ) : (
+                <p className="fs-10 font-mono" style={{ color, lineHeight: 1.5, opacity: 0.9 }}>{insight.text.replace(/ — /g, ", ")}</p>
+              )}
             </div>
           );
         })}

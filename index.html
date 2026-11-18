@@ -15208,6 +15208,39 @@ function creatorInsight(a) {
     tone
   };
 }
+async function analysisFn(body) {
+  let token = "";
+  try {
+    token = JSON.parse(localStorage.getItem("agencyos_session") || "{}").token || "";
+  } catch (e) {}
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/creator-analysis`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      "x-zion-token": token
+    },
+    body: JSON.stringify(body)
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+}
+const VERDICT = {
+  good: {
+    c: "#39e673",
+    l: "Good"
+  },
+  watch: {
+    c: "#f0be3c",
+    l: "Watch"
+  },
+  bad: {
+    c: "#E2725B",
+    l: "Act now"
+  }
+};
 const TONE_COLOR = {
   good: "#39e673",
   bad: "#E2725B",
@@ -15264,6 +15297,27 @@ function CreatorInsightsSection({
       });
     });
   });
+  const [ai, setAi] = useState(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  useEffect(() => {
+    if (restrictModel) return;
+    analysisFn({
+      action: "get"
+    }).then(setAi).catch(() => {});
+  }, [restrictModel]);
+  const refreshAi = async () => {
+    setAiBusy(true);
+    try {
+      await analysisFn({
+        action: "run",
+        notify: false
+      });
+      setAi(await analysisFn({
+        action: "get"
+      }));
+    } catch (e) {}
+    setAiBusy(false);
+  };
   if (!accounts.length) return null;
   accounts.sort((a, b) => b.earnings30d - a.earnings30d);
   const maxEarnings = Math.max(1, ...accounts.map(a => a.earnings30d));
@@ -15271,7 +15325,22 @@ function CreatorInsightsSection({
     className: "flex items-center justify-between mb-4"
   }, React.createElement("span", {
     className: "fs-11 uppercase tracking-widest c-muted font-mono"
-  }, "Creator performance · ", periodLabel), React.createElement("span", {
+  }, "Creator performance · ", periodLabel), !restrictModel && ai && ai.at ? React.createElement("span", {
+    className: "flex items-center gap-2"
+  }, React.createElement("span", {
+    className: "fs-9 uppercase tracking-widest font-mono px-1.5 py-0.5 rounded",
+    style: {
+      color: "#39e673",
+      background: "rgba(57,230,115,0.1)"
+    }
+  }, "AI read, ", timeAgo(ai.at)), React.createElement("button", {
+    onClick: refreshAi,
+    disabled: aiBusy,
+    className: "fs-9 uppercase tracking-widest font-mono px-1.5 py-0.5 rounded c-muted",
+    style: {
+      border: "1px solid rgba(255,255,255,0.12)"
+    }
+  }, aiBusy ? "Reading" : "Refresh")) : React.createElement("span", {
     className: "fs-9 uppercase tracking-widest font-mono px-1.5 py-0.5 rounded",
     style: {
       color: "#8B93A1",
@@ -15317,7 +15386,8 @@ function CreatorInsightsSection({
     }
   }, accounts.map(a => {
     const insight = creatorInsight(a);
-    const color = TONE_COLOR[insight.tone];
+    const r = !restrictModel && ai && ai.accounts ? ai.accounts[`${a.model}|${a.accountType === "free" ? "free" : "paid"}`] : null;
+    const color = r ? (VERDICT[r.verdict] || VERDICT.watch).c : TONE_COLOR[insight.tone];
     return React.createElement("div", {
       key: `${a.model}-${a.accountType}-card`,
       className: "rounded-lg p-3",
@@ -15358,14 +15428,63 @@ function CreatorInsightsSection({
       className: "flex justify-between fs-10 font-mono c-faint"
     }, React.createElement("span", null, "Avg sub length"), React.createElement("span", {
       className: "c-muted"
-    }, a.avgSubscriptionLengthDays != null ? `${a.avgSubscriptionLengthDays}d` : "—"))), React.createElement("p", {
+    }, a.avgSubscriptionLengthDays != null ? `${a.avgSubscriptionLengthDays}d` : "—"))), r ? React.createElement("div", {
+      style: {
+        borderTop: "1px solid rgba(255,255,255,0.06)",
+        paddingTop: 8
+      }
+    }, React.createElement("div", {
+      className: "flex items-center gap-2 mb-1.5"
+    }, React.createElement("span", {
+      className: "fs-9 uppercase tracking-widest font-mono px-1.5 py-0.5 rounded",
+      style: {
+        color,
+        background: `${color}1f`
+      }
+    }, (VERDICT[r.verdict] || VERDICT.watch).l)), React.createElement("div", {
+      className: "fs-12 c-text font-bold",
+      style: {
+        lineHeight: 1.4
+      }
+    }, r.headline), r.alert ? React.createElement("div", {
+      className: "fs-11 mt-1.5",
+      style: {
+        color: "#E2725B",
+        lineHeight: 1.45
+      }
+    }, r.alert) : null, React.createElement("ul", {
+      className: "fs-11 c-muted mt-1.5",
+      style: {
+        lineHeight: 1.5,
+        paddingLeft: 14,
+        listStyle: "disc"
+      }
+    }, (r.findings || []).map((f, i) => React.createElement("li", {
+      key: i
+    }, f))), (r.actions || []).length > 0 && React.createElement("div", {
+      className: "mt-2"
+    }, React.createElement("div", {
+      className: "fs-9 uppercase tracking-widest font-mono c-faint mb-1"
+    }, "Team should"), (r.actions || []).map((x, i) => React.createElement("div", {
+      key: i,
+      className: "fs-11 c-text",
+      style: {
+        lineHeight: 1.45,
+        marginBottom: 3
+      }
+    }, x))), r.trend ? React.createElement("div", {
+      className: "fs-10 c-faint mt-2",
+      style: {
+        lineHeight: 1.45
+      }
+    }, r.trend) : null) : React.createElement("p", {
       className: "fs-10 font-mono",
       style: {
         color,
         lineHeight: 1.5,
         opacity: 0.9
       }
-    }, insight.text));
+    }, insight.text.replace(/ — /g, ", ")));
   })));
   if (embedded) return content;
   return React.createElement("div", {
@@ -27031,7 +27150,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1nekm0j</script>
+<script type="text/babel" id="zion-version">1887a31</script>
 <script>
 (function () {
   var last = 0;
