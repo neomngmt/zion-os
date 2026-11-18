@@ -15683,6 +15683,7 @@ function AcquisitionPage() {
   const [busy, setBusy] = useState("");
   const [showCfg, setShowCfg] = useState(false);
   const [addText, setAddText] = useState("");
+  const [newOfCount, setNewOfCount] = useState(20);
   const [ref, setRef] = useState({
     name: "",
     phone: "",
@@ -15787,8 +15788,8 @@ function AcquisitionPage() {
   } : l));
   const scoreColor = s => s == null ? "rgba(255,255,255,.08)" : s >= 70 ? "#39e673" : s >= 45 ? "#ffcf8a" : "rgba(255,255,255,.12)";
   const runText = run ? {
-    searching: "Searching Instagram",
-    reading: "Reading the profiles",
+    searching: run.kind === "newof" ? "Searching new OnlyFans profiles" : "Searching Instagram",
+    reading: "Reading their Instagram profiles",
     judging: "The AI is judging the leads"
   }[run.state] || "" : "";
   return React.createElement("div", {
@@ -15837,7 +15838,47 @@ function AcquisitionPage() {
     className: "aq-kpi"
   }, React.createElement("b", null, all.filter(l => l.status === "replied" || l.status === "call").length), React.createElement("span", null, "talking now")), React.createElement("div", {
     className: "aq-kpi"
-  }, React.createElement("b", null, lists.signed.length), React.createElement("span", null, "signed"))), agency === "CZ" && React.createElement("div", {
+  }, React.createElement("b", null, lists.signed.length), React.createElement("span", null, "signed"))), React.createElement("div", {
+    className: "hb-card",
+    style: {
+      marginBottom: 16,
+      display: "flex",
+      gap: 12,
+      alignItems: "center",
+      flexWrap: "wrap",
+      borderColor: "rgba(57,230,115,.35)"
+    }
+  }, React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 220
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 800
+    }
+  }, "Newly created OnlyFans profiles"), React.createElement("div", {
+    className: "hb-note"
+  }, running && run?.kind === "newof" ? runText : `OnlyFans creators from ${agency === "CZ" ? "Czechia" : "the US"} who joined in the last 30 days and link an Instagram. Small pages only. About 0.8 cents per lead.`)), React.createElement("select", {
+    className: "hb-in",
+    style: {
+      maxWidth: 110
+    },
+    value: newOfCount,
+    onChange: e => setNewOfCount(Number(e.target.value))
+  }, [20, 50, 100].map(n => React.createElement("option", {
+    key: n,
+    value: n
+  }, n, " leads"))), React.createElement("button", {
+    className: "hb-btn",
+    disabled: running || busy === "newof",
+    onClick: () => act("newof", {
+      action: "new-of",
+      count: newOfCount
+    }, j => setRun(j.run))
+  }, running && run?.kind === "newof" ? React.createElement(React.Fragment, null, React.createElement("span", {
+    className: "hb-spin"
+  }), "Scraping") : "Scrape newly created OF profiles")), agency === "CZ" && React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))",
@@ -16103,7 +16144,13 @@ function AcquisitionPage() {
       }
     }, isDue && React.createElement("span", {
       className: "aq-tag fu"
-    }, "Follow up"), l.of_status === "yes" && React.createElement("span", {
+    }, "Follow up"), l.source === "new OF" && React.createElement("span", {
+      className: "aq-tag fu",
+      style: {
+        background: "#7c5cff",
+        color: "#fff"
+      }
+    }, "New OF"), l.of_status === "yes" && React.createElement("span", {
       className: "aq-tag of"
     }, "OF"), l.of_status === "maybe" && React.createElement("span", {
       className: "aq-tag ofm"
@@ -28883,7 +28930,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1slvteb</script>
+<script type="text/babel" id="zion-version">1h6sp36</script>
 <script>
 (function () {
   var last = 0;

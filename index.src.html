@@ -9181,6 +9181,7 @@ function AcquisitionPage() {
   const [busy, setBusy] = useState("");
   const [showCfg, setShowCfg] = useState(false);
   const [addText, setAddText] = useState("");
+  const [newOfCount, setNewOfCount] = useState(20);
   const [ref, setRef] = useState({ name: "", phone: "", ig: "", referred_by: "", notes: "" });
   const [importMsg, setImportMsg] = useState("");
   const importFile = async (file) => {
@@ -9230,7 +9231,7 @@ function AcquisitionPage() {
   const lead = open ? all.find((l) => l.id === open) : null;
   const patchLocal = (id, p) => setLeads((cur) => (cur || []).map((l) => l.id === id ? { ...l, ...p } : l));
   const scoreColor = (s) => (s == null ? "rgba(255,255,255,.08)" : s >= 70 ? "#39e673" : s >= 45 ? "#ffcf8a" : "rgba(255,255,255,.12)");
-  const runText = run ? ({ searching: "Searching Instagram", reading: "Reading the profiles", judging: "The AI is judging the leads" }[run.state] || "") : "";
+  const runText = run ? ({ searching: run.kind === "newof" ? "Searching new OnlyFans profiles" : "Searching Instagram", reading: "Reading their Instagram profiles", judging: "The AI is judging the leads" }[run.state] || "") : "";
 
   return (
     <div className="hb">
@@ -9250,6 +9251,18 @@ function AcquisitionPage() {
         <div className="aq-kpi"><b>{agency === "CZ" ? week("lead_at") : week("messaged_at")}</b><span>{agency === "CZ" ? "leads this week" : "messaged this week"}</span></div>
         <div className="aq-kpi"><b>{all.filter((l) => l.status === "replied" || l.status === "call").length}</b><span>talking now</span></div>
         <div className="aq-kpi"><b>{lists.signed.length}</b><span>signed</span></div>
+      </div>
+      <div className="hb-card" style={{ marginBottom: 16, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", borderColor: "rgba(57,230,115,.35)" }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
+          <div style={{ fontWeight: 800 }}>Newly created OnlyFans profiles</div>
+          <div className="hb-note">{running && run?.kind === "newof" ? runText : `OnlyFans creators from ${agency === "CZ" ? "Czechia" : "the US"} who joined in the last 30 days and link an Instagram. Small pages only. About 0.8 cents per lead.`}</div>
+        </div>
+        <select className="hb-in" style={{ maxWidth: 110 }} value={newOfCount} onChange={(e) => setNewOfCount(Number(e.target.value))}>
+          {[20, 50, 100].map((n) => <option key={n} value={n}>{n} leads</option>)}
+        </select>
+        <button className="hb-btn" disabled={running || busy === "newof"} onClick={() => act("newof", { action: "new-of", count: newOfCount }, (j) => setRun(j.run))}>
+          {running && run?.kind === "newof" ? <><span className="hb-spin" />Scraping</> : "Scrape newly created OF profiles"}
+        </button>
       </div>
       {agency === "CZ" && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 14, marginBottom: 16 }}>
@@ -9310,6 +9323,7 @@ function AcquisitionPage() {
                 <div style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.contact_name || (l.source === "manual" && !l.followers ? l.source_detail || l.handle : `@${l.handle}`)} <span className="hb-note" style={{ fontWeight: 400 }}>{l.contact_name ? [l.phone, l.source === "referral" ? `via ${l.referred_by || "contact"}` : l.campaign].filter(Boolean).join(", ") : l.full_name || ""}</span></div>
                 <div style={{ marginTop: 3 }}>
                   {isDue && <span className="aq-tag fu">Follow up</span>}
+                  {l.source === "new OF" && <span className="aq-tag fu" style={{ background: "#7c5cff", color: "#fff" }}>New OF</span>}
                   {l.of_status === "yes" && <span className="aq-tag of">OF</span>}
                   {l.of_status === "maybe" && <span className="aq-tag ofm">OF maybe</span>}
                   {/Agency likely/.test(l.of_note || "") && <span className="aq-tag ag">Agency likely</span>}
