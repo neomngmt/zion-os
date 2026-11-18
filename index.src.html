@@ -14253,7 +14253,7 @@ function InflowwRevenueCard({ myInflowwRows, accountType, title, last7Dates, day
           <DeltaTag current={rangeTotal} previous={prevTotal} />
           <div className="flex rounded-lg border c-border overflow-hidden">
             {[7, 30].map((n) => (
-              <button key={n} onClick={() => setRange(n)}
+              <button key={n} onClick={() => { setRange(n); try { window.dispatchEvent(new CustomEvent("zion-range", { detail: n })); } catch (e) {} }}
                 className={`tap px-2 py-0.5 fs-9 font-mono uppercase transition-colors ${range === n ? "c-bg-accent c-onaccent" : "c-muted hover-bg-surface"}`}>
                 {n}D
               </button>
@@ -14297,6 +14297,27 @@ function CreatorMoney({ model, record, rows, children }) {
     return () => { cancel = true; };
   }, [model]);
 
+  // the top fans follow the 7D / 30D switch of the revenue chart
+  const [fanRange, setFanRange] = useState(7);
+  useEffect(() => { const on = (e) => setFanRange(e.detail === 30 ? 30 : 7); window.addEventListener("zion-range", on); return () => window.removeEventListener("zion-range", on); }, []);
+  const [ins7, setIns7] = useState(() => cacheGet(`zionIns7:${model}`));
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/creator-insights`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+          body: JSON.stringify({ model, days: 7 }),
+        });
+        const j = await r.json();
+        if (!r.ok || j.error) return;
+        cacheSet(`zionIns7:${model}`, j);
+        if (!cancel) setIns7(j);
+      } catch (e) {}
+    })();
+    return () => { cancel = true; };
+  }, [model]);
   const [topFan, setTopFan] = useState(() => { const c = cacheGet(`zionTopFan:${model}`); return c === null ? undefined : c; });
   useEffect(() => {
     let cancel = false;
@@ -14382,20 +14403,20 @@ function CreatorMoney({ model, record, rows, children }) {
             </div>
           )}
 
-          {ins.topFans && ins.topFans.length > 0 && (
+          {(() => { const fi = fanRange === 7 && ins7 && ins7.connected ? ins7 : ins; return fi.topFans && fi.topFans.length > 0 ? (
             <div className={card}>
-              <div className={label}>Top fans, last 30 days</div>
+              <div className={label}>Top fans, last {fi === ins7 ? 7 : 30} days</div>
               <div className="mt-2">
-                {ins.topFans.map((f) => (
+                {fi.topFans.map((f) => (
                   <div key={f.label} className="flex items-center justify-between py-1.5 fs-12 c-text" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                     <span style={{ wordBreak: "break-word" }}>{f.label} <span className="c-faint fs-10 font-mono">{f.count}x</span></span>
                     <span className="font-mono">{money(f.net)} <span className="c-faint">({f.sharePct}%)</span></span>
                   </div>
                 ))}
               </div>
-              <div className="fs-11 c-muted mt-2">Your top 5 fans bring {ins.top5SharePct}% of your income. Keep them happy.</div>
+              <div className="fs-11 c-muted mt-2">Your top 5 fans bring {fi.top5SharePct}% of your income. Keep them happy.</div>
             </div>
-          )}
+          ) : (fanRange === 7 ? <div className={card}><div className={label}>Top fans, last 7 days</div><div className="fs-12 c-muted mt-2">No purchases in the last 7 days yet.</div></div> : null); })()}
 
           {topFan && topFan.topFanAllTime && (
             <div className={card} style={{ borderColor: "rgba(240,190,60,0.45)" }}>

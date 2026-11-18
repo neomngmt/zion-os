@@ -22136,7 +22136,14 @@ function InflowwRevenueCard({
     className: "flex rounded-lg border c-border overflow-hidden"
   }, [7, 30].map(n => React.createElement("button", {
     key: n,
-    onClick: () => setRange(n),
+    onClick: () => {
+      setRange(n);
+      try {
+        window.dispatchEvent(new CustomEvent("zion-range", {
+          detail: n
+        }));
+      } catch (e) {}
+    },
     className: `tap px-2 py-0.5 fs-9 font-mono uppercase transition-colors ${range === n ? "c-bg-accent c-onaccent" : "c-muted hover-bg-surface"}`
   }, n, "D"))))), embedded ? React.createElement("div", {
     className: "fs-12 c-muted mb-1"
@@ -22206,6 +22213,39 @@ function CreatorMoney({
       } catch (e) {
         if (!cancel) setErr(e.message || "Could not load");
       }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [model]);
+  const [fanRange, setFanRange] = useState(7);
+  useEffect(() => {
+    const on = e => setFanRange(e.detail === 30 ? 30 : 7);
+    window.addEventListener("zion-range", on);
+    return () => window.removeEventListener("zion-range", on);
+  }, []);
+  const [ins7, setIns7] = useState(() => cacheGet(`zionIns7:${model}`));
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/creator-insights`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({
+            model,
+            days: 7
+          })
+        });
+        const j = await r.json();
+        if (!r.ok || j.error) return;
+        cacheSet(`zionIns7:${model}`, j);
+        if (!cancel) setIns7(j);
+      } catch (e) {}
     })();
     return () => {
       cancel = true;
@@ -22324,31 +22364,40 @@ function CreatorMoney({
     className: "text-2xl font-extrabold c-accent"
   }, money(Math.ceil(monthNet * 1.2 / 50) * 50)), " net this month."), React.createElement("div", {
     className: "fs-12 c-muted mt-1"
-  }, "That is 20% more than you are at now.")), ins.topFans && ins.topFans.length > 0 && React.createElement("div", {
-    className: card
-  }, React.createElement("div", {
-    className: label
-  }, "Top fans, last 30 days"), React.createElement("div", {
-    className: "mt-2"
-  }, ins.topFans.map(f => React.createElement("div", {
-    key: f.label,
-    className: "flex items-center justify-between py-1.5 fs-12 c-text",
-    style: {
-      borderBottom: "1px solid rgba(255,255,255,0.05)"
-    }
-  }, React.createElement("span", {
-    style: {
-      wordBreak: "break-word"
-    }
-  }, f.label, " ", React.createElement("span", {
-    className: "c-faint fs-10 font-mono"
-  }, f.count, "x")), React.createElement("span", {
-    className: "font-mono"
-  }, money(f.net), " ", React.createElement("span", {
-    className: "c-faint"
-  }, "(", f.sharePct, "%)"))))), React.createElement("div", {
-    className: "fs-11 c-muted mt-2"
-  }, "Your top 5 fans bring ", ins.top5SharePct, "% of your income. Keep them happy.")), topFan && topFan.topFanAllTime && React.createElement("div", {
+  }, "That is 20% more than you are at now.")), (() => {
+    const fi = fanRange === 7 && ins7 && ins7.connected ? ins7 : ins;
+    return fi.topFans && fi.topFans.length > 0 ? React.createElement("div", {
+      className: card
+    }, React.createElement("div", {
+      className: label
+    }, "Top fans, last ", fi === ins7 ? 7 : 30, " days"), React.createElement("div", {
+      className: "mt-2"
+    }, fi.topFans.map(f => React.createElement("div", {
+      key: f.label,
+      className: "flex items-center justify-between py-1.5 fs-12 c-text",
+      style: {
+        borderBottom: "1px solid rgba(255,255,255,0.05)"
+      }
+    }, React.createElement("span", {
+      style: {
+        wordBreak: "break-word"
+      }
+    }, f.label, " ", React.createElement("span", {
+      className: "c-faint fs-10 font-mono"
+    }, f.count, "x")), React.createElement("span", {
+      className: "font-mono"
+    }, money(f.net), " ", React.createElement("span", {
+      className: "c-faint"
+    }, "(", f.sharePct, "%)"))))), React.createElement("div", {
+      className: "fs-11 c-muted mt-2"
+    }, "Your top 5 fans bring ", fi.top5SharePct, "% of your income. Keep them happy.")) : fanRange === 7 ? React.createElement("div", {
+      className: card
+    }, React.createElement("div", {
+      className: label
+    }, "Top fans, last 7 days"), React.createElement("div", {
+      className: "fs-12 c-muted mt-2"
+    }, "No purchases in the last 7 days yet.")) : null;
+  })(), topFan && topFan.topFanAllTime && React.createElement("div", {
     className: card,
     style: {
       borderColor: "rgba(240,190,60,0.45)"
@@ -26551,7 +26600,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">fpz430</script>
+<script type="text/babel" id="zion-version">14f49uj</script>
 <script>
 (function () {
   var last = 0;
