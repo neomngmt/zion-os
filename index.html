@@ -9172,7 +9172,7 @@ function IgHub({
     }
     setBusy("");
   };
-  const scanning = data?.scan?.state === "running";
+  const scanning = data?.scan?.state === "running" || data?.scan?.state === "collecting";
   useEffect(() => {
     if (!scanning) return;
     const t = setInterval(async () => {
@@ -23980,7 +23980,7 @@ function TrendsHub() {
     }
     setBusy("");
   };
-  const scanning = data?.scan?.state === "running";
+  const scanning = data?.scan?.state === "running" || data?.scan?.state === "collecting";
   useEffect(() => {
     if (!scanning) return;
     window.__zionBusy = true;
@@ -24060,7 +24060,7 @@ function TrendsHub() {
     }
   }, scanning ? `Scanning ${data.scan.profiles} accounts` : data.scan?.state === "done" ? `Last scan ${timeAgo(data.scan.finishedAt)}` : "Not scanned yet"), React.createElement("div", {
     className: "hb-note"
-  }, scanning ? "Takes 2 to 5 minutes, you can leave this page." : data.scan?.state === "done" ? `Kept ${data.scan.kept} standout reels of ${data.scan.scanned} read. A scan costs about ${cost} USD of Apify credit.` : `Runs only when you press it, about ${cost} USD of Apify credit.`), data.scan?.state === "failed" && React.createElement("div", {
+  }, scanning ? "Takes 2 to 5 minutes. You can close the page, Telegram tells you when it is done." : data.scan?.state === "done" ? `Kept ${data.scan.kept} standout reels of ${data.scan.scanned} read. A scan costs about ${cost} USD of Apify credit.` : `Runs only when you press it, about ${cost} USD of Apify credit.`), data.scan?.state === "failed" && React.createElement("div", {
     className: "hb-note",
     style: {
       color: "#ff8a6b"
@@ -27290,7 +27290,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">u1vi84</script>
+<script type="text/babel" id="zion-version">1ibgaqx</script>
 <script>
 (function () {
   var last = 0;

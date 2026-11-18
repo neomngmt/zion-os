@@ -5110,7 +5110,7 @@ function IgHub({ models, tab }) {
     setBusy("");
   };
   // While a scan runs, ask every 8 seconds whether Apify finished; the server stores the result when it has.
-  const scanning = data?.scan?.state === "running";
+  const scanning = data?.scan?.state === "running" || data?.scan?.state === "collecting";
   useEffect(() => {
     if (!scanning) return;
     const t = setInterval(async () => {
@@ -15604,7 +15604,7 @@ function TrendsHub() {
     try { const j = await hubFn({ model: T, ...body }); if (after) await after(j); else await load(); } catch (e) { setErr(e.message); }
     setBusy("");
   };
-  const scanning = data?.scan?.state === "running";
+  const scanning = data?.scan?.state === "running" || data?.scan?.state === "collecting";
   useEffect(() => {
     if (!scanning) return;
     window.__zionBusy = true;
@@ -15639,7 +15639,7 @@ function TrendsHub() {
           <div className="hb-card" style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 200 }}>
               <div style={{ fontWeight: 700 }}>{scanning ? `Scanning ${data.scan.profiles} accounts` : data.scan?.state === "done" ? `Last scan ${timeAgo(data.scan.finishedAt)}` : "Not scanned yet"}</div>
-              <div className="hb-note">{scanning ? "Takes 2 to 5 minutes, you can leave this page." : data.scan?.state === "done" ? `Kept ${data.scan.kept} standout reels of ${data.scan.scanned} read. A scan costs about ${cost} USD of Apify credit.` : `Runs only when you press it, about ${cost} USD of Apify credit.`}</div>
+              <div className="hb-note">{scanning ? "Takes 2 to 5 minutes. You can close the page, Telegram tells you when it is done." : data.scan?.state === "done" ? `Kept ${data.scan.kept} standout reels of ${data.scan.scanned} read. A scan costs about ${cost} USD of Apify credit.` : `Runs only when you press it, about ${cost} USD of Apify credit.`}</div>
               {data.scan?.state === "failed" && <div className="hb-note" style={{ color: "#ff8a6b" }}>{data.scan.error}</div>}
             </div>
             <button className="hb-btn" disabled={scanning || busy === "scan" || !active.length} onClick={() => { if (window.confirm(`Scan ${active.length} accounts now? About ${cost} USD of Apify credit.`)) act("scan", { action: "scan" }); }}>
