@@ -15595,6 +15595,247 @@ const VERDICT = {
     l: "Act now"
   }
 };
+async function oopsieFn(body) {
+  let token = "";
+  try {
+    token = JSON.parse(localStorage.getItem("agencyos_session") || "{}").token || "";
+  } catch (e) {}
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/oopsie-stats`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      "x-zion-token": token
+    },
+    body: JSON.stringify(body || {})
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+}
+const OO_CSS = `
+.oo-head{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+.oo-tabs{ display:inline-flex; padding:4px; gap:4px; border-radius:12px; background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.08); }
+.oo-tabs button{ padding:5px 11px; border-radius:9px; font-size:12px; font-weight:700; color:#8fa39a; }
+.oo-tabs button.on{ color:#03110a; background:#39e673; }
+.oo-models{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; }
+.oo-m{ border-radius:20px; padding:16px; background:#0e1310; border:1px solid rgba(255,255,255,.08); opacity:0; animation:hbIn .55s cubic-bezier(.16,1,.3,1) forwards; animation-delay:calc(var(--i,0) * 70ms); }
+.oo-big{ display:flex; gap:18px; margin:6px 0 10px; }
+.oo-big div b{ display:block; font-size:24px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.oo-big div span{ font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#8fa39a; }
+.oo-page{ padding:9px 0; border-top:1px solid rgba(255,255,255,.06); }
+.oo-page:first-of-type{ border-top:0; }
+.oo-bar{ height:6px; border-radius:99px; background:rgba(255,255,255,.07); overflow:hidden; margin-top:5px; }
+.oo-bar i{ display:block; height:100%; border-radius:99px; background:linear-gradient(90deg,#12b34c,#39e673); transform-origin:left; animation:revModelBarGrow .9s cubic-bezier(.2,.9,.2,1) both; }
+.oo-flags{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.oo-flag{ font-size:11px; color:#c9d3ce; padding:2px 8px; border-radius:999px; background:rgba(255,255,255,.05); }
+`;
+function OoSpark({
+  views,
+  clicks,
+  height = 56
+}) {
+  const n = Math.max(views.length, clicks.length);
+  if (n < 2) return null;
+  const max = Math.max(1, ...views, ...clicks);
+  const pts = arr => arr.map((v, i) => `${i / (n - 1) * 100},${height - v / max * (height - 4) - 2}`).join(" ");
+  return React.createElement("svg", {
+    viewBox: `0 0 100 ${height}`,
+    preserveAspectRatio: "none",
+    style: {
+      width: "100%",
+      height,
+      display: "block"
+    }
+  }, React.createElement("defs", null, React.createElement("linearGradient", {
+    id: "ooG",
+    x1: "0",
+    x2: "0",
+    y1: "0",
+    y2: "1"
+  }, React.createElement("stop", {
+    offset: "0%",
+    stopColor: "#39e673",
+    stopOpacity: ".35"
+  }), React.createElement("stop", {
+    offset: "100%",
+    stopColor: "#39e673",
+    stopOpacity: "0"
+  }))), React.createElement("polyline", {
+    points: pts(views),
+    fill: "none",
+    stroke: "rgba(255,255,255,.35)",
+    strokeWidth: "1.2",
+    vectorEffect: "non-scaling-stroke"
+  }), React.createElement("polygon", {
+    points: `0,${height} ${pts(clicks)} 100,${height}`,
+    fill: "url(#ooG)"
+  }), React.createElement("polyline", {
+    points: pts(clicks),
+    fill: "none",
+    stroke: "#39e673",
+    strokeWidth: "2",
+    vectorEffect: "non-scaling-stroke"
+  }));
+}
+const ooSum = (a, b) => (a || []).map((v, i) => v + ((b || [])[i] || 0));
+function OopsieModelCard({
+  m,
+  range,
+  i,
+  labels
+}) {
+  const v = range === 7 ? m.views7 : m.views30,
+    c = range === 7 ? m.clicks7 : m.clicks30;
+  const views = m.pages.reduce((acc, p) => ooSum(acc.length ? acc : p.seriesViews.map(() => 0), p.seriesViews), []);
+  const clicks = m.pages.reduce((acc, p) => ooSum(acc.length ? acc : p.seriesClicks.map(() => 0), p.seriesClicks), []);
+  const cut = range === 7 ? -7 : undefined;
+  const maxV = Math.max(1, ...m.pages.map(p => range === 7 ? p.views7 : p.views30));
+  const countries = {};
+  m.pages.forEach(p => (p.countries || []).forEach(x => {
+    countries[x.code || x.country] = (countries[x.code || x.country] || 0) + (x.count || 0);
+  }));
+  const topC = Object.entries(countries).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  const totalC = Object.values(countries).reduce((a, b) => a + b, 0) || 1;
+  return React.createElement("div", {
+    className: "oo-m",
+    style: {
+      "--i": i
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "baseline",
+      gap: 8
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 16,
+      flex: 1
+    }
+  }, m.model), React.createElement("span", {
+    className: "hb-note"
+  }, m.pages.length, " page", m.pages.length === 1 ? "" : "s")), React.createElement("div", {
+    className: "oo-big"
+  }, React.createElement("div", null, React.createElement("b", null, v.toLocaleString("en-US")), React.createElement("span", null, "Views")), React.createElement("div", null, React.createElement("b", {
+    style: {
+      color: "#39e673"
+    }
+  }, c.toLocaleString("en-US")), React.createElement("span", null, "Clicks")), React.createElement("div", null, React.createElement("b", null, v ? Math.round(c / v * 100) : 0, "%"), React.createElement("span", null, "CTR"))), React.createElement(OoSpark, {
+    views: views.slice(cut),
+    clicks: clicks.slice(cut)
+  }), React.createElement("div", {
+    className: "hb-note",
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      margin: "2px 0 8px"
+    }
+  }, React.createElement("span", null, labels.slice(cut)[0] || ""), React.createElement("span", null, "views grey, clicks green"), React.createElement("span", null, labels[labels.length - 1] || "")), m.pages.map(p => {
+    const pv = range === 7 ? p.views7 : p.views30,
+      pc = range === 7 ? p.clicks7 : p.clicks30;
+    return React.createElement("div", {
+      key: p.slug,
+      className: "oo-page"
+    }, React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        fontSize: 13
+      }
+    }, React.createElement("span", {
+      style: {
+        fontWeight: 700
+      }
+    }, p.source || p.slug), React.createElement("span", {
+      className: "hb-note"
+    }, "oopsie.bio/", p.slug), React.createElement("span", {
+      style: {
+        marginLeft: "auto",
+        fontVariantNumeric: "tabular-nums"
+      }
+    }, pv, " views, ", React.createElement("b", {
+      style: {
+        color: "#39e673"
+      }
+    }, pc), " clicks")), React.createElement("div", {
+      className: "oo-bar"
+    }, React.createElement("i", {
+      style: {
+        width: `${pv / maxV * 100}%`
+      }
+    })), pv === 0 && React.createElement("div", {
+      className: "hb-note",
+      style: {
+        marginTop: 4,
+        color: "#ffcf8a"
+      }
+    }, "No visits in this period. Is this link still in her bio?"));
+  }), topC.length > 0 && React.createElement("div", {
+    className: "oo-flags"
+  }, topC.map(([code, n]) => React.createElement("span", {
+    key: code,
+    className: "oo-flag"
+  }, code, " ", Math.round(n / totalC * 100), "%")), React.createElement("span", {
+    className: "hb-note"
+  }, "last 30 days")));
+}
+function OopsieSection({
+  restrictModel
+}) {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+  const [range, setRange] = useState(7);
+  useEffect(() => {
+    oopsieFn(restrictModel ? {} : {}).then(setData).catch(e => setErr(e.message));
+  }, [restrictModel]);
+  if (err) return restrictModel ? null : React.createElement("div", {
+    className: "hb hb-card",
+    style: {
+      marginBottom: 24
+    }
+  }, React.createElement("style", null, HUB_CSS), React.createElement("div", {
+    className: "hb-note"
+  }, "Link in bio stats are not available: ", err));
+  if (!data || !(data.models || []).length) return null;
+  return React.createElement("div", {
+    className: "hb hb-card",
+    style: {
+      marginBottom: 24
+    }
+  }, React.createElement("style", null, HUB_CSS, OO_CSS), React.createElement("div", {
+    className: "oo-head"
+  }, React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 11,
+      letterSpacing: ".14em",
+      textTransform: "uppercase",
+      color: "#8fa39a"
+    }
+  }, restrictModel ? "Your link in bio" : "Link in bio"), React.createElement("div", {
+    className: "hb-note"
+  }, "Visits to the Oopsie pages and clicks on to OnlyFans. Updated every 30 minutes.")), React.createElement("div", {
+    className: "oo-tabs"
+  }, [[7, "7D"], [30, "30D"]].map(([k, l]) => React.createElement("button", {
+    key: k,
+    className: range === k ? "on" : "",
+    onClick: () => setRange(k)
+  }, l)))), React.createElement("div", {
+    className: "oo-models"
+  }, data.models.map((m, i) => React.createElement(OopsieModelCard, {
+    key: m.model,
+    m: m,
+    range: range,
+    i: i,
+    labels: data.labels || []
+  }))));
+}
 const TONE_COLOR = {
   good: "#39e673",
   bad: "#E2725B",
@@ -16358,7 +16599,7 @@ function Dashboard({
     days: revRange,
     periodLabel: revRange === 7 ? "this week" : "this month",
     sinceISO: days[0]
-  }), showAllWeeksModal && (() => {
+  }), React.createElement(OopsieSection, null), showAllWeeksModal && (() => {
     const allWeeks = getAllWeeksHistory();
     const groups = [];
     allWeeks.forEach(w => {
@@ -23055,6 +23296,8 @@ function CreatorDashboard({
       rows: inflowwDailyStats
     }, inflowwSectionEmbedded), React.createElement(ShootHomeCard, {
       onOpen: onOpenIg
+    }), React.createElement(OopsieSection, {
+      restrictModel: restrictModel
     }), React.createElement(ThisWeeksAsks, {
       tasks: tasks,
       restrictModel: restrictModel,
@@ -23069,6 +23312,8 @@ function CreatorDashboard({
     rows: inflowwDailyStats
   }, inflowwSectionEmbedded), React.createElement(ShootHomeCard, {
     onOpen: onOpenIg
+  }), React.createElement(OopsieSection, {
+    restrictModel: restrictModel
   }), React.createElement(GoalCard, {
     latest: latest
   }), React.createElement(ThisWeeksAsks, {
@@ -27622,7 +27867,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">ve1wrl</script>
+<script type="text/babel" id="zion-version">1tz0396</script>
 <script>
 (function () {
   var last = 0;
