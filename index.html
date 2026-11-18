@@ -15676,6 +15676,7 @@ function AcquisitionPage() {
   });
   const [leads, setLeads] = useState(null);
   const [run, setRun] = useState(null);
+  const [reddit, setReddit] = useState(null);
   const [cfg, setCfg] = useState(null);
   const [view, setView] = useState("todo");
   const [open, setOpen] = useState(null);
@@ -15729,6 +15730,7 @@ function AcquisitionPage() {
       })]);
       setLeads(l.leads || []);
       setRun(l.run);
+      setReddit(l.reddit || null);
       setCfg(c.config || {});
       setErr("");
     } catch (e) {
@@ -15768,14 +15770,30 @@ function AcquisitionPage() {
     }
     setBusy("");
   };
+  const redditRunning = reddit && ["running", "judging"].includes(reddit.state);
+  useEffect(() => {
+    if (!redditRunning) return;
+    const t = setInterval(async () => {
+      try {
+        const j = await acqFn({
+          action: "reddit-status",
+          agency: "US"
+        });
+        setReddit(j.reddit);
+        if (j.reddit?.state === "done") load();
+      } catch (e) {}
+    }, 8000);
+    return () => clearInterval(t);
+  }, [redditRunning, load]);
   const all = leads || [];
   const now = Date.now();
   const due = all.filter(l => l.next_followup_at && Date.parse(l.next_followup_at) <= now + 12 * 3600000 && !["signed", "lost", "skip"].includes(l.status));
   const fresh = all.filter(l => l.status === "new");
   const week = k => all.filter(l => l[k] && now - Date.parse(l[k]) < 7 * 86400000).length;
   const lists = {
-    todo: [...due, ...fresh.filter(l => !due.includes(l) && ((l.score || 0) >= 50 || l.source === "ads" || l.source === "referral"))].slice(0, 80),
+    todo: [...due, ...fresh.filter(l => !due.includes(l) && l.source !== "reddit" && ((l.score || 0) >= 50 || l.source === "ads" || l.source === "referral"))].slice(0, 80),
     new: fresh,
+    reddit: all.filter(l => l.source === "reddit" && l.status === "new").sort((a, b) => (b.score || 0) - (a.score || 0)),
     pipeline: all.filter(l => ["messaged", "replied", "call"].includes(l.status)),
     signed: all.filter(l => l.status === "signed"),
     archive: all.filter(l => ["lost", "skip"].includes(l.status))
@@ -16092,11 +16110,40 @@ function AcquisitionPage() {
     disabled: busy === "add" || !addText.trim()
   }, busy === "add" ? "Adding" : "Add")))), React.createElement("div", {
     className: "hb-bar"
-  }, [["todo", `To do ${lists.todo.length}`], ["new", `All new ${lists.new.length}`], ["pipeline", `In talks ${lists.pipeline.length}`], ["signed", `Signed ${lists.signed.length}`], ["archive", `Archive ${lists.archive.length}`]].map(([k, l]) => React.createElement("button", {
+  }, [["todo", `To do ${lists.todo.length}`], ...(agency === "US" ? [["reddit", `Reddit ${lists.reddit.length}`]] : []), ["new", `All new ${lists.new.length}`], ["pipeline", `In talks ${lists.pipeline.length}`], ["signed", `Signed ${lists.signed.length}`], ["archive", `Archive ${lists.archive.length}`]].map(([k, l]) => React.createElement("button", {
     key: k,
     className: `hb-chip ${view === k ? "on" : ""}`,
     onClick: () => setView(k)
-  }, l))), React.createElement("div", {
+  }, l))), view === "reddit" && React.createElement("div", {
+    className: "hb-card",
+    style: {
+      marginBottom: 12,
+      display: "flex",
+      gap: 12,
+      alignItems: "center",
+      flexWrap: "wrap"
+    }
+  }, React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 220
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 800
+    }
+  }, "Creators asking for help on Reddit"), React.createElement("div", {
+    className: "hb-note"
+  }, redditRunning ? "Reading the newest posts" : reddit?.state === "done" ? `Last check ${timeAgo(reddit.finishedAt)}: ${reddit.added} new of ${reddit.read} posts in r/${(reddit.subs || []).join(", r/")}` : "Checked every morning at 8:00.", " Answer in the comments with the reply below from a real account, never mass DMs.")), React.createElement("button", {
+    className: "hb-btn ghost",
+    disabled: redditRunning || busy === "rd",
+    onClick: () => act("rd", {
+      action: "reddit-scan",
+      agency: "US"
+    }, j => setReddit(j.reddit))
+  }, redditRunning ? React.createElement(React.Fragment, null, React.createElement("span", {
+    className: "hb-spin"
+  }), "Checking") : "Check now")), React.createElement("div", {
     className: "hb-card",
     style: {
       padding: 8
@@ -16133,7 +16180,12 @@ function AcquisitionPage() {
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
       }
-    }, l.contact_name || (l.source === "manual" && !l.followers ? l.source_detail || l.handle : `@${l.handle}`), " ", React.createElement("span", {
+    }, l.source === "reddit" ? React.createElement(React.Fragment, null, l.handle, " ", React.createElement("span", {
+      className: "hb-note",
+      style: {
+        fontWeight: 400
+      }
+    }, l.full_name)) : l.contact_name || (l.source === "manual" && !l.followers ? l.source_detail || l.handle : `@${l.handle}`), " ", React.createElement("span", {
       className: "hb-note",
       style: {
         fontWeight: 400
@@ -16142,7 +16194,15 @@ function AcquisitionPage() {
       style: {
         marginTop: 3
       }
-    }, isDue && React.createElement("span", {
+    }, l.source === "reddit" && React.createElement("span", {
+      className: "aq-tag",
+      style: {
+        color: "#fff",
+        background: "#ff4500"
+      }
+    }, "Reddit"), l.source === "reddit" && React.createElement("span", {
+      className: "hb-note"
+    }, String(l.of_note || "").slice(0, 120)), isDue && React.createElement("span", {
       className: "aq-tag fu"
     }, "Follow up"), l.source === "new OF" && React.createElement("span", {
       className: "aq-tag fu",
@@ -16181,6 +16241,7 @@ function AcqSettings({
   onSaved
 }) {
   const [f, setF] = useState({
+    reddit_subs: (cfg.reddit_subs || ["onlyfansadvice"]).join(" "),
     hashtags: (cfg.hashtags || []).join(" "),
     seeds: (cfg.seeds || []).join(" "),
     follow_of: (cfg.follow_of || []).join(" "),
@@ -16227,7 +16288,7 @@ function AcqSettings({
       fontWeight: 800,
       marginBottom: 10
     }
-  }, "Search settings, ", agency, " agency"), row("Hashtags", "hashtags", "praha brno czechgirl", "Reels posted under these hashtags. Separate with spaces."), row("Similar to these accounts", "seeds", "maminajarkaa val3ntyna.an1cka", "Instagram shows accounts similar to these, our own models work well."), row("Followers of these big accounts", "follow_of", "a big influencer or brand her audience follows", "Reads up to 150 followers of each, up to 3 accounts."), React.createElement("div", {
+  }, "Search settings, ", agency, " agency"), row("Hashtags", "hashtags", "praha brno czechgirl", "Reels posted under these hashtags. Separate with spaces."), row("Similar to these accounts", "seeds", "maminajarkaa val3ntyna.an1cka", "Instagram shows accounts similar to these, our own models work well."), agency === "US" && row("Subreddits to watch", "reddit_subs", "onlyfansadvice", "Checked every morning for creators asking for help. Separate with spaces."), row("Followers of these big accounts", "follow_of", "a big influencer or brand her audience follows", "Reads up to 150 followers of each, up to 3 accounts."), React.createElement("div", {
     style: {
       display: "flex",
       gap: 10,
@@ -16386,7 +16447,43 @@ function AcqLeadSheet({
     className: "aq-kpi"
   }, React.createElement("b", null, lead.median_views ? igK(lead.median_views) : "?"), React.createElement("span", null, "median views")), React.createElement("div", {
     className: "aq-kpi"
-  }, React.createElement("b", null, lead.score ?? "?"), React.createElement("span", null, "score"))), (lead.phone || lead.email) && React.createElement("div", {
+  }, React.createElement("b", null, lead.score ?? "?"), React.createElement("span", null, "score"))), lead.source === "reddit" && React.createElement("div", {
+    className: "hb-card",
+    style: {
+      padding: 12,
+      margin: "12px 0"
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      marginBottom: 6
+    }
+  }, lead.full_name), lead.bio && React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "#d9e2dd",
+      lineHeight: 1.5,
+      whiteSpace: "pre-wrap",
+      maxHeight: 180,
+      overflow: "auto"
+    }
+  }, lead.bio), React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginTop: 10
+    }
+  }, lead.source_detail && React.createElement("a", {
+    className: "hb-btn sm",
+    href: lead.source_detail,
+    target: "_blank",
+    rel: "noopener noreferrer"
+  }, "Open the post"), React.createElement("a", {
+    className: "hb-btn ghost sm",
+    href: `https://www.reddit.com/user/${lead.handle.replace(/^u\//, "")}/`,
+    target: "_blank",
+    rel: "noopener noreferrer"
+  }, "Her Reddit profile"))), (lead.phone || lead.email) && React.createElement("div", {
     className: "hb-card",
     style: {
       padding: 12,
@@ -16432,7 +16529,7 @@ function AcqLeadSheet({
     }
   }, React.createElement("span", {
     className: "hb-note"
-  }, q.replace(/_/g, " ")), React.createElement("div", null, String(a))))), lead.bio && React.createElement("p", {
+  }, q.replace(/_/g, " ")), React.createElement("div", null, String(a))))), lead.bio && lead.source !== "reddit" && React.createElement("p", {
     style: {
       fontSize: 13,
       color: "#d9e2dd",
@@ -16532,7 +16629,7 @@ function AcqLeadSheet({
       fontWeight: 800,
       flex: 1
     }
-  }, "DM for the scout"), React.createElement("button", {
+  }, lead.source === "reddit" ? "Reply for her post" : "DM for the scout"), React.createElement("button", {
     className: "hb-btn ghost sm",
     disabled: busy === "dm",
     onClick: async () => {
@@ -28930,7 +29027,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1h6sp36</script>
+<script type="text/babel" id="zion-version">m3mzyu</script>
 <script>
 (function () {
   var last = 0;

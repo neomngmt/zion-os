@@ -9174,6 +9174,7 @@ function AcquisitionPage() {
   const [agency, setAgency] = useState(() => { try { return localStorage.getItem("zionAcqAgency") || "CZ"; } catch (e) { return "CZ"; } });
   const [leads, setLeads] = useState(null);
   const [run, setRun] = useState(null);
+  const [reddit, setReddit] = useState(null);
   const [cfg, setCfg] = useState(null);
   const [view, setView] = useState("todo");
   const [open, setOpen] = useState(null);
@@ -9200,7 +9201,7 @@ function AcquisitionPage() {
   const load = useCallback(async () => {
     try {
       const [l, c] = await Promise.all([acqFn({ action: "leads", agency }), acqFn({ action: "config", agency })]);
-      setLeads(l.leads || []); setRun(l.run); setCfg(c.config || {}); setErr("");
+      setLeads(l.leads || []); setRun(l.run); setReddit(l.reddit || null); setCfg(c.config || {}); setErr("");
     } catch (e) { setErr(e.message); }
   }, [agency]);
   useEffect(() => { setLeads(null); load(); }, [agency, load]);
@@ -9215,14 +9216,21 @@ function AcquisitionPage() {
     try { const j = await acqFn({ agency, ...body }); if (after) await after(j); else await load(); } catch (e) { setErr(e.message); }
     setBusy("");
   };
+  const redditRunning = reddit && ["running", "judging"].includes(reddit.state);
+  useEffect(() => {
+    if (!redditRunning) return;
+    const t = setInterval(async () => { try { const j = await acqFn({ action: "reddit-status", agency: "US" }); setReddit(j.reddit); if (j.reddit?.state === "done") load(); } catch (e) {} }, 8000);
+    return () => clearInterval(t);
+  }, [redditRunning, load]);
   const all = leads || [];
   const now = Date.now();
   const due = all.filter((l) => l.next_followup_at && Date.parse(l.next_followup_at) <= now + 12 * 3600000 && !["signed", "lost", "skip"].includes(l.status));
   const fresh = all.filter((l) => l.status === "new");
   const week = (k) => all.filter((l) => l[k] && now - Date.parse(l[k]) < 7 * 86400000).length;
   const lists = {
-    todo: [...due, ...fresh.filter((l) => !due.includes(l) && ((l.score || 0) >= 50 || l.source === "ads" || l.source === "referral"))].slice(0, 80),
+    todo: [...due, ...fresh.filter((l) => !due.includes(l) && l.source !== "reddit" && ((l.score || 0) >= 50 || l.source === "ads" || l.source === "referral"))].slice(0, 80),
     new: fresh,
+    reddit: all.filter((l) => l.source === "reddit" && l.status === "new").sort((a, b) => (b.score || 0) - (a.score || 0)),
     pipeline: all.filter((l) => ["messaged", "replied", "call"].includes(l.status)),
     signed: all.filter((l) => l.status === "signed"),
     archive: all.filter((l) => ["lost", "skip"].includes(l.status)),
@@ -9307,10 +9315,19 @@ function AcquisitionPage() {
       </form>
       </>)}
       <div className="hb-bar">
-        {[["todo", `To do ${lists.todo.length}`], ["new", `All new ${lists.new.length}`], ["pipeline", `In talks ${lists.pipeline.length}`], ["signed", `Signed ${lists.signed.length}`], ["archive", `Archive ${lists.archive.length}`]].map(([k, l]) => (
+        {[["todo", `To do ${lists.todo.length}`], ...(agency === "US" ? [["reddit", `Reddit ${lists.reddit.length}`]] : []), ["new", `All new ${lists.new.length}`], ["pipeline", `In talks ${lists.pipeline.length}`], ["signed", `Signed ${lists.signed.length}`], ["archive", `Archive ${lists.archive.length}`]].map(([k, l]) => (
           <button key={k} className={`hb-chip ${view === k ? "on" : ""}`} onClick={() => setView(k)}>{l}</button>
         ))}
       </div>
+      {view === "reddit" && (
+        <div className="hb-card" style={{ marginBottom: 12, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <div style={{ fontWeight: 800 }}>Creators asking for help on Reddit</div>
+            <div className="hb-note">{redditRunning ? "Reading the newest posts" : reddit?.state === "done" ? `Last check ${timeAgo(reddit.finishedAt)}: ${reddit.added} new of ${reddit.read} posts in r/${(reddit.subs || []).join(", r/")}` : "Checked every morning at 8:00."} Answer in the comments with the reply below from a real account, never mass DMs.</div>
+          </div>
+          <button className="hb-btn ghost" disabled={redditRunning || busy === "rd"} onClick={() => act("rd", { action: "reddit-scan", agency: "US" }, (j) => setReddit(j.reddit))}>{redditRunning ? <><span className="hb-spin" />Checking</> : "Check now"}</button>
+        </div>
+      )}
       <div className="hb-card" style={{ padding: 8 }}>
         {leads === null ? <div className="hb-note" style={{ padding: 12 }}>Loading</div> : !shown.length ? (
           <div className="hb-empty" style={{ margin: 8 }}><b>{view === "todo" ? "Nothing to do right now" : "No leads here"}</b>{view === "todo" ? "Press Find new leads, or add some by hand above." : ""}</div>
@@ -9320,8 +9337,10 @@ function AcquisitionPage() {
             <div key={l.id} className="aq-row" onClick={() => setOpen(l.id)}>
               <div className="aq-ava" style={{ backgroundImage: l.thumb_url ? `url(${l.thumb_url})` : "none" }}>{l.thumb_url ? "" : l.handle.charAt(0).toUpperCase()}</div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.contact_name || (l.source === "manual" && !l.followers ? l.source_detail || l.handle : `@${l.handle}`)} <span className="hb-note" style={{ fontWeight: 400 }}>{l.contact_name ? [l.phone, l.source === "referral" ? `via ${l.referred_by || "contact"}` : l.campaign].filter(Boolean).join(", ") : l.full_name || ""}</span></div>
+                <div style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.source === "reddit" ? <>{l.handle} <span className="hb-note" style={{ fontWeight: 400 }}>{l.full_name}</span></> : l.contact_name || (l.source === "manual" && !l.followers ? l.source_detail || l.handle : `@${l.handle}`)} <span className="hb-note" style={{ fontWeight: 400 }}>{l.contact_name ? [l.phone, l.source === "referral" ? `via ${l.referred_by || "contact"}` : l.campaign].filter(Boolean).join(", ") : l.full_name || ""}</span></div>
                 <div style={{ marginTop: 3 }}>
+                  {l.source === "reddit" && <span className="aq-tag" style={{ color: "#fff", background: "#ff4500" }}>Reddit</span>}
+                  {l.source === "reddit" && <span className="hb-note">{String(l.of_note || "").slice(0, 120)}</span>}
                   {isDue && <span className="aq-tag fu">Follow up</span>}
                   {l.source === "new OF" && <span className="aq-tag fu" style={{ background: "#7c5cff", color: "#fff" }}>New OF</span>}
                   {l.of_status === "yes" && <span className="aq-tag of">OF</span>}
@@ -9340,7 +9359,7 @@ function AcquisitionPage() {
   );
 }
 function AcqSettings({ cfg, agency, onSaved }) {
-  const [f, setF] = useState({ hashtags: (cfg.hashtags || []).join(" "), seeds: (cfg.seeds || []).join(" "), follow_of: (cfg.follow_of || []).join(" "), min_followers: cfg.min_followers || 1000, max_followers: cfg.max_followers || 50000, dm_template: cfg.dm_template || "" });
+  const [f, setF] = useState({ reddit_subs: (cfg.reddit_subs || ["onlyfansadvice"]).join(" "), hashtags: (cfg.hashtags || []).join(" "), seeds: (cfg.seeds || []).join(" "), follow_of: (cfg.follow_of || []).join(" "), min_followers: cfg.min_followers || 1000, max_followers: cfg.max_followers || 50000, dm_template: cfg.dm_template || "" });
   const [busy, setBusy] = useState(false);
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
   const row = (label, k, ph, hint) => (
@@ -9355,6 +9374,7 @@ function AcqSettings({ cfg, agency, onSaved }) {
       <div style={{ fontWeight: 800, marginBottom: 10 }}>Search settings, {agency} agency</div>
       {row("Hashtags", "hashtags", "praha brno czechgirl", "Reels posted under these hashtags. Separate with spaces.")}
       {row("Similar to these accounts", "seeds", "maminajarkaa val3ntyna.an1cka", "Instagram shows accounts similar to these, our own models work well.")}
+      {agency === "US" && row("Subreddits to watch", "reddit_subs", "onlyfansadvice", "Checked every morning for creators asking for help. Separate with spaces.")}
       {row("Followers of these big accounts", "follow_of", "a big influencer or brand her audience follows", "Reads up to 150 followers of each, up to 3 accounts.")}
       <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
         <div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Min followers</div><input className="hb-in" type="number" style={{ width: "100%" }} value={f.min_followers} onChange={(e) => set("min_followers", e.target.value)} /></div>
@@ -9396,6 +9416,16 @@ function AcqLeadSheet({ lead, onClose, onPatch, onDeleted }) {
             <div className="aq-kpi"><b>{lead.score ?? "?"}</b><span>score</span></div>
           </div>
         )}
+        {lead.source === "reddit" && (
+          <div className="hb-card" style={{ padding: 12, margin: "12px 0" }}>
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>{lead.full_name}</div>
+            {lead.bio && <div style={{ fontSize: 13, color: "#d9e2dd", lineHeight: 1.5, whiteSpace: "pre-wrap", maxHeight: 180, overflow: "auto" }}>{lead.bio}</div>}
+            <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+              {lead.source_detail && <a className="hb-btn sm" href={lead.source_detail} target="_blank" rel="noopener noreferrer">Open the post</a>}
+              <a className="hb-btn ghost sm" href={`https://www.reddit.com/user/${lead.handle.replace(/^u\//, "")}/`} target="_blank" rel="noopener noreferrer">Her Reddit profile</a>
+            </div>
+          </div>
+        )}
         {(lead.phone || lead.email) && (
           <div className="hb-card" style={{ padding: 12, margin: "12px 0" }}>
             {lead.phone && <div style={{ fontSize: 15, fontWeight: 700 }}><a href={`tel:${lead.phone}`}>{lead.phone}</a></div>}
@@ -9409,7 +9439,7 @@ function AcqLeadSheet({ lead, onClose, onPatch, onDeleted }) {
             {Object.entries(lead.answers).map(([q, a]) => <div key={q} style={{ fontSize: 13, marginBottom: 6 }}><span className="hb-note">{q.replace(/_/g, " ")}</span><div>{String(a)}</div></div>)}
           </div>
         )}
-        {lead.bio && <p style={{ fontSize: 13, color: "#d9e2dd", lineHeight: 1.5, whiteSpace: "pre-wrap", margin: "4px 0 10px" }}>{lead.bio}</p>}
+        {lead.bio && lead.source !== "reddit" && <p style={{ fontSize: 13, color: "#d9e2dd", lineHeight: 1.5, whiteSpace: "pre-wrap", margin: "4px 0 10px" }}>{lead.bio}</p>}
         {lead.of_note && <div className="hb-card" style={{ padding: 12, marginBottom: 10 }}><div className="hb-note" style={{ marginBottom: 3 }}>AI read</div><div style={{ fontSize: 13, lineHeight: 1.5 }}>{lead.of_note}</div>{lead.of_link && <a href={lead.of_link} target="_blank" rel="noopener noreferrer" className="hb-note" style={{ color: "#39e673" }}>{lead.of_link}</a>}</div>}
         <div style={{ fontSize: 12, fontWeight: 700, marginTop: 6 }}>Checked by you</div>
         <div className="aq-stage">
@@ -9428,7 +9458,7 @@ function AcqLeadSheet({ lead, onClose, onPatch, onDeleted }) {
         )}
         <div className="hb-card" style={{ padding: 14, marginBottom: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-            <div style={{ fontWeight: 800, flex: 1 }}>DM for the scout</div>
+            <div style={{ fontWeight: 800, flex: 1 }}>{lead.source === "reddit" ? "Reply for her post" : "DM for the scout"}</div>
             <button className="hb-btn ghost sm" disabled={busy === "dm"} onClick={async () => { setBusy("dm"); try { const j = await acqFn({ action: "dm", id: lead.id }); onPatch({ dm: j.dm }); } catch (e) {} setBusy(""); }}>{busy === "dm" ? <><span className="hb-spin" />Writing</> : lead.dm ? "Write again" : "Write DM"}</button>
           </div>
           {lead.dm ? (
