@@ -4870,6 +4870,126 @@ function PlatformEmpty({ platform, title, message }) {
   );
 }
 
+// Snapchat and Facebook have no stats source we can read (OneUp analytics needs a bigger plan, Meta API is off limits),
+// so their dashboards show the accounts and what Zion scheduled (social_post_log, written by oneup-schedule).
+const ND_CSS = `
+.nd{ color:#f2f5f0; }
+.nd-hero{ position:relative; overflow:hidden; border-radius:24px; padding:22px; margin-bottom:16px; border:1px solid rgba(57,230,115,.18);
+  background: radial-gradient(ellipse 120% 90% at 0% 0%, rgba(57,230,115,.13), transparent 55%), radial-gradient(ellipse 90% 80% at 100% 0%, rgba(255,214,0,.07), transparent 55%), #0b0f0d; }
+.nd-top{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
+.nd-title{ font-size:24px; font-weight:800; letter-spacing:-.02em; flex:1; display:flex; align-items:center; gap:10px; }
+.nd-kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+.nd-kpi{ border-radius:16px; padding:14px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07); opacity:0; animation:hbIn .5s cubic-bezier(.16,1,.3,1) forwards; animation-delay:calc(var(--i,0) * 60ms); }
+.nd-kpi .v{ font-size:28px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.nd-kpi .l{ font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#8fa39a; margin-top:2px; }
+.nd-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:14px; margin-bottom:16px; }
+.nd-acc{ border-radius:20px; padding:16px; background:#0e1310; border:1px solid rgba(255,255,255,.08); transition:border-color .25s, transform .25s; opacity:0; animation:hbIn .55s cubic-bezier(.16,1,.3,1) forwards; animation-delay:calc(var(--i,0) * 50ms); }
+.nd-acc:hover{ border-color:rgba(57,230,115,.4); transform:translateY(-2px); }
+.nd-acc.off{ opacity:.55; }
+.nd-row{ display:flex; justify-content:space-between; font-size:12px; color:#8fa39a; padding:4px 0; }
+.nd-row b{ color:#e6ece9; font-weight:600; font-variant-numeric:tabular-nums; }
+.nd-pill{ display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:600; }
+.nd-pill.on{ color:#39e673; background:rgba(57,230,115,.1); border:1px solid rgba(57,230,115,.3); }
+.nd-pill.off{ color:#8fa39a; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1); }
+.nd-bars{ display:flex; align-items:flex-end; gap:6px; height:90px; padding-top:6px; }
+.nd-bar{ flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; }
+.nd-bar i{ display:block; width:100%; border-radius:6px 6px 2px 2px; background:linear-gradient(180deg,#39e673,#12b34c); transform-origin:bottom; animation:revModelBarGrow .8s cubic-bezier(.2,.9,.2,1) both; min-height:3px; }
+.nd-bar span{ font-size:10px; color:#6f7f77; }
+.nd-up{ display:flex; gap:10px; align-items:center; padding:9px 0; border-top:1px solid rgba(255,255,255,.06); font-size:13px; }
+.nd-up:first-child{ border-top:0; }
+`;
+function SocialPostLogDashboard({ platform, label, Logo, models, handleKey, onPlanPosts, linkedFn, note }) {
+  const [log, setLog] = useState(null);
+  useEffect(() => {
+    const since = new Date(Date.now() - 30 * 86400000).toISOString();
+    supabaseClient.from("social_post_log").select("model, account, scheduled_at, text, media_kind, spotlight").eq("platform", platform).gte("scheduled_at", since).order("scheduled_at", { ascending: true })
+      .then(({ data }) => setLog(data || [])).catch(() => setLog([]));
+  }, [platform]);
+  const now = Date.now(), day = 86400000;
+  const rows = log || [];
+  const past7 = rows.filter((r) => { const t = Date.parse(r.scheduled_at); return t <= now && t > now - 7 * day; });
+  const next7 = rows.filter((r) => { const t = Date.parse(r.scheduled_at); return t > now && t <= now + 7 * day; });
+  const days = Array.from({ length: 14 }, (_, i) => { const d = new Date(now + (i - 6) * day); return d.toISOString().slice(0, 10); }); // 6 days back, today, 7 days ahead
+  const perDay = days.map((d) => rows.filter((r) => String(r.scheduled_at).slice(0, 10) === d).length);
+  const maxDay = Math.max(1, ...perDay);
+  const fmtWhen = (iso) => new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const linkedCount = models.filter((m) => linkedFn(m)).length;
+  return (
+    <div className="nd">
+      <style>{HUB_CSS}{ND_CSS}</style>
+      <div className="nd-hero">
+        <div className="nd-top">
+          <div className="nd-title"><Logo size={22} />{label}</div>
+          <button className="hb-btn" onClick={onPlanPosts}>Plan posts</button>
+        </div>
+        <div className="nd-kpis">
+          {[[past7.length, "posted last 7 days"], [next7.length, "scheduled next 7 days"], [`${linkedCount}/${models.length}`, "accounts linked"],
+            ...(platform === "snap" ? [[rows.filter((r) => r.spotlight).length, "spotlight, 30 days"]] : [])].map(([v, l], i) => (
+            <div key={l} className="nd-kpi" style={{ "--i": i }}><div className="v">{log === null ? "…" : v}</div><div className="l">{l}</div></div>
+          ))}
+        </div>
+      </div>
+      <div className="hb-card" style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 6 }}>
+          <div style={{ fontWeight: 800, fontSize: 15 }}>Posts per day</div>
+          <span className="hb-note">last 7 days and the next 7, scheduled through Zion</span>
+        </div>
+        <div className="nd-bars">
+          {perDay.map((n, i) => (
+            <div key={days[i]} className="nd-bar" title={`${days[i]}: ${n} posts`}>
+              <i style={{ height: `${(n / maxDay) * 70}px`, opacity: n ? 1 : .15, animationDelay: `${i * 30}ms` }} />
+              <span>{new Date(days[i] + "T12:00:00").getDate()}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="nd-grid">
+        {models.map((m, i) => {
+          const on = linkedFn(m);
+          const mine = rows.filter((r) => r.model === m.name);
+          const nextOne = mine.find((r) => Date.parse(r.scheduled_at) > now);
+          const handle = m[handleKey];
+          return (
+            <div key={m.name} className={`nd-acc ${on ? "" : "off"}`} style={{ "--i": i }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                <div className="hb-ava" style={{ width: 34, height: 34, fontSize: 13 }}>{m.name.charAt(0)}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700 }}>{m.name}</div>
+                  <div className="hb-note">{handle ? `@${handle}` : "no handle in Model Manager"}</div>
+                </div>
+                <span className={`nd-pill ${on ? "on" : "off"}`}>{on ? "Linked" : "Not linked"}</span>
+              </div>
+              <div className="nd-row"><span>Posted last 7 days</span><b>{mine.filter((r) => { const t = Date.parse(r.scheduled_at); return t <= now && t > now - 7 * day; }).length}</b></div>
+              <div className="nd-row"><span>Scheduled next 7 days</span><b>{mine.filter((r) => { const t = Date.parse(r.scheduled_at); return t > now && t <= now + 7 * day; }).length}</b></div>
+              <div className="nd-row"><span>Next post</span><b>{nextOne ? fmtWhen(nextOne.scheduled_at) : "-"}</b></div>
+            </div>
+          );
+        })}
+      </div>
+      {next7.length > 0 && (
+        <div className="hb-card" style={{ marginBottom: 16 }}>
+          <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 6 }}>Coming up</div>
+          {next7.slice(0, 12).map((r, i) => (
+            <div key={i} className="nd-up">
+              <span className="hb-fmt" style={{ marginBottom: 0 }}>{r.spotlight ? "Spotlight" : r.media_kind === "video" ? "Video" : "Photo"}</span>
+              <b style={{ minWidth: 90 }}>{r.model}</b>
+              <span className="hb-note" style={{ minWidth: 150 }}>{fmtWhen(r.scheduled_at)}</span>
+              <span style={{ color: "#d9e2dd", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{r.text && r.text !== "." ? r.text : "no caption"}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="hb-note">{note}</p>
+    </div>
+  );
+}
+function SnapOverviewDashboard({ models, onPlanPosts }) {
+  const accs = useOneupAccounts();
+  return <SocialPostLogDashboard platform="snap" label="Snapchat" Logo={SnapchatLogo} models={models} handleKey="snapHandle" onPlanPosts={onPlanPosts}
+    linkedFn={(m) => Array.isArray(accs) ? oneupLinked(accs, "snap", m.name) : !!m.snapHandle}
+    note="Counts come from posts scheduled through Zion since 18 Nov 2026. Snapchat views need OneUp analytics, which is not on the current plan." />;
+}
+
 function FacebookPagesPanel({ models, restrictModel }) {
   const [urls, setUrls] = useState(() => Object.fromEntries(models.map((m) => [m.name, m.fbUrl || ""])));
   const [saved, setSaved] = useState("");
@@ -5601,6 +5721,7 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
   // Content Plan screen instead of making the user click through the menu).
   const [igEntryScreen, setIgEntryScreen] = useState("menu");
   const [ttPlanningMode, setTtPlanningMode] = useState(false);
+  const [snapPlanningMode, setSnapPlanningMode] = useState(false);
 
   // The sidebar's Content Director arrow lets you jump straight to a
   // platform (Instagram / TikTok / X) — when that changes, follow it here.
@@ -5851,7 +5972,16 @@ function ContentDirector({ cards, persistCards, models, restrictModel, forcedNet
   const snapMode = network === "snap" && !restrictModel;
   if (snapMode) {
     const snapModelName = filter !== "all" ? filter : null;
-    return <XCaptionStudio key={snapModelName || "snap"} models={modelsFor("snap")} filterModel={snapModelName || "all"} platform="snap" platformLabel="Snapchat" PlatformLogo={SnapchatLogo} />;
+    if (!snapPlanningMode) return <SnapOverviewDashboard models={modelsFor("snap")} onPlanPosts={() => setSnapPlanningMode(true)} />;
+    return (
+      <>
+        <button onClick={() => setSnapPlanningMode(false)}
+          className="flex items-center gap-1 fs-10 font-mono uppercase c-faint hover-accent-text mb-3 transition-colors">
+          <ChevronLeft size={12} /> Snapchat Dashboard
+        </button>
+        <XCaptionStudio key={snapModelName || "snap"} models={modelsFor("snap")} filterModel={snapModelName || "all"} platform="snap" platformLabel="Snapchat" PlatformLogo={SnapchatLogo} />
+      </>
+    );
   }
 
   const networkSidebar = (
@@ -14876,134 +15006,102 @@ function cleanIgUrl(url) {
 
 const ORDINALS_CS = ["První", "Druhé", "Třetí", "Čtvrté", "Páté", "Šesté", "Sedmé", "Osmé", "Deváté", "Desáté"];
 
+const TG_CSS = `
+.tg-hero{ position:relative; overflow:hidden; border-radius:26px; padding:24px; margin-bottom:18px; border:1px solid rgba(57,230,115,.2);
+  background: radial-gradient(ellipse 110% 90% at 0% 0%, rgba(57,230,115,.14), transparent 55%), radial-gradient(ellipse 80% 70% at 100% 100%, rgba(56,189,248,.07), transparent 60%), #0b0f0d; }
+.tg-hero h2{ margin:0 0 4px; font-size:26px; font-weight:800; letter-spacing:-.02em; }
+.tg-steps{ display:flex; gap:8px; flex-wrap:wrap; margin:12px 0 16px; }
+.tg-step{ display:flex; align-items:center; gap:7px; padding:6px 11px; border-radius:999px; font-size:12px; color:#c9d3ce; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); }
+.tg-step b{ width:18px; height:18px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:10px; color:#03110a; background:#39e673; }
+.tg-lang{ display:inline-flex; padding:4px; gap:4px; border-radius:12px; background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.08); }
+.tg-lang button{ padding:6px 12px; border-radius:9px; font-size:12px; font-weight:700; color:#8fa39a; }
+.tg-lang button.on{ color:#03110a; background:#39e673; }
+.tg-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px; }
+.tg-card{ display:grid; grid-template-columns:96px 1fr; gap:14px; padding:14px; border-radius:20px; background:#0e1310; border:1px solid rgba(255,255,255,.08); opacity:0; animation:hbIn .55s cubic-bezier(.16,1,.3,1) forwards; animation-delay:calc(var(--i,0) * 60ms); transition:border-color .25s; }
+.tg-card:hover{ border-color:rgba(57,230,115,.4); }
+.tg-thumb{ position:relative; width:96px; aspect-ratio:9/14; border-radius:14px; background:#080c0a center/cover no-repeat; display:block; overflow:hidden; }
+.tg-thumb .n{ position:absolute; top:6px; left:6px; min-width:22px; height:22px; padding:0 6px; border-radius:99px; background:#39e673; color:#03110a; font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; }
+.tg-script{ font-size:15px; line-height:1.5; color:#f2f5f0; font-weight:600; margin:6px 0 8px; white-space:pre-wrap; }
+.tg-orig{ font-size:12px; color:#6f7f77; line-height:1.45; border-left:2px solid rgba(255,255,255,.1); padding-left:9px; margin-bottom:8px; }
+.tg-skel{ border-radius:20px; height:170px; background:linear-gradient(90deg, rgba(255,255,255,.03), rgba(255,255,255,.07), rgba(255,255,255,.03)); background-size:200% 100%; animation:tgShimmer 1.2s linear infinite; }
+@keyframes tgShimmer{ from{ background-position:200% 0; } to{ background-position:-200% 0; } }
+@media (max-width:560px){ .tg-card{ grid-template-columns:72px 1fr; } .tg-thumb{ width:72px; } }
+`;
 function TitleGeneratorPage() {
-  const [linksText, setLinksText] = useState("");
-  const [lang, setLang] = useState("cs"); // "cs" or "en"
-  const [results, setResults] = useState([]); // [{url, script, status, error}]
-  const [running, setRunning] = useState(false);
-  const stopRequestedRef = useRef(false);
-  const [copiedMsg, setCopiedMsg] = useState("");
-
-  const runOne = async (i, urlForLookup) => {
-    setResults((prev) => prev.map((r, idx) => idx === i ? { ...r, status: "pending", error: null } : r));
+  const [text, setText] = useState("");
+  const [lang, setLang] = useState("cs");
+  const [items, setItems] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [copied, setCopied] = useState("");
+  const parsed = shootParse(text).items;
+  const run = async () => {
+    setBusy(true); setErr(""); setItems([]);
+    window.__zionBusy = true;
     try {
-      const { data, error } = await supabaseClient.functions.invoke("reel-transcribe-ts", {
-        body: { url: urlForLookup, lang },
-      });
-      if (error) {
-        // supabase-js only gives a generic message by default — the real
-        // reason (from our function's own error response) is in
-        // error.context, which is the raw fetch Response object.
-        let detail = error.message || "failed";
-        try {
-          if (error.context && typeof error.context.json === "function") {
-            const body = await error.context.json();
-            if (body?.error) detail = body.error;
-          }
-        } catch {}
-        setResults((prev) => prev.map((r, idx) => idx === i ? { ...r, status: "error", error: detail } : r));
-        return;
+      const out = [];
+      // ten reels per round, the server reads each one and transcribes it
+      for (let k = 0; k < parsed.length; k += 10) {
+        const j = await hubFn({ action: "title-gen", lang, urls: parsed.slice(k, k + 10).map((x) => x.url) });
+        out.push(...(j.items || []));
+        setItems([...out]);
       }
-      setResults((prev) => prev.map((r, idx) => idx === i ? { ...r, script: data?.script || "", status: "done" } : r));
-    } catch (e) {
-      setResults((prev) => prev.map((r, idx) => idx === i ? { ...r, status: "error", error: e.message || "failed" } : r));
-    }
+    } catch (e) { setErr(e.message); }
+    window.__zionBusy = false;
+    setBusy(false);
   };
-
-  const runGenerate = async () => {
-    const urls = linksText.split("\n").map((l) => l.trim()).filter((l) => l && /^https?:\/\//i.test(l)).map(cleanIgUrl);
-    if (!urls.length) return;
-    stopRequestedRef.current = false;
-    setRunning(true);
-    setResults(urls.map((url) => ({ url, script: "", status: "pending" })));
-    for (let i = 0; i < urls.length; i++) {
-      if (stopRequestedRef.current) {
-        setResults((prev) => prev.map((r, idx) => idx >= i ? { ...r, status: "error", error: "zastaveno" } : r));
-        break;
-      }
-      if (i > 0) await new Promise((res) => setTimeout(res, 8000)); // space requests out — back-to-back scraping is what was triggering Instagram's block
-      await runOne(i, urls[i]);
-    }
-    setRunning(false);
-  };
-
-  const exportText = results
-    .filter((r) => r.status === "done")
-    .map((r, i) => `${ORDINALS_CS[i] || `${i + 1}.`} video: \n${r.url}\nScénář: \n${r.script}`)
-    .join("\n\n");
-
-  const copyExport = async () => {
-    try {
-      await navigator.clipboard.writeText(exportText);
-      setCopiedMsg("Copied!");
-      setTimeout(() => setCopiedMsg(""), 2000);
-    } catch {
-      setCopiedMsg("Copy failed, copy it by hand below.");
-    }
-  };
-
+  const ordinal = (i) => (lang === "cs" ? (ORDINALS_CS[i] ? `${ORDINALS_CS[i]} video` : `${i + 1}. video`) : `Video ${i + 1}`);
+  const allText = items.map((r, i) => `${ordinal(i)}:\n${r.url}\n${lang === "cs" ? "Scénář" : "Script"}:\n${r.script || (r.missing ? "(could not be read)" : "")}`).join("\n\n");
+  const copy = async (key, t) => { try { await navigator.clipboard.writeText(t); setCopied(key); setTimeout(() => setCopied(""), 1500); } catch (e) {} };
   return (
-    <div>
-      <div className="flex items-center justify-end mb-4 flex-wrap gap-2">
-        <div className="flex rounded-lg border c-border overflow-hidden">
-          {[["cs", "Czech"], ["en", "English"]].map(([val, label]) => (
-            <button key={val} onClick={() => setLang(val)}
-              className={`tap px-3 py-1.5 fs-11 font-mono uppercase transition-colors ${lang === val ? "c-bg-accent c-onaccent" : "c-muted hover-bg-surface"}`}>
-              {label}
-            </button>
-          ))}
+    <div className="hb">
+      <style>{HUB_CSS}{SHOOT_CSS}{TG_CSS}</style>
+      <div className="tg-hero">
+        <h2>Title Generator</h2>
+        <div className="hb-note">Paste reels, get the script for each one, ready to send to a model.</div>
+        <div className="tg-steps">
+          <span className="tg-step"><b>1</b>Paste reel links</span>
+          <span className="tg-step"><b>2</b>Zion reads and transcribes each reel</span>
+          <span className="tg-step"><b>3</b>Copy the scripts</span>
         </div>
-      </div>
-
-      <div className="c-bg-surface border c-border rounded-xl p-5 mb-5">
-        <label className="block fs-11 uppercase tracking-widest c-muted font-mono mb-2">
-          IG Reel links (one per line)
-        </label>
-        <textarea value={linksText} onChange={(e) => setLinksText(e.target.value)}
-          placeholder={"https://www.instagram.com/reel/.../?igsh=...\nhttps://www.instagram.com/reel/.../?igsh=..."}
-          className="w-full min-h-[160px] c-bg-app border c-border rounded-lg px-3 py-2 text-sm c-text font-mono outline-none focus-border-accent" />
-        <div className="flex gap-2 mt-3">
-          <button onClick={runGenerate} disabled={running || !linksText.trim()}
-            className="tap px-4 py-2 rounded-lg c-bg-accent c-onaccent fs-12 font-bold disabled:opacity-40">
-            {running ? "Working…" : "Generate scripts"}
-          </button>
-          {running && (
-            <button onClick={() => { stopRequestedRef.current = true; }}
-              className="tap px-4 py-2 rounded-lg fs-12 font-bold" style={{ background: "#e07a5f", color: "#1a0a05" }}>
-              Zastavit
-            </button>
-          )}
+        <textarea className="sh-ta" value={text} onChange={(e) => setText(e.target.value)} placeholder={"https://www.instagram.com/reel/...\nhttps://www.instagram.com/reel/..."} />
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 12 }}>
+          <div className="tg-lang">{[["cs", "Czech"], ["en", "English"]].map(([v, l]) => <button key={v} className={lang === v ? "on" : ""} onClick={() => setLang(v)}>{l}</button>)}</div>
+          <button className="hb-btn" disabled={busy || !parsed.length} onClick={run}>{busy ? <><span className="hb-spin" />Reading {parsed.length} reels</> : `Generate ${parsed.length || ""} scripts`}</button>
+          <span className="hb-note">{parsed.length ? `${parsed.length} clean links, igsh removed` : "One link per line"}{parsed.length ? `, about ${Math.max(1, Math.round(parsed.length * 0.5))} cents` : ""}</span>
+          {items.length > 0 && !busy && <button className="hb-btn ghost" style={{ marginLeft: "auto" }} onClick={() => copy("all", allText)}>{copied === "all" ? "Copied" : "Copy all"}</button>}
         </div>
+        {err && <div className="hb-err" style={{ marginTop: 10 }}>{err}</div>}
       </div>
-
-      {results.length > 0 && (
-        <div className="c-bg-surface border c-border rounded-xl p-5 mb-5">
-          <div className="fs-11 uppercase tracking-widest c-muted font-mono mb-3">Results</div>
-          <div className="flex flex-col gap-3">
-            {results.map((r, i) => (
-              <div key={i} className="c-bg-app border c-border rounded-lg p-3">
-                <div className="fs-11 font-mono c-muted mb-1 truncate">{r.url}</div>
-                {r.status === "pending" && <div className="fs-12 c-muted italic">working…</div>}
-                {r.status === "error" && <div className="fs-12" style={{ color: "#e07a5f" }}>chyba: {r.error}</div>}
-                {r.status === "done" && <div className="fs-13 c-text whitespace-pre-wrap">{r.script}</div>}
+      <div className="tg-grid">
+        {items.map((r, i) => (
+          <div key={r.shortcode + i} className="tg-card" style={{ "--i": Math.min(i, 12) }}>
+            <a href={r.url} target="_blank" rel="noopener noreferrer" className="tg-thumb" style={{ backgroundImage: r.thumb_url ? `url(${r.thumb_url})` : "none" }}><span className="n">{i + 1}</span></a>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                {r.style && <span className="hb-fmt" style={{ marginBottom: 0 }}>{r.style}</span>}
+                {r.handle && <span className="hb-note">@{r.handle}{r.views ? `, ${igK(r.views)} views` : ""}</span>}
               </div>
-            ))}
+              {r.missing ? (
+                <div className="hb-note" style={{ marginTop: 8 }}>Instagram did not show this reel without a login (18+, private or deleted). Open it and write the script by hand.</div>
+              ) : (
+                <>
+                  <div className="tg-script">{r.script || "No script"}</div>
+                  {r.transcript && r.spoken && <div className="tg-orig">{r.transcript.slice(0, 220)}{r.transcript.length > 220 ? "…" : ""}</div>}
+                  {!r.spoken && <div className="hb-note" style={{ marginBottom: 8 }}>Nothing is spoken in this reel, this is an on-screen text idea.</div>}
+                </>
+              )}
+              <div style={{ display: "flex", gap: 6 }}>
+                {r.script && <button className="hb-btn sm" onClick={() => copy(r.shortcode, `${r.url}\n${r.script}`)}>{copied === r.shortcode ? "Copied" : "Copy"}</button>}
+                <a className="hb-btn ghost sm" href={r.url} target="_blank" rel="noopener noreferrer">Watch</a>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
-
-      {results.some((r) => r.status === "done") && (
-        <div className="c-bg-surface border c-border rounded-xl p-5">
-          <div className="flex items-center justify-between mb-3">
-            <div className="fs-11 uppercase tracking-widest c-muted font-mono">Export</div>
-            <button onClick={copyExport} className="tap px-3 py-1.5 rounded-lg c-bg-accent c-onaccent fs-11 font-bold">
-              {copiedMsg || "Copy"}
-            </button>
-          </div>
-          <pre className="fs-12 c-text whitespace-pre-wrap font-mono c-bg-app border c-border rounded-lg p-3" style={{ maxHeight: 300, overflowY: "auto" }}>
-            {exportText}
-          </pre>
-        </div>
+        ))}
+        {busy && Array.from({ length: Math.max(0, Math.min(parsed.length, 10) - (items.length % 10)) }).map((_, k) => <div key={"s" + k} className="tg-skel" />)}
+      </div>
+      {!items.length && !busy && (
+        <div className="hb-empty" style={{ marginTop: 4 }}><b>Scripts appear here</b>Each card shows the reel, its video style and the script in {lang === "cs" ? "Czech" : "English"}. Reels with no speech get an on-screen text idea.</div>
       )}
     </div>
   );
