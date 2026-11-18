@@ -5155,7 +5155,7 @@ function IgHub({ models, tab }) {
           {!active.length ? (
             <div className="hb-empty"><b>No tracked profiles for {model} yet</b>Open the Tracked profiles tab and add Instagram accounts from her niche. Their best reels land here.</div>
           ) : !reels.length ? (
-            <div className="hb-empty"><b>Nothing in the swipe file yet</b>Press Scan now. It reads the newest reels of {active.length} tracked profile{active.length === 1 ? "" : "s"} and keeps the ones that beat that account's own normal numbers. Takes 2 to 5 minutes. It also runs by itself every Thursday.</div>
+            <div className="hb-empty"><b>Nothing in the swipe file yet</b>Press Scan now. It reads the newest reels of {active.length} tracked profile{active.length === 1 ? "" : "s"} and keeps the ones that beat that account's own normal numbers. Takes 2 to 5 minutes.</div>
           ) : !shown.length ? (
             <div className="hb-empty"><b>No reels match this filter</b></div>
           ) : (
@@ -5200,7 +5200,7 @@ function IgHub({ models, tab }) {
               : <button className="hb-btn" disabled={busy === "send" || !(plan.items || []).length} onClick={() => { if (window.confirm(`Send this plan to ${model}? She gets a notification and sees it in her Zion.`)) act("send", { action: "plan-send", id: plan.id }); }}>{busy === "send" ? "Sending" : `Send to ${model}`}</button>)}
           </div>
           {!plan ? (
-            <div className="hb-empty"><b>No plan yet</b>A plan is written by itself every Thursday afternoon from the swipe file, so it is ready for your Friday check. You can also write one now. It needs at least a few reels in the swipe file.</div>
+            <div className="hb-empty"><b>No plan yet</b>Press Scan now in the Swipe file first, then Write the plan here. Nothing runs by itself, so you only pay for what you press. It needs at least a few reels in the swipe file.</div>
           ) : (
             <div className="hb-card">
               {plan.summary && <p style={{ fontSize: 14, lineHeight: 1.6, color: "#d9e2dd", margin: "0 0 6px" }}>{plan.summary}</p>}
