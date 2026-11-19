@@ -14174,23 +14174,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
     const myRequestId = ++requestIdRef.current;
     setMessages((m) => [...m, { role: "user", text }]);
 
-    // Memory: if the person explicitly asked Neo to remember something,
-    // save it as its own fact — scoped to this creator if she said it,
-    // or agency-wide if the Boss said it — and re-load so it's available
-    // in context on this very request too.
-    const rememberMatch = text.match(/\b(?:remember|pamatuj(?:\s+si)?|zapamatuj(?:\s+si)?)\b\s*(?:that|,|:)?\s*(.+)/i);
-    if (rememberMatch && rememberMatch[1] && rememberMatch[1].trim().length > 2) {
-      try {
-        await supabaseClient.from("neo_memory").insert({
-          agency,
-          model: session.role === "creator" ? session.name : null,
-          content: rememberMatch[1].trim(),
-        });
-        await loadNeoMemories();
-      } catch (e) {
-        console.error("failed to save neo memory", e);
-      }
-    }
+    // Memory is handled by Neo himself now (neo-agent saves facts with its remember tool).
 
     // heroModels already scopes creators down to just their own record —
     // reused everywhere below so Neo never sees another model's data in a
@@ -14628,7 +14612,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
         </div>
       </div>
 
-      <NeoChat compact messages={messages} setMessages={setMessages} thinking={thinking} onSend={(t) => send(t, "text")} canAct={session.role === "admin"} />
+      <NeoChat compact={session.role === "admin"} messages={messages} setMessages={setMessages} thinking={thinking} onSend={(t) => send(t, "text")} canAct={session.role === "admin"} />
 
       {/* agency stats (team only) + primary objective strip + 3-card grid +
           model roster — actually gated by role now, not just labeled "team

@@ -23977,19 +23977,6 @@ function NeoPage({
       role: "user",
       text
     }]);
-    const rememberMatch = text.match(/\b(?:remember|pamatuj(?:\s+si)?|zapamatuj(?:\s+si)?)\b\s*(?:that|,|:)?\s*(.+)/i);
-    if (rememberMatch && rememberMatch[1] && rememberMatch[1].trim().length > 2) {
-      try {
-        await supabaseClient.from("neo_memory").insert({
-          agency,
-          model: session.role === "creator" ? session.name : null,
-          content: rememberMatch[1].trim()
-        });
-        await loadNeoMemories();
-      } catch (e) {
-        console.error("failed to save neo memory", e);
-      }
-    }
     const heroNames = new Set(heroModels.map(m => m.name));
     const nDaysAgoStr = n => {
       const d = new Date();
@@ -24622,7 +24609,7 @@ function NeoPage({
       textShadow: `0 0 8px ${neoGreen}88`
     }
   }, activeSubs.toLocaleString()))), React.createElement(NeoChat, {
-    compact: true,
+    compact: session.role === "admin",
     messages: messages,
     setMessages: setMessages,
     thinking: thinking,
@@ -31526,7 +31513,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">gfxc6q</script>
+<script type="text/babel" id="zion-version">1jwid45</script>
 <script>
 (function () {
   var last = 0;
