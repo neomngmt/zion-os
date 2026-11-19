@@ -1063,6 +1063,69 @@ canvas { display: block; }
   100% { opacity: 0; transform: translateY(-16px) scale(1); }
 }
 .rev-delta-flash { animation: revDeltaPop 2.4s ease-out forwards; display: inline-block; }
+/* ===================== Zion aesthetic layer =====================
+   One look for every page: a slow colourful aurora behind everything, glassy cards on top.
+   Each section has its own colours (html[data-zpage] is set by the app shell). */
+:root{
+  --z-h1:#39e673; --z-h2:#38bdf8; --z-h3:#a78bfa; --z-h4:#ff5db1; --z-h5:#f0be3c;
+  --z-card:rgba(15,20,23,.66); --z-card2:rgba(20,26,30,.7); --z-sheet:rgba(9,12,14,.97);
+  --z-line:rgba(255,255,255,.075);
+  --bg-surface:rgba(18,24,27,.55); --bg-panel:rgba(10,13,16,.5);
+  --border:rgba(255,255,255,.085); --border2:rgba(255,255,255,.15);
+}
+html[data-zpage="dashboard"]{ --z-h1:#39e673; --z-h2:#38bdf8; --z-h3:#a78bfa; --z-h4:#f0be3c; }
+html[data-zpage="ig"], html[data-zpage="weeklytrends"], html[data-zpage="reelsorter"]{ --z-h1:#ff5db1; --z-h2:#f0be3c; --z-h3:#a78bfa; --z-h4:#ff7a45; }
+html[data-zpage="acquisition"]{ --z-h1:#ff7a45; --z-h2:#f0be3c; --z-h3:#ff5db1; --z-h4:#38bdf8; }
+html[data-zpage="knowledge"], html[data-zpage="neo"]{ --z-h1:#a78bfa; --z-h2:#39e673; --z-h3:#38bdf8; --z-h4:#ff5db1; }
+html[data-zpage="customs"]{ --z-h1:#ff5db1; --z-h2:#a78bfa; --z-h3:#f0be3c; --z-h4:#38bdf8; }
+html[data-zpage="chatters"]{ --z-h1:#f0be3c; --z-h2:#39e673; --z-h3:#ff7a45; --z-h4:#a78bfa; }
+html[data-zpage="tasks"], html[data-zpage="calendar"]{ --z-h1:#38bdf8; --z-h2:#a78bfa; --z-h3:#39e673; --z-h4:#ff5db1; }
+html[data-zpage="models"], html[data-zpage="settings"]{ --z-h1:#a78bfa; --z-h2:#38bdf8; --z-h3:#ff5db1; --z-h4:#39e673; }
+html[data-zpage="x"], html[data-zpage="tiktok"], html[data-zpage="threads"], html[data-zpage="snap"], html[data-zpage="fb"], html[data-zpage="content"], html[data-zpage="titlegen"]{ --z-h1:#38bdf8; --z-h2:#ff5db1; --z-h3:#f0be3c; --z-h4:#a78bfa; }
+html[data-zpage="editor"]{ --z-h1:#c6f432; --z-h2:#38bdf8; --z-h3:#a78bfa; --z-h4:#ff5db1; }
+
+body{ background-color:#05070a !important; }
+body::before{
+  content:""; position:fixed; z-index:0; pointer-events:none; inset:-12vmax;
+  background:
+    radial-gradient(38vmax 34vmax at 30% 18%, color-mix(in srgb, var(--z-h1) 50%, transparent), transparent 70%),
+    radial-gradient(36vmax 32vmax at 80% 16%, color-mix(in srgb, var(--z-h3) 52%, transparent), transparent 70%),
+    radial-gradient(40vmax 36vmax at 78% 84%, color-mix(in srgb, var(--z-h4) 44%, transparent), transparent 70%),
+    radial-gradient(38vmax 34vmax at 28% 84%, color-mix(in srgb, var(--z-h2) 48%, transparent), transparent 70%),
+    radial-gradient(26vmax 22vmax at 52% 50%, color-mix(in srgb, var(--z-h5) 16%, transparent), transparent 70%);
+  opacity:.85; animation:zAurora 46s ease-in-out infinite alternate; will-change:transform;
+}
+body::after{ content:""; position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+@keyframes zAurora{ 0%{ transform:translate3d(0,0,0) rotate(0deg) scale(1); } 50%{ transform:translate3d(3vmax,-2vmax,0) rotate(8deg) scale(1.06); } 100%{ transform:translate3d(-3vmax,2vmax,0) rotate(-6deg) scale(1.02); } }
+@media (prefers-reduced-motion:reduce){ body::before{ animation:none; } }
+#root{ position:relative; z-index:1; }
+.c-bg-app{ background-color:transparent !important; }
+
+/* glass cards */
+.c-bg-surface, .c-bg-panel{ border-color:var(--border); }
+.hb-card, .ap-card, .nd-acc, .kn-card, .kn-composer, .hb-reel{ background:var(--z-card) !important; border-color:var(--z-line) !important; box-shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 20px 50px -30px rgba(0,0,0,.7); }
+.hb-card{ border-radius:22px; }
+.hb-card:hover, .ap-card:hover{ border-color:color-mix(in srgb, var(--z-h1) 35%, transparent) !important; }
+.hb-sheet, .aq-panel, .kn-panel{ background:var(--z-sheet) !important; }
+.aq-head{ background:var(--z-sheet) !important; }
+
+/* colour on the main actions */
+.c-bg-accent, .hb-btn:not(.ghost):not(:disabled){ background-image:linear-gradient(120deg, var(--z-h1), color-mix(in srgb, var(--z-h1) 45%, var(--z-h2))) !important; }
+.hb-btn{ transition:transform .15s, filter .2s, box-shadow .2s; }
+.hb-btn:not(.ghost):not(:disabled):hover{ transform:translateY(-1px); box-shadow:0 10px 26px -12px var(--z-h1); }
+.hb-chip.on{ background-image:linear-gradient(120deg, var(--z-h1), var(--z-h2)) !important; border-color:transparent !important; color:#05130b !important; }
+
+/* page titles and big numbers get a soft gradient */
+.z-grad{ background:linear-gradient(100deg, var(--z-h1), var(--z-h2) 45%, var(--z-h3)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+h1.text-2xl, h1.text-3xl, h2.text-2xl, .page-title{ background:linear-gradient(100deg, #fff, color-mix(in srgb, var(--z-h1) 70%, #fff) 60%, var(--z-h3)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+
+/* thin colourful scrollbars */
+*::-webkit-scrollbar{ width:9px; height:9px; }
+*::-webkit-scrollbar-thumb{ background:linear-gradient(var(--z-h1), var(--z-h3)); border-radius:9px; border:2px solid transparent; background-clip:padding-box; }
+*::-webkit-scrollbar-track{ background:transparent; }
+::selection{ background:color-mix(in srgb, var(--z-h1) 40%, transparent); }
+
 `;
 function useSupaTable(table, idField, fallback, toJS, toDB, columns = "*") {
   const [value, setValue] = useState(fallback);
@@ -9076,7 +9139,7 @@ const HUB_CSS = `
 .hb-btn.ghost{ color:#d9e2dd; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12); }
 .hb-btn.ghost:hover{ box-shadow:none; background:rgba(255,255,255,.1); }
 .hb-btn.sm{ padding:6px 11px; font-size:12px; border-radius:10px; }
-.hb-card{ background:#0e1310; border:1px solid rgba(57,230,115,.16); border-radius:20px; padding:18px; }
+.hb-card{ background:var(--z-card); border:1px solid rgba(57,230,115,.16); border-radius:20px; padding:18px; }
 .hb-note{ font-size:12px; color:#8fa39a; line-height:1.5; }
 .hb-err{ font-size:12px; color:#ff8a6b; margin-bottom:12px; }
 .hb-empty{ padding:44px 20px; text-align:center; border-radius:20px; border:1px dashed rgba(255,255,255,.14); color:#8fa39a; font-size:13px; line-height:1.6; }
@@ -29290,8 +29353,8 @@ function igShrinkImage(file, maxSide = 1400) {
   });
 }
 const IG_C = {
-  card: "#0e1310",
-  card2: "#111a14",
+  card: "var(--z-card)",
+  card2: "var(--z-card2)",
   line: "rgba(57,230,115,0.16)",
   tx: "#f2f5f0",
   dim: "#8fa39a",
@@ -30941,6 +31004,9 @@ function App() {
   const NAV = session.role === "admin" ? NAV_ADMIN : NAV_CREATOR;
   const restrictModel = session.role === "creator" ? session.name : undefined;
   const currentView = view || "dashboard";
+  try {
+    document.documentElement.dataset.zpage = currentView;
+  } catch (e) {}
   const scopedPersistCards = isAdmin ? async next => persistCards([...cards.filter(c => !agencyModelNameSet.has(c.model)), ...next]) : persistCards;
   const scopedPersistTasks = isAdmin ? async next => persistTasks([...tasks.filter(t => !agencyModelNameSet.has(t.model)), ...next]) : persistTasks;
   const scopedPersistStats = isAdmin ? async next => persistStats([...stats.filter(s => !agencyModelNameSet.has(s.model)), ...next]) : persistStats;
@@ -31381,7 +31447,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">xbqdvs</script>
+<script type="text/babel" id="zion-version">nio90i</script>
 <script>
 (function () {
   var last = 0;
