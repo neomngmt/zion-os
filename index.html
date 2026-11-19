@@ -72,6 +72,299 @@ function primeNeoAudioUnlock() {
   sharedNeoAudioEl.play().catch(() => {});
 }
 let prefetchedGreetingUrl = null;
+const neoLive = {
+  c: null,
+  state: "idle",
+  h: null,
+  agency: "CZ",
+  amp: 0,
+  key: null,
+  keyAt: 0,
+  keyP: null,
+  greetPending: false
+};
+const neoLiveTok = () => {
+  try {
+    return JSON.parse(localStorage.getItem("agencyos_session") || "{}").token || "";
+  } catch (e) {
+    return "";
+  }
+};
+async function neoLiveAgent(body) {
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/neo-agent`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      "x-zion-token": neoLiveTok()
+    },
+    body: JSON.stringify({
+      agency: neoLive.agency,
+      ...body
+    })
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+}
+const neoLiveVoice = () => {
+  try {
+    return localStorage.getItem("zionNeoVoice2") || "cedar";
+  } catch (e) {
+    return "cedar";
+  }
+};
+function neoLiveKey(agency, force) {
+  if (agency) neoLive.agency = agency;
+  if (!force && neoLive.key && Date.now() - neoLive.keyAt < 90000) return Promise.resolve(neoLive.key);
+  if (neoLive.keyP) return neoLive.keyP;
+  neoLive.keyP = neoLiveAgent({
+    realtime: true,
+    voice: neoLiveVoice()
+  }).then(j => {
+    neoLive.key = j;
+    neoLive.keyAt = Date.now();
+    return j;
+  }).finally(() => {
+    neoLive.keyP = null;
+  });
+  return neoLive.keyP;
+}
+const neoLiveEmit = (name, ...a) => {
+  try {
+    neoLive.h && neoLive.h[name] && neoLive.h[name](...a);
+  } catch (e) {}
+};
+const neoLiveSetState = st => {
+  neoLive.state = st;
+  neoLiveEmit("state", st);
+};
+function neoLiveGreet() {
+  const c = neoLive.c;
+  if (!c || !c.dc || c.dc.readyState !== "open" || !neoLive.h) {
+    neoLive.greetPending = true;
+    return;
+  }
+  neoLive.greetPending = false;
+  try {
+    c.dc.send(JSON.stringify({
+      type: "response.create"
+    }));
+  } catch (e) {}
+}
+function neoLiveEnd() {
+  const c = neoLive.c;
+  neoLive.c = null;
+  neoLive.greetPending = false;
+  if (c) {
+    try {
+      c.dc && c.dc.close();
+    } catch (e) {}
+    try {
+      c.pc && c.pc.close();
+    } catch (e) {}
+    try {
+      c.mic && c.mic.getTracks().forEach(t => {
+        t.enabled = false;
+      });
+    } catch (e) {}
+    try {
+      c.audio && (c.audio.srcObject = null);
+    } catch (e) {}
+    try {
+      c.ctx && c.ctx.close();
+    } catch (e) {}
+    if (c.raf) cancelAnimationFrame(c.raf);
+  }
+  neoLive.amp = 0;
+  neoLiveSetState("idle");
+}
+async function neoLiveStart(agency) {
+  if (neoLive.c) return;
+  if (agency) neoLive.agency = agency;
+  const c = {
+    calls: []
+  };
+  neoLive.c = c;
+  neoLive.greetPending = true;
+  neoLiveSetState("connecting");
+  neoLiveEmit("error", "");
+  try {
+    c.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    try {
+      await c.ctx.resume();
+    } catch (e) {}
+    c.audio = document.createElement("audio");
+    c.audio.autoplay = true;
+    c.audio.setAttribute("playsinline", "");
+    const keyP = neoLiveKey(agency);
+    keyP.catch(() => {});
+    const live = window.__zionNeoMic && window.__zionNeoMic.getTracks().some(t => t.readyState === "live") ? window.__zionNeoMic : null;
+    c.mic = live || (await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    }));
+    window.__zionNeoMic = c.mic;
+    c.mic.getTracks().forEach(t => {
+      t.enabled = true;
+    });
+    if (neoLive.c !== c) {
+      c.mic.getTracks().forEach(t => {
+        t.enabled = false;
+      });
+      return;
+    }
+    const pc = new RTCPeerConnection();
+    c.pc = pc;
+    pc.ontrack = e => {
+      const stream = e.streams[0];
+      c.audio.srcObject = stream;
+      c.audio.play().catch(() => {});
+      try {
+        const an = c.ctx.createAnalyser();
+        an.fftSize = 512;
+        c.ctx.createMediaStreamSource(stream).connect(an);
+        const buf = new Uint8Array(an.frequencyBinCount);
+        const tick = () => {
+          an.getByteTimeDomainData(buf);
+          let sum = 0;
+          for (let i = 0; i < buf.length; i++) {
+            const v = (buf[i] - 128) / 128;
+            sum += v * v;
+          }
+          neoLive.amp = Math.min(1, Math.sqrt(sum / buf.length) * 5);
+          neoLiveEmit("amp", neoLive.amp);
+          c.raf = requestAnimationFrame(tick);
+        };
+        tick();
+      } catch (e) {}
+    };
+    pc.addTrack(c.mic.getTracks()[0], c.mic);
+    const dc = pc.createDataChannel("oai-events");
+    c.dc = dc;
+    const send = o => {
+      try {
+        dc.readyState === "open" && dc.send(JSON.stringify(o));
+      } catch (e) {}
+    };
+    dc.onopen = () => {
+      neoLiveSetState("live");
+      if (neoLive.greetPending) neoLiveGreet();
+    };
+    dc.onmessage = async m => {
+      let ev;
+      try {
+        ev = JSON.parse(m.data);
+      } catch (e) {
+        return;
+      }
+      switch (ev.type) {
+        case "input_audio_buffer.speech_started":
+          neoLiveEmit("phase", "listening");
+          break;
+        case "input_audio_buffer.speech_stopped":
+          neoLiveEmit("phase", "thinking");
+          break;
+        case "output_audio_buffer.started":
+          neoLiveEmit("phase", "speaking");
+          break;
+        case "output_audio_buffer.stopped":
+        case "output_audio_buffer.cleared":
+          neoLiveEmit("phase", "listening");
+          break;
+        case "response.function_call_arguments.done":
+          {
+            let args = {};
+            try {
+              args = JSON.parse(ev.arguments || "{}");
+            } catch (e) {}
+            const job = (async () => {
+              if (ev.name === "navigate") {
+                neoLiveEmit("navigate", args.page);
+                return "Opened.";
+              }
+              try {
+                const j = await neoLiveAgent({
+                  run_tool: {
+                    name: ev.name,
+                    args
+                  }
+                });
+                if (j.pending) {
+                  neoLiveEmit("pending", {
+                    tool: ev.name,
+                    args,
+                    summary: j.summary
+                  });
+                  return "Prepared. It is NOT done yet: the person sees a Confirm button on the screen and has to tap it.";
+                }
+                return j.result || "Done.";
+              } catch (e) {
+                return `Error: ${e.message}`;
+              }
+            })();
+            c.calls.push(job.then(output => send({
+              type: "conversation.item.create",
+              item: {
+                type: "function_call_output",
+                call_id: ev.call_id,
+                output: String(output).slice(0, 15000)
+              }
+            })));
+            break;
+          }
+        case "response.done":
+          {
+            const calls = c.calls;
+            c.calls = [];
+            if (calls.length) {
+              await Promise.all(calls);
+              send({
+                type: "response.create"
+              });
+            }
+            break;
+          }
+        default:
+          break;
+      }
+    };
+    pc.onconnectionstatechange = () => {
+      if (["failed", "closed", "disconnected"].includes(pc.connectionState) && neoLive.c === c) {
+        neoLiveEmit("error", "The call dropped. Tap the orb to call again.");
+        neoLiveEnd();
+      }
+    };
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    const sess = await keyP;
+    neoLive.key = null;
+    if (neoLive.c !== c) return;
+    const r = await fetch(`https://api.openai.com/v1/realtime/calls?model=${encodeURIComponent(sess.model)}`, {
+      method: "POST",
+      body: offer.sdp,
+      headers: {
+        Authorization: `Bearer ${sess.key}`,
+        "Content-Type": "application/sdp"
+      }
+    });
+    if (!r.ok) throw new Error(`Voice service ${r.status}`);
+    await pc.setRemoteDescription({
+      type: "answer",
+      sdp: await r.text()
+    });
+    setTimeout(() => {
+      neoLiveKey(null, true).catch(() => {});
+    }, 1000);
+  } catch (e) {
+    neoLiveEmit("error", /Permission|NotAllowed/i.test(String(e && (e.name || e.message))) ? "Allow the microphone for Zion to talk to Neo." : e.message || "Could not start the call");
+    neoLiveEnd();
+  }
+}
 function prefetchNeoGreeting(text) {
   prefetchedGreetingUrl = (async () => {
     try {
@@ -24120,285 +24413,65 @@ function NeoPage({
       }
     }
   };
-  const callRef = useRef(null);
-  const [callState, setCallState] = useState("idle");
+  const [callState, setCallState] = useState(neoLive.state);
   const [callError, setCallError] = useState("");
-  const neoTok = () => {
-    try {
-      return JSON.parse(localStorage.getItem("agencyos_session") || "{}").token || "";
-    } catch (e) {
-      return "";
+  const callRef = {
+    get current() {
+      return neoLive.c;
     }
   };
-  const neoAgent = async body => {
-    const r = await fetch(`${SUPABASE_URL}/functions/v1/neo-agent`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        "x-zion-token": neoTok()
-      },
-      body: JSON.stringify({
-        agency,
-        ...body
-      })
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
-    return j;
-  };
-  const endCall = () => {
-    const c = callRef.current;
-    callRef.current = null;
-    if (c) {
-      try {
-        c.dc && c.dc.close();
-      } catch (e) {}
-      try {
-        c.pc && c.pc.close();
-      } catch (e) {}
-      try {
-        c.mic && c.mic.getTracks().forEach(t => {
-          t.enabled = false;
-        });
-      } catch (e) {}
-      try {
-        c.audio && (c.audio.srcObject = null);
-      } catch (e) {}
-      try {
-        c.ctx && c.ctx.close();
-      } catch (e) {}
-      if (c.raf) cancelAnimationFrame(c.raf);
-    }
-    liveAmpRef.current = 0;
-    speakingRef.current = false;
-    setSpeaking(false);
-    setListening(false);
-    setThinking(false);
-    thinkingRef.current = false;
-    setCallState("idle");
-  };
-  const startCall = async () => {
-    if (callRef.current) return;
-    setCallError("");
-    setCallState("connecting");
-    setThinking(true);
-    const c = {
-      pending: new Map(),
-      calls: []
-    };
-    callRef.current = c;
-    try {
-      c.ctx = new (window.AudioContext || window.webkitAudioContext)();
-      try {
-        await c.ctx.resume();
-      } catch (e) {}
-      c.audio = document.createElement("audio");
-      c.audio.autoplay = true;
-      c.audio.setAttribute("playsinline", "");
-      const live = window.__zionNeoMic && window.__zionNeoMic.getTracks().some(t => t.readyState === "live") ? window.__zionNeoMic : null;
-      c.mic = live || (await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      }));
-      window.__zionNeoMic = c.mic;
-      c.mic.getTracks().forEach(t => {
-        t.enabled = true;
-      });
-      if (callRef.current !== c) {
-        c.mic.getTracks().forEach(t => {
-          t.enabled = false;
-        });
-        return;
-      }
-      const sess = await neoAgent({
-        realtime: true,
-        voice: (() => {
-          try {
-            return localStorage.getItem("zionNeoVoice2") || "cedar";
-          } catch (e) {
-            return "cedar";
-          }
-        })()
-      });
-      if (callRef.current !== c) return;
-      const pc = new RTCPeerConnection();
-      c.pc = pc;
-      pc.ontrack = e => {
-        const stream = e.streams[0];
-        c.audio.srcObject = stream;
-        c.audio.play().catch(() => {});
-        try {
-          const an = c.ctx.createAnalyser();
-          an.fftSize = 512;
-          c.ctx.createMediaStreamSource(stream).connect(an);
-          const buf = new Uint8Array(an.frequencyBinCount);
-          const tick = () => {
-            an.getByteTimeDomainData(buf);
-            let sum = 0;
-            for (let i = 0; i < buf.length; i++) {
-              const v = (buf[i] - 128) / 128;
-              sum += v * v;
-            }
-            const amp = Math.min(1, Math.sqrt(sum / buf.length) * 5);
-            liveAmpRef.current = speakingRef.current ? amp : 0;
-            if (amp > 0.05 && speakingRef.current) speakBumpRef.current = Date.now();
-            c.raf = requestAnimationFrame(tick);
-          };
-          tick();
-        } catch (e) {}
-      };
-      pc.addTrack(c.mic.getTracks()[0], c.mic);
-      const dc = pc.createDataChannel("oai-events");
-      c.dc = dc;
-      const send = o => {
-        try {
-          dc.readyState === "open" && dc.send(JSON.stringify(o));
-        } catch (e) {}
-      };
-      dc.onopen = () => {
-        setCallState("live");
-        setThinking(false);
-        thinkingRef.current = false;
-        setListening(true);
-        send({
-          type: "response.create"
-        });
-      };
-      dc.onmessage = async m => {
-        let ev;
-        try {
-          ev = JSON.parse(m.data);
-        } catch (e) {
-          return;
-        }
-        switch (ev.type) {
-          case "input_audio_buffer.speech_started":
-            setListening(true);
-            setThinking(false);
-            break;
-          case "input_audio_buffer.speech_stopped":
-            setListening(false);
-            setThinking(true);
-            break;
-          case "output_audio_buffer.started":
-            speakingRef.current = true;
-            setSpeaking(true);
-            setThinking(false);
-            setListening(false);
-            break;
-          case "output_audio_buffer.stopped":
-          case "output_audio_buffer.cleared":
-            speakingRef.current = false;
-            setSpeaking(false);
-            liveAmpRef.current = 0;
-            setListening(true);
-            break;
-          case "response.function_call_arguments.done":
-            {
-              let args = {};
-              try {
-                args = JSON.parse(ev.arguments || "{}");
-              } catch (e) {}
-              const job = (async () => {
-                if (ev.name === "navigate") {
-                  if (onNavigate && args.page) setTimeout(() => onNavigate(args.page), 400);
-                  return "Opened.";
-                }
-                try {
-                  const j = await neoAgent({
-                    run_tool: {
-                      name: ev.name,
-                      args
-                    }
-                  });
-                  if (j.pending) {
-                    setMessages(all => [...all, {
-                      role: "neo",
-                      text: "",
-                      pending: [{
-                        id: `rt${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
-                        tool: ev.name,
-                        args,
-                        summary: j.summary,
-                        state: "ask"
-                      }]
-                    }]);
-                    return "Prepared. It is NOT done yet: the person sees a Confirm button on the screen and has to tap it.";
-                  }
-                  return j.result || "Done.";
-                } catch (e) {
-                  return `Error: ${e.message}`;
-                }
-              })();
-              c.calls.push(job.then(output => send({
-                type: "conversation.item.create",
-                item: {
-                  type: "function_call_output",
-                  call_id: ev.call_id,
-                  output: String(output).slice(0, 15000)
-                }
-              })));
-              break;
-            }
-          case "response.done":
-            {
-              const calls = c.calls;
-              c.calls = [];
-              if (calls.length) {
-                await Promise.all(calls);
-                send({
-                  type: "response.create"
-                });
-              }
-              break;
-            }
-          case "error":
-            if (ev.error && !/active response|cancel/i.test(ev.error.message || "")) console.warn("Neo call", ev.error);
-            break;
-          default:
-            break;
-        }
-      };
-      pc.onconnectionstatechange = () => {
-        if (["failed", "closed", "disconnected"].includes(pc.connectionState) && callRef.current === c) {
-          setCallError("The call dropped. Tap the orb to call again.");
-          endCall();
-        }
-      };
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      const r = await fetch(`https://api.openai.com/v1/realtime/calls?model=${encodeURIComponent(sess.model)}`, {
-        method: "POST",
-        body: offer.sdp,
-        headers: {
-          Authorization: `Bearer ${sess.key}`,
-          "Content-Type": "application/sdp"
-        }
-      });
-      if (!r.ok) throw new Error(`Voice service ${r.status}`);
-      await pc.setRemoteDescription({
-        type: "answer",
-        sdp: await r.text()
-      });
-    } catch (e) {
-      setCallError(/Permission|NotAllowed/i.test(String(e && (e.name || e.message))) ? "Allow the microphone for Zion to talk to Neo." : e.message || "Could not start the call");
-      endCall();
-    }
-  };
-  useEffect(() => () => {
-    if (callRef.current) endCall();
-  }, []);
   useEffect(() => {
-    const t = setTimeout(() => {
-      if (!callRef.current) startCall();
-    }, 500);
-    return () => clearTimeout(t);
+    neoLive.h = {
+      state: st => {
+        setCallState(st);
+        if (st === "idle") {
+          speakingRef.current = false;
+          setSpeaking(false);
+          setListening(false);
+          setThinking(false);
+          thinkingRef.current = false;
+          liveAmpRef.current = 0;
+        }
+        if (st === "live") {
+          setThinking(false);
+          setListening(true);
+        }
+        if (st === "connecting") setThinking(true);
+      },
+      error: m => setCallError(m || ""),
+      phase: ph => {
+        speakingRef.current = ph === "speaking";
+        setSpeaking(ph === "speaking");
+        setListening(ph === "listening");
+        setThinking(ph === "thinking");
+        if (ph !== "speaking") liveAmpRef.current = 0;
+      },
+      amp: v => {
+        liveAmpRef.current = speakingRef.current ? v : 0;
+        if (v > 0.05 && speakingRef.current) speakBumpRef.current = Date.now();
+      },
+      navigate: pg => {
+        if (onNavigate && pg) setTimeout(() => onNavigate(pg), 400);
+      },
+      pending: x => setMessages(all => [...all, {
+        role: "neo",
+        text: "",
+        pending: [{
+          id: `rt${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
+          ...x,
+          state: "ask"
+        }]
+      }])
+    };
+    setCallState(neoLive.state);
+    if (!neoLive.c) neoLiveStart(agency);else neoLiveGreet();
+    return () => {
+      neoLive.h = null;
+      neoLiveEnd();
+    };
   }, []);
+  const endCall = () => neoLiveEnd();
+  const startCall = () => neoLiveStart(agency);
   const neoStatus = callError ? callError : callState === "connecting" ? "connecting" : callState === "live" ? speaking ? "speaking, just talk to cut in" : thinking ? "thinking" : "listening, just talk" : "tap the orb to call again";
   const orbClick = () => {
     if (callRef.current) {
@@ -31659,12 +31732,17 @@ function App() {
               sessionStorage.setItem("neoBooted", "1");
             } catch {}
           }
-          const gName = session.role === "admin" ? "Boss" : session.name || "there";
-          prefetchNeoGreeting(`Hi ${gName}! How can I help you today?`);
+          neoLiveStart(session.agency);
         }
         setView(n.id);
         setMobileNavOpen(false);
       },
+      onPointerEnter: n.id === "neo" ? () => {
+        neoLiveKey(session.agency).catch(() => {});
+      } : undefined,
+      onTouchStart: n.id === "neo" ? () => {
+        neoLiveKey(session.agency).catch(() => {});
+      } : undefined,
       className: `tap w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg fs-13 transition-colors ${activeNav ? "c-bg-accent-a1 c-accent" : "c-muted hover-bg-surface hover-text-primary"} ${n.id === "neo" ? "nav-neo-item" : ""}`
     }, React.createElement(Icon, {
       size: 20
@@ -31788,7 +31866,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1f6c0zl</script>
+<script type="text/babel" id="zion-version">151lrdz</script>
 <script>
 (function () {
   var last = 0;
