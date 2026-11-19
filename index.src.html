@@ -14462,7 +14462,9 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
     }
   };
   useEffect(() => () => { if (callRef.current) endCall(); }, []);
-  const neoStatus = callError ? callError : callState === "connecting" ? "connecting" : callState === "live" ? (speaking ? "speaking, just talk to cut in" : thinking ? "thinking" : "listening, just talk") : "tap the orb to talk";
+  // the call starts on its own when Neo opens (the tap on the Neo menu item counts as the go ahead)
+  useEffect(() => { const t = setTimeout(() => { if (!callRef.current) startCall(); }, 500); return () => clearTimeout(t); }, []);
+  const neoStatus = callError ? callError : callState === "connecting" ? "connecting" : callState === "live" ? (speaking ? "speaking, just talk to cut in" : thinking ? "thinking" : "listening, just talk") : "tap the orb to call again";
 
   const orbClick = () => {
     // the orb starts and ends the live call

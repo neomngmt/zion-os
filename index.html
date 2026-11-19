@@ -24384,7 +24384,13 @@ function NeoPage({
   useEffect(() => () => {
     if (callRef.current) endCall();
   }, []);
-  const neoStatus = callError ? callError : callState === "connecting" ? "connecting" : callState === "live" ? speaking ? "speaking, just talk to cut in" : thinking ? "thinking" : "listening, just talk" : "tap the orb to talk";
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!callRef.current) startCall();
+    }, 500);
+    return () => clearTimeout(t);
+  }, []);
+  const neoStatus = callError ? callError : callState === "connecting" ? "connecting" : callState === "live" ? speaking ? "speaking, just talk to cut in" : thinking ? "thinking" : "listening, just talk" : "tap the orb to call again";
   const orbClick = () => {
     if (callRef.current) {
       endCall();
@@ -31773,7 +31779,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1auag1s</script>
+<script type="text/babel" id="zion-version">10sr2vl</script>
 <script>
 (function () {
   var last = 0;
