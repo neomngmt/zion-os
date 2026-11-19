@@ -15516,9 +15516,6 @@ function OfExtrasSection({
 }
 function creatorInsight(a) {
   const notes = [];
-  if (a.replyMin != null) {
-    if (a.replyMin > 60) notes.push("reply time over an hour, lost revenue");else if (a.replyMin <= 30) notes.push("reply time fine");
-  }
   if (a.renewPct != null) {
     if (a.renewPct >= 55) notes.push("strong renew");else if (a.renewPct < 45) notes.push("weak renew");
   } else if (a.accountType === "free") {
@@ -15531,7 +15528,7 @@ function creatorInsight(a) {
     text: "No big swings.",
     tone: "neutral"
   };
-  const tone = a.replyMin > 60 || a.renewPct != null && a.renewPct < 45 || a.activeFans > 1000 && a.avgSpend < 1 ? "bad" : a.replyMin <= 30 && a.renewPct >= 55 ? "good" : "neutral";
+  const tone = a.renewPct != null && a.renewPct < 45 || a.activeFans > 1000 && a.avgSpend < 1 ? "bad" : a.renewPct >= 55 ? "good" : "neutral";
   return {
     text: notes.join(" · ") + ".",
     tone
@@ -19115,10 +19112,6 @@ function CreatorInsightsSection({
     }, React.createElement("span", null, "OF rank"), React.createElement("span", {
       className: "c-muted"
     }, a.performanceRank != null ? `Top ${Number(a.performanceRank)}%` : "—")), React.createElement("div", {
-      className: "flex justify-between fs-10 font-mono c-faint"
-    }, React.createElement("span", null, "Reply time"), React.createElement("span", {
-      className: "c-muted"
-    }, a.replyMin != null ? `${a.replyMin} min` : "—")), React.createElement("div", {
       className: "flex justify-between fs-10 font-mono c-faint"
     }, React.createElement("span", null, "Renew on"), React.createElement("span", {
       className: "c-muted"
@@ -31146,7 +31139,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1dard4b</script>
+<script type="text/babel" id="zion-version">md99i1</script>
 <script>
 (function () {
   var last = 0;

@@ -9073,15 +9073,11 @@ function OfExtrasSection({ models, inflowwDailyStats, days = 7, periodLabel = "t
 }
 
 
-// Auto-generated read on an account's health, combining reply time + renew rate +
+// Auto-generated read on an account's health, combining renew rate +
 // the "big fan pool but nobody pays" pattern — same idea as the Creator Report
 // table above, just turned into a plain-language verdict instead of raw numbers.
 function creatorInsight(a) {
   const notes = [];
-  if (a.replyMin != null) {
-    if (a.replyMin > 60) notes.push("reply time over an hour, lost revenue");
-    else if (a.replyMin <= 30) notes.push("reply time fine");
-  }
   if (a.renewPct != null) {
     if (a.renewPct >= 55) notes.push("strong renew");
     else if (a.renewPct < 45) notes.push("weak renew");
@@ -9092,8 +9088,8 @@ function creatorInsight(a) {
     notes.push("many fans, almost nobody pays, content or price does not convert");
   }
   if (!notes.length) return { text: "No big swings.", tone: "neutral" };
-  const tone = a.replyMin > 60 || (a.renewPct != null && a.renewPct < 45) || (a.activeFans > 1000 && a.avgSpend < 1)
-    ? "bad" : (a.replyMin <= 30 && a.renewPct >= 55) ? "good" : "neutral";
+  const tone = (a.renewPct != null && a.renewPct < 45) || (a.activeFans > 1000 && a.avgSpend < 1)
+    ? "bad" : a.renewPct >= 55 ? "good" : "neutral";
   return { text: notes.join(" · ") + ".", tone };
 }
 
@@ -10467,9 +10463,6 @@ function CreatorInsightsSection({ models, inflowwDailyStats, embedded, days = 30
               <div className="flex flex-col gap-1 mb-2">
                 <div className="flex justify-between fs-10 font-mono c-faint">
                   <span>OF rank</span><span className="c-muted">{a.performanceRank != null ? `Top ${Number(a.performanceRank)}%` : "—"}</span>
-                </div>
-                <div className="flex justify-between fs-10 font-mono c-faint">
-                  <span>Reply time</span><span className="c-muted">{a.replyMin != null ? `${a.replyMin} min` : "—"}</span>
                 </div>
                 <div className="flex justify-between fs-10 font-mono c-faint">
                   <span>Renew on</span><span className="c-muted">{a.renewPct != null ? `${a.renewPct}%` : "—"}</span>
