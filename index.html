@@ -16144,9 +16144,9 @@ function KnowledgePage() {
   }, [open]);
   const addYoutube = async e => {
     e && e.preventDefault();
-    const links = url.split(/\s+/).map(x => x.trim()).filter(x => /youtu/.test(x));
+    const links = url.split(/\s+/).map(x => x.trim()).filter(x => /youtu|loom\.com|fathom\.video/.test(x));
     if (!links.length) {
-      setErr("Paste a YouTube link.");
+      setErr("Paste a YouTube, Loom or Fathom link.");
       return;
     }
     setBusy("yt");
@@ -16158,7 +16158,7 @@ function KnowledgePage() {
       setMsg(`Reading video ${i + 1} of ${links.length}`);
       try {
         const j = await knFn({
-          action: "add-youtube",
+          action: /loom\.com/.test(link) ? "add-loom" : /fathom\.video/.test(link) ? "add-fathom" : "add-youtube",
           url: link
         });
         await load();
@@ -16175,7 +16175,7 @@ function KnowledgePage() {
       }
       await load();
     }
-    setMsg(ok ? `Neo learned ${ok} video${ok === 1 ? "" : "s"}.` : "");
+    setMsg(ok ? `Neo learned ${ok} link${ok === 1 ? "" : "s"}.` : "");
     setBusy("");
   };
   const addText = async e => {
@@ -16278,9 +16278,9 @@ function KnowledgePage() {
   const topics = Object.entries(ready.flatMap(k => k.tags || []).reduce((o, t) => (o[t] = (o[t] || 0) + 1, o), {})).sort((a, b) => b[1] - a[1]).slice(0, 12);
   const list = all.filter(k => (!topic || (k.tags || []).includes(topic)) && (!filter || `${k.title} ${(k.tags || []).join(" ")} ${k.summary || ""}`.toLowerCase().includes(filter.toLowerCase())));
   const fmtDur = sec => !sec ? "" : sec >= 3600 ? `${Math.floor(sec / 3600)}h ${Math.round(sec % 3600 / 60)}m` : `${Math.round(sec / 60)} min`;
-  const kind = k => k.source_type === "youtube" ? "YouTube" : k.source_type === "fathom" ? "Fathom call" : k.source_type === "text" ? "Transcript" : "Recording";
+  const kind = k => k.source_type === "youtube" ? "YouTube" : k.source_type === "loom" ? "Loom" : k.source_type === "fathom" ? "Fathom call" : k.source_type === "text" ? "Transcript" : "Recording";
   const ytThumb = k => k.source_type === "youtube" && k.url && k.url.includes("v=") ? `https://i.ytimg.com/vi/${k.url.split("v=")[1]}/hqdefault.jpg` : null;
-  const TABS = [["link", "YouTube link"], ["text", "Transcript"], ["file", "Recording"]];
+  const TABS = [["link", "Link"], ["text", "Transcript"], ["file", "Recording"]];
   return React.createElement("div", {
     className: "hb kn"
   }, React.createElement("style", null, HUB_CSS, SHOOT_CSS, KN_CSS), React.createElement("section", {
@@ -16323,14 +16323,14 @@ function KnowledgePage() {
     disabled: !!busy && tab !== k
   }, l)), React.createElement("span", {
     className: "kn-tabs-note"
-  }, tab === "link" ? "about 1 cent a video" : tab === "text" ? "Fathom, Zoom or notes, almost free" : "about 20 cents an hour")), tab === "link" && React.createElement("form", {
+  }, tab === "link" ? "YouTube, Loom or Fathom, about 1 cent" : tab === "text" ? "Fathom, Zoom or notes, almost free" : "about 20 cents an hour")), tab === "link" && React.createElement("form", {
     className: "kn-row",
     onSubmit: addYoutube
   }, React.createElement("input", {
     className: "kn-field",
     value: url,
     onChange: e => setUrl(e.target.value),
-    placeholder: "Paste one or more YouTube links"
+    placeholder: "Paste YouTube, Loom or Fathom links"
   }), React.createElement("button", {
     className: "kn-go",
     disabled: !!busy || !url.trim()
@@ -16557,7 +16557,7 @@ function KnowledgePage() {
     href: detail.url,
     target: "_blank",
     rel: "noopener noreferrer"
-  }, detail.source_type === "fathom" ? "Open in Fathom" : "Watch on YouTube"), React.createElement("p", {
+  }, detail.source_type === "fathom" ? "Open in Fathom" : detail.source_type === "loom" ? "Watch on Loom" : "Watch on YouTube"), React.createElement("p", {
     className: "kn-panel-sum"
   }, detail.summary), Object.entries((detail.insights || []).reduce((g, x) => ((g[x.topic] = g[x.topic] || []).push(x), g), {})).map(([t, xs]) => React.createElement("section", {
     key: t,
@@ -31500,7 +31500,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">ngo7an</script>
+<script type="text/babel" id="zion-version">3q4v2t</script>
 <script>
 (function () {
   var last = 0;

@@ -9431,21 +9431,21 @@ function KnowledgePage() {
 
   const addYoutube = async (e) => {
     e && e.preventDefault();
-    const links = url.split(/\s+/).map((x) => x.trim()).filter((x) => /youtu/.test(x));
-    if (!links.length) { setErr("Paste a YouTube link."); return; }
+    const links = url.split(/\s+/).map((x) => x.trim()).filter((x) => /youtu|loom\.com|fathom\.video/.test(x));
+    if (!links.length) { setErr("Paste a YouTube, Loom or Fathom link."); return; }
     setBusy("yt"); setErr(""); setMsg(""); setUrl("");
     let ok = 0;
     for (const [i, link] of links.entries()) {
       setMsg(`Reading video ${i + 1} of ${links.length}`);
       try {
-        const j = await knFn({ action: "add-youtube", url: link });
+        const j = await knFn({ action: /loom\.com/.test(link) ? "add-loom" : /fathom\.video/.test(link) ? "add-fathom" : "add-youtube", url: link });
         await load();
         if (!j.already) { setMsg(`Learning from video ${i + 1} of ${links.length}`); await knFn({ action: "process", id: j.id }); }
         ok++;
       } catch (e2) { setErr(`${link}: ${e2.message}`); }
       await load();
     }
-    setMsg(ok ? `Neo learned ${ok} video${ok === 1 ? "" : "s"}.` : "");
+    setMsg(ok ? `Neo learned ${ok} link${ok === 1 ? "" : "s"}.` : "");
     setBusy("");
   };
   const addText = async (e) => {
@@ -9487,9 +9487,9 @@ function KnowledgePage() {
   const topics = Object.entries(ready.flatMap((k) => k.tags || []).reduce((o, t) => ((o[t] = (o[t] || 0) + 1), o), {})).sort((a, b) => b[1] - a[1]).slice(0, 12);
   const list = all.filter((k) => (!topic || (k.tags || []).includes(topic)) && (!filter || `${k.title} ${(k.tags || []).join(" ")} ${k.summary || ""}`.toLowerCase().includes(filter.toLowerCase())));
   const fmtDur = (sec) => (!sec ? "" : sec >= 3600 ? `${Math.floor(sec / 3600)}h ${Math.round((sec % 3600) / 60)}m` : `${Math.round(sec / 60)} min`);
-  const kind = (k) => (k.source_type === "youtube" ? "YouTube" : k.source_type === "fathom" ? "Fathom call" : k.source_type === "text" ? "Transcript" : "Recording");
+  const kind = (k) => (k.source_type === "youtube" ? "YouTube" : k.source_type === "loom" ? "Loom" : k.source_type === "fathom" ? "Fathom call" : k.source_type === "text" ? "Transcript" : "Recording");
   const ytThumb = (k) => k.source_type === "youtube" && k.url && k.url.includes("v=") ? `https://i.ytimg.com/vi/${k.url.split("v=")[1]}/hqdefault.jpg` : null;
-  const TABS = [["link", "YouTube link"], ["text", "Transcript"], ["file", "Recording"]];
+  const TABS = [["link", "Link"], ["text", "Transcript"], ["file", "Recording"]];
 
   return (
     <div className="hb kn">
@@ -9513,11 +9513,11 @@ function KnowledgePage() {
         onDrop={(e) => { e.preventDefault(); setDrag(false); if (!busy && e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]); }}>
         <div className="kn-tabs" role="tablist">
           {TABS.map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)} disabled={!!busy && tab !== k}>{l}</button>)}
-          <span className="kn-tabs-note">{tab === "link" ? "about 1 cent a video" : tab === "text" ? "Fathom, Zoom or notes, almost free" : "about 20 cents an hour"}</span>
+          <span className="kn-tabs-note">{tab === "link" ? "YouTube, Loom or Fathom, about 1 cent" : tab === "text" ? "Fathom, Zoom or notes, almost free" : "about 20 cents an hour"}</span>
         </div>
         {tab === "link" && (
           <form className="kn-row" onSubmit={addYoutube}>
-            <input className="kn-field" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Paste one or more YouTube links" />
+            <input className="kn-field" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Paste YouTube, Loom or Fathom links" />
             <button className="kn-go" disabled={!!busy || !url.trim()}>{busy === "yt" ? <><span className="hb-spin" />Learning</> : "Teach Neo"}</button>
           </form>
         )}
@@ -9604,7 +9604,7 @@ function KnowledgePage() {
             {!detail ? <div className="kn-mono" style={{ padding: 24 }}>Loading</div> : <>
               <div className="kn-kicker" style={{ marginTop: 6 }}>{kind(detail)}{detail.duration_sec ? `  ·  ${fmtDur(detail.duration_sec)}` : ""}</div>
               <h2 className="kn-panel-title">{detail.title}</h2>
-              {detail.url && <a className="kn-link" href={detail.url} target="_blank" rel="noopener noreferrer">{detail.source_type === "fathom" ? "Open in Fathom" : "Watch on YouTube"}</a>}
+              {detail.url && <a className="kn-link" href={detail.url} target="_blank" rel="noopener noreferrer">{detail.source_type === "fathom" ? "Open in Fathom" : detail.source_type === "loom" ? "Watch on Loom" : "Watch on YouTube"}</a>}
               <p className="kn-panel-sum">{detail.summary}</p>
               {Object.entries((detail.insights || []).reduce((g, x) => ((g[x.topic] = g[x.topic] || []).push(x), g), {})).map(([t, xs]) => (
                 <section key={t} className="kn-topic">
