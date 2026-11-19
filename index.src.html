@@ -13292,8 +13292,87 @@ function NeoBootSequence({ onDone }) {
   );
 }
 
+
+// ---- Neo chat: type like a normal chat, confirm the actions Neo prepares, pick the voice ----
+const NEO_VOICES = [["cedar", "Cedar, calm male"], ["ash", "Ash, warm male"], ["ballad", "Ballad, soft male"], ["echo", "Echo, clear male"], ["onyx", "Onyx, deep male (old)"], ["verse", "Verse, lively male"],
+  ["marin", "Marin, natural female"], ["coral", "Coral, friendly female"], ["sage", "Sage, calm female"], ["nova", "Nova, bright female"], ["shimmer", "Shimmer, soft female"], ["alloy", "Alloy, neutral"], ["fable", "Fable, storyteller"]];
+const neoVoice = () => { try { return localStorage.getItem("zionNeoVoice") || "cedar"; } catch (e) { return "cedar"; } };
+function NeoChat({ messages, setMessages, thinking, onSend, canAct }) {
+  const [text, setText] = useState("");
+  const [voice, setVoice] = useState(neoVoice());
+  const [preview, setPreview] = useState(false);
+  const boxRef = useRef(null);
+  useEffect(() => { if (boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight; }, [messages, thinking]);
+  const setState = (mi, pid, patch) => setMessages((all) => all.map((m, i) => (i === mi ? { ...m, pending: (m.pending || []).map((p) => (p.id === pid ? { ...p, ...patch } : p)) } : m)));
+  const confirm = async (mi, p) => {
+    setState(mi, p.id, { state: "run" });
+    try {
+      let tok = ""; try { tok = (JSON.parse(localStorage.getItem("agencyos_session") || "{}")).token || ""; } catch (e) {}
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/neo-agent`, { method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, "x-zion-token": tok },
+        body: JSON.stringify({ execute: { tool: p.tool, args: p.args } }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+      setState(mi, p.id, { state: "done", result: j.result });
+    } catch (e) { setState(mi, p.id, { state: "fail", result: e.message }); }
+  };
+  const playPreview = async () => {
+    setPreview(true);
+    try {
+      const { data } = await supabaseClient.functions.invoke("neo-tts", { body: { text: "Hey boss, this is how I sound. Anna had a strong week, want me to set her next goal?", voice } });
+      const raw = data instanceof Blob ? data : new Blob([data]);
+      const a = new Audio(URL.createObjectURL(new Blob([await raw.arrayBuffer()], { type: "audio/mpeg" })));
+      a.onended = () => setPreview(false);
+      await a.play();
+    } catch (e) { setPreview(false); }
+  };
+  const submit = (e) => { e.preventDefault(); const t = text.trim(); if (!t || thinking) return; setText(""); onSend(t); };
+  const C = { g: "#39e673", dim: "#6f8a7a", line: "rgba(57,230,115,.18)", bg: "rgba(3,9,6,.72)" };
+  return (
+    <div className="neo-fade-in" style={{ position: "relative", zIndex: 2, margin: "8px auto 28px", maxWidth: 820, border: `1px solid ${C.line}`, background: C.bg, backdropFilter: "blur(6px)", borderRadius: 14, overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: `1px solid ${C.line}`, flexWrap: "wrap" }}>
+        <span style={{ color: C.g, fontWeight: 700, letterSpacing: "2px", fontSize: 11 }}>CHAT WITH NEO</span>
+        <span style={{ color: C.dim, fontSize: 11, flex: 1, minWidth: 120 }}>{canAct ? "Ask anything or tell him what to do. Changes wait for your OK." : "Ask about your numbers."}</span>
+        <select value={voice} onChange={(e) => { setVoice(e.target.value); try { localStorage.setItem("zionNeoVoice", e.target.value); } catch (x) {} }}
+          style={{ background: "#06100b", color: C.g, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12, padding: "4px 6px" }} title="Neo's voice">
+          {NEO_VOICES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+        <button type="button" onClick={playPreview} disabled={preview} style={{ fontSize: 12, color: "#03110a", background: C.g, borderRadius: 8, padding: "4px 10px", fontWeight: 700, opacity: preview ? 0.6 : 1 }}>{preview ? "Playing" : "Hear voice"}</button>
+      </div>
+      <div ref={boxRef} style={{ maxHeight: 420, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+        {!messages.length && <div style={{ color: C.dim, fontSize: 13 }}>Try: "How much did everyone make this week?", "Give Anna a task to film 5 selfies by Friday", "Open Acquisition", "Who on Reddit replied?"</div>}
+        {messages.map((m, i) => (
+          <div key={i} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "88%" }}>
+            <div style={{ whiteSpace: "pre-wrap", fontSize: 14, lineHeight: 1.5, padding: "9px 13px", borderRadius: 13,
+              color: m.role === "user" ? "#03110a" : "#dffce6", background: m.role === "user" ? C.g : "rgba(57,230,115,.07)", border: m.role === "user" ? "none" : `1px solid ${C.line}` }}>{m.text}</div>
+            {(m.pending || []).map((p) => (
+              <div key={p.id} style={{ marginTop: 6, padding: "10px 12px", borderRadius: 12, border: `1px solid ${p.state === "done" ? C.g : p.state === "fail" ? "#e07a5f" : "rgba(255,210,74,.5)"}`, background: "rgba(255,210,74,.05)" }}>
+                <div style={{ fontSize: 13, color: "#f2f5f0", marginBottom: p.state === "ask" ? 8 : 4 }}>{p.summary}</div>
+                {p.state === "ask" && <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => confirm(i, p)} style={{ fontSize: 13, fontWeight: 700, padding: "6px 14px", borderRadius: 9, background: C.g, color: "#03110a" }}>Confirm</button>
+                  <button onClick={() => setState(i, p.id, { state: "no" })} style={{ fontSize: 13, padding: "6px 14px", borderRadius: 9, border: `1px solid ${C.line}`, color: "#c9d3ce", background: "transparent" }}>Cancel</button>
+                </div>}
+                {p.state === "run" && <div style={{ fontSize: 12, color: C.dim }}>Working on it</div>}
+                {p.state === "done" && <div style={{ fontSize: 12, color: C.g }}>Done. {p.result}</div>}
+                {p.state === "fail" && <div style={{ fontSize: 12, color: "#e07a5f" }}>Did not work: {p.result}</div>}
+                {p.state === "no" && <div style={{ fontSize: 12, color: C.dim }}>Cancelled, nothing changed.</div>}
+              </div>
+            ))}
+          </div>
+        ))}
+        {thinking && <div style={{ color: C.dim, fontSize: 13 }}>Neo is looking it up</div>}
+      </div>
+      <form onSubmit={submit} style={{ display: "flex", gap: 8, padding: 10, borderTop: `1px solid ${C.line}` }}>
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Write to Neo" style={{ flex: 1, minWidth: 0, background: "#06100b", color: "#f2f5f0", border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 12px", fontSize: 15 }} />
+        <button disabled={!text.trim() || thinking} style={{ fontWeight: 700, padding: "0 16px", borderRadius: 10, background: C.g, color: "#03110a", opacity: !text.trim() || thinking ? 0.5 : 1 }}>Send</button>
+      </form>
+    </div>
+  );
+}
+
 function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models, stats, reels, trends, bufferDailyStats, bufferTopPosts, inflowwDailyStats, igGraphStats, settings, persistSettings }) {
   const [messages, setMessages] = useState([]);
+  const messagesRef = useRef([]);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
   // messages was tracked but never actually shown anywhere — if TTS fails
   // or the viewer has sound off, there was no way to read what Neo said.
   // Surface at least her last reply's text once things go back to idle.
@@ -13431,7 +13510,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
       let url = prefetchedUrl;
       if (!url) {
         const { data, error } = await supabaseClient.functions.invoke("neo-tts", {
-          body: { text },
+          body: { text, voice: neoVoice() },
         });
         if (error) {
           // supabase-js's FunctionsHttpError hides the real response body
@@ -13525,7 +13604,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
     }
   };
 
-  const send = async (text) => {
+  const send = async (text, mode = "text") => {
     if (!text || thinkingRef.current) return;
     thinkingRef.current = true;
     setThinking(true);
@@ -13587,174 +13666,23 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
     });
 
     try {
-      const { data, error } = await supabaseClient.functions.invoke("clever-service", {
-        body: {
-          message: text,
-          agency,
-          context: {
-            viewerRole: session.role,
-            viewerName: session.name,
-            memories: neoMemories.map((m) => m.content),
-            primaryObjective: {
-              monthlyRevenueSoFar: Math.round(monthRevenue),
-              monthlyRevenueGoal: Math.round(monthGoal),
-              percentToGoal: monthPct,
-              dayOfMonth,
-              daysInMonth,
-            },
-            todayDate: toISO(new Date()),
-            yesterdayDate: nDaysAgoStr(1),
-            cardCount: cards.filter((c) => heroNames.has(c.model)).length,
-            openTasksCount: tasks.filter((t) => heroNames.has(t.model) && t.status !== "done").length,
-            overdueTasksCount: tasks.filter((t) => heroNames.has(t.model) && t.status !== "done" && t.dueDate && t.dueDate < todayISO()).length,
-
-            // Full roster, not just names — handles/persona notes so Neo can
-            // reason about branding/content direction per model too.
-            models: heroModels.map((m) => ({
-              name: m.name, agency: m.agency, note: m.note || null,
-              igHandle: m.igHandle || null, xHandle: m.xHandle || null, tiktokHandle: m.tiktokHandle || null,
-              onboarded: !!m.onboarded,
-            })),
-
-            // Full content pipeline (not just a count) — every scene/card
-            // currently in flight, whatever stage it's at.
-            contentPipeline: cards.filter((c) => heroNames.has(c.model)).slice(0, 150)
-              .map((c) => ({ model: c.model, title: c.title, stage: c.stage, platform: c.platform, sceneType: c.sceneType || null, deadline: c.deadline || null, assignee: c.assignee || null })),
-
-            // Full task list (not just counts) — real titles/due dates so Neo
-            // can say what specifically is overdue, not just a number.
-            tasks: tasks.filter((t) => heroNames.has(t.model)).slice(0, 150)
-              .map((t) => ({ model: t.model, title: t.title, dueDate: t.dueDate || null, status: t.status, assignee: t.assignee || null, recurring: !!t.recurring })),
-
-            // Per-model manually-logged weekly earnings/growth history —
-            // extended window (16 weeks, ~4 months) since this is the only
-            // source for older IG-follower/reach trend data.
-            earningsByModel: heroModels.map((m) => ({
-              model: m.name,
-              weeks: stats.filter((s) => s.model === m.name)
-                .sort((a, b) => (b.weekOf || "").localeCompare(a.weekOf || ""))
-                .slice(0, 16)
-                .map((s) => ({ weekOf: s.weekOf, ofEarnings: s.ofEarnings, ofSubs: s.ofSubs, igFollowers: s.igFollowers, igReach: s.igReach })),
-            })),
-
-            // All logged reels, not just a top-12 sample — real title/link/
-            // full metrics so Neo can talk about anything shared, not only
-            // the biggest hits.
-            reelsLogged: reels.filter((r) => heroNames.has(r.model)).sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 60)
-              .map((r) => ({ model: r.model, title: r.title, link: r.link || null, weekOf: r.weekOf, views: r.views, likes: r.likes, shares: r.shares, comments: r.comments })),
-
-            recentTrends: trends.filter((t) => (agency === "US" ? t.showUS : t.showCZ)).slice(-15).map((t) => ({ title: t.title, category: t.category })),
-
-            // Publer-synced social performance, per model per platform:
-            // 7d/30d totals (posts, reach, likes, replies, reposts, avg
-            // engagement) plus the last 7 real days broken out day-by-day
-            // for pattern/timing questions ("does she do better posting at
-            // night"). IG is deliberately NOT in this Publer-sourced loop —
-            // IG was fully migrated off Publer to the direct Graph API
-            // (igGraphStats, see ig-graph-sync) earlier this session, so
-            // bufferDailyStats never has platform "ig" rows anymore. This
-            // silently dropped IG out of Neo's own knowledge entirely
-            // (rows.length was always 0, filtered out by .filter(Boolean))
-            // until the separate igGraphStats block below was added back.
-            socialStatsByModel: [
-              ...heroModels.flatMap((m) => ["x", "tiktok"].map((platform) => {
-                const rows = bufferByModelPlatform.get(`${m.name}|${platform}`) || [];
-                if (!rows.length) return null;
-                const sumSince = (n, field) => rows.filter((r) => r.statDate >= nDaysAgoStr(n)).reduce((t, r) => t + (r[field] || 0), 0);
-                const last7 = rows.filter((r) => r.statDate >= nDaysAgoStr(7));
-                const avgEr7 = (() => { const withEr = last7.filter((r) => r.engagementRate != null); return withEr.length ? withEr.reduce((s, r) => s + r.engagementRate, 0) / withEr.length : null; })();
-                return {
-                  model: m.name, platform,
-                  last7Days: { posts: sumSince(7, "postCount"), impressions: sumSince(7, "impressions"), likes: sumSince(7, "reactions"), replies: sumSince(7, "comments"), reposts: sumSince(7, "reposts"), avgEngagementRate: avgEr7 != null ? Number(avgEr7.toFixed(2)) : null },
-                  last30Days: { posts: sumSince(30, "postCount"), impressions: sumSince(30, "impressions") },
-                  dailyLast7: last7.sort((a, b) => a.statDate.localeCompare(b.statDate)).map((r) => ({ date: r.statDate, posts: r.postCount || 0, impressions: r.impressions || 0, likes: r.reactions || 0 })),
-                };
-              })).filter(Boolean),
-              // Real IG numbers straight from ig_graph_stats (direct Meta API) —
-              // a model can have more than one connected IG account, so each
-              // account is its own entry here (label distinguishes them).
-              ...heroModels.flatMap((m) => (igGraphStats || []).filter((r) => r.model === m.name).map((r) => ({
-                model: m.name, platform: "ig", label: r.label || null,
-                last7Days: { impressions: r.views7d || 0, reach: r.reach7d || 0 },
-                last30Days: { impressions: r.views30d || 0, reach: r.reach30d || 0 },
-              }))),
-            ],
-
-            // Real best-performing post per model per platform (actual
-            // caption text, not just a number) — this table only ever holds
-            // the current best one per model+platform, so it's cheap to send
-            // in full.
-            topPostsByPlatform: (bufferTopPosts || []).filter((p) => heroNames.has(p.model))
-              .map((p) => ({ model: p.model, platform: p.platform, text: p.text || null, impressions: p.impressions, likes: p.reactions, comments: p.comments, reposts: p.reposts, link: p.externalLink || null })),
-
-            // Real OnlyFans earnings synced from Infloww (Free + Paid
-            // accounts combined) — this is the current, authoritative
-            // source for "how much did X earn."
-            inflowwEarningsByModel: heroModels.map((m) => {
-              const rows = inflowwByModel.get(m.name) || [];
-              const sum = (days) => rows.filter((r) => r.statDate >= nDaysAgoStr(days)).reduce((t, r) => t + (r.earningsNet || 0), 0);
-              return rows.length ? { model: m.name, last7Days: Math.round(sum(7)), last30Days: Math.round(sum(30)) } : null;
-            }).filter(Boolean),
-
-            // Day-by-day earnings AND new subscribers, last 14 calendar days —
-            // lets Neo answer "how much did X earn yesterday/on Tuesday" or
-            // "how many new subs did X get yesterday" precisely instead of
-            // only knowing rolled-up totals. newSubscribers was missing here
-            // until a live bug report: asked "how many new subscribers
-            // yesterday", Neo had no such field anywhere in its context and
-            // answered with yesterday's EARNINGS instead — the closest
-            // number it could find, but a completely different question.
-            dailyEarningsByModel: heroModels.map((m) => {
-              const rows = inflowwByModel.get(m.name) || [];
-              const earningsByDate = new Map();
-              const subsByDate = new Map();
-              rows.forEach((r) => {
-                earningsByDate.set(r.statDate, (earningsByDate.get(r.statDate) || 0) + (r.earningsNet || 0));
-                subsByDate.set(r.statDate, (subsByDate.get(r.statDate) || 0) + (r.newSubscribers || 0));
-              });
-              const days = Array.from({ length: 14 }, (_, i) => {
-                const dateStr = nDaysAgoStr(13 - i);
-                return { date: dateStr, earnings: Math.round(earningsByDate.get(dateStr) || 0), newSubscribers: subsByDate.get(dateStr) || 0 };
-              });
-              return rows.length ? { model: m.name, days } : null;
-            }).filter(Boolean),
-
-            // The rest of what Infloww syncs beyond raw earnings — the same
-            // "Creator Performance" numbers shown on the dashboard: reply
-            // time, active/expired fans, renew rate, profile rank, profile
-            // visitors, avg subscription length, refunds this week, and the
-            // chat-vs-subscription revenue ratio. Latest-available snapshot
-            // per field (these aren't meaningful to sum across days).
-            creatorPerformanceByModel: heroModels.map((m) => {
-              const rows = inflowwByModel.get(m.name) || [];
-              if (!rows.length) return null;
-              const weekRows = rows.filter((r) => r.statDate >= nDaysAgoStr(7));
-              const replyMs = latestField(rows, "replyTimeMs");
-              const renewOn = latestField(rows, "fansWithRenewOn");
-              const activeFans = latestField(rows, "activeFans");
-              return {
-                model: m.name,
-                replyTimeMinutes: replyMs != null ? Math.round(replyMs / 60000) : null,
-                activeFans, expiredFans: latestField(rows, "expiredFans"),
-                renewOnPercent: (renewOn != null && activeFans) ? Number(((renewOn / activeFans) * 100).toFixed(1)) : null,
-                onlyfansTopPercent: latestField(rows, "performanceRank"),
-                profileVisitors7d: weekRows.reduce((t, r) => t + (r.profileVisitors || 0), 0),
-                avgSubscriptionLengthDays: latestField(rows, "avgSubscriptionLengthDays"),
-                refundsThisWeek: Math.round(weekRows.reduce((t, r) => t + (r.refundsNet || 0), 0)),
-                fansChattedLatest: latestField(rows, "fansChatted"),
-                messagesRevenue7d: Math.round(weekRows.reduce((t, r) => t + (r.messagesNet || 0), 0)),
-                subsRevenue7d: Math.round(weekRows.reduce((t, r) => t + (r.subsNet || 0), 0)),
-              };
-            }).filter(Boolean),
-          },
-        },
+      // Neo's brain with tools (neo-agent): it looks things up itself and proposes changes for confirmation
+      const history = [...messagesRef.current, { role: "user", text }].filter((m) => m.role === "user" || m.role === "neo").slice(-16)
+        .map((m) => ({ role: m.role === "neo" ? "assistant" : "user", content: m.text }));
+      let tok = ""; try { tok = (JSON.parse(localStorage.getItem("agencyos_session") || "{}")).token || ""; } catch (e) {}
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/neo-agent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, "x-zion-token": tok },
+        body: JSON.stringify({ messages: history, agency, mode }),
       });
-      if (error) throw error;
-      if (myRequestId !== requestIdRef.current) return; // cancelled — ignore this response
-      const reply = data?.reply || "...";
-      setMessages((m) => [...m, { role: "neo", text: reply }]);
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || data.error) throw new Error(data.error || `HTTP ${resp.status}`);
+      if (myRequestId !== requestIdRef.current) return; // cancelled, ignore this response
+      const reply = data.reply || "...";
+      setMessages((m) => [...m, { role: "neo", text: reply, pending: (data.pending || []).map((x) => ({ ...x, state: "ask" })) }]);
       setQueriesToday((n) => n + 1);
-      speakText(reply);
+      if (data.navigate && onNavigate) setTimeout(() => onNavigate(data.navigate), 600);
+      if (mode === "voice") speakText(reply);
     } catch (e) {
       if (myRequestId !== requestIdRef.current) return;
       const detail = e?.message || e?.context?.error || (typeof e === "string" ? e : JSON.stringify(e));
@@ -13828,7 +13756,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
       if (res.isFinal && text && !finalized) {
         finalized = true;
         clearTimeout(safety);
-        send(text);
+        send(text, "voice");
         try { oneShot.stop(); } catch {}
       }
     };
@@ -14136,6 +14064,8 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
           <div className="text-2xl font-bold" style={{ color: neoGreen, textShadow: `0 0 8px ${neoGreen}88` }}>{activeSubs.toLocaleString()}</div>
         </div>
       </div>
+
+      <NeoChat messages={messages} setMessages={setMessages} thinking={thinking} onSend={(t) => send(t, "text")} canAct={session.role === "admin"} />
 
       {/* agency stats (team only) + primary objective strip + 3-card grid +
           model roster — actually gated by role now, not just labeled "team
