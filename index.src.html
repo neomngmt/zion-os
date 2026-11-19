@@ -9327,6 +9327,15 @@ function KnowledgePage() {
   const [open, setOpen] = useState(null);
   const [detail, setDetail] = useState(null);
   const [filter, setFilter] = useState("");
+  const [paste, setPaste] = useState("");
+  const addText = async (e) => {
+    e.preventDefault();
+    if (paste.trim().length < 200) { setErr("Paste the whole transcript."); return; }
+    setBusy("tx"); setErr(""); setMsg("Neo is reading the call");
+    try { const j = await knFn({ action: "add-text", text: paste }); setPaste(""); await load(); await knFn({ action: "process", id: j.id }); setMsg("Neo learned the call."); }
+    catch (e2) { setErr(e2.message); setMsg(""); }
+    setBusy(""); load();
+  };
   const load = useCallback(async () => { try { const j = await knFn({ action: "list" }); setItems(j.items || []); } catch (e) { setErr(e.message); } }, []);
   useEffect(() => { load(); }, [load]);
   // keep the list fresh while something is still being learned
@@ -9408,6 +9417,11 @@ function KnowledgePage() {
           <textarea className="sh-ta" style={{ minHeight: 70, width: "100%", display: "block", boxSizing: "border-box" }} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." />
           <button className="hb-btn" style={{ marginTop: 8, display: "block" }} disabled={!!busy || !url.trim()}>{busy === "yt" ? <><span className="hb-spin" />Learning</> : "Teach Neo"}</button>
         </form>
+        <form className="hb-card" onSubmit={addText}>
+          <div className="kn-add-h"><span className="kn-ico" style={{ background: "#00b386" }}>¶</span><div><b>Paste a transcript</b><div className="hb-note">From Fathom, Zoom or notes. Transcript and summary together is best. Almost free.</div></div></div>
+          <textarea className="sh-ta" style={{ minHeight: 70, width: "100%", display: "block", boxSizing: "border-box" }} value={paste} onChange={(e) => setPaste(e.target.value)} placeholder="Paste the whole transcript here" />
+          <button className="hb-btn" style={{ marginTop: 8, display: "block" }} disabled={!!busy || paste.trim().length < 200}>{busy === "tx" ? <><span className="hb-spin" />Learning</> : "Teach Neo"}</button>
+        </form>
         <label className="hb-card kn-drop" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); if (!busy) uploadFile(e.dataTransfer.files[0]); }}>
           <div className="kn-add-h"><span className="kn-ico" style={{ background: "#7c5cff" }}>●</span><div><b>Call recordings</b><div className="hb-note">MP4 or MOV screen recordings, or audio. A one hour call costs about 20 cents.</div></div></div>
           <input type="file" accept="video/*,audio/*,.mp4,.mov,.m4a,.mp3,.wav,.webm" style={{ display: "none" }} disabled={!!busy} onChange={(e) => { uploadFile(e.target.files[0]); e.target.value = ""; }} />
@@ -9437,12 +9451,12 @@ function KnowledgePage() {
             return (
               <div key={k.id} className="kn-card" onClick={() => k.status === "ready" && setOpen(k.id)} style={{ cursor: k.status === "ready" ? "pointer" : "default" }}>
                 <div className="kn-thumb" style={k.source_type === "youtube" && k.url ? { backgroundImage: `url(https://i.ytimg.com/vi/${k.url.split("v=")[1]}/mqdefault.jpg)` } : {}}>
-                  {k.source_type !== "youtube" && <span>CALL</span>}
+                  {k.source_type !== "youtube" && <span>{k.source_type === "fathom" ? "FATHOM" : "CALL"}</span>}
                   <i style={{ background: sc }}>{["transcribing", "processing", "uploading"].includes(k.status) && <span className="hb-spin" style={{ width: 9, height: 9 }} />}{sl}</i>
                 </div>
                 <div style={{ padding: 12 }}>
                   <div className="kn-title">{k.title || k.file_name || "Untitled"}</div>
-                  <div className="hb-note" style={{ marginTop: 4 }}>{[k.source_type === "youtube" ? "YouTube" : "Call", fmtDur(k.duration_sec), k.insight_count ? `${k.insight_count} lessons` : null, k.status === "uploading" && k.progress ? `part ${k.progress.done || 0} of ${k.progress.parts}` : null].filter(Boolean).join(" · ")}</div>
+                  <div className="hb-note" style={{ marginTop: 4 }}>{[k.source_type === "youtube" ? "YouTube" : k.source_type === "fathom" ? "Fathom call" : "Call", fmtDur(k.duration_sec), k.insight_count ? `${k.insight_count} lessons` : null, k.status === "uploading" && k.progress ? `part ${k.progress.done || 0} of ${k.progress.parts}` : null].filter(Boolean).join(" · ")}</div>
                   {k.status === "failed" && <div className="hb-note" style={{ color: "#E2725B", marginTop: 6 }}>{k.error}</div>}
                   {k.summary && <div className="kn-sum">{k.summary}</div>}
                   {(k.tags || []).length > 0 && <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 8 }}>{k.tags.slice(0, 5).map((t) => <span key={t} className="kn-tag">{t}</span>)}</div>}
@@ -9467,7 +9481,7 @@ function KnowledgePage() {
               <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 800, fontSize: 18 }}>{detail?.title || "Loading"}</div>
-                  {detail?.url && <a className="hb-note" href={detail.url} target="_blank" rel="noopener noreferrer" style={{ color: "#39e673" }}>Open on YouTube</a>}
+                  {detail?.url && <a className="hb-note" href={detail.url} target="_blank" rel="noopener noreferrer" style={{ color: "#39e673" }}>{detail.source_type === "fathom" ? "Open in Fathom" : "Open on YouTube"}</a>}
                 </div>
                 <button className="hb-x" onClick={() => setOpen(null)} aria-label="Close"><X size={16} /></button>
               </div>
@@ -9498,7 +9512,7 @@ const KN_CSS = `
 .kn-stats div{ min-width:86px; padding:12px 14px; border-radius:16px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07); }
 .kn-stats b{ display:block; font-size:26px; font-weight:900; font-variant-numeric:tabular-nums; }
 .kn-stats span{ font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#8fa39a; }
-.kn-add{ display:grid; grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr)); gap:14px; }
+.kn-add{ display:grid; grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr)); gap:14px; }
 .kn-add-h{ display:flex; gap:12px; align-items:center; margin-bottom:10px; }
 .kn-ico{ width:38px; height:38px; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:14px; flex-shrink:0; }
 .kn-drop{ cursor:pointer; display:block; }

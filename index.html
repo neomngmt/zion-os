@@ -15930,6 +15930,35 @@ function KnowledgePage() {
   const [open, setOpen] = useState(null);
   const [detail, setDetail] = useState(null);
   const [filter, setFilter] = useState("");
+  const [paste, setPaste] = useState("");
+  const addText = async e => {
+    e.preventDefault();
+    if (paste.trim().length < 200) {
+      setErr("Paste the whole transcript.");
+      return;
+    }
+    setBusy("tx");
+    setErr("");
+    setMsg("Neo is reading the call");
+    try {
+      const j = await knFn({
+        action: "add-text",
+        text: paste
+      });
+      setPaste("");
+      await load();
+      await knFn({
+        action: "process",
+        id: j.id
+      });
+      setMsg("Neo learned the call.");
+    } catch (e2) {
+      setErr(e2.message);
+      setMsg("");
+    }
+    setBusy("");
+    load();
+  };
   const load = useCallback(async () => {
     try {
       const j = await knFn({
@@ -16117,6 +16146,38 @@ function KnowledgePage() {
     disabled: !!busy || !url.trim()
   }, busy === "yt" ? React.createElement(React.Fragment, null, React.createElement("span", {
     className: "hb-spin"
+  }), "Learning") : "Teach Neo")), React.createElement("form", {
+    className: "hb-card",
+    onSubmit: addText
+  }, React.createElement("div", {
+    className: "kn-add-h"
+  }, React.createElement("span", {
+    className: "kn-ico",
+    style: {
+      background: "#00b386"
+    }
+  }, "¶"), React.createElement("div", null, React.createElement("b", null, "Paste a transcript"), React.createElement("div", {
+    className: "hb-note"
+  }, "From Fathom, Zoom or notes. Transcript and summary together is best. Almost free."))), React.createElement("textarea", {
+    className: "sh-ta",
+    style: {
+      minHeight: 70,
+      width: "100%",
+      display: "block",
+      boxSizing: "border-box"
+    },
+    value: paste,
+    onChange: e => setPaste(e.target.value),
+    placeholder: "Paste the whole transcript here"
+  }), React.createElement("button", {
+    className: "hb-btn",
+    style: {
+      marginTop: 8,
+      display: "block"
+    },
+    disabled: !!busy || paste.trim().length < 200
+  }, busy === "tx" ? React.createElement(React.Fragment, null, React.createElement("span", {
+    className: "hb-spin"
   }), "Learning") : "Teach Neo")), React.createElement("label", {
     className: "hb-card kn-drop",
     onDragOver: e => e.preventDefault(),
@@ -16228,7 +16289,7 @@ function KnowledgePage() {
       style: k.source_type === "youtube" && k.url ? {
         backgroundImage: `url(https://i.ytimg.com/vi/${k.url.split("v=")[1]}/mqdefault.jpg)`
       } : {}
-    }, k.source_type !== "youtube" && React.createElement("span", null, "CALL"), React.createElement("i", {
+    }, k.source_type !== "youtube" && React.createElement("span", null, k.source_type === "fathom" ? "FATHOM" : "CALL"), React.createElement("i", {
       style: {
         background: sc
       }
@@ -16249,7 +16310,7 @@ function KnowledgePage() {
       style: {
         marginTop: 4
       }
-    }, [k.source_type === "youtube" ? "YouTube" : "Call", fmtDur(k.duration_sec), k.insight_count ? `${k.insight_count} lessons` : null, k.status === "uploading" && k.progress ? `part ${k.progress.done || 0} of ${k.progress.parts}` : null].filter(Boolean).join(" · ")), k.status === "failed" && React.createElement("div", {
+    }, [k.source_type === "youtube" ? "YouTube" : k.source_type === "fathom" ? "Fathom call" : "Call", fmtDur(k.duration_sec), k.insight_count ? `${k.insight_count} lessons` : null, k.status === "uploading" && k.progress ? `part ${k.progress.done || 0} of ${k.progress.parts}` : null].filter(Boolean).join(" · ")), k.status === "failed" && React.createElement("div", {
       className: "hb-note",
       style: {
         color: "#E2725B",
@@ -16343,7 +16404,7 @@ function KnowledgePage() {
     style: {
       color: "#39e673"
     }
-  }, "Open on YouTube")), React.createElement("button", {
+  }, detail.source_type === "fathom" ? "Open in Fathom" : "Open on YouTube")), React.createElement("button", {
     className: "hb-x",
     onClick: () => setOpen(null),
     "aria-label": "Close"
@@ -16413,7 +16474,7 @@ const KN_CSS = `
 .kn-stats div{ min-width:86px; padding:12px 14px; border-radius:16px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07); }
 .kn-stats b{ display:block; font-size:26px; font-weight:900; font-variant-numeric:tabular-nums; }
 .kn-stats span{ font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#8fa39a; }
-.kn-add{ display:grid; grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr)); gap:14px; }
+.kn-add{ display:grid; grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr)); gap:14px; }
 .kn-add-h{ display:flex; gap:12px; align-items:center; margin-bottom:10px; }
 .kn-ico{ width:38px; height:38px; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:14px; flex-shrink:0; }
 .kn-drop{ cursor:pointer; display:block; }
@@ -31216,7 +31277,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">12i5wjb</script>
+<script type="text/babel" id="zion-version">sasecf</script>
 <script>
 (function () {
   var last = 0;
