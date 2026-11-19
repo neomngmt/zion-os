@@ -14404,7 +14404,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
       {session.role === "admin" && (
       <>
       {/* financial strip — shown on all screen sizes now, it reads nicer as a full-width strip than the small circular ring */}
-      <div className="flex items-center gap-7 flex-wrap mt-8 pt-5 pb-5 neo-fade-in" style={{ borderTop: `1px solid ${border}`, animationDelay: "0.85s", transform: `translate(0px, -20px) scale(1.02)` }}>
+      <div className="flex items-center gap-7 flex-wrap mt-8 pt-5 pb-5 neo-fade-in" style={{ borderTop: `1px solid ${border}`, animationDelay: "0.85s", transform: "translateY(-20px)", paddingLeft: 4, paddingRight: 4, maxWidth: "100%", boxSizing: "border-box" }}>
         <div>
           <div className="fs-9 tracking-widest flex items-center gap-2" style={{ color: textDim, letterSpacing: "2px" }}>
             PRIMARY OBJECTIVE — MONTHLY REVENUE
