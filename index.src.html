@@ -14679,7 +14679,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
                 <circle cx="200" cy="200" r="148" fill="none" stroke="rgba(57,230,115,0.22)" strokeWidth="1" />
               </svg>
             </div>
-            {showThinkingLabel && (
+            {false && showThinkingLabel && ( /* the THINKING label above the orb was removed on request */
               <div className="absolute left-1/2 -translate-x-1/2 font-mono uppercase tracking-widest flex items-baseline"
                 style={{ top: "-130px", color: amber, fontSize: "14px", letterSpacing: "5px", fontFamily: "'Orbitron', 'JetBrains Mono', monospace", fontWeight: 700, textShadow: `0 0 10px ${amber}aa`, animation: "neoThinkPulse 1.1s ease-in-out infinite", zIndex: 21 }}>
                 THINKING
