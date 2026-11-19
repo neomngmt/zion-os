@@ -27,7 +27,8 @@
   window.startOnlyFansAuthentication = startOnlyFansAuthentication;
 </script>
 <style>
-html,body{margin:0;padding:0;overflow-x:hidden;max-width:100vw;}
+html,body{margin:0;padding:0;overflow-x:hidden;max-width:100vw;overscroll-behavior-x:none;}
+@supports (overflow:clip){ html,body{ overflow-x:clip; } }
 html{padding-bottom:env(safe-area-inset-bottom);}
 body{ background-color:#07090a; }
 /* Same typography as the agency site: Inter for text, JetBrains Mono for labels and numbers */
@@ -9148,7 +9149,10 @@ const ACQ_CSS = `
 .aq-nav::-webkit-scrollbar{ display:none; }
 .aq-nav > button{ scroll-snap-align:start; }
 .aq-head{ position:sticky; top:-22px; z-index:2; margin:-22px -22px 0; padding:22px 22px 10px; background:#0b100d; }
+.aq-page{ max-width:100%; overflow-x:clip; touch-action:pan-y; }
 @media (max-width:600px){
+  .aq-nav{ flex-wrap:wrap; overflow:visible; gap:6px; }
+  .aq-nav > button{ padding:8px 11px !important; font-size:12px !important; }
   .aq-kpis{ grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
   .aq-kpi{ padding:10px; border-radius:13px; }
   .aq-kpi b{ font-size:20px; }
@@ -9277,7 +9281,7 @@ function AcquisitionPage() {
   const runText = run ? ({ searching: run.kind === "newof" ? "Searching new OnlyFans profiles" : "Searching Instagram", reading: "Reading their Instagram profiles", judging: "The AI is judging the leads" }[run.state] || "") : "";
 
   return (
-    <div className="hb">
+    <div className="hb aq-page">
       <style>{HUB_CSS}{SHOOT_CSS}{ACQ_CSS}</style>
       <div className="aq-top">
         <div style={{ flex: 1, minWidth: 220 }}>
