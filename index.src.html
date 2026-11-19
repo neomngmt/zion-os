@@ -10141,6 +10141,53 @@ function XOutreachPanel() {
   );
 }
 
+// X outreach in short, on the Acquisition overview: today's messages, the daily limit, replies
+function XOverviewCard({ onOpen }) {
+  const [d, setD] = useState(null);
+  useEffect(() => { xrFn({ action: "stats" }).then(setD).catch(() => setD({ connected: false, failed: true })); }, []);
+  if (!d || d.failed) return null;
+  const n = (v) => Number(v || 0).toLocaleString("en-US");
+  if (!d.connected) return (
+    <div className="hb-card" style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <span style={{ width: 30, height: 30, borderRadius: 9, background: "#e7e9ea", color: "#03110a", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900 }}>X</span>
+      <div style={{ flex: 1, fontWeight: 800 }}>X outreach: XReacher is not connected</div>
+      <button className="hb-btn sm" onClick={onOpen}>Open X outreach</button>
+    </div>
+  );
+  const sy = d.sync || {}; const camps = sy.campaigns || [];
+  const keys = Object.keys(d.daily || {}).filter((k) => k !== "_filled").sort();
+  const today = (d.daily || {})[keys[keys.length - 1]] || {};
+  const sumC = (k, f) => camps.reduce((a, c) => a + ((c[k] || {})[f] || 0), 0);
+  const first = today.contacted ?? sumC("today", "contacted");
+  const fu = today.followups ?? sumC("today", "followups");
+  const rep = today.replies ?? sumC("today", "replies");
+  const limit = camps.filter((c) => c.status === "active").reduce((a, c) => a + (c.daily_limit || 0), 0);
+  const last7 = keys.slice(-7).map((k) => d.daily[k]);
+  const max = Math.max(1, ...last7.map((x) => (x.contacted || 0) + (x.followups || 0)));
+  return (
+    <div className="hb-card" style={{ marginBottom: 16, borderColor: "rgba(231,233,234,.28)", background: "linear-gradient(160deg, rgba(231,233,234,.07), #0e1310 55%)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+        <span style={{ width: 30, height: 30, borderRadius: 9, background: "#e7e9ea", color: "#03110a", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900 }}>X</span>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <div style={{ fontWeight: 800, fontSize: 16 }}>X outreach today: {n(first + fu)} messages, {n(rep)} {rep === 1 ? "reply" : "replies"}</div>
+          <div className="hb-note">{sy.at ? `XReacher, synced ${timeAgo(sy.at)}` : "XReacher"}</div>
+        </div>
+        <button className="hb-btn sm" onClick={onOpen}>Open X outreach</button>
+      </div>
+      <div style={{ display: "flex", gap: 18, alignItems: "flex-end", flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 6 }}><span>New creators today</span><b style={{ fontVariantNumeric: "tabular-nums" }}>{n(first)}{limit ? ` / ${limit}` : ""}</b></div>
+          <div style={{ height: 8, borderRadius: 999, background: "rgba(255,255,255,.07)", overflow: "hidden" }}><i style={{ display: "block", height: "100%", borderRadius: 999, width: `${limit ? Math.min(100, (first / limit) * 100) : 0}%`, background: "linear-gradient(90deg,#12b34c,#39e673)" }} /></div>
+          <div className="hb-note" style={{ fontSize: 11, marginTop: 5 }}>{n(first)} first messages, {n(fu)} follow-ups. Last 7 days: {n(sumC("week", "contacted") + sumC("week", "followups"))} messages, {n(sumC("week", "replies"))} replies.</div>
+        </div>
+        <div title="Messages per day, last 7 days" style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 44, width: 120 }}>
+          {last7.map((x, i) => <div key={i} style={{ flex: 1, height: `${(((x.contacted || 0) + (x.followups || 0)) / max) * 100}%`, minHeight: 2, borderRadius: 3, background: i === last7.length - 1 ? "#39e673" : "rgba(57,230,115,.35)" }} />)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AcquisitionPage() {
   const [agency, setAgency] = useState(() => { try { return localStorage.getItem("zionAcqAgency") || "US"; } catch (e) { return "US"; } });
   const [leads, setLeads] = useState(null);
@@ -10277,6 +10324,7 @@ function AcquisitionPage() {
           );
         })}
       </div>
+      {section === "overview" && !kpi && agency === "US" && <XOverviewCard onOpen={() => setSection("xout")} />}
       {section === "overview" && !kpi && agency === "US" && (
         <div className="hb-card" style={{ marginBottom: 16, borderColor: "rgba(255,69,0,.45)", background: "linear-gradient(160deg, rgba(255,69,0,.10), #0e1310 55%)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
