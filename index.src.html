@@ -9308,6 +9308,12 @@ async function acqFn(body) {
 }
 const ACQ_STAGES = [["new", "New"], ["messaged", "Messaged"], ["replied", "Replied"], ["call", "Call"], ["signed", "Signed"], ["lost", "Not interested"], ["skip", "Skipped"]];
 const ACQ_CSS = `
+.ad-row{ display:grid; grid-template-columns:minmax(150px,1.6fr) repeat(7,minmax(56px,1fr)); gap:8px; align-items:center; padding:11px 10px; border-top:1px solid rgba(255,255,255,.05); font-variant-numeric:tabular-nums; cursor:pointer; border-radius:10px; transition:background .2s; font-size:13.5px; }
+.ad-row:hover{ background:rgba(255,255,255,.04); }
+.ad-row > span:not(:first-child){ text-align:right; }
+.ad-row.h{ border-top:0; cursor:default; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#6f8279; padding-bottom:4px; }
+.ad-row.h:hover, .ad-row.t:hover{ background:none; }
+.ad-row.t{ cursor:default; font-weight:800; border-top:1px solid rgba(255,255,255,.14); }
 .aq-top{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
 .aq-kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-bottom:16px; }
 .aq-kpi{ border-radius:16px; padding:13px; background:#0e1310; border:1px solid rgba(255,255,255,.08); }
@@ -9899,9 +9905,25 @@ const XR_CSS = `
   .xr-bars{ height:120px; gap:2px; }
 }
 `;
+// X numbers for a period from the XReacher sync: "today" | "7" | "30" | "all"
+function xrNums(d, per) {
+  const camps = d?.sync?.campaigns || [];
+  const sumC = (k, f) => camps.reduce((a, c) => a + ((c[k] || {})[f] || 0), 0);
+  const keys = Object.keys(d?.daily || {}).filter((k) => k !== "_filled").sort();
+  const td = (d?.daily || {})[keys[keys.length - 1]];
+  if (per === "today") return { contacted: td ? td.contacted : sumC("today", "contacted"), followups: td ? td.followups : sumC("today", "followups"), replies: td ? td.replies : sumC("today", "replies"), follows: sumC("today", "follows"), likes: sumC("today", "likes") };
+  if (per === "all") { const t = d?.sync?.totals || {}; return { contacted: t.contacted || 0, followups: t.followups || 0, replies: t.replies || 0, follows: camps.reduce((a, c) => a + (c.follows || 0), 0), likes: camps.reduce((a, c) => a + (c.likes || 0), 0) }; }
+  const k = per === "7" ? "week" : "month";
+  return { contacted: sumC(k, "contacted"), followups: sumC(k, "followups"), replies: sumC(k, "replies"), follows: sumC(k, "follows"), likes: sumC(k, "likes") };
+}
+// when did she first answer (X reply time from XReacher, or her first message in the chat)
+const acqHerAt = (l) => { if (l.replied_at) return Date.parse(l.replied_at); const m = (Array.isArray(l.convo) ? l.convo : []).find((x) => x.from === "her" && x.at); return m ? Date.parse(m.at) : null; };
+// start of a period: today = since midnight, 7 / 30 = rolling days, all = no limit
+const acqSince = (per) => { if (per === "all") return 0; if (per === "today") { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); } return Date.now() - Number(per) * 86400000; };
+const ACQ_PERIODS = [["today", "Today"], ["7", "Last 7 days"], ["30", "Last 30 days"], ["all", "All time"]];
 const xrClean = (t) => String(t || "").replace(/\s+[–—]\s+/g, ", ").replace(/[–—]/g, "-");
 const xrDay = (k) => new Date(`${k}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-function XOutreachPanel() {
+function XOutreachPanel({ leads = [], onOpenLead }) {
   const [d, setD] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -9912,6 +9934,7 @@ function XOutreachPanel() {
   const [inboxBusy, setInboxBusy] = useState(false);
   const [onlyReplied, setOnlyReplied] = useState(false);
   const [open, setOpen] = useState(null);
+  const [showReplies, setShowReplies] = useState(false);
   const load = () => xrFn({ action: "stats" }).then(setD).catch((e) => setErr(e.message));
   useEffect(() => { load(); }, []);
   const loadInbox = async (more) => {
@@ -9945,12 +9968,7 @@ function XOutreachPanel() {
   const dayKeys = Object.keys(daily).filter((k) => k !== "_filled").sort();
   const todayKey = dayKeys[dayKeys.length - 1];
   const sumC = (k, f) => camps.reduce((a, c) => a + ((c[k] || {})[f] || 0), 0);
-  const P = (() => {
-    if (per === "today") { const x = daily[todayKey] || { contacted: sumC("today", "contacted"), followups: sumC("today", "followups"), replies: sumC("today", "replies") }; return { ...x, follows: sumC("today", "follows"), likes: sumC("today", "likes") }; }
-    if (per === "all") return { contacted: t.contacted, followups: t.followups, replies: t.replies, follows: camps.reduce((a, c) => a + (c.follows || 0), 0), likes: camps.reduce((a, c) => a + (c.likes || 0), 0) };
-    const k = per === "7" ? "week" : "month";
-    return { contacted: sumC(k, "contacted"), followups: sumC(k, "followups"), replies: sumC(k, "replies"), follows: sumC(k, "follows"), likes: sumC(k, "likes") };
-  })();
+  const P = xrNums(d, per);
   const pct = (a, b) => (b ? `${(Math.round((a / b) * 1000) / 10).toLocaleString("en-US")}%` : "0%");
   const n = (v) => Number(v || 0).toLocaleString("en-US");
   const perLabel = { today: "today", "7": "in the last 7 days", "30": "in the last 30 days", all: "since the start" }[per];
@@ -9969,7 +9987,9 @@ function XOutreachPanel() {
   const leftAll = lists.filter((l) => (l.campaigns || []).length).reduce((a, l) => a + l.left, 0);
   const pace = Math.round(sumC("week", "contacted") / 7); // new creators a day, last 7 days
   const convs = (inbox?.conversations || []).filter((c) => !onlyReplied || c.replied);
-  const K = ({ v, l, sub, hot }) => <div className={`aq-kpi${hot ? " hot" : ""}`}><b>{v}</b><span>{l}</span>{sub && <div className="hb-note" style={{ marginTop: 4, fontSize: 11 }}>{sub}</div>}</div>;
+  const K = ({ v, l, sub, hot, on, click }) => <div className={`aq-kpi${hot ? " hot" : ""}${on ? " on" : ""}`} onClick={click} style={click ? { cursor: "pointer" } : undefined}><b>{v}</b><span>{l}</span>{sub && <div className="hb-note" style={{ marginTop: 4, fontSize: 11 }}>{sub}</div>}</div>;
+  const since = acqSince(per);
+  const replied = leads.filter((l) => { const t = acqHerAt(l); return t != null && t >= since; }).sort((a, b) => acqHerAt(b) - acqHerAt(a));
 
   return (
     <div style={{ marginBottom: 14 }}>
@@ -10005,13 +10025,29 @@ function XOutreachPanel() {
           {[["today", "Today"], ["7", "Last 7 days"], ["30", "Last 30 days"], ["all", "All time"]].map(([k, l]) => <button key={k} className={`hb-chip ${per === k ? "on" : ""}`} onClick={() => { setPer(k); setHover(null); }}>{l}</button>)}
         </div>
         <div className="aq-kpis" style={{ marginBottom: 0 }}>
-          <K hot v={n(P.contacted + P.followups)} l="Messages sent" sub={`${n(P.contacted)} first, ${n(P.followups)} follow-ups`} />
-          <K v={n(P.contacted)} l="Creators contacted" sub={`new creators ${perLabel}`} />
-          <K v={n(P.replies)} l="Replies" sub={`creators who answered ${perLabel}`} />
-          <K v={pct(P.replies, P.contacted)} l="Reply rate" sub={`per creator; ${pct(P.replies, P.contacted + P.followups)} per message`} />
+          <K hot v={n(P.contacted)} l="DMs sent" sub={`first DM to a new creator ${perLabel}`} />
+          <K v={n(P.followups)} l="Follow-ups" sub={`to creators who did not answer yet; ${n(P.contacted + P.followups)} messages in total`} />
+          <K v={n(P.replies)} l="Replies" on={showReplies} click={() => setShowReplies((v) => !v)} sub={showReplies ? "tap again to hide" : "tap to see who"} />
+          <K v={pct(P.replies, P.contacted)} l="Reply rate" sub={`replies per DM; ${pct(P.replies, P.contacted + P.followups)} per message`} />
           <K v={n(P.follows)} l="Follows" sub={`${n(P.likes)} likes before the DM`} />
         </div>
         {err && <div className="hb-note" style={{ color: "#E2725B", marginTop: 8 }}>{err}</div>}
+        {showReplies && (
+          <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,.06)", paddingTop: 8 }}>
+            <div style={{ fontWeight: 800, margin: "4px 4px 6px" }}>Who replied {perLabel} ({replied.length})</div>
+            {replied.length === 0 && <div className="hb-note" style={{ padding: 4 }}>{P.replies ? "XReacher counts replies here, Zion is still finding out who they were. Check again in a few minutes." : "Nobody yet."}</div>}
+            {replied.map((l) => (
+              <div key={l.id} className="xr-conv" onClick={() => onOpenLead && onOpenLead(l.id)}>
+                <div className="aq-ava" style={{ width: 36, height: 36, fontSize: 13 }}>{(l.handle || "?").slice(0, 1).toUpperCase()}</div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>@{l.handle} <span className="hb-note" style={{ fontWeight: 500 }}>{xrClean(l.full_name)}</span></div>
+                  <div className="t">Replied {new Date(acqHerAt(l)).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}{l.status && l.status !== "replied" ? `, now: ${l.status}` : ""}</div>
+                </div>
+                <a className="hb-btn ghost sm" href={`https://x.com/${l.handle}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>X</a>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {days.length > 0 && (
@@ -10054,7 +10090,7 @@ function XOutreachPanel() {
       {tab === "inbox" && (
         <div className="hb-card" style={{ padding: 8, marginBottom: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "6px 6px 10px" }}>
-            <div style={{ fontWeight: 800, flex: 1 }}>Conversations {inbox?.handle ? <span className="hb-note" style={{ fontWeight: 500 }}>on {inbox.handle}, newest first</span> : null}</div>
+            <div style={{ fontWeight: 800, flex: 1 }}>Conversations {inbox?.handle ? <span className="hb-note" style={{ fontWeight: 500 }}>on {inbox.handle}, the newest 20</span> : null}</div>
             <button className={`hb-chip ${!onlyReplied ? "on" : ""}`} onClick={() => setOnlyReplied(false)}>All</button>
             <button className={`hb-chip ${onlyReplied ? "on" : ""}`} onClick={() => setOnlyReplied(true)}>Replied</button>
           </div>
@@ -10070,7 +10106,7 @@ function XOutreachPanel() {
               {c.unread > 0 ? <span className="aq-score" style={{ background: "#39e673", color: "#03110a" }}>{c.unread}</span> : <span />}
             </div>
           ))}
-          {inbox?.more && <div style={{ padding: 8 }}><button className="hb-btn ghost sm" disabled={inboxBusy} onClick={() => loadInbox(true)}>{inboxBusy ? <><span className="hb-spin" />Loading</> : "Load more"}</button></div>}
+          {/* XReacher's inbox paging returns the first page again, so only the newest 20 chats are shown */}
           {inbox?.note && <div className="hb-note" style={{ padding: "4px 8px 8px", fontSize: 11 }}>Some chats on this account are encrypted, so XReacher cannot show their text. Open them in X to read them.</div>}
         </div>
       )}
@@ -10169,7 +10205,7 @@ function XOverviewCard({ onOpen }) {
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
         <span style={{ width: 30, height: 30, borderRadius: 9, background: "#e7e9ea", color: "#03110a", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900 }}>X</span>
         <div style={{ flex: 1, minWidth: 200 }}>
-          <div style={{ fontWeight: 800, fontSize: 16 }}>X outreach today: {n(first + fu)} messages, {n(rep)} {rep === 1 ? "reply" : "replies"}</div>
+          <div style={{ fontWeight: 800, fontSize: 16 }}>X outreach today: {n(first)} DMs, {n(fu)} follow-ups, {n(rep)} {rep === 1 ? "reply" : "replies"}</div>
           <div className="hb-note">{sy.at ? `XReacher, synced ${timeAgo(sy.at)}` : "XReacher"}</div>
         </div>
         <button className="hb-btn sm" onClick={onOpen}>Open X outreach</button>
@@ -10178,7 +10214,7 @@ function XOverviewCard({ onOpen }) {
         <div style={{ flex: 1, minWidth: 200 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 6 }}><span>New creators today</span><b style={{ fontVariantNumeric: "tabular-nums" }}>{n(first)}{limit ? ` / ${limit}` : ""}</b></div>
           <div style={{ height: 8, borderRadius: 999, background: "rgba(255,255,255,.07)", overflow: "hidden" }}><i style={{ display: "block", height: "100%", borderRadius: 999, width: `${limit ? Math.min(100, (first / limit) * 100) : 0}%`, background: "linear-gradient(90deg,#12b34c,#39e673)" }} /></div>
-          <div className="hb-note" style={{ fontSize: 11, marginTop: 5 }}>{n(first)} first messages, {n(fu)} follow-ups. Last 7 days: {n(sumC("week", "contacted") + sumC("week", "followups"))} messages, {n(sumC("week", "replies"))} replies.</div>
+          <div className="hb-note" style={{ fontSize: 11, marginTop: 5 }}>{n(first)} DMs, {n(fu)} follow-ups. Last 7 days: {n(sumC("week", "contacted"))} DMs, {n(sumC("week", "followups"))} follow-ups, {n(sumC("week", "replies"))} replies.</div>
         </div>
         <div title="Messages per day, last 7 days" style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 44, width: 120 }}>
           {last7.map((x, i) => <div key={i} style={{ flex: 1, height: `${(((x.contacted || 0) + (x.followups || 0)) / max) * 100}%`, minHeight: 2, borderRadius: 3, background: i === last7.length - 1 ? "#39e673" : "rgba(57,230,115,.35)" }} />)}
@@ -10196,6 +10232,10 @@ function AcquisitionPage() {
   const [cfg, setCfg] = useState(null);
   const [view, setView] = useState("active");
   const [kpi, setKpi] = useState(null);
+  const [per, setPer] = useState(() => { try { return localStorage.getItem("zionAcqPer") || "today"; } catch (e) { return "today"; } });
+  const pickPer = (p) => { setPer(p); try { localStorage.setItem("zionAcqPer", p); } catch (e) {} };
+  const [xr, setXr] = useState(null);
+  useEffect(() => { if (agency === "US") xrFn({ action: "stats" }).then(setXr).catch(() => setXr(null)); else setXr(null); }, [agency]);
   const [queue, setQueue] = useState(null);
   const [section, setSectionRaw] = useState(() => { try { return localStorage.getItem("zionAcqSection") || "overview"; } catch (e) { return "overview"; } });
   const setSection = (x) => { setSectionRaw(x); setView("active"); try { localStorage.setItem("zionAcqSection", x); } catch (e) {} };
@@ -10277,10 +10317,27 @@ function AcquisitionPage() {
     ...all.filter((l) => l.source === "reddit" && l.status === "new" && (l.score || 0) >= 60).sort((a, b) => (b.score || 0) - (a.score || 0)),
   ].slice(0, 15);
   const startQueue = () => setQueue(replyQueue.map((l) => l.id));
+  const since = acqSince(per);
+  const perWord = { today: "today", "7": "last 7 days", "30": "last 30 days", all: "all time" }[per];
+  const xn = agency === "US" && xr && xr.connected ? xrNums(xr, per) : null;
+  const handSent = all.filter((l) => l.source !== "x" && l.messaged_at && Date.parse(l.messaged_at) >= since);
+  const repliedIn = all.filter((l) => { const t = acqHerAt(l); return t != null && t >= since; }).sort((a, b) => acqHerAt(b) - acqHerAt(a));
+  const xRepliedIn = repliedIn.filter((l) => l.source === "x").length;
   const kpiLists = {
     due: { title: "Follow-ups due", list: due },
-    good: { title: agency === "CZ" ? "New leads" : "Good new leads", list: agency === "CZ" ? fresh : fresh.filter((l) => (l.score || 0) >= 50).sort((a, b) => (b.score || 0) - (a.score || 0)) },
-    messaged: { title: agency === "CZ" ? "Leads this week" : "Messaged this week", list: all.filter((l) => { const t = agency === "CZ" ? l.lead_at : l.messaged_at; return t && now - Date.parse(t) < 7 * 86400000; }) },
+    good: agency === "CZ" ? { title: "New leads", list: fresh } : {
+      title: "Good new leads",
+      sub: "Reddit qualified + replied on X",
+      list: [
+        ...all.filter((l) => l.source === "x" && !["call", "signed", "lost", "skip"].includes(l.status)).sort((a, b) => (acqHerAt(b) || 0) - (acqHerAt(a) || 0)),
+        ...fresh.filter((l) => l.source === "reddit" && (l.score || 0) >= 50).sort((a, b) => (b.score || 0) - (a.score || 0)),
+      ],
+    },
+    messaged: agency === "CZ"
+      ? { title: "New leads", sub: perWord, list: all.filter((l) => l.lead_at && Date.parse(l.lead_at) >= since) }
+      : { title: "DMs sent", sub: perWord, n: (xn ? xn.contacted : 0) + handSent.length, list: handSent },
+    followups: { title: "Follow-ups", sub: perWord, n: xn ? xn.followups : 0, list: [] },
+    replies: { title: "Replies", sub: perWord, n: (xn ? Math.max(xn.replies, xRepliedIn) : xRepliedIn) + (repliedIn.length - xRepliedIn), list: repliedIn },
     talking: { title: "Talking now", list: all.filter((l) => l.status === "replied" || l.status === "call") },
     signed: { title: "Signed", list: all.filter((l) => l.status === "signed") },
   };
@@ -10302,14 +10359,6 @@ function AcquisitionPage() {
         </div>
       </div>
       {err && <div className="hb-err">{err}</div>}
-      <div className="aq-kpis">
-        {[["due", "hot"], ["good", ""], ["messaged", ""], ["talking", ""], ["signed", ""]].map(([k, cls]) => (
-          <button key={k} className={`aq-kpi ${cls} ${kpi === k ? "on" : ""}`} style={{ textAlign: "left", cursor: "pointer" }}
-            onClick={() => { setKpi(kpi === k ? null : k); setSectionRaw("overview"); }}>
-            <b>{kpiLists[k].list.length}</b><span>{kpiLists[k].title}</span>
-          </button>
-        ))}
-      </div>
       <div className="aq-nav">
         {SECTIONS.map(([k, label, color]) => {
           const n = k === "plan" ? null : k === "overview" ? lists.todo.length : k === "ongoing" ? ongoing.length : all.filter((l) => sectionOf(l) === k && !["signed", "lost", "skip"].includes(l.status)).length;
@@ -10324,7 +10373,77 @@ function AcquisitionPage() {
           );
         })}
       </div>
-      {section === "overview" && !kpi && agency === "US" && <XOverviewCard onOpen={() => setSection("xout")} />}
+      {section === "overview" && (() => {
+        const n = (v) => Number(v || 0).toLocaleString("en-US");
+        const inP = (t) => t && Date.parse(t) >= since;
+        const meFollow = (l) => { const c = (Array.isArray(l.convo) ? l.convo : []).filter((m) => m.from === "me" && m.at && Date.parse(m.at) >= since).length; return Math.max(0, c - (inP(l.messaged_at) ? 1 : 0)); };
+        const rows = SECTIONS.filter(([k]) => !["overview", "plan", "ongoing"].includes(k) && (agency === "US" || k !== "xout")).map(([k, label, color]) => {
+          const L = all.filter((l) => sectionOf(l) === k);
+          const isX = k === "xout" && xn;
+          const repL = L.filter((l) => { const t = acqHerAt(l); return t != null && t >= since; }).length;
+          return { k, label: k === "xout" ? "X (XReacher)" : label, color,
+            found: L.filter((l) => inP(k === "meta" ? (l.lead_at || l.created_at) : l.created_at)).length,
+            dms: isX ? xn.contacted : L.filter((l) => inP(l.messaged_at)).length,
+            fu: isX ? xn.followups : L.reduce((a2, l) => a2 + meFollow(l), 0),
+            rep: isX ? Math.max(xn.replies, repL) : repL,
+            talking: L.filter((l) => ["replied", "call"].includes(l.status)).length,
+            signed: L.filter((l) => l.status === "signed").length };
+        });
+        const T = rows.reduce((t, r) => ({ dms: t.dms + r.dms, fu: t.fu + r.fu, rep: t.rep + r.rep, signed: t.signed + r.signed, found: t.found + r.found }), { dms: 0, fu: 0, rep: 0, signed: 0, found: 0 });
+        const pct = (a2, b2) => (b2 ? `${(Math.round((a2 / b2) * 1000) / 10).toLocaleString("en-US")}%` : "0%");
+        const xLimit = (xr?.sync?.campaigns || []).filter((c) => c.status === "active").reduce((a2, c) => a2 + (c.daily_limit || 0), 0);
+        const Big = ({ k, v, l, sub, hot }) => (
+          <button className={`aq-kpi ${hot ? "hot" : ""} ${kpi === k ? "on" : ""}`} style={{ textAlign: "left", cursor: "pointer" }} onClick={() => setKpi(kpi === k ? null : k)}>
+            <b style={{ fontSize: 30 }}>{v}</b><span>{l}</span>{sub && <div className="hb-note" style={{ marginTop: 4, fontSize: 11 }}>{sub}</div>}
+          </button>
+        );
+        return (
+          <div className="hb-card" style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+              <div style={{ flex: 1, minWidth: 180 }}>
+                <div style={{ fontWeight: 800, fontSize: 18 }}>Outreach, {perWord}</div>
+                <div className="hb-note">Every channel in one place. Tap a number for the people, tap a channel to open it.</div>
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {ACQ_PERIODS.map(([k, l]) => <button key={k} className={`hb-chip ${per === k ? "on" : ""}`} onClick={() => pickPer(k)}>{l}</button>)}
+              </div>
+            </div>
+            <div className="aq-kpis" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", marginBottom: 14 }}>
+              <Big hot k="messaged" v={n(T.dms)} l="DMs sent" sub="first message to a new creator" />
+              <Big k="followups" v={n(T.fu)} l="Follow-ups" sub="to creators who did not answer yet" />
+              <Big k="replies" v={n(T.rep)} l="Replies" sub={`${pct(T.rep, T.dms)} of DMs answered`} />
+              <Big k="signed" v={n(T.signed)} l="Signed" sub="creators who signed, all time" />
+            </div>
+            <div style={{ overflowX: "auto", margin: "0 -4px" }}>
+              <div style={{ minWidth: 620 }}>
+                <div className="ad-row h"><span>Channel</span><span>New leads</span><span>DMs</span><span>Follow-ups</span><span>Replies</span><span>Reply rate</span><span>Talking</span><span>Signed</span></div>
+                {rows.map((r) => {
+                  const zero = !r.found && !r.dms && !r.fu && !r.rep && !r.talking && !r.signed;
+                  return (
+                    <div key={r.k} className="ad-row" style={{ opacity: zero ? 0.45 : 1 }} onClick={() => setSection(r.k)}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, minWidth: 0 }}>
+                        <i style={{ width: 9, height: 9, borderRadius: "50%", background: r.color, flexShrink: 0 }} />
+                        <span style={{ minWidth: 0 }}>
+                          <span style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.label}</span>
+                          {r.k === "xout" && xn && per === "today" && xLimit ? <span className="hb-note" style={{ display: "block", fontWeight: 500, fontSize: 11 }}>{n(r.dms)} of {xLimit} daily limit</span> : null}
+                        </span>
+                      </span>
+                      <span>{n(r.found)}</span><span>{n(r.dms)}</span><span>{n(r.fu)}</span><span style={{ color: r.rep ? "#a8f5c4" : undefined, fontWeight: r.rep ? 800 : 400 }}>{n(r.rep)}</span>
+                      <span>{r.dms ? pct(r.rep, r.dms) : ""}</span><span>{n(r.talking)}</span><span>{n(r.signed)}</span>
+                    </div>
+                  );
+                })}
+                <div className="ad-row t"><span>Total</span><span>{n(T.found)}</span><span>{n(T.dms)}</span><span>{n(T.fu)}</span><span>{n(T.rep)}</span><span>{T.dms ? pct(T.rep, T.dms) : ""}</span><span>{n(rows.reduce((a2, r) => a2 + r.talking, 0))}</span><span>{n(T.signed)}</span></div>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
+              {[["good", "Good new leads"], ["talking", "Talking now"], ["due", "Follow-ups due by you"]].map(([k, l]) => (
+                <button key={k} className={`hb-chip ${kpi === k ? "on" : ""}`} onClick={() => setKpi(kpi === k ? null : k)}>{l} <b style={{ marginLeft: 4 }}>{kpiLists[k].list.length}</b></button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
       {section === "overview" && !kpi && agency === "US" && (
         <div className="hb-card" style={{ marginBottom: 16, borderColor: "rgba(255,69,0,.45)", background: "linear-gradient(160deg, rgba(255,69,0,.10), #0e1310 55%)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
@@ -10408,6 +10527,22 @@ function AcquisitionPage() {
           <div style={{ fontWeight: 800, fontSize: 15, flex: 1 }}>{kpi ? `${kpiLists[kpi].title} (${kpiLists[kpi].list.length})` : "To do today, from every source"}</div>
           {kpi && <button className="hb-btn ghost sm" onClick={() => setKpi(null)}>Back to to do</button>}
         </div>
+      ) : null}
+      {section === "overview" && (kpi === "messaged" || kpi === "followups") && agency === "US" ? (
+        <div className="hb-card" style={{ marginBottom: 12 }}>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>{kpi === "followups" ? `Follow-ups, ${perWord}: ${kpiLists.followups.n.toLocaleString("en-US")}` : `DMs sent, ${perWord}: ${kpiLists.messaged.n.toLocaleString("en-US")}`}</div>
+          <div className="aq-row" style={{ gridTemplateColumns: "1fr auto", cursor: "pointer" }} onClick={() => setSection("xout")}>
+            <div><div style={{ fontWeight: 700 }}>X with XReacher</div><div className="hb-note">{xn ? (kpi === "followups" ? "second and third messages to creators who did not answer" : "first DM to a new creator") : "XReacher not connected"}</div></div>
+            <b style={{ fontVariantNumeric: "tabular-nums" }}>{xn ? (kpi === "followups" ? xn.followups : xn.contacted).toLocaleString("en-US") : 0}</b>
+          </div>
+          {kpi === "messaged" && <div className="aq-row" style={{ gridTemplateColumns: "1fr auto", cursor: "default" }}>
+            <div><div style={{ fontWeight: 700 }}>By hand in Zion</div><div className="hb-note">Instagram, Reddit and other leads marked as messaged, listed below</div></div>
+            <b style={{ fontVariantNumeric: "tabular-nums" }}>{handSent.length}</b>
+          </div>}
+        </div>
+      ) : null}
+      {section === "overview" ? (
+        <></>
       ) : section === "ongoing" ? (
         <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "4px 0 10px", flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 200 }}>
@@ -10424,7 +10559,7 @@ function AcquisitionPage() {
           ))}
         </div>
       )}
-      {section === "xout" && <XOutreachPanel />}
+      {section === "xout" && <XOutreachPanel leads={all.filter((l) => l.source === "x")} onOpenLead={setOpen} />}
       {section === "reddit" && (
         <div className="hb-card" style={{ marginBottom: 12, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 220 }}>

@@ -15970,6 +15970,12 @@ async function acqFn(body) {
 }
 const ACQ_STAGES = [["new", "New"], ["messaged", "Messaged"], ["replied", "Replied"], ["call", "Call"], ["signed", "Signed"], ["lost", "Not interested"], ["skip", "Skipped"]];
 const ACQ_CSS = `
+.ad-row{ display:grid; grid-template-columns:minmax(150px,1.6fr) repeat(7,minmax(56px,1fr)); gap:8px; align-items:center; padding:11px 10px; border-top:1px solid rgba(255,255,255,.05); font-variant-numeric:tabular-nums; cursor:pointer; border-radius:10px; transition:background .2s; font-size:13.5px; }
+.ad-row:hover{ background:rgba(255,255,255,.04); }
+.ad-row > span:not(:first-child){ text-align:right; }
+.ad-row.h{ border-top:0; cursor:default; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#6f8279; padding-bottom:4px; }
+.ad-row.h:hover, .ad-row.t:hover{ background:none; }
+.ad-row.t{ cursor:default; font-weight:800; border-top:1px solid rgba(255,255,255,.14); }
 .aq-top{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
 .aq-kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-bottom:16px; }
 .aq-kpi{ border-radius:16px; padding:13px; background:#0e1310; border:1px solid rgba(255,255,255,.08); }
@@ -17009,12 +17015,61 @@ const XR_CSS = `
   .xr-bars{ height:120px; gap:2px; }
 }
 `;
+function xrNums(d, per) {
+  const camps = d?.sync?.campaigns || [];
+  const sumC = (k, f) => camps.reduce((a, c) => a + ((c[k] || {})[f] || 0), 0);
+  const keys = Object.keys(d?.daily || {}).filter(k => k !== "_filled").sort();
+  const td = (d?.daily || {})[keys[keys.length - 1]];
+  if (per === "today") return {
+    contacted: td ? td.contacted : sumC("today", "contacted"),
+    followups: td ? td.followups : sumC("today", "followups"),
+    replies: td ? td.replies : sumC("today", "replies"),
+    follows: sumC("today", "follows"),
+    likes: sumC("today", "likes")
+  };
+  if (per === "all") {
+    const t = d?.sync?.totals || {};
+    return {
+      contacted: t.contacted || 0,
+      followups: t.followups || 0,
+      replies: t.replies || 0,
+      follows: camps.reduce((a, c) => a + (c.follows || 0), 0),
+      likes: camps.reduce((a, c) => a + (c.likes || 0), 0)
+    };
+  }
+  const k = per === "7" ? "week" : "month";
+  return {
+    contacted: sumC(k, "contacted"),
+    followups: sumC(k, "followups"),
+    replies: sumC(k, "replies"),
+    follows: sumC(k, "follows"),
+    likes: sumC(k, "likes")
+  };
+}
+const acqHerAt = l => {
+  if (l.replied_at) return Date.parse(l.replied_at);
+  const m = (Array.isArray(l.convo) ? l.convo : []).find(x => x.from === "her" && x.at);
+  return m ? Date.parse(m.at) : null;
+};
+const acqSince = per => {
+  if (per === "all") return 0;
+  if (per === "today") {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }
+  return Date.now() - Number(per) * 86400000;
+};
+const ACQ_PERIODS = [["today", "Today"], ["7", "Last 7 days"], ["30", "Last 30 days"], ["all", "All time"]];
 const xrClean = t => String(t || "").replace(/\s+[–—]\s+/g, ", ").replace(/[–—]/g, "-");
 const xrDay = k => new Date(`${k}T12:00:00`).toLocaleDateString("en-US", {
   month: "short",
   day: "numeric"
 });
-function XOutreachPanel() {
+function XOutreachPanel({
+  leads = [],
+  onOpenLead
+}) {
   const [d, setD] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -17025,6 +17080,7 @@ function XOutreachPanel() {
   const [inboxBusy, setInboxBusy] = useState(false);
   const [onlyReplied, setOnlyReplied] = useState(false);
   const [open, setOpen] = useState(null);
+  const [showReplies, setShowReplies] = useState(false);
   const load = () => xrFn({
     action: "stats"
   }).then(setD).catch(e => setErr(e.message));
@@ -17124,35 +17180,7 @@ function XOutreachPanel() {
   const dayKeys = Object.keys(daily).filter(k => k !== "_filled").sort();
   const todayKey = dayKeys[dayKeys.length - 1];
   const sumC = (k, f) => camps.reduce((a, c) => a + ((c[k] || {})[f] || 0), 0);
-  const P = (() => {
-    if (per === "today") {
-      const x = daily[todayKey] || {
-        contacted: sumC("today", "contacted"),
-        followups: sumC("today", "followups"),
-        replies: sumC("today", "replies")
-      };
-      return {
-        ...x,
-        follows: sumC("today", "follows"),
-        likes: sumC("today", "likes")
-      };
-    }
-    if (per === "all") return {
-      contacted: t.contacted,
-      followups: t.followups,
-      replies: t.replies,
-      follows: camps.reduce((a, c) => a + (c.follows || 0), 0),
-      likes: camps.reduce((a, c) => a + (c.likes || 0), 0)
-    };
-    const k = per === "7" ? "week" : "month";
-    return {
-      contacted: sumC(k, "contacted"),
-      followups: sumC(k, "followups"),
-      replies: sumC(k, "replies"),
-      follows: sumC(k, "follows"),
-      likes: sumC(k, "likes")
-    };
-  })();
+  const P = xrNums(d, per);
   const pct = (a, b) => b ? `${(Math.round(a / b * 1000) / 10).toLocaleString("en-US")}%` : "0%";
   const n = v => Number(v || 0).toLocaleString("en-US");
   const perLabel = {
@@ -17184,9 +17212,15 @@ function XOutreachPanel() {
     v,
     l,
     sub,
-    hot
+    hot,
+    on,
+    click
   }) => React.createElement("div", {
-    className: `aq-kpi${hot ? " hot" : ""}`
+    className: `aq-kpi${hot ? " hot" : ""}${on ? " on" : ""}`,
+    onClick: click,
+    style: click ? {
+      cursor: "pointer"
+    } : undefined
   }, React.createElement("b", null, v), React.createElement("span", null, l), sub && React.createElement("div", {
     className: "hb-note",
     style: {
@@ -17194,6 +17228,11 @@ function XOutreachPanel() {
       fontSize: 11
     }
   }, sub));
+  const since = acqSince(per);
+  const replied = leads.filter(l => {
+    const t = acqHerAt(l);
+    return t != null && t >= since;
+  }).sort((a, b) => acqHerAt(b) - acqHerAt(a));
   return React.createElement("div", {
     style: {
       marginBottom: 14
@@ -17326,21 +17365,23 @@ function XOutreachPanel() {
     }
   }, React.createElement(K, {
     hot: true,
-    v: n(P.contacted + P.followups),
-    l: "Messages sent",
-    sub: `${n(P.contacted)} first, ${n(P.followups)} follow-ups`
-  }), React.createElement(K, {
     v: n(P.contacted),
-    l: "Creators contacted",
-    sub: `new creators ${perLabel}`
+    l: "DMs sent",
+    sub: `first DM to a new creator ${perLabel}`
+  }), React.createElement(K, {
+    v: n(P.followups),
+    l: "Follow-ups",
+    sub: `to creators who did not answer yet; ${n(P.contacted + P.followups)} messages in total`
   }), React.createElement(K, {
     v: n(P.replies),
     l: "Replies",
-    sub: `creators who answered ${perLabel}`
+    on: showReplies,
+    click: () => setShowReplies(v => !v),
+    sub: showReplies ? "tap again to hide" : "tap to see who"
   }), React.createElement(K, {
     v: pct(P.replies, P.contacted),
     l: "Reply rate",
-    sub: `per creator; ${pct(P.replies, P.contacted + P.followups)} per message`
+    sub: `replies per DM; ${pct(P.replies, P.contacted + P.followups)} per message`
   }), React.createElement(K, {
     v: n(P.follows),
     l: "Follows",
@@ -17351,7 +17392,63 @@ function XOutreachPanel() {
       color: "#E2725B",
       marginTop: 8
     }
-  }, err)), days.length > 0 && React.createElement("div", {
+  }, err), showReplies && React.createElement("div", {
+    style: {
+      marginTop: 12,
+      borderTop: "1px solid rgba(255,255,255,.06)",
+      paddingTop: 8
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      margin: "4px 4px 6px"
+    }
+  }, "Who replied ", perLabel, " (", replied.length, ")"), replied.length === 0 && React.createElement("div", {
+    className: "hb-note",
+    style: {
+      padding: 4
+    }
+  }, P.replies ? "XReacher counts replies here, Zion is still finding out who they were. Check again in a few minutes." : "Nobody yet."), replied.map(l => React.createElement("div", {
+    key: l.id,
+    className: "xr-conv",
+    onClick: () => onOpenLead && onOpenLead(l.id)
+  }, React.createElement("div", {
+    className: "aq-ava",
+    style: {
+      width: 36,
+      height: 36,
+      fontSize: 13
+    }
+  }, (l.handle || "?").slice(0, 1).toUpperCase()), React.createElement("div", {
+    style: {
+      minWidth: 0
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis"
+    }
+  }, "@", l.handle, " ", React.createElement("span", {
+    className: "hb-note",
+    style: {
+      fontWeight: 500
+    }
+  }, xrClean(l.full_name))), React.createElement("div", {
+    className: "t"
+  }, "Replied ", new Date(acqHerAt(l)).toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  }), l.status && l.status !== "replied" ? `, now: ${l.status}` : "")), React.createElement("a", {
+    className: "hb-btn ghost sm",
+    href: `https://x.com/${l.handle}`,
+    target: "_blank",
+    rel: "noreferrer",
+    onClick: e => e.stopPropagation()
+  }, "X"))))), days.length > 0 && React.createElement("div", {
     className: "hb-card",
     style: {
       marginBottom: 12
@@ -17470,7 +17567,7 @@ function XOutreachPanel() {
     style: {
       fontWeight: 500
     }
-  }, "on ", inbox.handle, ", newest first") : null), React.createElement("button", {
+  }, "on ", inbox.handle, ", the newest 20") : null), React.createElement("button", {
     className: `hb-chip ${!onlyReplied ? "on" : ""}`,
     onClick: () => setOnlyReplied(false)
   }, "All"), React.createElement("button", {
@@ -17518,17 +17615,7 @@ function XOutreachPanel() {
       background: "#39e673",
       color: "#03110a"
     }
-  }, c.unread) : React.createElement("span", null))), inbox?.more && React.createElement("div", {
-    style: {
-      padding: 8
-    }
-  }, React.createElement("button", {
-    className: "hb-btn ghost sm",
-    disabled: inboxBusy,
-    onClick: () => loadInbox(true)
-  }, inboxBusy ? React.createElement(React.Fragment, null, React.createElement("span", {
-    className: "hb-spin"
-  }), "Loading") : "Load more")), inbox?.note && React.createElement("div", {
+  }, c.unread) : React.createElement("span", null))), inbox?.note && React.createElement("div", {
     className: "hb-note",
     style: {
       padding: "4px 8px 8px",
@@ -17799,7 +17886,7 @@ function XOverviewCard({
       fontWeight: 800,
       fontSize: 16
     }
-  }, "X outreach today: ", n(first + fu), " messages, ", n(rep), " ", rep === 1 ? "reply" : "replies"), React.createElement("div", {
+  }, "X outreach today: ", n(first), " DMs, ", n(fu), " follow-ups, ", n(rep), " ", rep === 1 ? "reply" : "replies"), React.createElement("div", {
     className: "hb-note"
   }, sy.at ? `XReacher, synced ${timeAgo(sy.at)}` : "XReacher")), React.createElement("button", {
     className: "hb-btn sm",
@@ -17848,7 +17935,7 @@ function XOverviewCard({
       fontSize: 11,
       marginTop: 5
     }
-  }, n(first), " first messages, ", n(fu), " follow-ups. Last 7 days: ", n(sumC("week", "contacted") + sumC("week", "followups")), " messages, ", n(sumC("week", "replies")), " replies.")), React.createElement("div", {
+  }, n(first), " DMs, ", n(fu), " follow-ups. Last 7 days: ", n(sumC("week", "contacted")), " DMs, ", n(sumC("week", "followups")), " follow-ups, ", n(sumC("week", "replies")), " replies.")), React.createElement("div", {
     title: "Messages per day, last 7 days",
     style: {
       display: "flex",
@@ -17882,6 +17969,25 @@ function AcquisitionPage() {
   const [cfg, setCfg] = useState(null);
   const [view, setView] = useState("active");
   const [kpi, setKpi] = useState(null);
+  const [per, setPer] = useState(() => {
+    try {
+      return localStorage.getItem("zionAcqPer") || "today";
+    } catch (e) {
+      return "today";
+    }
+  });
+  const pickPer = p => {
+    setPer(p);
+    try {
+      localStorage.setItem("zionAcqPer", p);
+    } catch (e) {}
+  };
+  const [xr, setXr] = useState(null);
+  useEffect(() => {
+    if (agency === "US") xrFn({
+      action: "stats"
+    }).then(setXr).catch(() => setXr(null));else setXr(null);
+  }, [agency]);
   const [queue, setQueue] = useState(null);
   const [section, setSectionRaw] = useState(() => {
     try {
@@ -18029,21 +18135,54 @@ function AcquisitionPage() {
   };
   const replyQueue = [...all.filter(l => l.source === "reddit" && l.unread && ["messaged", "replied", "call"].includes(l.status)), ...all.filter(l => l.source === "reddit" && l.status === "new" && (l.score || 0) >= 60).sort((a, b) => (b.score || 0) - (a.score || 0))].slice(0, 15);
   const startQueue = () => setQueue(replyQueue.map(l => l.id));
+  const since = acqSince(per);
+  const perWord = {
+    today: "today",
+    "7": "last 7 days",
+    "30": "last 30 days",
+    all: "all time"
+  }[per];
+  const xn = agency === "US" && xr && xr.connected ? xrNums(xr, per) : null;
+  const handSent = all.filter(l => l.source !== "x" && l.messaged_at && Date.parse(l.messaged_at) >= since);
+  const repliedIn = all.filter(l => {
+    const t = acqHerAt(l);
+    return t != null && t >= since;
+  }).sort((a, b) => acqHerAt(b) - acqHerAt(a));
+  const xRepliedIn = repliedIn.filter(l => l.source === "x").length;
   const kpiLists = {
     due: {
       title: "Follow-ups due",
       list: due
     },
-    good: {
-      title: agency === "CZ" ? "New leads" : "Good new leads",
-      list: agency === "CZ" ? fresh : fresh.filter(l => (l.score || 0) >= 50).sort((a, b) => (b.score || 0) - (a.score || 0))
+    good: agency === "CZ" ? {
+      title: "New leads",
+      list: fresh
+    } : {
+      title: "Good new leads",
+      sub: "Reddit qualified + replied on X",
+      list: [...all.filter(l => l.source === "x" && !["call", "signed", "lost", "skip"].includes(l.status)).sort((a, b) => (acqHerAt(b) || 0) - (acqHerAt(a) || 0)), ...fresh.filter(l => l.source === "reddit" && (l.score || 0) >= 50).sort((a, b) => (b.score || 0) - (a.score || 0))]
     },
-    messaged: {
-      title: agency === "CZ" ? "Leads this week" : "Messaged this week",
-      list: all.filter(l => {
-        const t = agency === "CZ" ? l.lead_at : l.messaged_at;
-        return t && now - Date.parse(t) < 7 * 86400000;
-      })
+    messaged: agency === "CZ" ? {
+      title: "New leads",
+      sub: perWord,
+      list: all.filter(l => l.lead_at && Date.parse(l.lead_at) >= since)
+    } : {
+      title: "DMs sent",
+      sub: perWord,
+      n: (xn ? xn.contacted : 0) + handSent.length,
+      list: handSent
+    },
+    followups: {
+      title: "Follow-ups",
+      sub: perWord,
+      n: xn ? xn.followups : 0,
+      list: []
+    },
+    replies: {
+      title: "Replies",
+      sub: perWord,
+      n: (xn ? Math.max(xn.replies, xRepliedIn) : xRepliedIn) + (repliedIn.length - xRepliedIn),
+      list: repliedIn
     },
     talking: {
       title: "Talking now",
@@ -18101,19 +18240,6 @@ function AcquisitionPage() {
   }, a, " agency")))), err && React.createElement("div", {
     className: "hb-err"
   }, err), React.createElement("div", {
-    className: "aq-kpis"
-  }, [["due", "hot"], ["good", ""], ["messaged", ""], ["talking", ""], ["signed", ""]].map(([k, cls]) => React.createElement("button", {
-    key: k,
-    className: `aq-kpi ${cls} ${kpi === k ? "on" : ""}`,
-    style: {
-      textAlign: "left",
-      cursor: "pointer"
-    },
-    onClick: () => {
-      setKpi(kpi === k ? null : k);
-      setSectionRaw("overview");
-    }
-  }, React.createElement("b", null, kpiLists[k].list.length), React.createElement("span", null, kpiLists[k].title)))), React.createElement("div", {
     className: "aq-nav"
   }, SECTIONS.map(([k, label, color]) => {
     const n = k === "plan" ? null : k === "overview" ? lists.todo.length : k === "ongoing" ? ongoing.length : all.filter(l => sectionOf(l) === k && !["signed", "lost", "skip"].includes(l.status)).length;
@@ -18151,9 +18277,212 @@ function AcquisitionPage() {
         display: n == null ? "none" : undefined
       }
     }, n));
-  })), section === "overview" && !kpi && agency === "US" && React.createElement(XOverviewCard, {
-    onOpen: () => setSection("xout")
-  }), section === "overview" && !kpi && agency === "US" && React.createElement("div", {
+  })), section === "overview" && (() => {
+    const n = v => Number(v || 0).toLocaleString("en-US");
+    const inP = t => t && Date.parse(t) >= since;
+    const meFollow = l => {
+      const c = (Array.isArray(l.convo) ? l.convo : []).filter(m => m.from === "me" && m.at && Date.parse(m.at) >= since).length;
+      return Math.max(0, c - (inP(l.messaged_at) ? 1 : 0));
+    };
+    const rows = SECTIONS.filter(([k]) => !["overview", "plan", "ongoing"].includes(k) && (agency === "US" || k !== "xout")).map(([k, label, color]) => {
+      const L = all.filter(l => sectionOf(l) === k);
+      const isX = k === "xout" && xn;
+      const repL = L.filter(l => {
+        const t = acqHerAt(l);
+        return t != null && t >= since;
+      }).length;
+      return {
+        k,
+        label: k === "xout" ? "X (XReacher)" : label,
+        color,
+        found: L.filter(l => inP(k === "meta" ? l.lead_at || l.created_at : l.created_at)).length,
+        dms: isX ? xn.contacted : L.filter(l => inP(l.messaged_at)).length,
+        fu: isX ? xn.followups : L.reduce((a2, l) => a2 + meFollow(l), 0),
+        rep: isX ? Math.max(xn.replies, repL) : repL,
+        talking: L.filter(l => ["replied", "call"].includes(l.status)).length,
+        signed: L.filter(l => l.status === "signed").length
+      };
+    });
+    const T = rows.reduce((t, r) => ({
+      dms: t.dms + r.dms,
+      fu: t.fu + r.fu,
+      rep: t.rep + r.rep,
+      signed: t.signed + r.signed,
+      found: t.found + r.found
+    }), {
+      dms: 0,
+      fu: 0,
+      rep: 0,
+      signed: 0,
+      found: 0
+    });
+    const pct = (a2, b2) => b2 ? `${(Math.round(a2 / b2 * 1000) / 10).toLocaleString("en-US")}%` : "0%";
+    const xLimit = (xr?.sync?.campaigns || []).filter(c => c.status === "active").reduce((a2, c) => a2 + (c.daily_limit || 0), 0);
+    const Big = ({
+      k,
+      v,
+      l,
+      sub,
+      hot
+    }) => React.createElement("button", {
+      className: `aq-kpi ${hot ? "hot" : ""} ${kpi === k ? "on" : ""}`,
+      style: {
+        textAlign: "left",
+        cursor: "pointer"
+      },
+      onClick: () => setKpi(kpi === k ? null : k)
+    }, React.createElement("b", {
+      style: {
+        fontSize: 30
+      }
+    }, v), React.createElement("span", null, l), sub && React.createElement("div", {
+      className: "hb-note",
+      style: {
+        marginTop: 4,
+        fontSize: 11
+      }
+    }, sub));
+    return React.createElement("div", {
+      className: "hb-card",
+      style: {
+        marginBottom: 16
+      }
+    }, React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        flexWrap: "wrap",
+        marginBottom: 14
+      }
+    }, React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 180
+      }
+    }, React.createElement("div", {
+      style: {
+        fontWeight: 800,
+        fontSize: 18
+      }
+    }, "Outreach, ", perWord), React.createElement("div", {
+      className: "hb-note"
+    }, "Every channel in one place. Tap a number for the people, tap a channel to open it.")), React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 6,
+        flexWrap: "wrap"
+      }
+    }, ACQ_PERIODS.map(([k, l]) => React.createElement("button", {
+      key: k,
+      className: `hb-chip ${per === k ? "on" : ""}`,
+      onClick: () => pickPer(k)
+    }, l)))), React.createElement("div", {
+      className: "aq-kpis",
+      style: {
+        gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
+        marginBottom: 14
+      }
+    }, React.createElement(Big, {
+      hot: true,
+      k: "messaged",
+      v: n(T.dms),
+      l: "DMs sent",
+      sub: "first message to a new creator"
+    }), React.createElement(Big, {
+      k: "followups",
+      v: n(T.fu),
+      l: "Follow-ups",
+      sub: "to creators who did not answer yet"
+    }), React.createElement(Big, {
+      k: "replies",
+      v: n(T.rep),
+      l: "Replies",
+      sub: `${pct(T.rep, T.dms)} of DMs answered`
+    }), React.createElement(Big, {
+      k: "signed",
+      v: n(T.signed),
+      l: "Signed",
+      sub: "creators who signed, all time"
+    })), React.createElement("div", {
+      style: {
+        overflowX: "auto",
+        margin: "0 -4px"
+      }
+    }, React.createElement("div", {
+      style: {
+        minWidth: 620
+      }
+    }, React.createElement("div", {
+      className: "ad-row h"
+    }, React.createElement("span", null, "Channel"), React.createElement("span", null, "New leads"), React.createElement("span", null, "DMs"), React.createElement("span", null, "Follow-ups"), React.createElement("span", null, "Replies"), React.createElement("span", null, "Reply rate"), React.createElement("span", null, "Talking"), React.createElement("span", null, "Signed")), rows.map(r => {
+      const zero = !r.found && !r.dms && !r.fu && !r.rep && !r.talking && !r.signed;
+      return React.createElement("div", {
+        key: r.k,
+        className: "ad-row",
+        style: {
+          opacity: zero ? 0.45 : 1
+        },
+        onClick: () => setSection(r.k)
+      }, React.createElement("span", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          fontWeight: 700,
+          minWidth: 0
+        }
+      }, React.createElement("i", {
+        style: {
+          width: 9,
+          height: 9,
+          borderRadius: "50%",
+          background: r.color,
+          flexShrink: 0
+        }
+      }), React.createElement("span", {
+        style: {
+          minWidth: 0
+        }
+      }, React.createElement("span", {
+        style: {
+          display: "block",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis"
+        }
+      }, r.label), r.k === "xout" && xn && per === "today" && xLimit ? React.createElement("span", {
+        className: "hb-note",
+        style: {
+          display: "block",
+          fontWeight: 500,
+          fontSize: 11
+        }
+      }, n(r.dms), " of ", xLimit, " daily limit") : null)), React.createElement("span", null, n(r.found)), React.createElement("span", null, n(r.dms)), React.createElement("span", null, n(r.fu)), React.createElement("span", {
+        style: {
+          color: r.rep ? "#a8f5c4" : undefined,
+          fontWeight: r.rep ? 800 : 400
+        }
+      }, n(r.rep)), React.createElement("span", null, r.dms ? pct(r.rep, r.dms) : ""), React.createElement("span", null, n(r.talking)), React.createElement("span", null, n(r.signed)));
+    }), React.createElement("div", {
+      className: "ad-row t"
+    }, React.createElement("span", null, "Total"), React.createElement("span", null, n(T.found)), React.createElement("span", null, n(T.dms)), React.createElement("span", null, n(T.fu)), React.createElement("span", null, n(T.rep)), React.createElement("span", null, T.dms ? pct(T.rep, T.dms) : ""), React.createElement("span", null, n(rows.reduce((a2, r) => a2 + r.talking, 0))), React.createElement("span", null, n(T.signed))))), React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        flexWrap: "wrap",
+        marginTop: 14
+      }
+    }, [["good", "Good new leads"], ["talking", "Talking now"], ["due", "Follow-ups due by you"]].map(([k, l]) => React.createElement("button", {
+      key: k,
+      className: `hb-chip ${kpi === k ? "on" : ""}`,
+      onClick: () => setKpi(kpi === k ? null : k)
+    }, l, " ", React.createElement("b", {
+      style: {
+        marginLeft: 4
+      }
+    }, kpiLists[k].list.length)))));
+  })(), section === "overview" && !kpi && agency === "US" && React.createElement("div", {
     className: "hb-card",
     style: {
       marginBottom: 16,
@@ -18507,7 +18836,50 @@ function AcquisitionPage() {
   }, kpi ? `${kpiLists[kpi].title} (${kpiLists[kpi].list.length})` : "To do today, from every source"), kpi && React.createElement("button", {
     className: "hb-btn ghost sm",
     onClick: () => setKpi(null)
-  }, "Back to to do")) : section === "ongoing" ? React.createElement("div", {
+  }, "Back to to do")) : null, section === "overview" && (kpi === "messaged" || kpi === "followups") && agency === "US" ? React.createElement("div", {
+    className: "hb-card",
+    style: {
+      marginBottom: 12
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      marginBottom: 8
+    }
+  }, kpi === "followups" ? `Follow-ups, ${perWord}: ${kpiLists.followups.n.toLocaleString("en-US")}` : `DMs sent, ${perWord}: ${kpiLists.messaged.n.toLocaleString("en-US")}`), React.createElement("div", {
+    className: "aq-row",
+    style: {
+      gridTemplateColumns: "1fr auto",
+      cursor: "pointer"
+    },
+    onClick: () => setSection("xout")
+  }, React.createElement("div", null, React.createElement("div", {
+    style: {
+      fontWeight: 700
+    }
+  }, "X with XReacher"), React.createElement("div", {
+    className: "hb-note"
+  }, xn ? kpi === "followups" ? "second and third messages to creators who did not answer" : "first DM to a new creator" : "XReacher not connected")), React.createElement("b", {
+    style: {
+      fontVariantNumeric: "tabular-nums"
+    }
+  }, xn ? (kpi === "followups" ? xn.followups : xn.contacted).toLocaleString("en-US") : 0)), kpi === "messaged" && React.createElement("div", {
+    className: "aq-row",
+    style: {
+      gridTemplateColumns: "1fr auto",
+      cursor: "default"
+    }
+  }, React.createElement("div", null, React.createElement("div", {
+    style: {
+      fontWeight: 700
+    }
+  }, "By hand in Zion"), React.createElement("div", {
+    className: "hb-note"
+  }, "Instagram, Reddit and other leads marked as messaged, listed below")), React.createElement("b", {
+    style: {
+      fontVariantNumeric: "tabular-nums"
+    }
+  }, handSent.length))) : null, section === "overview" ? React.createElement(React.Fragment, null) : section === "ongoing" ? React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -18551,7 +18923,10 @@ function AcquisitionPage() {
     key: k,
     className: `hb-chip ${view === k ? "on" : ""}`,
     onClick: () => setView(k)
-  }, l))), section === "xout" && React.createElement(XOutreachPanel, null), section === "reddit" && React.createElement("div", {
+  }, l))), section === "xout" && React.createElement(XOutreachPanel, {
+    leads: all.filter(l => l.source === "x"),
+    onOpenLead: setOpen
+  }), section === "reddit" && React.createElement("div", {
     className: "hb-card",
     style: {
       marginBottom: 12,
@@ -32852,7 +33227,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">g9icys</script>
+<script type="text/babel" id="zion-version">1txib4v</script>
 <script>
 (function () {
   var last = 0;
