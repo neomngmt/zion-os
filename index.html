@@ -1082,6 +1082,7 @@ html[data-zpage="chatters"]{ --z-h1:#f0be3c; --z-h2:#39e673; --z-h3:#ff7a45; --z
 html[data-zpage="tasks"], html[data-zpage="calendar"]{ --z-h1:#38bdf8; --z-h2:#a78bfa; --z-h3:#39e673; --z-h4:#ff5db1; }
 html[data-zpage="models"], html[data-zpage="settings"]{ --z-h1:#a78bfa; --z-h2:#38bdf8; --z-h3:#ff5db1; --z-h4:#39e673; }
 html[data-zpage="x"], html[data-zpage="tiktok"], html[data-zpage="threads"], html[data-zpage="snap"], html[data-zpage="fb"], html[data-zpage="content"], html[data-zpage="titlegen"]{ --z-h1:#38bdf8; --z-h2:#ff5db1; --z-h3:#f0be3c; --z-h4:#a78bfa; }
+html[data-zrole="creator"][data-zpage]{ --z-h1:#ff5db1; --z-h2:#f0be3c; --z-h3:#a78bfa; --z-h4:#38bdf8; --z-h5:#ff7a45; }
 html[data-zpage="editor"]{ --z-h1:#c6f432; --z-h2:#38bdf8; --z-h3:#a78bfa; --z-h4:#ff5db1; }
 
 body{ background-color:#05070a !important; }
@@ -14986,15 +14987,21 @@ function RevenueChart({
     y2: "1"
   }, React.createElement("stop", {
     offset: "0%",
-    stopColor: "#39e673",
-    stopOpacity: "0.32"
+    style: {
+      stopColor: "var(--z-h1, #39e673)"
+    },
+    stopOpacity: "0.34"
   }), React.createElement("stop", {
     offset: "60%",
-    stopColor: "#39e673",
-    stopOpacity: "0.07"
+    style: {
+      stopColor: "var(--z-h3, #39e673)"
+    },
+    stopOpacity: "0.08"
   }), React.createElement("stop", {
     offset: "100%",
-    stopColor: "#39e673",
+    style: {
+      stopColor: "var(--z-h3, #39e673)"
+    },
     stopOpacity: "0"
   })), React.createElement("linearGradient", {
     id: "rcCol",
@@ -15004,12 +15011,38 @@ function RevenueChart({
     y2: "1"
   }, React.createElement("stop", {
     offset: "0%",
-    stopColor: "#39e673",
-    stopOpacity: "0.55"
+    style: {
+      stopColor: "var(--z-h1, #39e673)"
+    },
+    stopOpacity: "0.6"
   }), React.createElement("stop", {
     offset: "100%",
-    stopColor: "#39e673",
-    stopOpacity: "0.05"
+    style: {
+      stopColor: "var(--z-h3, #39e673)"
+    },
+    stopOpacity: "0.06"
+  })), React.createElement("linearGradient", {
+    id: "rcLine",
+    gradientUnits: "userSpaceOnUse",
+    x1: padLeft,
+    y1: "0",
+    x2: width - padRight,
+    y2: "0"
+  }, React.createElement("stop", {
+    offset: "0%",
+    style: {
+      stopColor: "var(--z-h2, #39e673)"
+    }
+  }), React.createElement("stop", {
+    offset: "50%",
+    style: {
+      stopColor: "var(--z-h1, #39e673)"
+    }
+  }), React.createElement("stop", {
+    offset: "100%",
+    style: {
+      stopColor: "var(--z-h3, #39e673)"
+    }
   })), React.createElement("filter", {
     id: "rcGlow",
     x: "-20%",
@@ -15058,8 +15091,8 @@ function RevenueChart({
   }), React.createElement("path", {
     d: path,
     fill: "none",
-    stroke: "#39e673",
-    strokeOpacity: "0.45",
+    stroke: "url(#rcLine)",
+    strokeOpacity: "0.5",
     strokeWidth: "6",
     filter: "url(#rcGlow)"
   }), React.createElement("path", {
@@ -15067,7 +15100,7 @@ function RevenueChart({
     d: path,
     pathLength: "1",
     fill: "none",
-    stroke: "#39e673",
+    stroke: "url(#rcLine)",
     strokeWidth: small ? 2.2 : 2.6,
     strokeLinecap: "round",
     strokeLinejoin: "round"
@@ -15078,7 +15111,9 @@ function RevenueChart({
     cy: p.y,
     r: "3",
     fill: "#0b0f0d",
-    stroke: "#39e673",
+    style: {
+      stroke: "var(--z-h1, #39e673)"
+    },
     strokeWidth: "1.8"
   })), last && !isSparse && React.createElement("g", {
     className: "rc-end"
@@ -15087,12 +15122,16 @@ function RevenueChart({
     cx: last.x,
     cy: last.y,
     r: "4",
-    fill: "#39e673"
+    style: {
+      fill: "var(--z-h3, #39e673)"
+    }
   }), React.createElement("circle", {
     cx: last.x,
     cy: last.y,
     r: "4.5",
-    fill: "#39e673",
+    style: {
+      fill: "var(--z-h3, #39e673)"
+    },
     stroke: "#0b0f0d",
     strokeWidth: "2"
   })), labels.map(({
@@ -26450,6 +26489,33 @@ function InflowwRevenueCard({
     value: sumInfloww(rangeRows, "subsCount")
   }), " subs")));
 }
+const CM_CSS = `
+.cm-hero{ position:relative; overflow:hidden; border-radius:26px; padding:24px 24px 20px; border:1px solid rgba(255,255,255,.08);
+  background:radial-gradient(90% 120% at 0% 0%, color-mix(in srgb, var(--z-h1) 22%, transparent), transparent 60%), radial-gradient(80% 120% at 100% 0%, color-mix(in srgb, var(--z-h3) 22%, transparent), transparent 60%), radial-gradient(70% 90% at 100% 100%, color-mix(in srgb, var(--z-h2) 14%, transparent), transparent 60%), var(--z-card); }
+.cm-kick{ display:flex; align-items:center; gap:8px; font-family:'JetBrains Mono', ui-monospace, monospace; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:#c9c3d6; }
+.cm-dot{ width:7px; height:7px; border-radius:50%; background:var(--z-h1); box-shadow:0 0 12px var(--z-h1); }
+.cm-big{ font-size:52px; line-height:1; font-weight:900; letter-spacing:-.03em; font-variant-numeric:tabular-nums; background:linear-gradient(100deg, var(--z-h2), var(--z-h1) 50%, var(--z-h3)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.cm-pill{ font-size:12px; font-weight:600; padding:5px 11px; border-radius:999px; color:#fff; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); }
+.cm-sub{ margin-top:10px; font-size:13.5px; color:#c4c9d0; }
+.cm-sub b{ color:#fff; }
+.cm-meta{ font-family:'JetBrains Mono', ui-monospace, monospace; font-size:11px; color:#aab0b8; }
+.cm-meta b{ color:#fff; margin-left:6px; }
+.cm-goal{ height:12px; border-radius:999px; background:rgba(255,255,255,.07); overflow:visible; }
+.cm-goal span{ position:relative; display:block; height:100%; border-radius:999px; background:linear-gradient(90deg, var(--z-h2), var(--z-h1) 55%, var(--z-h3)); box-shadow:0 0 20px -2px color-mix(in srgb, var(--z-h1) 70%, transparent); transition:width 1s cubic-bezier(.2,.8,.2,1); }
+.cm-goal i{ position:absolute; right:-2px; top:50%; width:16px; height:16px; margin-top:-8px; border-radius:50%; background:#fff; box-shadow:0 0 0 4px color-mix(in srgb, var(--z-h3) 45%, transparent), 0 0 18px var(--z-h3); }
+.cm-card{ position:relative; overflow:hidden; border-radius:22px; padding:20px; background:var(--z-card); border:1px solid color-mix(in srgb, var(--c, #ffffff) 22%, transparent); transition:transform .25s, border-color .25s; }
+.cm-card::before{ content:""; position:absolute; inset:0; pointer-events:none; background:radial-gradient(80% 90% at 100% 0%, color-mix(in srgb, var(--c, #fff) 16%, transparent), transparent 65%); }
+.cm-card:hover{ transform:translateY(-2px); border-color:color-mix(in srgb, var(--c, #fff) 45%, transparent); }
+.cm-card > *{ position:relative; }
+.cm-label{ font-family:'JetBrains Mono', ui-monospace, monospace; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--c, #aab0b8); }
+.cm-num{ font-size:28px; font-weight:900; letter-spacing:-.02em; color:#fff; font-variant-numeric:tabular-nums; }
+.cm-row{ display:flex; align-items:center; gap:10px; padding:8px 0; font-size:13px; color:#eef0f3; border-bottom:1px solid rgba(255,255,255,.05); }
+.cm-row:last-child{ border-bottom:0; }
+.cm-row-name{ flex:1; min-width:0; word-break:break-word; }
+.cm-ava{ width:28px; height:28px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; color:#140a12; }
+.cm-crown{ background:radial-gradient(90% 120% at 100% 0%, rgba(240,190,60,.22), transparent 60%), var(--z-card); }
+@media (max-width:640px){ .cm-hero{ padding:20px 18px 18px; } .cm-big{ font-size:42px; } }
+`;
 function CreatorMoney({
   model,
   record,
@@ -26576,43 +26642,41 @@ function CreatorMoney({
   const myShare = sharePct != null ? monthNet * sharePct / 100 : null;
   const goal = record && record.monthlyGoal ? Number(record.monthlyGoal) : null;
   const goalPct = goal ? Math.min(100, Math.round(monthNet / goal * 100)) : 0;
-  const card = "c-bg-surface border c-border rounded-xl p-5";
-  const label = "fs-11 uppercase tracking-widest c-muted font-mono";
+  const card = "cm-card";
+  const label = "cm-label";
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const maxDay = ins ? Math.max(1, ...(ins.weekdays || [0])) : 1;
   return React.createElement("div", {
-    className: "mb-6"
+    className: "mb-6 cm"
+  }, React.createElement("style", null, CM_CSS), React.createElement("div", {
+    className: "cm-hero mb-3"
   }, React.createElement("div", {
-    className: `${card} mb-3`
-  }, React.createElement("div", {
-    className: label
-  }, "My money this month"), React.createElement("div", {
-    className: "flex items-baseline gap-2 mt-2 flex-wrap"
+    className: "cm-kick"
   }, React.createElement("span", {
-    className: "text-3xl font-extrabold c-accent"
+    className: "cm-dot"
+  }), "Hi ", model, ", your month so far"), React.createElement("div", {
+    className: "flex items-baseline gap-3 mt-3 flex-wrap"
+  }, React.createElement("span", {
+    className: "cm-big"
   }, money(myShare != null ? myShare : monthNet)), React.createElement("span", {
-    className: "fs-12 c-muted"
-  }, myShare != null ? `your share (${sharePct}%)` : "net revenue")), React.createElement("div", {
-    className: "fs-12 c-muted mt-1"
-  }, "Net revenue ", money(monthNet), " so far, on pace for ", money(pace), " by the end of the month."), goal ? React.createElement("div", {
+    className: "cm-pill"
+  }, myShare != null ? `your share, ${sharePct}%` : "net revenue")), React.createElement("div", {
+    className: "cm-sub"
+  }, "Net revenue ", money(monthNet), " so far, on pace for ", React.createElement("b", null, money(pace)), " by the end of the month."), goal ? React.createElement("div", {
     className: "mt-4"
   }, React.createElement("div", {
-    className: "flex justify-between fs-11 font-mono c-muted mb-1.5"
-  }, React.createElement("span", null, "Monthly goal"), React.createElement("span", null, money(monthNet), " / ", money(goal), " (", goalPct, "%)")), React.createElement("div", {
+    className: "flex justify-between cm-meta mb-2"
+  }, React.createElement("span", null, "Monthly goal"), React.createElement("span", null, money(monthNet), " / ", money(goal), " ", React.createElement("b", null, goalPct, "%"))), React.createElement("div", {
+    className: "cm-goal"
+  }, React.createElement("span", {
     style: {
-      height: 8,
-      borderRadius: 6,
-      background: "rgba(255,255,255,0.07)",
-      overflow: "hidden"
+      width: `${Math.max(3, goalPct)}%`
     }
-  }, React.createElement("div", {
+  }, React.createElement("i", null))), monthNet >= goal && React.createElement("div", {
+    className: "cm-meta mt-2",
     style: {
-      width: `${goalPct}%`,
-      height: "100%",
-      background: "linear-gradient(90deg,#12b34c,#39e673)"
+      color: "var(--z-h2)"
     }
-  })), monthNet >= goal && React.createElement("div", {
-    className: "fs-11 font-mono c-accent mt-2"
   }, "Goal reached, great month!"), record && record.goalAuto && record.goalNote && React.createElement("div", {
     className: "fs-11 c-muted mt-2"
   }, record.goalNote, " ", React.createElement("span", {
@@ -26622,13 +26686,16 @@ function CreatorMoney({
   }, "Extra insights are not available right now."), ins && ins.connected && React.createElement("div", {
     className: "grid grid-cols-1 md:grid-cols-2 gap-3"
   }, ins.payout && React.createElement("div", {
-    className: card
+    className: card,
+    style: {
+      "--c": "#f0be3c"
+    }
   }, React.createElement("div", {
     className: label
   }, "At OnlyFans now"), React.createElement("div", {
     className: "flex items-baseline gap-2 mt-2"
   }, React.createElement("span", {
-    className: "text-2xl font-extrabold c-text"
+    className: "cm-num"
   }, money(ins.payout.available + ins.payout.pending)), React.createElement("span", {
     className: "fs-12 c-muted"
   }, "paid out to you by OnlyFans")), React.createElement("div", {
@@ -26638,40 +26705,49 @@ function CreatorMoney({
   }, "You keep about ", money((ins.payout.available + ins.payout.pending) * sharePct / 100), ". Your manager sends you an invoice for the agency share (about ", money((ins.payout.available + ins.payout.pending) * (100 - sharePct) / 100), ") after the payout reaches you."), React.createElement("div", {
     className: "fs-10 c-faint font-mono mt-2"
   }, "Estimate from your current balance, the invoice is the exact amount.")), monthNet > 0 && React.createElement("div", {
-    className: card
+    className: card,
+    style: {
+      "--c": "#ff5db1"
+    }
   }, React.createElement("div", {
     className: label
   }, "Your next goal"), React.createElement("div", {
     className: "fs-15 c-text mt-2"
   }, "Reach ", React.createElement("span", {
-    className: "text-2xl font-extrabold c-accent"
+    className: "cm-num",
+    style: {
+      color: "var(--c)"
+    }
   }, money(Math.ceil(monthNet * 1.2 / 50) * 50)), " net this month."), React.createElement("div", {
     className: "fs-12 c-muted mt-1"
   }, "That is 20% more than you are at now.")), (() => {
     const fi = fanRange === 7 && ins7 && ins7.connected ? ins7 : ins;
     return fi.topFans && fi.topFans.length > 0 ? React.createElement("div", {
-      className: card
+      className: card,
+      style: {
+        "--c": "#a78bfa"
+      }
     }, React.createElement("div", {
       className: label
     }, "Top fans, last ", fi === ins7 ? 7 : 30, " days"), React.createElement("div", {
       className: "mt-2"
-    }, fi.topFans.map(f => React.createElement("div", {
+    }, fi.topFans.map((f, i) => React.createElement("div", {
       key: f.label,
-      className: "flex items-center justify-between py-1.5 fs-12 c-text",
-      style: {
-        borderBottom: "1px solid rgba(255,255,255,0.05)"
-      }
+      className: "cm-row"
     }, React.createElement("span", {
+      className: "cm-ava",
       style: {
-        wordBreak: "break-word"
+        background: ["linear-gradient(135deg,#f0be3c,#ff7a45)", "linear-gradient(135deg,#ff5db1,#a78bfa)", "linear-gradient(135deg,#a78bfa,#38bdf8)", "linear-gradient(135deg,#38bdf8,#39e673)", "linear-gradient(135deg,#39e673,#f0be3c)"][i % 5]
       }
+    }, String(f.label || "?").charAt(0).toUpperCase()), React.createElement("span", {
+      className: "cm-row-name"
     }, f.label, " ", React.createElement("span", {
       className: "c-faint fs-10 font-mono"
     }, f.count, "x")), React.createElement("span", {
       className: "font-mono"
     }, money(f.net), " ", React.createElement("span", {
       className: "c-faint"
-    }, "(", f.sharePct, "%)"))))), React.createElement("div", {
+    }, f.sharePct, "%"))))), React.createElement("div", {
       className: "fs-11 c-muted mt-2"
     }, "Your top 5 fans bring ", fi.top5SharePct, "% of your income. Keep them happy.")) : fanRange === 7 ? React.createElement("div", {
       className: card
@@ -26681,24 +26757,24 @@ function CreatorMoney({
       className: "fs-12 c-muted mt-2"
     }, "No purchases in the last 7 days yet.")) : null;
   })(), topFan && topFan.topFanAllTime && React.createElement("div", {
-    className: card,
+    className: `${card} cm-crown`,
     style: {
-      borderColor: "rgba(240,190,60,0.45)"
+      "--c": "#f0be3c"
     }
   }, React.createElement("div", {
-    className: label,
-    style: {
-      color: "#f0be3c"
-    }
+    className: label
   }, "Top fan all time"), React.createElement("div", {
     className: "flex items-baseline gap-2 mt-2 flex-wrap"
   }, React.createElement("span", {
-    className: "text-2xl font-extrabold c-text",
+    className: "cm-num",
     style: {
       wordBreak: "break-word"
     }
   }, topFan.topFanAllTime.name)), React.createElement("div", {
-    className: "fs-13 c-accent font-extrabold mt-1"
+    className: "fs-14 font-extrabold mt-1",
+    style: {
+      color: "var(--c)"
+    }
   }, money(topFan.topFanAllTime.net), " spent"), React.createElement("div", {
     className: "fs-12 c-muted mt-1"
   }, topFan.topFanAllTime.count, " purchases", topFan.topFanAllTime.first ? `, since ${new Date(topFan.topFanAllTime.first).toLocaleDateString(undefined, {
@@ -26707,18 +26783,20 @@ function CreatorMoney({
   })}` : ""), React.createElement("div", {
     className: "fs-10 c-faint font-mono mt-2"
   }, "Counted from the start of your sales with us", topFan.partial ? " (very long history, may be incomplete)" : "", ".")), ins.chatters && ins.chatters.length > 0 && React.createElement("div", {
-    className: card
+    className: card,
+    style: {
+      "--c": "#38bdf8"
+    }
   }, React.createElement("div", {
     className: label
   }, "Chatters on your page"), React.createElement("div", {
     className: "mt-2"
   }, ins.chatters.map(c => React.createElement("div", {
     key: c.name,
-    className: "flex items-center justify-between py-1.5 fs-12 c-text",
-    style: {
-      borderBottom: "1px solid rgba(255,255,255,0.05)"
-    }
-  }, React.createElement("span", null, c.name), React.createElement("span", {
+    className: "cm-row"
+  }, React.createElement("span", {
+    className: "cm-row-name"
+  }, c.name), React.createElement("span", {
     className: "font-mono"
   }, money(c.net), " ", React.createElement("span", {
     className: "c-faint fs-10"
@@ -31006,6 +31084,7 @@ function App() {
   const currentView = view || "dashboard";
   try {
     document.documentElement.dataset.zpage = currentView;
+    document.documentElement.dataset.zrole = session.role || "";
   } catch (e) {}
   const scopedPersistCards = isAdmin ? async next => persistCards([...cards.filter(c => !agencyModelNameSet.has(c.model)), ...next]) : persistCards;
   const scopedPersistTasks = isAdmin ? async next => persistTasks([...tasks.filter(t => !agencyModelNameSet.has(t.model)), ...next]) : persistTasks;
@@ -31447,7 +31526,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">nio90i</script>
+<script type="text/babel" id="zion-version">gfxc6q</script>
 <script>
 (function () {
   var last = 0;
