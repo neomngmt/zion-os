@@ -15600,8 +15600,8 @@ const ACQ_CSS = `
 .aq-tag.ofm{ color:#ffcf8a; background:rgba(255,170,60,.12); }
 .aq-tag.ag{ color:#ff8a6b; background:rgba(255,120,90,.12); }
 .aq-tag.fu{ color:#03110a; background:#39e673; }
-.aq-sheet{ position:fixed; inset:0; z-index:60; display:flex; justify-content:flex-end; background:rgba(2,6,4,.6); backdrop-filter:blur(6px); }
-.aq-panel{ width:min(520px,100%); height:100%; overflow:auto; -webkit-overflow-scrolling:touch; background:#0b100d; border-left:1px solid rgba(57,230,115,.25); padding:0 22px calc(22px + env(safe-area-inset-bottom)); animation:hbIn .35s cubic-bezier(.16,1,.3,1) both; }
+.aq-sheet{ position:fixed; inset:0; z-index:200; height:100dvh; overflow:hidden; touch-action:pan-y; display:flex; justify-content:flex-end; background:rgba(2,6,4,.6); backdrop-filter:blur(6px); }
+.aq-panel{ width:min(520px,100%); max-width:100vw; height:100%; overflow-y:auto; overflow-x:hidden; overflow-wrap:anywhere; overscroll-behavior:contain; touch-action:pan-y; -webkit-overflow-scrolling:touch; background:#0b100d; border-left:1px solid rgba(57,230,115,.25); padding:0 22px calc(22px + env(safe-area-inset-bottom)); animation:hbIn .35s cubic-bezier(.16,1,.3,1) both; }
 .aq-stage{ display:flex; gap:6px; flex-wrap:wrap; margin:12px 0; }
 .aq-note2{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .aq-nav{ display:flex; gap:8px; overflow-x:auto; margin-bottom:16px; padding-bottom:2px; scroll-snap-type:x proximity; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
@@ -16554,6 +16554,13 @@ function AcqLeadSheet({
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
   }, [onClose]);
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
   const [busy, setBusy] = useState("");
   const [notes, setNotes] = useState(lead.notes || "");
   const [copied, setCopied] = useState("");
@@ -16577,7 +16584,7 @@ function AcqLeadSheet({
     } catch (e) {}
   };
   const igUrl = lead.contact_name ? undefined : lead.followers != null || !/\./.test(lead.handle) ? `https://www.instagram.com/${lead.handle}/` : lead.source_detail;
-  return React.createElement("div", {
+  return ReactDOM.createPortal(React.createElement("div", {
     className: "aq-sheet",
     onClick: onClose
   }, React.createElement("div", {
@@ -16938,7 +16945,7 @@ function AcqLeadSheet({
       } catch (e) {}
       onDeleted();
     }
-  }, "Delete lead"))));
+  }, "Delete lead")))), document.body);
 }
 async function oopsieFn(body) {
   let token = "";
@@ -29217,7 +29224,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">f03pqp</script>
+<script type="text/babel" id="zion-version">17nuum8</script>
 <script>
 (function () {
   var last = 0;
