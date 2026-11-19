@@ -13605,7 +13605,7 @@ function NeoBootSequence({ onDone }) {
 // ---- Neo chat: type like a normal chat, confirm the actions Neo prepares, pick the voice ----
 const NEO_VOICES = [["cedar", "Cedar, calm male"], ["ash", "Ash, warm male"], ["ballad", "Ballad, soft male"], ["echo", "Echo, clear male"], ["onyx", "Onyx, deep male (old)"], ["verse", "Verse, lively male"],
   ["marin", "Marin, natural female"], ["coral", "Coral, friendly female"], ["sage", "Sage, calm female"], ["nova", "Nova, bright female"], ["shimmer", "Shimmer, soft female"], ["alloy", "Alloy, neutral"], ["fable", "Fable, storyteller"]];
-const neoVoice = () => { try { return localStorage.getItem("zionNeoVoice") || "cedar"; } catch (e) { return "cedar"; } };
+const neoVoice = () => { try { return localStorage.getItem("zionNeoVoice2") || "verse"; } catch (e) { return "verse"; } };
 function NeoChat({ messages, setMessages, thinking, onSend, canAct, compact }) {
   const [text, setText] = useState("");
   const [voice, setVoice] = useState(neoVoice());
@@ -13662,7 +13662,7 @@ function NeoChat({ messages, setMessages, thinking, onSend, canAct, compact }) {
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: `1px solid ${C.line}`, flexWrap: "wrap" }}>
         <span style={{ color: C.g, fontWeight: 700, letterSpacing: "2px", fontSize: 11 }}>CHAT WITH NEO</span>
         <span style={{ color: C.dim, fontSize: 11, flex: 1, minWidth: 120 }}>{canAct ? "Ask anything or tell him what to do. Changes wait for your OK." : "Ask about your numbers."}</span>
-        <select value={voice} onChange={(e) => { setVoice(e.target.value); try { localStorage.setItem("zionNeoVoice", e.target.value); } catch (x) {} }}
+        <select value={voice} onChange={(e) => { setVoice(e.target.value); try { localStorage.setItem("zionNeoVoice2", e.target.value); } catch (x) {} }}
           style={{ background: "#06100b", color: C.g, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12, padding: "4px 6px" }} title="Neo's voice">
           {NEO_VOICES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>

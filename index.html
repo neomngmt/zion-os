@@ -23106,9 +23106,9 @@ function NeoBootSequence({
 const NEO_VOICES = [["cedar", "Cedar, calm male"], ["ash", "Ash, warm male"], ["ballad", "Ballad, soft male"], ["echo", "Echo, clear male"], ["onyx", "Onyx, deep male (old)"], ["verse", "Verse, lively male"], ["marin", "Marin, natural female"], ["coral", "Coral, friendly female"], ["sage", "Sage, calm female"], ["nova", "Nova, bright female"], ["shimmer", "Shimmer, soft female"], ["alloy", "Alloy, neutral"], ["fable", "Fable, storyteller"]];
 const neoVoice = () => {
   try {
-    return localStorage.getItem("zionNeoVoice") || "cedar";
+    return localStorage.getItem("zionNeoVoice2") || "verse";
   } catch (e) {
-    return "cedar";
+    return "verse";
   }
 };
 function NeoChat({
@@ -23316,7 +23316,7 @@ function NeoChat({
     onChange: e => {
       setVoice(e.target.value);
       try {
-        localStorage.setItem("zionNeoVoice", e.target.value);
+        localStorage.setItem("zionNeoVoice2", e.target.value);
       } catch (x) {}
     },
     style: {
@@ -31212,7 +31212,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1g38c8k</script>
+<script type="text/babel" id="zion-version">kmclj8</script>
 <script>
 (function () {
   var last = 0;
