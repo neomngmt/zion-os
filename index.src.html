@@ -16086,7 +16086,7 @@ function CreatorMoney({ model, record, rows, children }) {
               <div className="fs-12 c-muted mt-1">{money(ins.payout.available)} available, {money(ins.payout.pending)} still pending.</div>
               {sharePct != null && (
                 <div className="fs-12 c-text mt-2">
-                  You keep about {money((ins.payout.available + ins.payout.pending) * sharePct / 100)}. Your manager sends you an invoice for the agency share (about {money((ins.payout.available + ins.payout.pending) * (100 - sharePct) / 100)}) after the payout reaches you.
+                  You keep about {money((ins.payout.available + ins.payout.pending) * sharePct / 100)}. Your manager sends you the invoice for the agency share (about {money((ins.payout.available + ins.payout.pending) * (100 - sharePct) / 100)}) every week, usually on Tuesday or Wednesday.
                 </div>
               )}
               <div className="fs-10 c-faint font-mono mt-2">Estimate from your current balance, the invoice is the exact amount.</div>
