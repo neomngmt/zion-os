@@ -13980,6 +13980,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
   // somehow re-runs (defensive — the actual cause of a double-greeting
   // would be a remount, which this can't fix, but it stops the symptom).
   useEffect(() => {
+    return; // the live call greets now
     if (greetedRef.current) return;
     greetedRef.current = true;
     // `cancelled`/`timeoutId` guard against the greeting audibly playing
@@ -14341,7 +14342,134 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
     }
   };
 
+
+  // ---------- live voice call (OpenAI Realtime over WebRTC), like ChatGPT voice ----------
+  // Tap the orb: the call starts and Neo greets. Talk any time, he stops when you talk.
+  // Neo reads Zion through neo-agent (run_tool); changes only show a Confirm card.
+  const callRef = useRef(null);
+  const [callState, setCallState] = useState("idle"); // idle | connecting | live
+  const [callError, setCallError] = useState("");
+  const neoTok = () => { try { return (JSON.parse(localStorage.getItem("agencyos_session") || "{}")).token || ""; } catch (e) { return ""; } };
+  const neoAgent = async (body) => {
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/neo-agent`, { method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, "x-zion-token": neoTok() }, body: JSON.stringify({ agency, ...body }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+    return j;
+  };
+  const endCall = () => {
+    const c = callRef.current; callRef.current = null;
+    if (c) {
+      try { c.dc && c.dc.close(); } catch (e) {}
+      try { c.pc && c.pc.close(); } catch (e) {}
+      try { c.mic && c.mic.getTracks().forEach((t) => t.stop()); } catch (e) {}
+      try { c.audio && (c.audio.srcObject = null); } catch (e) {}
+      try { c.ctx && c.ctx.close(); } catch (e) {}
+      if (c.raf) cancelAnimationFrame(c.raf);
+    }
+    liveAmpRef.current = 0; speakingRef.current = false;
+    setSpeaking(false); setListening(false); setThinking(false); thinkingRef.current = false;
+    setCallState("idle");
+  };
+  const startCall = async () => {
+    if (callRef.current) return;
+    setCallError(""); setCallState("connecting"); setThinking(true);
+    const c = { pending: new Map(), calls: [] };
+    callRef.current = c;
+    try {
+      // the microphone and the sound must start inside the tap (iPhone rule)
+      c.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      try { await c.ctx.resume(); } catch (e) {}
+      c.audio = document.createElement("audio"); c.audio.autoplay = true; c.audio.setAttribute("playsinline", "");
+      c.mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      if (callRef.current !== c) { c.mic.getTracks().forEach((t) => t.stop()); return; }
+      const sess = await neoAgent({ realtime: true, voice: (() => { try { return localStorage.getItem("zionNeoVoice2") || "cedar"; } catch (e) { return "cedar"; } })() });
+      if (callRef.current !== c) return;
+      const pc = new RTCPeerConnection(); c.pc = pc;
+      pc.ontrack = (e) => {
+        const stream = e.streams[0];
+        c.audio.srcObject = stream; c.audio.play().catch(() => {});
+        // the orb moves with Neo's voice
+        try {
+          const an = c.ctx.createAnalyser(); an.fftSize = 512;
+          c.ctx.createMediaStreamSource(stream).connect(an);
+          const buf = new Uint8Array(an.frequencyBinCount);
+          const tick = () => {
+            an.getByteTimeDomainData(buf);
+            let sum = 0; for (let i = 0; i < buf.length; i++) { const v = (buf[i] - 128) / 128; sum += v * v; }
+            const amp = Math.min(1, Math.sqrt(sum / buf.length) * 5);
+            liveAmpRef.current = speakingRef.current ? amp : 0;
+            if (amp > 0.05 && speakingRef.current) speakBumpRef.current = Date.now();
+            c.raf = requestAnimationFrame(tick);
+          };
+          tick();
+        } catch (e) {}
+      };
+      pc.addTrack(c.mic.getTracks()[0], c.mic);
+      const dc = pc.createDataChannel("oai-events"); c.dc = dc;
+      const send = (o) => { try { dc.readyState === "open" && dc.send(JSON.stringify(o)); } catch (e) {} };
+      dc.onopen = () => {
+        setCallState("live"); setThinking(false); thinkingRef.current = false; setListening(true);
+        send({ type: "response.create" }); // Neo says hello
+      };
+      dc.onmessage = async (m) => {
+        let ev; try { ev = JSON.parse(m.data); } catch (e) { return; }
+        switch (ev.type) {
+          case "input_audio_buffer.speech_started":
+            setListening(true); setThinking(false); break;
+          case "input_audio_buffer.speech_stopped":
+            setListening(false); setThinking(true); break;
+          case "output_audio_buffer.started":
+            speakingRef.current = true; setSpeaking(true); setThinking(false); setListening(false); break;
+          case "output_audio_buffer.stopped":
+          case "output_audio_buffer.cleared":
+            speakingRef.current = false; setSpeaking(false); liveAmpRef.current = 0; setListening(true); break;
+          case "response.function_call_arguments.done": {
+            let args = {}; try { args = JSON.parse(ev.arguments || "{}"); } catch (e) {}
+            const job = (async () => {
+              if (ev.name === "navigate") { if (onNavigate && args.page) setTimeout(() => onNavigate(args.page), 400); return "Opened."; }
+              try {
+                const j = await neoAgent({ run_tool: { name: ev.name, args } });
+                if (j.pending) {
+                  setMessages((all) => [...all, { role: "neo", text: "", pending: [{ id: `rt${Date.now()}${Math.random().toString(36).slice(2, 6)}`, tool: ev.name, args, summary: j.summary, state: "ask" }] }]);
+                  return "Prepared. It is NOT done yet: the person sees a Confirm button on the screen and has to tap it.";
+                }
+                return j.result || "Done.";
+              } catch (e) { return `Error: ${e.message}`; }
+            })();
+            c.calls.push(job.then((output) => send({ type: "conversation.item.create", item: { type: "function_call_output", call_id: ev.call_id, output: String(output).slice(0, 15000) } })));
+            break;
+          }
+          case "response.done": {
+            // once every tool of this answer has its result, Neo continues talking
+            const calls = c.calls; c.calls = [];
+            if (calls.length) { await Promise.all(calls); send({ type: "response.create" }); }
+            break;
+          }
+          case "error":
+            if (ev.error && !/active response|cancel/i.test(ev.error.message || "")) console.warn("Neo call", ev.error);
+            break;
+          default: break;
+        }
+      };
+      pc.onconnectionstatechange = () => { if (["failed", "closed", "disconnected"].includes(pc.connectionState) && callRef.current === c) { setCallError("The call dropped. Tap the orb to call again."); endCall(); } };
+      const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
+      const r = await fetch(`https://api.openai.com/v1/realtime/calls?model=${encodeURIComponent(sess.model)}`, { method: "POST", body: offer.sdp, headers: { Authorization: `Bearer ${sess.key}`, "Content-Type": "application/sdp" } });
+      if (!r.ok) throw new Error(`Voice service ${r.status}`);
+      await pc.setRemoteDescription({ type: "answer", sdp: await r.text() });
+    } catch (e) {
+      setCallError(/Permission|NotAllowed/i.test(String(e && (e.name || e.message))) ? "Allow the microphone for Zion to talk to Neo." : (e.message || "Could not start the call"));
+      endCall();
+    }
+  };
+  useEffect(() => () => { if (callRef.current) endCall(); }, []);
+  const neoStatus = callError ? callError : callState === "connecting" ? "connecting" : callState === "live" ? (speaking ? "speaking, just talk to cut in" : thinking ? "thinking" : "listening, just talk") : "tap the orb to talk";
+
   const orbClick = () => {
+    // the orb starts and ends the live call
+    if (callRef.current) { endCall(); return; }
+    startCall();
+  };
+  const orbClickOld = () => {
     unlockAudio();
     if (thinking) {
       requestIdRef.current++; // invalidates the in-flight response
@@ -14490,7 +14618,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
               {/* fixed-height status area — content changes but the box never does, so it can't shove other elements around */}
               <div className="mt-3 neo-fade-in overflow-hidden" style={{ height: 40, maxWidth: 280, animationDelay: "0.4s" }}>
                 <div className="fs-13 italic" style={{ color: neoGreen, opacity: 0.9 }}>
-                  {thinking ? "thinking — click the orb to stop." : speaking ? "speaking — click the orb to stop." : listening ? "listening — click the orb to stop." : (lastNeoText || "click the orb to ask something.")}
+                  {neoStatus}
                 </div>
               </div>
               {/* Desktop previously had no equivalent of the mobile block below —
@@ -14507,7 +14635,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
               N.E.O. — <b style={{ color: amber }}>NEURAL ENGAGEMENT ORCHESTRATOR</b>
             </div>
             <div className="fs-13 italic mt-3 max-w-sm neo-fade-in" style={{ color: neoGreen, opacity: 0.9, animationDelay: "0.6s" }}>
-              {thinking ? "thinking — click the orb to stop." : speaking ? "speaking — click the orb to stop." : listening ? "listening — click the orb to stop." : (lastNeoText || "click the orb to ask something.")}
+              {neoStatus}
             </div>
             {heard && <div className="fs-10 italic mt-1" style={{ color: neoGreen, opacity: 0.4 }}>heard: "{heard}"</div>}
             {voiceError && <div className="fs-10 italic mt-1" style={{ color: "#e07a5f" }}>voice error: {voiceError}</div>}
