@@ -15591,6 +15591,17 @@ const ACQ_CSS = `
 .aq-kpi b{ display:block; font-size:24px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
 .aq-kpi span{ font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#8fa39a; }
 .aq-kpi.hot{ border-color:rgba(57,230,115,.45); background:linear-gradient(160deg, rgba(57,230,115,.12), #0e1310); }
+.aq-kpi{ transition:border-color .2s, transform .2s; color:inherit; }
+.aq-kpi:hover{ border-color:rgba(57,230,115,.5); transform:translateY(-1px); }
+.aq-kpi.on{ border-color:#39e673; box-shadow:0 0 0 2px rgba(57,230,115,.25) inset; }
+.aq-bub{ max-width:85%; padding:9px 12px; border-radius:14px; font-size:13.5px; line-height:1.45; white-space:pre-wrap; margin-bottom:6px; }
+.aq-bub.me{ margin-left:auto; background:rgba(57,230,115,.14); border:1px solid rgba(57,230,115,.3); border-bottom-right-radius:4px; }
+.aq-bub.her{ background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); border-bottom-left-radius:4px; }
+.aq-bub small{ display:block; font-size:10.5px; color:#8fa39a; margin-top:3px; }
+.aq-fun{ display:flex; gap:4px; margin:8px 0 10px; }
+.aq-fun span{ flex:1; text-align:center; font-size:10px; padding:4px 2px; border-radius:8px; background:rgba(255,255,255,.05); color:#8fa39a; text-transform:uppercase; letter-spacing:.06em; }
+.aq-fun span.on{ background:#38bdf8; color:#03110a; font-weight:800; }
+.aq-fun span.done{ background:rgba(56,189,248,.2); color:#cfeefe; }
 .aq-row{ display:grid; grid-template-columns:44px 1fr auto; gap:12px; align-items:center; padding:11px 12px; border-radius:14px; cursor:pointer; transition:background .2s; border-top:1px solid rgba(255,255,255,.05); }
 .aq-row:hover{ background:rgba(255,255,255,.04); }
 .aq-ava{ width:44px; height:44px; border-radius:50%; background:#1b2420 center/cover no-repeat; display:flex; align-items:center; justify-content:center; font-weight:800; color:#8fa39a; }
@@ -15706,6 +15717,7 @@ function AcquisitionPage() {
   const [reddit, setReddit] = useState(null);
   const [cfg, setCfg] = useState(null);
   const [view, setView] = useState("active");
+  const [kpi, setKpi] = useState(null);
   const [section, setSectionRaw] = useState(() => {
     try {
       return localStorage.getItem("zionAcqSection") || "overview";
@@ -15832,8 +15844,9 @@ function AcquisitionPage() {
   const fresh = all.filter(l => l.status === "new");
   const week = k => all.filter(l => l[k] && now - Date.parse(l[k]) < 7 * 86400000).length;
   const sectionOf = l => l.source === "ads" ? "meta" : l.source === "referral" ? "referrals" : l.source === "reddit" ? "reddit" : l.source === "new OF" ? "newof" : ["hashtag", "similar", "followers", "search"].includes(l.source) || l.source === "manual" && l.followers != null ? "instagram" : "other";
-  const SECTIONS = [["overview", "Overview", "#39e673"], ["meta", "Meta ads", "#1877f2"], ["referrals", "Contacts", "#f0be3c"], ["reddit", "Reddit", "#ff4500"], ["instagram", "Instagram outreach", "#e1306c"], ["newof", "New OF profiles", "#7c5cff"], ["other", "Other links", "#8fa39a"]];
-  const inSection = all.filter(l => sectionOf(l) === section);
+  const SECTIONS = [["overview", "Overview", "#39e673"], ["ongoing", "Ongoing", "#38bdf8"], ["meta", "Meta ads", "#1877f2"], ["referrals", "Contacts", "#f0be3c"], ["reddit", "Reddit", "#ff4500"], ["instagram", "Instagram outreach", "#e1306c"], ["newof", "New OF profiles", "#7c5cff"], ["other", "Other links", "#8fa39a"]];
+  const ongoing = all.filter(l => ["messaged", "replied", "call"].includes(l.status)).sort((a, b) => (b.unread ? 1 : 0) - (a.unread ? 1 : 0) || Date.parse(b.last_contact_at || b.messaged_at || 0) - Date.parse(a.last_contact_at || a.messaged_at || 0));
+  const inSection = section === "ongoing" ? ongoing : all.filter(l => sectionOf(l) === section);
   const stageLists = {
     active: inSection.filter(l => !["signed", "lost", "skip"].includes(l.status)).sort((a, b) => (b.score || 0) - (a.score || 0)),
     new: inSection.filter(l => l.status === "new").sort((a, b) => (b.score || 0) - (a.score || 0)),
@@ -15849,7 +15862,32 @@ function AcquisitionPage() {
     signed: all.filter(l => l.status === "signed"),
     archive: all.filter(l => ["lost", "skip"].includes(l.status))
   };
-  const shown = section === "overview" ? lists.todo : stageLists[view] || [];
+  const kpiLists = {
+    due: {
+      title: "Follow-ups due",
+      list: due
+    },
+    good: {
+      title: agency === "CZ" ? "New leads" : "Good new leads",
+      list: agency === "CZ" ? fresh : fresh.filter(l => (l.score || 0) >= 50).sort((a, b) => (b.score || 0) - (a.score || 0))
+    },
+    messaged: {
+      title: agency === "CZ" ? "Leads this week" : "Messaged this week",
+      list: all.filter(l => {
+        const t = agency === "CZ" ? l.lead_at : l.messaged_at;
+        return t && now - Date.parse(t) < 7 * 86400000;
+      })
+    },
+    talking: {
+      title: "Talking now",
+      list: all.filter(l => l.status === "replied" || l.status === "call")
+    },
+    signed: {
+      title: "Signed",
+      list: all.filter(l => l.status === "signed")
+    }
+  };
+  const shown = kpi && section === "overview" ? kpiLists[kpi].list : section === "overview" ? lists.todo : section === "ongoing" ? ongoing : stageLists[view] || [];
   const lead = open ? all.find(l => l.id === open) : null;
   const patchLocal = (id, p) => setLeads(cur => (cur || []).map(l => l.id === id ? {
     ...l,
@@ -15897,20 +15935,21 @@ function AcquisitionPage() {
     className: "hb-err"
   }, err), React.createElement("div", {
     className: "aq-kpis"
-  }, React.createElement("div", {
-    className: "aq-kpi hot"
-  }, React.createElement("b", null, due.length), React.createElement("span", null, "follow-ups due")), React.createElement("div", {
-    className: "aq-kpi"
-  }, React.createElement("b", null, agency === "CZ" ? fresh.length : fresh.filter(l => (l.score || 0) >= 50).length), React.createElement("span", null, agency === "CZ" ? "new leads" : "good new leads")), React.createElement("div", {
-    className: "aq-kpi"
-  }, React.createElement("b", null, agency === "CZ" ? week("lead_at") : week("messaged_at")), React.createElement("span", null, agency === "CZ" ? "leads this week" : "messaged this week")), React.createElement("div", {
-    className: "aq-kpi"
-  }, React.createElement("b", null, all.filter(l => l.status === "replied" || l.status === "call").length), React.createElement("span", null, "talking now")), React.createElement("div", {
-    className: "aq-kpi"
-  }, React.createElement("b", null, lists.signed.length), React.createElement("span", null, "signed"))), React.createElement("div", {
+  }, [["due", "hot"], ["good", ""], ["messaged", ""], ["talking", ""], ["signed", ""]].map(([k, cls]) => React.createElement("button", {
+    key: k,
+    className: `aq-kpi ${cls} ${kpi === k ? "on" : ""}`,
+    style: {
+      textAlign: "left",
+      cursor: "pointer"
+    },
+    onClick: () => {
+      setKpi(kpi === k ? null : k);
+      setSectionRaw("overview");
+    }
+  }, React.createElement("b", null, kpiLists[k].list.length), React.createElement("span", null, kpiLists[k].title)))), React.createElement("div", {
     className: "aq-nav"
   }, SECTIONS.map(([k, label, color]) => {
-    const n = k === "overview" ? lists.todo.length : all.filter(l => sectionOf(l) === k && !["signed", "lost", "skip"].includes(l.status)).length;
+    const n = k === "overview" ? lists.todo.length : k === "ongoing" ? ongoing.length : all.filter(l => sectionOf(l) === k && !["signed", "lost", "skip"].includes(l.status)).length;
     const on = section === k;
     return React.createElement("button", {
       key: k,
@@ -15944,7 +15983,7 @@ function AcquisitionPage() {
         background: on ? "rgba(0,0,0,.18)" : "rgba(255,255,255,.08)"
       }
     }, n));
-  })), section === "overview" && agency === "US" && React.createElement("div", {
+  })), section === "overview" && !kpi && agency === "US" && React.createElement("div", {
     className: "hb-card",
     style: {
       marginBottom: 16,
@@ -16280,11 +16319,52 @@ function AcquisitionPage() {
     disabled: busy === "add" || !addText.trim()
   }, busy === "add" ? "Adding" : "Add")))), section === "overview" ? React.createElement("div", {
     style: {
-      fontWeight: 800,
-      fontSize: 15,
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
       margin: "4px 0 10px"
     }
-  }, "To do today, from every source") : React.createElement("div", {
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 15,
+      flex: 1
+    }
+  }, kpi ? `${kpiLists[kpi].title} (${kpiLists[kpi].list.length})` : "To do today, from every source"), kpi && React.createElement("button", {
+    className: "hb-btn ghost sm",
+    onClick: () => setKpi(null)
+  }, "Back to to do")) : section === "ongoing" ? React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      margin: "4px 0 10px",
+      flexWrap: "wrap"
+    }
+  }, React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 200
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 15
+    }
+  }, "Ongoing conversations"), React.createElement("div", {
+    className: "hb-note"
+  }, "Everyone you wrote to. New replies come first. Reddit threads are checked every morning.")), React.createElement("button", {
+    className: "hb-btn ghost sm",
+    disabled: busy === "tc",
+    onClick: () => act("tc", {
+      action: "thread-check"
+    }, async j => {
+      await load();
+      setErr(j.newReplies ? "" : "");
+    })
+  }, busy === "tc" ? React.createElement(React.Fragment, null, React.createElement("span", {
+    className: "hb-spin"
+  }), "Checking Reddit") : "Check Reddit replies now")) : React.createElement("div", {
     className: "hb-bar"
   }, [["active", `Active ${stageLists.active.length}`], ["new", `New ${stageLists.new.length}`], ["talks", `In talks ${stageLists.talks.length}`], ["signed", `Signed ${stageLists.signed.length}`], ["archive", `Archive ${stageLists.archive.length}`]].map(([k, l]) => React.createElement("button", {
     key: k,
@@ -16370,7 +16450,13 @@ function AcquisitionPage() {
       style: {
         marginTop: 3
       }
-    }, l.source === "reddit" && React.createElement("span", {
+    }, l.unread && React.createElement("span", {
+      className: "aq-tag",
+      style: {
+        color: "#03110a",
+        background: "#38bdf8"
+      }
+    }, "New reply"), l.source === "reddit" && React.createElement("span", {
       className: "aq-tag",
       style: {
         color: "#fff",
@@ -16541,6 +16627,192 @@ function AcqSettings({
     }
   }, busy ? "Saving" : "Save settings")));
 }
+const ACQ_FUNNEL = [["help", "Help"], ["trust", "Trust"], ["offer", "Offer"], ["move", "DM"], ["call", "Call"]];
+function AcqConversation({
+  lead,
+  onPatch
+}) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [msg, setMsg] = useState("");
+  const convo = Array.isArray(lead.convo) ? lead.convo : [];
+  const stageIdx = Math.max(0, ACQ_FUNNEL.findIndex(f => f[0] === (lead.funnel_stage || "help")));
+  const sug = lead.suggestion;
+  const add = async (from, t, stage) => {
+    if (!t.trim()) return;
+    setBusy(from);
+    try {
+      const j = await acqFn({
+        action: "add-message",
+        id: lead.id,
+        from,
+        text: t,
+        stage
+      });
+      onPatch({
+        convo: [...convo, j.message],
+        suggestion: null,
+        ...(stage ? {
+          funnel_stage: stage
+        } : {}),
+        ...(from === "her" && lead.status === "messaged" ? {
+          status: "replied"
+        } : {})
+      });
+      setText("");
+    } catch (e) {
+      setMsg(e.message);
+    }
+    setBusy("");
+  };
+  return React.createElement("div", {
+    className: "hb-card",
+    style: {
+      padding: 14,
+      marginBottom: 12,
+      borderColor: "rgba(56,189,248,.35)"
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      flex: 1
+    }
+  }, "Conversation"), lead.source === "reddit" && React.createElement("button", {
+    className: "hb-btn ghost sm",
+    disabled: busy === "chk",
+    onClick: async () => {
+      setBusy("chk");
+      setMsg("");
+      try {
+        const j = await acqFn({
+          action: "thread-check",
+          id: lead.id
+        });
+        setMsg(j.newReplies ? `${j.newReplies} new repl${j.newReplies === 1 ? "y" : "ies"}, reopen the card to see them` : "No new reply from her yet");
+      } catch (e) {
+        setMsg(e.message);
+      }
+      setBusy("");
+    }
+  }, busy === "chk" ? React.createElement(React.Fragment, null, React.createElement("span", {
+    className: "hb-spin"
+  }), "Checking") : "Check her replies")), React.createElement("div", {
+    className: "aq-fun"
+  }, ACQ_FUNNEL.map(([k, l], i) => React.createElement("span", {
+    key: k,
+    className: i === stageIdx ? "on" : i < stageIdx ? "done" : ""
+  }, l))), msg && React.createElement("div", {
+    className: "hb-note",
+    style: {
+      marginBottom: 8
+    }
+  }, msg), React.createElement("div", {
+    style: {
+      maxHeight: 340,
+      overflowY: "auto",
+      marginBottom: 8
+    }
+  }, convo.length ? convo.map((c, i) => React.createElement("div", {
+    key: c.id || i,
+    className: `aq-bub ${c.from === "me" ? "me" : "her"}`
+  }, c.text, React.createElement("small", null, c.from === "me" ? "You" : "Her", c.at ? `, ${new Date(c.at).toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  })}` : ""))) : React.createElement("div", {
+    className: "hb-note"
+  }, "Nothing yet. Paste what was said below.")), React.createElement("div", {
+    style: {
+      borderTop: "1px solid rgba(255,255,255,.06)",
+      paddingTop: 10,
+      marginBottom: 10
+    }
+  }, React.createElement("button", {
+    className: "hb-btn sm",
+    disabled: busy === "sug",
+    onClick: async () => {
+      setBusy("sug");
+      setMsg("");
+      try {
+        const j = await acqFn({
+          action: "next-reply",
+          id: lead.id
+        });
+        onPatch({
+          suggestion: j.suggestion
+        });
+      } catch (e) {
+        setMsg(e.message);
+      }
+      setBusy("");
+    }
+  }, busy === "sug" ? React.createElement(React.Fragment, null, React.createElement("span", {
+    className: "hb-spin"
+  }), "Writing") : sug ? "Suggest again" : "Suggest my next reply"), sug && React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, React.createElement("div", {
+    className: "hb-note",
+    style: {
+      marginBottom: 4
+    }
+  }, "Step: ", (ACQ_FUNNEL.find(f => f[0] === sug.stage) || [, sug.stage])[1], sug.tip ? `. ${sug.tip}` : ""), React.createElement("div", {
+    className: "aq-bub me",
+    style: {
+      maxWidth: "100%",
+      marginLeft: 0
+    }
+  }, sug.reply), React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6
+    }
+  }, React.createElement("button", {
+    className: "hb-btn sm",
+    onClick: async () => {
+      try {
+        await navigator.clipboard.writeText(sug.reply);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      } catch (e) {}
+    }
+  }, copied ? "Copied" : "Copy"), React.createElement("button", {
+    className: "hb-btn ghost sm",
+    disabled: busy === "me",
+    onClick: () => add("me", sug.reply, sug.stage)
+  }, "I sent this")))), React.createElement("textarea", {
+    className: "sh-ta",
+    style: {
+      minHeight: 64
+    },
+    value: text,
+    onChange: e => setText(e.target.value),
+    placeholder: "Paste a message from her, or what you sent"
+  }), React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginTop: 6
+    }
+  }, React.createElement("button", {
+    className: "hb-btn ghost sm",
+    disabled: !text.trim() || busy === "her",
+    onClick: () => add("her", text)
+  }, "She said this"), React.createElement("button", {
+    className: "hb-btn ghost sm",
+    disabled: !text.trim() || busy === "me",
+    onClick: () => add("me", text)
+  }, "I sent this")));
+}
 function AcqLeadSheet({
   lead,
   onClose,
@@ -16554,6 +16826,20 @@ function AcqLeadSheet({
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
   }, [onClose]);
+  useEffect(() => {
+    if (lead.unread) {
+      onPatch({
+        unread: false
+      });
+      acqFn({
+        action: "update",
+        id: lead.id,
+        patch: {
+          unread: false
+        }
+      }).catch(() => {});
+    }
+  }, [lead.id]);
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -16862,9 +17148,24 @@ function AcqLeadSheet({
     onClick: () => copy("a", parts[0])
   }, copied === "a" ? "Copied" : lead.source === "reddit" ? "Copy reply" : "Copy DM"), lead.status === "new" && React.createElement("button", {
     className: "hb-btn ghost sm",
-    onClick: () => up({
-      status: "messaged"
-    })
+    onClick: async () => {
+      try {
+        const j = await acqFn({
+          action: "add-message",
+          id: lead.id,
+          from: "me",
+          text: parts[0],
+          stage: "help"
+        });
+        onPatch({
+          status: "messaged",
+          messaged_at: j.message.at,
+          last_contact_at: j.message.at,
+          funnel_stage: "help",
+          convo: [...(lead.convo || []), j.message]
+        });
+      } catch (e) {}
+    }
   }, lead.source === "reddit" ? "I replied" : "Mark as messaged")), parts[1] && React.createElement(React.Fragment, null, React.createElement("div", {
     className: "hb-note",
     style: {
@@ -16885,7 +17186,10 @@ function AcqLeadSheet({
     onClick: () => copy("b", parts[1])
   }, copied === "b" ? "Copied" : "Copy follow-up"))) : React.createElement("div", {
     className: "hb-note"
-  }, "A personal first message and a follow-up, about half a cent.")), React.createElement("div", {
+  }, "A personal first message and a follow-up, about half a cent.")), (["messaged", "replied", "call"].includes(lead.status) || (lead.convo || []).length > 0) && React.createElement(AcqConversation, {
+    lead: lead,
+    onPatch: onPatch
+  }), React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -29224,7 +29528,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">17nuum8</script>
+<script type="text/babel" id="zion-version">1urc6q6</script>
 <script>
 (function () {
   var last = 0;
