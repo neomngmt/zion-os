@@ -15602,6 +15602,22 @@ const ACQ_CSS = `
 .aq-sheet{ position:fixed; inset:0; z-index:60; display:flex; justify-content:flex-end; background:rgba(2,6,4,.6); backdrop-filter:blur(6px); }
 .aq-panel{ width:min(520px,100%); height:100%; overflow:auto; background:#0b100d; border-left:1px solid rgba(57,230,115,.25); padding:22px; animation:hbIn .35s cubic-bezier(.16,1,.3,1) both; }
 .aq-stage{ display:flex; gap:6px; flex-wrap:wrap; margin:12px 0; }
+.aq-note2{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.aq-nav{ display:flex; gap:8px; overflow-x:auto; margin-bottom:16px; padding-bottom:2px; scroll-snap-type:x proximity; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+.aq-nav::-webkit-scrollbar{ display:none; }
+.aq-nav > button{ scroll-snap-align:start; }
+.aq-head{ position:sticky; top:-22px; z-index:2; margin:-22px -22px 0; padding:22px 22px 10px; background:#0b100d; }
+@media (max-width:600px){
+  .aq-kpis{ grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+  .aq-kpi{ padding:10px; border-radius:13px; }
+  .aq-kpi b{ font-size:20px; }
+  .aq-kpi span{ font-size:8.5px; letter-spacing:.1em; }
+  .aq-row{ grid-template-columns:36px 1fr auto; gap:10px; padding:10px 8px; }
+  .aq-ava{ width:36px; height:36px; }
+  .aq-panel{ padding:16px; }
+  .aq-head{ top:-16px; margin:-16px -16px 0; padding:16px 16px 10px; }
+  .aq-top .hb-note{ display:none; }
+}
 `;
 function acqParseCsv(buf) {
   const u8 = new Uint8Array(buf);
@@ -15887,13 +15903,7 @@ function AcquisitionPage() {
   }, React.createElement("b", null, all.filter(l => l.status === "replied" || l.status === "call").length), React.createElement("span", null, "talking now")), React.createElement("div", {
     className: "aq-kpi"
   }, React.createElement("b", null, lists.signed.length), React.createElement("span", null, "signed"))), React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8,
-      overflowX: "auto",
-      marginBottom: 16,
-      paddingBottom: 2
-    }
+    className: "aq-nav"
   }, SECTIONS.map(([k, label, color]) => {
     const n = k === "overview" ? lists.todo.length : all.filter(l => sectionOf(l) === k && !["signed", "lost", "skip"].includes(l.status)).length;
     const on = section === k;
@@ -16362,8 +16372,8 @@ function AcquisitionPage() {
         background: "#ff4500"
       }
     }, "Reddit"), l.source === "reddit" && React.createElement("span", {
-      className: "hb-note"
-    }, String(l.of_note || "").slice(0, 120)), isDue && React.createElement("span", {
+      className: "hb-note aq-note2"
+    }, String(l.of_note || "")), isDue && React.createElement("span", {
       className: "aq-tag fu"
     }, "Follow up"), l.source === "new OF" && React.createElement("span", {
       className: "aq-tag fu",
@@ -16535,7 +16545,7 @@ function AcqLeadSheet({
   const [busy, setBusy] = useState("");
   const [notes, setNotes] = useState(lead.notes || "");
   const [copied, setCopied] = useState("");
-  const parts = String(lead.dm || "").split("\n\n---\nFollow-up:\n");
+  const parts = String(lead.dm || "").replace(/^Reply for the post:\n/, "").split("\n\n---\nFollow-up:\n");
   const up = async (patch, extra = {}) => {
     onPatch(patch);
     try {
@@ -16562,6 +16572,7 @@ function AcqLeadSheet({
     className: "aq-panel hb",
     onClick: e => e.stopPropagation()
   }, React.createElement("div", {
+    className: "aq-head",
     style: {
       display: "flex",
       gap: 12,
@@ -16824,12 +16835,12 @@ function AcqLeadSheet({
   }, React.createElement("button", {
     className: "hb-btn sm",
     onClick: () => copy("a", parts[0])
-  }, copied === "a" ? "Copied" : "Copy DM"), lead.status === "new" && React.createElement("button", {
+  }, copied === "a" ? "Copied" : lead.source === "reddit" ? "Copy reply" : "Copy DM"), lead.status === "new" && React.createElement("button", {
     className: "hb-btn ghost sm",
     onClick: () => up({
       status: "messaged"
     })
-  }, "Mark as messaged")), parts[1] && React.createElement(React.Fragment, null, React.createElement("div", {
+  }, lead.source === "reddit" ? "I replied" : "Mark as messaged")), parts[1] && React.createElement(React.Fragment, null, React.createElement("div", {
     className: "hb-note",
     style: {
       marginBottom: 3
@@ -29188,7 +29199,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1lkp67</script>
+<script type="text/babel" id="zion-version">1wfd4mv</script>
 <script>
 (function () {
   var last = 0;
