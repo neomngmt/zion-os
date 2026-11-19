@@ -9233,7 +9233,7 @@ function AcquisitionPage() {
   const fresh = all.filter((l) => l.status === "new");
   const week = (k) => all.filter((l) => l[k] && now - Date.parse(l[k]) < 7 * 86400000).length;
   const lists = {
-    todo: [...due, ...fresh.filter((l) => !due.includes(l) && l.source !== "reddit" && ((l.score || 0) >= 50 || l.source === "ads" || l.source === "referral"))].slice(0, 80),
+    todo: [...due, ...fresh.filter((l) => !due.includes(l) && (l.source === "reddit" ? (l.score || 0) >= 60 : ((l.score || 0) >= 50 || l.source === "ads" || l.source === "referral")))].slice(0, 80),
     new: fresh,
     reddit: all.filter((l) => l.source === "reddit" && l.status === "new").sort((a, b) => (b.score || 0) - (a.score || 0)),
     pipeline: all.filter((l) => ["messaged", "replied", "call"].includes(l.status)),
@@ -9265,6 +9265,27 @@ function AcquisitionPage() {
         <div className="aq-kpi"><b>{all.filter((l) => l.status === "replied" || l.status === "call").length}</b><span>talking now</span></div>
         <div className="aq-kpi"><b>{lists.signed.length}</b><span>signed</span></div>
       </div>
+      {agency === "US" && view !== "reddit" && (
+        <div className="hb-card" style={{ marginBottom: 16, borderColor: "rgba(255,69,0,.45)", background: "linear-gradient(160deg, rgba(255,69,0,.10), #0e1310 55%)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+            <span style={{ width: 30, height: 30, borderRadius: "50%", background: "#ff4500", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900 }}>r/</span>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <div style={{ fontWeight: 800, fontSize: 16 }}>Reddit: {lists.reddit.length} creators asking for help</div>
+              <div className="hb-note">{reddit?.state === "done" ? `Checked ${timeAgo(reddit.finishedAt)} in r/${(reddit.subs || []).join(", r/")}, every morning at 8:00` : redditRunning ? "Checking the newest posts now" : "Checked every morning at 8:00"}</div>
+            </div>
+            <button className="hb-btn" style={{ background: "#ff4500", color: "#fff" }} onClick={() => setView("reddit")}>Open Reddit leads</button>
+          </div>
+          {lists.reddit.slice(0, 3).map((l) => (
+            <div key={l.id} className="aq-row" onClick={() => setOpen(l.id)} style={{ gridTemplateColumns: "1fr auto" }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.full_name} <span className="hb-note" style={{ fontWeight: 400 }}>{l.handle}</span></div>
+                <div className="hb-note" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.of_note}</div>
+              </div>
+              <span className="aq-score" style={{ background: scoreColor(l.score), color: (l.score || 0) >= 45 ? "#03110a" : "#c9d3ce" }}>{l.score ?? "?"}</span>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="hb-card" style={{ marginBottom: 16, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", borderColor: "rgba(57,230,115,.35)" }}>
         <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontWeight: 800 }}>Newly created OnlyFans profiles</div>

@@ -15797,7 +15797,7 @@ function AcquisitionPage() {
   const fresh = all.filter(l => l.status === "new");
   const week = k => all.filter(l => l[k] && now - Date.parse(l[k]) < 7 * 86400000).length;
   const lists = {
-    todo: [...due, ...fresh.filter(l => !due.includes(l) && l.source !== "reddit" && ((l.score || 0) >= 50 || l.source === "ads" || l.source === "referral"))].slice(0, 80),
+    todo: [...due, ...fresh.filter(l => !due.includes(l) && (l.source === "reddit" ? (l.score || 0) >= 60 : (l.score || 0) >= 50 || l.source === "ads" || l.source === "referral"))].slice(0, 80),
     new: fresh,
     reddit: all.filter(l => l.source === "reddit" && l.status === "new").sort((a, b) => (b.score || 0) - (a.score || 0)),
     pipeline: all.filter(l => ["messaged", "replied", "call"].includes(l.status)),
@@ -15862,7 +15862,89 @@ function AcquisitionPage() {
     className: "aq-kpi"
   }, React.createElement("b", null, all.filter(l => l.status === "replied" || l.status === "call").length), React.createElement("span", null, "talking now")), React.createElement("div", {
     className: "aq-kpi"
-  }, React.createElement("b", null, lists.signed.length), React.createElement("span", null, "signed"))), React.createElement("div", {
+  }, React.createElement("b", null, lists.signed.length), React.createElement("span", null, "signed"))), agency === "US" && view !== "reddit" && React.createElement("div", {
+    className: "hb-card",
+    style: {
+      marginBottom: 16,
+      borderColor: "rgba(255,69,0,.45)",
+      background: "linear-gradient(160deg, rgba(255,69,0,.10), #0e1310 55%)"
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      flexWrap: "wrap",
+      marginBottom: 8
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 30,
+      height: 30,
+      borderRadius: "50%",
+      background: "#ff4500",
+      color: "#fff",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontWeight: 900
+    }
+  }, "r/"), React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 200
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 16
+    }
+  }, "Reddit: ", lists.reddit.length, " creators asking for help"), React.createElement("div", {
+    className: "hb-note"
+  }, reddit?.state === "done" ? `Checked ${timeAgo(reddit.finishedAt)} in r/${(reddit.subs || []).join(", r/")}, every morning at 8:00` : redditRunning ? "Checking the newest posts now" : "Checked every morning at 8:00")), React.createElement("button", {
+    className: "hb-btn",
+    style: {
+      background: "#ff4500",
+      color: "#fff"
+    },
+    onClick: () => setView("reddit")
+  }, "Open Reddit leads")), lists.reddit.slice(0, 3).map(l => React.createElement("div", {
+    key: l.id,
+    className: "aq-row",
+    onClick: () => setOpen(l.id),
+    style: {
+      gridTemplateColumns: "1fr auto"
+    }
+  }, React.createElement("div", {
+    style: {
+      minWidth: 0
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, l.full_name, " ", React.createElement("span", {
+    className: "hb-note",
+    style: {
+      fontWeight: 400
+    }
+  }, l.handle)), React.createElement("div", {
+    className: "hb-note",
+    style: {
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }
+  }, l.of_note)), React.createElement("span", {
+    className: "aq-score",
+    style: {
+      background: scoreColor(l.score),
+      color: (l.score || 0) >= 45 ? "#03110a" : "#c9d3ce"
+    }
+  }, l.score ?? "?")))), React.createElement("div", {
     className: "hb-card",
     style: {
       marginBottom: 16,
@@ -29036,7 +29118,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1eh6pjh</script>
+<script type="text/babel" id="zion-version">1onnosc</script>
 <script>
 (function () {
   var last = 0;
