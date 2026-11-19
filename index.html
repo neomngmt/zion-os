@@ -16980,6 +16980,250 @@ const KN_CSS = `
 }
 @media (prefers-reduced-motion:reduce){ .kn-dot, .kn-wave i{ animation:none; } .kn-panel, .kn-sheet{ animation:none; } }
 `;
+function XOutreachPanel() {
+  const [d, setD] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const load = () => xrFn({
+    action: "stats"
+  }).then(setD).catch(e => setErr(e.message));
+  useEffect(() => {
+    load();
+  }, []);
+  if (!d) return React.createElement("div", {
+    className: "hb-card",
+    style: {
+      marginBottom: 12
+    }
+  }, React.createElement("div", {
+    className: "hb-note"
+  }, err || "Loading X outreach"));
+  if (!d.connected) return React.createElement("div", {
+    className: "hb-card",
+    style: {
+      marginBottom: 12
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 800
+    }
+  }, "XReacher is not connected"), React.createElement("div", {
+    className: "hb-note"
+  }, "Connect it in Settings, then the numbers show up here."));
+  const sy = d.sync || {};
+  const t = sy.totals || {
+    contacted: 0,
+    followups: 0,
+    replies: 0
+  };
+  const sum = (k, f) => (sy.campaigns || []).reduce((a, c) => a + ((c[k] || {})[f] || 0), 0);
+  const pct = (a, b) => b ? `${(Math.round(a / b * 1000) / 10).toLocaleString("en-US")}%` : "0%";
+  const hist = d.history || {};
+  const days = Object.keys(hist).sort();
+  const perDay = days.slice(1).map((k, i) => {
+    const a = hist[days[i]],
+      b = hist[k];
+    return {
+      day: k,
+      contacted: Math.max(0, b.contacted - a.contacted),
+      replies: Math.max(0, b.replies - a.replies),
+      followups: Math.max(0, b.followups - a.followups)
+    };
+  }).slice(-21);
+  const maxBar = Math.max(1, ...perDay.map(x => x.contacted + x.followups));
+  const K = ({
+    v,
+    l,
+    sub
+  }) => React.createElement("div", {
+    className: "aq-kpi"
+  }, React.createElement("b", null, v), React.createElement("span", null, l), sub && React.createElement("div", {
+    className: "hb-note",
+    style: {
+      marginTop: 4,
+      fontSize: 11
+    }
+  }, sub));
+  return React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, React.createElement("div", {
+    className: "hb-card",
+    style: {
+      marginBottom: 12
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      flexWrap: "wrap",
+      marginBottom: 12
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 30,
+      height: 30,
+      borderRadius: 9,
+      background: "#e7e9ea",
+      color: "#03110a",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontWeight: 900
+    }
+  }, "X"), React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 200
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 16
+    }
+  }, "X outreach with XReacher"), React.createElement("div", {
+    className: "hb-note"
+  }, sy.at ? `Synced ${timeAgo(sy.at)}, every 30 minutes. Zion only reads, it never sends.` : "Not synced yet")), React.createElement("button", {
+    className: "hb-btn ghost sm",
+    disabled: busy,
+    onClick: async () => {
+      setBusy(true);
+      setErr("");
+      try {
+        await xrFn({
+          action: "sync"
+        });
+        await load();
+      } catch (e) {
+        setErr(e.message);
+      }
+      setBusy(false);
+    }
+  }, busy ? React.createElement(React.Fragment, null, React.createElement("span", {
+    className: "hb-spin"
+  }), "Syncing") : "Sync now")), React.createElement("div", {
+    className: "aq-kpis"
+  }, React.createElement(K, {
+    v: t.contacted.toLocaleString("en-US"),
+    l: "Creators contacted",
+    sub: `${sum("today", "contacted")} today, ${sum("week", "contacted")} this week`
+  }), React.createElement(K, {
+    v: (t.contacted + t.followups).toLocaleString("en-US"),
+    l: "Messages sent",
+    sub: `${t.followups.toLocaleString("en-US")} of them follow-ups`
+  }), React.createElement(K, {
+    v: t.replies,
+    l: "Replies",
+    sub: `${sum("today", "replies")} today, ${sum("week", "replies")} this week`
+  }), React.createElement(K, {
+    v: pct(t.replies, t.contacted),
+    l: "Reply rate",
+    sub: `per creator; ${pct(t.replies, t.contacted + t.followups)} per message (XReacher)`
+  })), err && React.createElement("div", {
+    className: "hb-note",
+    style: {
+      color: "#E2725B",
+      marginTop: 8
+    }
+  }, err)), perDay.length > 0 && React.createElement("div", {
+    className: "hb-card",
+    style: {
+      marginBottom: 12
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      marginBottom: 10
+    }
+  }, "Per day"), React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "flex-end",
+      gap: 4,
+      height: 120
+    }
+  }, perDay.map(x => React.createElement("div", {
+    key: x.day,
+    title: `${x.day}: ${x.contacted} contacted, ${x.followups} follow-ups, ${x.replies} replies`,
+    style: {
+      flex: 1,
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "flex-end",
+      height: "100%",
+      position: "relative"
+    }
+  }, x.replies > 0 && React.createElement("span", {
+    style: {
+      position: "absolute",
+      top: -2,
+      left: "50%",
+      transform: "translateX(-50%)",
+      fontSize: 10,
+      fontWeight: 800,
+      color: "#39e673"
+    }
+  }, x.replies), React.createElement("div", {
+    style: {
+      height: `${x.followups / maxBar * 100}%`,
+      background: "rgba(57,230,115,.35)",
+      borderRadius: "4px 4px 0 0"
+    }
+  }), React.createElement("div", {
+    style: {
+      height: `${x.contacted / maxBar * 100}%`,
+      background: "#39e673",
+      borderRadius: x.followups ? 0 : "4px 4px 0 0"
+    }
+  })))), React.createElement("div", {
+    className: "hb-note",
+    style: {
+      marginTop: 8
+    }
+  }, "Bright: first messages, light: follow-ups, the number on top: replies. The chart fills in day by day from today.")), React.createElement("div", {
+    className: "hb-card",
+    style: {
+      padding: 8,
+      marginBottom: 12
+    }
+  }, (sy.campaigns || []).map(c => React.createElement("div", {
+    key: c.id,
+    className: "aq-row",
+    style: {
+      gridTemplateColumns: "1fr auto",
+      cursor: "default"
+    }
+  }, React.createElement("div", {
+    style: {
+      minWidth: 0
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 700
+    }
+  }, c.name, " ", React.createElement("span", {
+    className: "aq-tag",
+    style: {
+      background: c.status === "active" ? "#39e673" : "rgba(255,255,255,.1)",
+      color: c.status === "active" ? "#03110a" : "#c9d3ce"
+    }
+  }, c.status === "active" ? `Running, ${c.daily_limit || "?"} a day` : "Paused")), React.createElement("div", {
+    className: "hb-note"
+  }, c.contacted, " contacted, ", c.followups, " follow-ups, ", c.replies, " replies (", pct(c.replies, c.contacted), "). This week: ", c.week?.contacted || 0, " contacted, ", c.week?.replies || 0, " replies.")), React.createElement("span", {
+    className: "aq-score",
+    style: {
+      background: "#39e673",
+      color: "#03110a"
+    }
+  }, c.replies)))), React.createElement("div", {
+    className: "hb-note",
+    style: {
+      marginBottom: 8
+    }
+  }, "Creators who replied are listed below and in Ongoing. Messages on this X account are encrypted, so some replies show only that she answered: open the chat in X to read it."));
+}
 function AcquisitionPage() {
   const [agency, setAgency] = useState(() => {
     try {
@@ -17120,8 +17364,8 @@ function AcquisitionPage() {
   const due = all.filter(l => l.next_followup_at && Date.parse(l.next_followup_at) <= now + 12 * 3600000 && !["signed", "lost", "skip"].includes(l.status));
   const fresh = all.filter(l => l.status === "new");
   const week = k => all.filter(l => l[k] && now - Date.parse(l[k]) < 7 * 86400000).length;
-  const sectionOf = l => l.source === "ads" ? "meta" : l.source === "referral" ? "referrals" : l.source === "reddit" ? "reddit" : l.source === "new OF" ? "newof" : ["hashtag", "similar", "followers", "search"].includes(l.source) || l.source === "manual" && l.followers != null ? "instagram" : "other";
-  const SECTIONS = [["overview", "Overview", "#39e673"], ["plan", "Plan", "#f0be3c"], ["ongoing", "Ongoing", "#38bdf8"], ["meta", "Meta ads", "#1877f2"], ["referrals", "Contacts", "#f0be3c"], ["reddit", "Reddit", "#ff4500"], ["instagram", "Instagram outreach", "#e1306c"], ["newof", "New OF profiles", "#7c5cff"], ["other", "Other links", "#8fa39a"]];
+  const sectionOf = l => l.source === "x" ? "xout" : l.source === "ads" ? "meta" : l.source === "referral" ? "referrals" : l.source === "reddit" ? "reddit" : l.source === "new OF" ? "newof" : ["hashtag", "similar", "followers", "search"].includes(l.source) || l.source === "manual" && l.followers != null ? "instagram" : "other";
+  const SECTIONS = [["overview", "Overview", "#39e673"], ["plan", "Plan", "#f0be3c"], ["ongoing", "Ongoing", "#38bdf8"], ["xout", "X outreach", "#e7e9ea"], ["meta", "Meta ads", "#1877f2"], ["referrals", "Contacts", "#f0be3c"], ["reddit", "Reddit", "#ff4500"], ["instagram", "Instagram outreach", "#e1306c"], ["newof", "New OF profiles", "#7c5cff"], ["other", "Other links", "#8fa39a"]];
   const ongoing = all.filter(l => ["messaged", "replied", "call"].includes(l.status)).sort((a, b) => (b.unread ? 1 : 0) - (a.unread ? 1 : 0) || Date.parse(b.last_contact_at || b.messaged_at || 0) - Date.parse(a.last_contact_at || a.messaged_at || 0));
   const inSection = section === "ongoing" ? ongoing : all.filter(l => sectionOf(l) === section);
   const stageLists = {
@@ -17661,7 +17905,7 @@ function AcquisitionPage() {
     key: k,
     className: `hb-chip ${view === k ? "on" : ""}`,
     onClick: () => setView(k)
-  }, l))), section === "reddit" && React.createElement("div", {
+  }, l))), section === "xout" && React.createElement(XOutreachPanel, null), section === "reddit" && React.createElement("div", {
     className: "hb-card",
     style: {
       marginBottom: 12,
@@ -31962,7 +32206,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">19rms3f</script>
+<script type="text/babel" id="zion-version">1sjq8l7</script>
 <script>
 (function () {
   var last = 0;
