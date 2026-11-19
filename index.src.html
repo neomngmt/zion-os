@@ -866,7 +866,7 @@ html[data-zpage="chatters"]{ --z-h1:#f0be3c; --z-h2:#39e673; --z-h3:#ff7a45; --z
 html[data-zpage="tasks"], html[data-zpage="calendar"]{ --z-h1:#38bdf8; --z-h2:#a78bfa; --z-h3:#39e673; --z-h4:#ff5db1; }
 html[data-zpage="models"], html[data-zpage="settings"]{ --z-h1:#a78bfa; --z-h2:#38bdf8; --z-h3:#ff5db1; --z-h4:#39e673; }
 html[data-zpage="x"], html[data-zpage="tiktok"], html[data-zpage="threads"], html[data-zpage="snap"], html[data-zpage="fb"], html[data-zpage="content"], html[data-zpage="titlegen"]{ --z-h1:#38bdf8; --z-h2:#ff5db1; --z-h3:#f0be3c; --z-h4:#a78bfa; }
-html[data-zrole="creator"][data-zpage]{ --z-h1:#ff5db1; --z-h2:#f0be3c; --z-h3:#a78bfa; --z-h4:#38bdf8; --z-h5:#ff7a45; }
+html[data-zrole="creator"][data-zpage]{ --z-h1:#39e673; --z-h2:#a8f5c4; --z-h3:#12b34c; --z-h4:#2dd4bf; --z-h5:#39e673; }
 html[data-zpage="editor"]{ --z-h1:#c6f432; --z-h2:#38bdf8; --z-h3:#a78bfa; --z-h4:#ff5db1; }
 
 body{ background-color:#07090a !important; }
@@ -15948,7 +15948,7 @@ function InflowwRevenueCard({ myInflowwRows, accountType, title, last7Dates, day
 const CM_CSS = `
 .cm-hero{ position:relative; overflow:hidden; border-radius:26px; padding:24px 24px 20px; border:1px solid rgba(255,255,255,.08);
   background:radial-gradient(90% 120% at 0% 0%, color-mix(in srgb, var(--z-h1) 22%, transparent), transparent 60%), radial-gradient(80% 120% at 100% 0%, color-mix(in srgb, var(--z-h3) 22%, transparent), transparent 60%), radial-gradient(70% 90% at 100% 100%, color-mix(in srgb, var(--z-h2) 14%, transparent), transparent 60%), var(--z-card); }
-.cm-kick{ display:flex; align-items:center; gap:8px; font-family:'JetBrains Mono', ui-monospace, monospace; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:#c9c3d6; }
+.cm-kick{ display:flex; align-items:center; gap:8px; font-family:'JetBrains Mono', ui-monospace, monospace; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:#8fa39a; }
 .cm-dot{ width:7px; height:7px; border-radius:50%; background:var(--z-h1); box-shadow:0 0 12px var(--z-h1); }
 .cm-big{ font-size:52px; line-height:1; font-weight:900; letter-spacing:-.03em; font-variant-numeric:tabular-nums; background:linear-gradient(100deg, var(--z-h2), var(--z-h1) 50%, var(--z-h3)); -webkit-background-clip:text; background-clip:text; color:transparent; }
 .cm-pill{ font-size:12px; font-weight:600; padding:5px 11px; border-radius:999px; color:#fff; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); }
@@ -15968,8 +15968,8 @@ const CM_CSS = `
 .cm-row{ display:flex; align-items:center; gap:10px; padding:8px 0; font-size:13px; color:#eef0f3; border-bottom:1px solid rgba(255,255,255,.05); }
 .cm-row:last-child{ border-bottom:0; }
 .cm-row-name{ flex:1; min-width:0; word-break:break-word; }
-.cm-ava{ width:28px; height:28px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; color:#140a12; }
-.cm-crown{ background:radial-gradient(90% 120% at 100% 0%, rgba(240,190,60,.22), transparent 60%), var(--z-card); }
+.cm-ava{ width:28px; height:28px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; color:#03110a; }
+.cm-crown{ background:radial-gradient(90% 120% at 100% 0%, rgba(57,230,115,.18), transparent 60%), var(--z-card); }
 @media (max-width:640px){ .cm-hero{ padding:20px 18px 18px; } .cm-big{ font-size:42px; } }
 `;
 
@@ -16077,7 +16077,7 @@ function CreatorMoney({ model, record, rows, children }) {
       {ins && ins.connected && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {ins.payout && (
-            <div className={card} style={{ "--c": "#f0be3c" }}>
+            <div className={card} style={{ "--c": "#39e673" }}>
               <div className={label}>At OnlyFans now</div>
               <div className="flex items-baseline gap-2 mt-2">
                 <span className="cm-num">{money(ins.payout.available + ins.payout.pending)}</span>
@@ -16094,7 +16094,7 @@ function CreatorMoney({ model, record, rows, children }) {
           )}
 
           {monthNet > 0 && (
-            <div className={card} style={{ "--c": "#ff5db1" }}>
+            <div className={card} style={{ "--c": "#a8f5c4" }}>
               <div className={label}>Your next goal</div>
               <div className="fs-15 c-text mt-2">Reach <span className="cm-num" style={{ color: "var(--c)" }}>{money(Math.ceil((monthNet * 1.2) / 50) * 50)}</span> net this month.</div>
               <div className="fs-12 c-muted mt-1">That is 20% more than you are at now.</div>
@@ -16102,12 +16102,12 @@ function CreatorMoney({ model, record, rows, children }) {
           )}
 
           {(() => { const fi = fanRange === 7 && ins7 && ins7.connected ? ins7 : ins; return fi.topFans && fi.topFans.length > 0 ? (
-            <div className={card} style={{ "--c": "#a78bfa" }}>
+            <div className={card} style={{ "--c": "#2dd4bf" }}>
               <div className={label}>Top fans, last {fi === ins7 ? 7 : 30} days</div>
               <div className="mt-2">
                 {fi.topFans.map((f, i) => (
                   <div key={f.label} className="cm-row">
-                    <span className="cm-ava" style={{ background: ["linear-gradient(135deg,#f0be3c,#ff7a45)", "linear-gradient(135deg,#ff5db1,#a78bfa)", "linear-gradient(135deg,#a78bfa,#38bdf8)", "linear-gradient(135deg,#38bdf8,#39e673)", "linear-gradient(135deg,#39e673,#f0be3c)"][i % 5] }}>{String(f.label || "?").charAt(0).toUpperCase()}</span>
+                    <span className="cm-ava" style={{ background: ["linear-gradient(135deg,#a8f5c4,#39e673)", "linear-gradient(135deg,#39e673,#12b34c)", "linear-gradient(135deg,#2dd4bf,#12b34c)", "linear-gradient(135deg,#12b34c,#0a5c2c)", "linear-gradient(135deg,#39e673,#2dd4bf)"][i % 5] }}>{String(f.label || "?").charAt(0).toUpperCase()}</span>
                     <span className="cm-row-name">{f.label} <span className="c-faint fs-10 font-mono">{f.count}x</span></span>
                     <span className="font-mono">{money(f.net)} <span className="c-faint">{f.sharePct}%</span></span>
                   </div>
@@ -16118,7 +16118,7 @@ function CreatorMoney({ model, record, rows, children }) {
           ) : (fanRange === 7 ? <div className={card}><div className={label}>Top fans, last 7 days</div><div className="fs-12 c-muted mt-2">No purchases in the last 7 days yet.</div></div> : null); })()}
 
           {topFan && topFan.topFanAllTime && (
-            <div className={`${card} cm-crown`} style={{ "--c": "#f0be3c" }}>
+            <div className={`${card} cm-crown`} style={{ "--c": "#39e673" }}>
               <div className={label}>Top fan all time</div>
               <div className="flex items-baseline gap-2 mt-2 flex-wrap">
                 <span className="cm-num" style={{ wordBreak: "break-word" }}>{topFan.topFanAllTime.name}</span>
@@ -16130,7 +16130,7 @@ function CreatorMoney({ model, record, rows, children }) {
           )}
 
           {ins.chatters && ins.chatters.length > 0 && (
-            <div className={card} style={{ "--c": "#38bdf8" }}>
+            <div className={card} style={{ "--c": "#12b34c" }}>
               <div className={label}>Chatters on your page</div>
               <div className="mt-2">
                 {ins.chatters.map((c) => (
