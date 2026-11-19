@@ -23116,7 +23116,8 @@ function NeoChat({
   setMessages,
   thinking,
   onSend,
-  canAct
+  canAct,
+  compact
 }) {
   const [text, setText] = useState("");
   const [voice, setVoice] = useState(neoVoice());
@@ -23203,6 +23204,77 @@ function NeoChat({
     line: "rgba(57,230,115,.18)",
     bg: "rgba(3,9,6,.72)"
   };
+  if (compact) {
+    const open = messages.map((m, i) => [m, i]).filter(([m]) => (m.pending || []).some(p => p.state !== "no"));
+    if (!open.length) return null;
+    return React.createElement("div", {
+      style: {
+        position: "relative",
+        zIndex: 2,
+        margin: "8px auto 24px",
+        maxWidth: 560,
+        display: "flex",
+        flexDirection: "column",
+        gap: 6
+      }
+    }, open.map(([m, i]) => (m.pending || []).filter(p => p.state !== "no").map(p => React.createElement("div", {
+      key: p.id,
+      style: {
+        padding: "10px 12px",
+        borderRadius: 12,
+        background: "rgba(3,9,6,.8)",
+        border: `1px solid ${p.state === "done" ? C.g : p.state === "fail" ? "#e07a5f" : "rgba(255,210,74,.5)"}`
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: "#f2f5f0",
+        marginBottom: p.state === "ask" ? 8 : 4
+      }
+    }, p.summary), p.state === "ask" && React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8
+      }
+    }, React.createElement("button", {
+      onClick: () => confirm(i, p),
+      style: {
+        fontSize: 13,
+        fontWeight: 700,
+        padding: "6px 14px",
+        borderRadius: 9,
+        background: C.g,
+        color: "#03110a"
+      }
+    }, "Confirm"), React.createElement("button", {
+      onClick: () => setState(i, p.id, {
+        state: "no"
+      }),
+      style: {
+        fontSize: 13,
+        padding: "6px 14px",
+        borderRadius: 9,
+        border: `1px solid ${C.line}`,
+        color: "#c9d3ce",
+        background: "transparent"
+      }
+    }, "Cancel")), p.state === "run" && React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: C.dim
+      }
+    }, "Working on it"), p.state === "done" && React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: C.g
+      }
+    }, "Done. ", p.result), p.state === "fail" && React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "#e07a5f"
+      }
+    }, "Did not work: ", p.result)))));
+  }
   return React.createElement("div", {
     className: "neo-fade-in",
     style: {
@@ -24283,6 +24355,7 @@ function NeoPage({
       textShadow: `0 0 8px ${neoGreen}88`
     }
   }, activeSubs.toLocaleString()))), React.createElement(NeoChat, {
+    compact: true,
     messages: messages,
     setMessages: setMessages,
     thinking: thinking,
@@ -31139,7 +31212,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">md99i1</script>
+<script type="text/babel" id="zion-version">1g38c8k</script>
 <script>
 (function () {
   var last = 0;

@@ -13606,7 +13606,7 @@ function NeoBootSequence({ onDone }) {
 const NEO_VOICES = [["cedar", "Cedar, calm male"], ["ash", "Ash, warm male"], ["ballad", "Ballad, soft male"], ["echo", "Echo, clear male"], ["onyx", "Onyx, deep male (old)"], ["verse", "Verse, lively male"],
   ["marin", "Marin, natural female"], ["coral", "Coral, friendly female"], ["sage", "Sage, calm female"], ["nova", "Nova, bright female"], ["shimmer", "Shimmer, soft female"], ["alloy", "Alloy, neutral"], ["fable", "Fable, storyteller"]];
 const neoVoice = () => { try { return localStorage.getItem("zionNeoVoice") || "cedar"; } catch (e) { return "cedar"; } };
-function NeoChat({ messages, setMessages, thinking, onSend, canAct }) {
+function NeoChat({ messages, setMessages, thinking, onSend, canAct, compact }) {
   const [text, setText] = useState("");
   const [voice, setVoice] = useState(neoVoice());
   const [preview, setPreview] = useState(false);
@@ -13636,6 +13636,27 @@ function NeoChat({ messages, setMessages, thinking, onSend, canAct }) {
   };
   const submit = (e) => { e.preventDefault(); const t = text.trim(); if (!t || thinking) return; setText(""); onSend(t); };
   const C = { g: "#39e673", dim: "#6f8a7a", line: "rgba(57,230,115,.18)", bg: "rgba(3,9,6,.72)" };
+  if (compact) {
+    // no chat window: only what Neo prepared and still waits for a yes
+    const open = messages.map((m, i) => [m, i]).filter(([m]) => (m.pending || []).some((p) => p.state !== "no"));
+    if (!open.length) return null;
+    return (
+      <div style={{ position: "relative", zIndex: 2, margin: "8px auto 24px", maxWidth: 560, display: "flex", flexDirection: "column", gap: 6 }}>
+        {open.map(([m, i]) => (m.pending || []).filter((p) => p.state !== "no").map((p) => (
+          <div key={p.id} style={{ padding: "10px 12px", borderRadius: 12, background: "rgba(3,9,6,.8)", border: `1px solid ${p.state === "done" ? C.g : p.state === "fail" ? "#e07a5f" : "rgba(255,210,74,.5)"}` }}>
+            <div style={{ fontSize: 13, color: "#f2f5f0", marginBottom: p.state === "ask" ? 8 : 4 }}>{p.summary}</div>
+            {p.state === "ask" && <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => confirm(i, p)} style={{ fontSize: 13, fontWeight: 700, padding: "6px 14px", borderRadius: 9, background: C.g, color: "#03110a" }}>Confirm</button>
+              <button onClick={() => setState(i, p.id, { state: "no" })} style={{ fontSize: 13, padding: "6px 14px", borderRadius: 9, border: `1px solid ${C.line}`, color: "#c9d3ce", background: "transparent" }}>Cancel</button>
+            </div>}
+            {p.state === "run" && <div style={{ fontSize: 12, color: C.dim }}>Working on it</div>}
+            {p.state === "done" && <div style={{ fontSize: 12, color: C.g }}>Done. {p.result}</div>}
+            {p.state === "fail" && <div style={{ fontSize: 12, color: "#e07a5f" }}>Did not work: {p.result}</div>}
+          </div>
+        )))}
+      </div>
+    );
+  }
   return (
     <div className="neo-fade-in" style={{ position: "relative", zIndex: 2, margin: "8px auto 28px", maxWidth: 820, border: `1px solid ${C.line}`, background: C.bg, backdropFilter: "blur(6px)", borderRadius: 14, overflow: "hidden" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: `1px solid ${C.line}`, flexWrap: "wrap" }}>
@@ -14374,7 +14395,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
         </div>
       </div>
 
-      <NeoChat messages={messages} setMessages={setMessages} thinking={thinking} onSend={(t) => send(t, "text")} canAct={session.role === "admin"} />
+      <NeoChat compact messages={messages} setMessages={setMessages} thinking={thinking} onSend={(t) => send(t, "text")} canAct={session.role === "admin"} />
 
       {/* agency stats (team only) + primary objective strip + 3-card grid +
           model roster — actually gated by role now, not just labeled "team
