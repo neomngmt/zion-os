@@ -9181,7 +9181,9 @@ function AcquisitionPage() {
   const [run, setRun] = useState(null);
   const [reddit, setReddit] = useState(null);
   const [cfg, setCfg] = useState(null);
-  const [view, setView] = useState("todo");
+  const [view, setView] = useState("active");
+  const [section, setSectionRaw] = useState(() => { try { return localStorage.getItem("zionAcqSection") || "overview"; } catch (e) { return "overview"; } });
+  const setSection = (x) => { setSectionRaw(x); setView("active"); try { localStorage.setItem("zionAcqSection", x); } catch (e) {} };
   const [open, setOpen] = useState(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState("");
@@ -9232,6 +9234,18 @@ function AcquisitionPage() {
   const due = all.filter((l) => l.next_followup_at && Date.parse(l.next_followup_at) <= now + 12 * 3600000 && !["signed", "lost", "skip"].includes(l.status));
   const fresh = all.filter((l) => l.status === "new");
   const week = (k) => all.filter((l) => l[k] && now - Date.parse(l[k]) < 7 * 86400000).length;
+  // every lead belongs to the section it came from
+  const sectionOf = (l) => (l.source === "ads" ? "meta" : l.source === "referral" ? "referrals" : l.source === "reddit" ? "reddit" : l.source === "new OF" ? "newof"
+    : ["hashtag", "similar", "followers", "search"].includes(l.source) || (l.source === "manual" && l.followers != null) ? "instagram" : "other");
+  const SECTIONS = [["overview", "Overview", "#39e673"], ["meta", "Meta ads", "#1877f2"], ["referrals", "Contacts", "#f0be3c"], ["reddit", "Reddit", "#ff4500"], ["instagram", "Instagram outreach", "#e1306c"], ["newof", "New OF profiles", "#7c5cff"], ["other", "Other links", "#8fa39a"]];
+  const inSection = all.filter((l) => sectionOf(l) === section);
+  const stageLists = {
+    active: inSection.filter((l) => !["signed", "lost", "skip"].includes(l.status)).sort((a, b) => (b.score || 0) - (a.score || 0)),
+    new: inSection.filter((l) => l.status === "new").sort((a, b) => (b.score || 0) - (a.score || 0)),
+    talks: inSection.filter((l) => ["messaged", "replied", "call"].includes(l.status)),
+    signed: inSection.filter((l) => l.status === "signed"),
+    archive: inSection.filter((l) => ["lost", "skip"].includes(l.status)),
+  };
   const lists = {
     todo: [...due, ...fresh.filter((l) => !due.includes(l) && (l.source === "reddit" ? (l.score || 0) >= 60 : ((l.score || 0) >= 50 || l.source === "ads" || l.source === "referral")))].slice(0, 80),
     new: fresh,
@@ -9240,7 +9254,7 @@ function AcquisitionPage() {
     signed: all.filter((l) => l.status === "signed"),
     archive: all.filter((l) => ["lost", "skip"].includes(l.status)),
   };
-  const shown = lists[view] || [];
+  const shown = section === "overview" ? lists.todo : (stageLists[view] || []);
   const lead = open ? all.find((l) => l.id === open) : null;
   const patchLocal = (id, p) => setLeads((cur) => (cur || []).map((l) => l.id === id ? { ...l, ...p } : l));
   const scoreColor = (s) => (s == null ? "rgba(255,255,255,.08)" : s >= 70 ? "#39e673" : s >= 45 ? "#ffcf8a" : "rgba(255,255,255,.12)");
@@ -9265,7 +9279,21 @@ function AcquisitionPage() {
         <div className="aq-kpi"><b>{all.filter((l) => l.status === "replied" || l.status === "call").length}</b><span>talking now</span></div>
         <div className="aq-kpi"><b>{lists.signed.length}</b><span>signed</span></div>
       </div>
-      {agency === "US" && view !== "reddit" && (
+      <div style={{ display: "flex", gap: 8, overflowX: "auto", marginBottom: 16, paddingBottom: 2 }}>
+        {SECTIONS.map(([k, label, color]) => {
+          const n = k === "overview" ? lists.todo.length : all.filter((l) => sectionOf(l) === k && !["signed", "lost", "skip"].includes(l.status)).length;
+          const on = section === k;
+          return (
+            <button key={k} onClick={() => setSection(k)} style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 14, fontSize: 13, fontWeight: 700,
+              color: on ? "#03110a" : "#d9e2dd", background: on ? color : "rgba(255,255,255,.04)", border: `1px solid ${on ? color : "rgba(255,255,255,.1)"}`, transition: "all .2s" }}>
+              {!on && <span style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />}
+              {label}
+              <span style={{ fontSize: 11, padding: "1px 7px", borderRadius: 999, background: on ? "rgba(0,0,0,.18)" : "rgba(255,255,255,.08)" }}>{n}</span>
+            </button>
+          );
+        })}
+      </div>
+      {section === "overview" && agency === "US" && (
         <div className="hb-card" style={{ marginBottom: 16, borderColor: "rgba(255,69,0,.45)", background: "linear-gradient(160deg, rgba(255,69,0,.10), #0e1310 55%)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
             <span style={{ width: 30, height: 30, borderRadius: "50%", background: "#ff4500", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900 }}>r/</span>
@@ -9273,7 +9301,7 @@ function AcquisitionPage() {
               <div style={{ fontWeight: 800, fontSize: 16 }}>Reddit: {lists.reddit.length} creators asking for help</div>
               <div className="hb-note">{reddit?.state === "done" ? `Checked ${timeAgo(reddit.finishedAt)} in r/${(reddit.subs || []).join(", r/")}, every morning at 8:00` : redditRunning ? "Checking the newest posts now" : "Checked every morning at 8:00"}</div>
             </div>
-            <button className="hb-btn" style={{ background: "#ff4500", color: "#fff" }} onClick={() => setView("reddit")}>Open Reddit leads</button>
+            <button className="hb-btn" style={{ background: "#ff4500", color: "#fff" }} onClick={() => setSection("reddit")}>Open Reddit leads</button>
           </div>
           {lists.reddit.slice(0, 3).map((l) => (
             <div key={l.id} className="aq-row" onClick={() => setOpen(l.id)} style={{ gridTemplateColumns: "1fr auto" }}>
@@ -9286,7 +9314,7 @@ function AcquisitionPage() {
           ))}
         </div>
       )}
-      <div className="hb-card" style={{ marginBottom: 16, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", borderColor: "rgba(57,230,115,.35)" }}>
+      {section === "newof" && <div className="hb-card" style={{ marginBottom: 16, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", borderColor: "rgba(124,92,255,.45)" }}>
         <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontWeight: 800 }}>Newly created OnlyFans profiles</div>
           <div className="hb-note">{running && run?.kind === "newof" ? runText : `OnlyFans creators from ${agency === "CZ" ? "Czechia" : "the US"} who joined in the last 30 days and link an Instagram. Small pages only. About 0.8 cents per lead.`}</div>
@@ -9297,18 +9325,18 @@ function AcquisitionPage() {
         <button className="hb-btn" disabled={running || busy === "newof"} onClick={() => act("newof", { action: "new-of", count: newOfCount }, (j) => setRun(j.run))}>
           {running && run?.kind === "newof" ? <><span className="hb-spin" />Scraping</> : "Scrape newly created OF profiles"}
         </button>
-      </div>
-      {agency === "CZ" && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(300px,100%),1fr))", gap: 14, marginBottom: 16 }}>
-          <label className="hb-card" style={{ cursor: "pointer", display: "block", borderStyle: "dashed" }}
+      </div>}
+      {(section === "meta" || section === "referrals") && (
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr)", gap: 14, marginBottom: 16 }}>
+          {section === "meta" && <label className="hb-card" style={{ cursor: "pointer", display: "block", borderStyle: "dashed" }}
             onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); importFile(e.dataTransfer.files[0]); }}>
             <div style={{ fontWeight: 800, marginBottom: 4 }}>Leads from paid ads</div>
             <div className="hb-note" style={{ marginBottom: 10 }}>In Ads Manager open the lead form, Download leads as CSV, then drop the file here. Name, phone, email, campaign and all answers come in, duplicates are skipped.</div>
             <span className="hb-btn">{busy === "import" ? <><span className="hb-spin" />Importing</> : "Choose CSV file"}</span>
             <input type="file" accept=".csv,.tsv,text/csv" style={{ display: "none" }} onChange={(e) => { importFile(e.target.files[0]); e.target.value = ""; }} />
             {importMsg && <div className="hb-note" style={{ marginTop: 8, color: "#39e673" }}>{importMsg}</div>}
-          </label>
-          <form className="hb-card" onSubmit={(e) => { e.preventDefault(); if (!ref.name.trim()) return; act("ref", { action: "import", rows: [{ name: ref.name, phone: ref.phone, email: "", source: "referral", referred_by: ref.referred_by, notes: [ref.ig ? `IG: ${ref.ig}` : "", ref.notes].filter(Boolean).join("\n") }] }, async () => { setRef({ name: "", phone: "", ig: "", referred_by: "", notes: "" }); await load(); }); }}>
+          </label>}
+          {section === "referrals" && <form className="hb-card" onSubmit={(e) => { e.preventDefault(); if (!ref.name.trim()) return; act("ref", { action: "import", rows: [{ name: ref.name, phone: ref.phone, email: "", source: "referral", referred_by: ref.referred_by, notes: [ref.ig ? `IG: ${ref.ig}` : "", ref.notes].filter(Boolean).join("\n") }] }, async () => { setRef({ name: "", phone: "", ig: "", referred_by: "", notes: "" }); await load(); }); }}>
             <div style={{ fontWeight: 800, marginBottom: 8 }}>Recommended by a contact</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <input className="hb-in" placeholder="Her name" value={ref.name} onChange={(e) => setRef({ ...ref, name: e.target.value })} />
@@ -9318,10 +9346,10 @@ function AcquisitionPage() {
             </div>
             <input className="hb-in" style={{ width: "100%", marginTop: 8 }} placeholder="Note" value={ref.notes} onChange={(e) => setRef({ ...ref, notes: e.target.value })} />
             <button className="hb-btn" style={{ marginTop: 10 }} disabled={busy === "ref" || !ref.name.trim()}>{busy === "ref" ? "Adding" : "Add contact"}</button>
-          </form>
+          </form>}
         </div>
       )}
-      {agency === "US" && (<>
+      {section === "instagram" && (<>
       <div className="hb-card" style={{ marginBottom: 16, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontWeight: 800 }}>{running ? runText : run?.state === "done" ? `Last search ${timeAgo(run.finishedAt)}: ${run.added || 0} new leads from ${run.read || 0} profiles read` : run?.state === "failed" ? `Last search failed: ${run.error}` : "No search yet"}</div>
@@ -9331,6 +9359,8 @@ function AcquisitionPage() {
         <button className="hb-btn" disabled={running || busy === "search"} onClick={() => act("search", { action: "search" }, (j) => setRun(j.run))}>{running ? <><span className="hb-spin" />Searching</> : "Find new leads"}</button>
       </div>
       {showCfg && cfg && <AcqSettings cfg={cfg} agency={agency} onSaved={() => { setShowCfg(false); load(); }} />}
+      </>)}
+      {(section === "instagram" || section === "other") && (<>
       <form className="hb-card" style={{ marginBottom: 16 }} onSubmit={(e) => { e.preventDefault(); if (addText.trim()) act("add", { action: "add", text: addText }, async () => { setAddText(""); await load(); }); }}>
         <div style={{ fontWeight: 800, marginBottom: 4 }}>Add leads you found anywhere</div>
         <div className="hb-note" style={{ marginBottom: 8 }}>Instagram usernames or links get their numbers read and judged. Any other link (TikTok, X, Reddit, OnlyFans, a website) is saved as it is.</div>
@@ -9340,12 +9370,16 @@ function AcquisitionPage() {
         </div>
       </form>
       </>)}
-      <div className="hb-bar">
-        {[["todo", `To do ${lists.todo.length}`], ["reddit", agency === "US" ? `Reddit ${lists.reddit.length}` : "Reddit (US)"], ["new", `All new ${lists.new.length}`], ["pipeline", `In talks ${lists.pipeline.length}`], ["signed", `Signed ${lists.signed.length}`], ["archive", `Archive ${lists.archive.length}`]].map(([k, l]) => (
-          <button key={k} className={`hb-chip ${view === k ? "on" : ""}`} onClick={() => { if (k === "reddit" && agency !== "US") pickAgency("US"); setView(k); }}>{l}</button>
-        ))}
-      </div>
-      {view === "reddit" && (
+      {section === "overview" ? (
+        <div style={{ fontWeight: 800, fontSize: 15, margin: "4px 0 10px" }}>To do today, from every source</div>
+      ) : (
+        <div className="hb-bar">
+          {[["active", `Active ${stageLists.active.length}`], ["new", `New ${stageLists.new.length}`], ["talks", `In talks ${stageLists.talks.length}`], ["signed", `Signed ${stageLists.signed.length}`], ["archive", `Archive ${stageLists.archive.length}`]].map(([k, l]) => (
+            <button key={k} className={`hb-chip ${view === k ? "on" : ""}`} onClick={() => setView(k)}>{l}</button>
+          ))}
+        </div>
+      )}
+      {section === "reddit" && (
         <div className="hb-card" style={{ marginBottom: 12, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 220 }}>
             <div style={{ fontWeight: 800 }}>Creators asking for help on Reddit</div>
@@ -9356,7 +9390,7 @@ function AcquisitionPage() {
       )}
       <div className="hb-card" style={{ padding: 8 }}>
         {leads === null ? <div className="hb-note" style={{ padding: 12 }}>Loading</div> : !shown.length ? (
-          <div className="hb-empty" style={{ margin: 8 }}><b>{view === "todo" ? "Nothing to do right now" : "No leads here"}</b>{view === "todo" ? "Press Find new leads, or add some by hand above." : ""}</div>
+          <div className="hb-empty" style={{ margin: 8 }}><b>{section === "overview" ? "Nothing to do right now" : "No leads here yet"}</b>{section === "overview" ? "Open a source above to find or add leads." : ""}</div>
         ) : shown.map((l) => {
           const isDue = !["signed", "lost", "skip"].includes(l.status) && l.next_followup_at && Date.parse(l.next_followup_at) <= now + 12 * 3600000;
           return (

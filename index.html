@@ -15684,7 +15684,21 @@ function AcquisitionPage() {
   const [run, setRun] = useState(null);
   const [reddit, setReddit] = useState(null);
   const [cfg, setCfg] = useState(null);
-  const [view, setView] = useState("todo");
+  const [view, setView] = useState("active");
+  const [section, setSectionRaw] = useState(() => {
+    try {
+      return localStorage.getItem("zionAcqSection") || "overview";
+    } catch (e) {
+      return "overview";
+    }
+  });
+  const setSection = x => {
+    setSectionRaw(x);
+    setView("active");
+    try {
+      localStorage.setItem("zionAcqSection", x);
+    } catch (e) {}
+  };
   const [open, setOpen] = useState(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState("");
@@ -15796,6 +15810,16 @@ function AcquisitionPage() {
   const due = all.filter(l => l.next_followup_at && Date.parse(l.next_followup_at) <= now + 12 * 3600000 && !["signed", "lost", "skip"].includes(l.status));
   const fresh = all.filter(l => l.status === "new");
   const week = k => all.filter(l => l[k] && now - Date.parse(l[k]) < 7 * 86400000).length;
+  const sectionOf = l => l.source === "ads" ? "meta" : l.source === "referral" ? "referrals" : l.source === "reddit" ? "reddit" : l.source === "new OF" ? "newof" : ["hashtag", "similar", "followers", "search"].includes(l.source) || l.source === "manual" && l.followers != null ? "instagram" : "other";
+  const SECTIONS = [["overview", "Overview", "#39e673"], ["meta", "Meta ads", "#1877f2"], ["referrals", "Contacts", "#f0be3c"], ["reddit", "Reddit", "#ff4500"], ["instagram", "Instagram outreach", "#e1306c"], ["newof", "New OF profiles", "#7c5cff"], ["other", "Other links", "#8fa39a"]];
+  const inSection = all.filter(l => sectionOf(l) === section);
+  const stageLists = {
+    active: inSection.filter(l => !["signed", "lost", "skip"].includes(l.status)).sort((a, b) => (b.score || 0) - (a.score || 0)),
+    new: inSection.filter(l => l.status === "new").sort((a, b) => (b.score || 0) - (a.score || 0)),
+    talks: inSection.filter(l => ["messaged", "replied", "call"].includes(l.status)),
+    signed: inSection.filter(l => l.status === "signed"),
+    archive: inSection.filter(l => ["lost", "skip"].includes(l.status))
+  };
   const lists = {
     todo: [...due, ...fresh.filter(l => !due.includes(l) && (l.source === "reddit" ? (l.score || 0) >= 60 : (l.score || 0) >= 50 || l.source === "ads" || l.source === "referral"))].slice(0, 80),
     new: fresh,
@@ -15804,7 +15828,7 @@ function AcquisitionPage() {
     signed: all.filter(l => l.status === "signed"),
     archive: all.filter(l => ["lost", "skip"].includes(l.status))
   };
-  const shown = lists[view] || [];
+  const shown = section === "overview" ? lists.todo : stageLists[view] || [];
   const lead = open ? all.find(l => l.id === open) : null;
   const patchLocal = (id, p) => setLeads(cur => (cur || []).map(l => l.id === id ? {
     ...l,
@@ -15862,7 +15886,50 @@ function AcquisitionPage() {
     className: "aq-kpi"
   }, React.createElement("b", null, all.filter(l => l.status === "replied" || l.status === "call").length), React.createElement("span", null, "talking now")), React.createElement("div", {
     className: "aq-kpi"
-  }, React.createElement("b", null, lists.signed.length), React.createElement("span", null, "signed"))), agency === "US" && view !== "reddit" && React.createElement("div", {
+  }, React.createElement("b", null, lists.signed.length), React.createElement("span", null, "signed"))), React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      overflowX: "auto",
+      marginBottom: 16,
+      paddingBottom: 2
+    }
+  }, SECTIONS.map(([k, label, color]) => {
+    const n = k === "overview" ? lists.todo.length : all.filter(l => sectionOf(l) === k && !["signed", "lost", "skip"].includes(l.status)).length;
+    const on = section === k;
+    return React.createElement("button", {
+      key: k,
+      onClick: () => setSection(k),
+      style: {
+        flexShrink: 0,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "10px 14px",
+        borderRadius: 14,
+        fontSize: 13,
+        fontWeight: 700,
+        color: on ? "#03110a" : "#d9e2dd",
+        background: on ? color : "rgba(255,255,255,.04)",
+        border: `1px solid ${on ? color : "rgba(255,255,255,.1)"}`,
+        transition: "all .2s"
+      }
+    }, !on && React.createElement("span", {
+      style: {
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: color
+      }
+    }), label, React.createElement("span", {
+      style: {
+        fontSize: 11,
+        padding: "1px 7px",
+        borderRadius: 999,
+        background: on ? "rgba(0,0,0,.18)" : "rgba(255,255,255,.08)"
+      }
+    }, n));
+  })), section === "overview" && agency === "US" && React.createElement("div", {
     className: "hb-card",
     style: {
       marginBottom: 16,
@@ -15907,7 +15974,7 @@ function AcquisitionPage() {
       background: "#ff4500",
       color: "#fff"
     },
-    onClick: () => setView("reddit")
+    onClick: () => setSection("reddit")
   }, "Open Reddit leads")), lists.reddit.slice(0, 3).map(l => React.createElement("div", {
     key: l.id,
     className: "aq-row",
@@ -15944,7 +16011,7 @@ function AcquisitionPage() {
       background: scoreColor(l.score),
       color: (l.score || 0) >= 45 ? "#03110a" : "#c9d3ce"
     }
-  }, l.score ?? "?")))), React.createElement("div", {
+  }, l.score ?? "?")))), section === "newof" && React.createElement("div", {
     className: "hb-card",
     style: {
       marginBottom: 16,
@@ -15952,7 +16019,7 @@ function AcquisitionPage() {
       gap: 12,
       alignItems: "center",
       flexWrap: "wrap",
-      borderColor: "rgba(57,230,115,.35)"
+      borderColor: "rgba(124,92,255,.45)"
     }
   }, React.createElement("div", {
     style: {
@@ -15984,14 +16051,14 @@ function AcquisitionPage() {
     }, j => setRun(j.run))
   }, running && run?.kind === "newof" ? React.createElement(React.Fragment, null, React.createElement("span", {
     className: "hb-spin"
-  }), "Scraping") : "Scrape newly created OF profiles")), agency === "CZ" && React.createElement("div", {
+  }), "Scraping") : "Scrape newly created OF profiles")), (section === "meta" || section === "referrals") && React.createElement("div", {
     style: {
       display: "grid",
-      gridTemplateColumns: "repeat(auto-fit,minmax(min(300px,100%),1fr))",
+      gridTemplateColumns: "minmax(0,1fr)",
       gap: 14,
       marginBottom: 16
     }
-  }, React.createElement("label", {
+  }, section === "meta" && React.createElement("label", {
     className: "hb-card",
     style: {
       cursor: "pointer",
@@ -16033,7 +16100,7 @@ function AcquisitionPage() {
       marginTop: 8,
       color: "#39e673"
     }
-  }, importMsg)), React.createElement("form", {
+  }, importMsg)), section === "referrals" && React.createElement("form", {
     className: "hb-card",
     onSubmit: e => {
       e.preventDefault();
@@ -16120,7 +16187,7 @@ function AcquisitionPage() {
       marginTop: 10
     },
     disabled: busy === "ref" || !ref.name.trim()
-  }, busy === "ref" ? "Adding" : "Add contact"))), agency === "US" && React.createElement(React.Fragment, null, React.createElement("div", {
+  }, busy === "ref" ? "Adding" : "Add contact"))), section === "instagram" && React.createElement(React.Fragment, null, React.createElement("div", {
     className: "hb-card",
     style: {
       marginBottom: 16,
@@ -16158,7 +16225,7 @@ function AcquisitionPage() {
       setShowCfg(false);
       load();
     }
-  }), React.createElement("form", {
+  })), (section === "instagram" || section === "other") && React.createElement(React.Fragment, null, React.createElement("form", {
     className: "hb-card",
     style: {
       marginBottom: 16
@@ -16196,16 +16263,19 @@ function AcquisitionPage() {
   }), React.createElement("button", {
     className: "hb-btn",
     disabled: busy === "add" || !addText.trim()
-  }, busy === "add" ? "Adding" : "Add")))), React.createElement("div", {
+  }, busy === "add" ? "Adding" : "Add")))), section === "overview" ? React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 15,
+      margin: "4px 0 10px"
+    }
+  }, "To do today, from every source") : React.createElement("div", {
     className: "hb-bar"
-  }, [["todo", `To do ${lists.todo.length}`], ["reddit", agency === "US" ? `Reddit ${lists.reddit.length}` : "Reddit (US)"], ["new", `All new ${lists.new.length}`], ["pipeline", `In talks ${lists.pipeline.length}`], ["signed", `Signed ${lists.signed.length}`], ["archive", `Archive ${lists.archive.length}`]].map(([k, l]) => React.createElement("button", {
+  }, [["active", `Active ${stageLists.active.length}`], ["new", `New ${stageLists.new.length}`], ["talks", `In talks ${stageLists.talks.length}`], ["signed", `Signed ${stageLists.signed.length}`], ["archive", `Archive ${stageLists.archive.length}`]].map(([k, l]) => React.createElement("button", {
     key: k,
     className: `hb-chip ${view === k ? "on" : ""}`,
-    onClick: () => {
-      if (k === "reddit" && agency !== "US") pickAgency("US");
-      setView(k);
-    }
-  }, l))), view === "reddit" && React.createElement("div", {
+    onClick: () => setView(k)
+  }, l))), section === "reddit" && React.createElement("div", {
     className: "hb-card",
     style: {
       marginBottom: 12,
@@ -16249,7 +16319,7 @@ function AcquisitionPage() {
     style: {
       margin: 8
     }
-  }, React.createElement("b", null, view === "todo" ? "Nothing to do right now" : "No leads here"), view === "todo" ? "Press Find new leads, or add some by hand above." : "") : shown.map(l => {
+  }, React.createElement("b", null, section === "overview" ? "Nothing to do right now" : "No leads here yet"), section === "overview" ? "Open a source above to find or add leads." : "") : shown.map(l => {
     const isDue = !["signed", "lost", "skip"].includes(l.status) && l.next_followup_at && Date.parse(l.next_followup_at) <= now + 12 * 3600000;
     return React.createElement("div", {
       key: l.id,
@@ -29118,7 +29188,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1onnosc</script>
+<script type="text/babel" id="zion-version">1lkp67</script>
 <script>
 (function () {
   var last = 0;
