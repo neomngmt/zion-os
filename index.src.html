@@ -9215,6 +9215,7 @@ function AcquisitionPage() {
   const [cfg, setCfg] = useState(null);
   const [view, setView] = useState("active");
   const [kpi, setKpi] = useState(null);
+  const [queue, setQueue] = useState(null);
   const [section, setSectionRaw] = useState(() => { try { return localStorage.getItem("zionAcqSection") || "overview"; } catch (e) { return "overview"; } });
   const setSection = (x) => { setSectionRaw(x); setView("active"); try { localStorage.setItem("zionAcqSection", x); } catch (e) {} };
   const [open, setOpen] = useState(null);
@@ -9289,6 +9290,12 @@ function AcquisitionPage() {
     signed: all.filter((l) => l.status === "signed"),
     archive: all.filter((l) => ["lost", "skip"].includes(l.status)),
   };
+  // Reddit leads waiting for me: her new replies first, then the best new posts
+  const replyQueue = [
+    ...all.filter((l) => l.source === "reddit" && l.unread && ["messaged", "replied", "call"].includes(l.status)),
+    ...all.filter((l) => l.source === "reddit" && l.status === "new" && (l.score || 0) >= 60).sort((a, b) => (b.score || 0) - (a.score || 0)),
+  ].slice(0, 15);
+  const startQueue = () => setQueue(replyQueue.map((l) => l.id));
   const kpiLists = {
     due: { title: "Follow-ups due", list: due },
     good: { title: agency === "CZ" ? "New leads" : "Good new leads", list: agency === "CZ" ? fresh : fresh.filter((l) => (l.score || 0) >= 50).sort((a, b) => (b.score || 0) - (a.score || 0)) },
@@ -9424,6 +9431,7 @@ function AcquisitionPage() {
             <div style={{ fontWeight: 800, fontSize: 15 }}>Ongoing conversations</div>
             <div className="hb-note">Everyone you wrote to. New replies come first. Reddit threads are checked every morning.</div>
           </div>
+          {replyQueue.length > 0 && <button className="hb-btn sm" style={{ background: "#ff4500", color: "#fff" }} onClick={startQueue}>Reply queue ({replyQueue.length})</button>}
           <button className="hb-btn ghost sm" disabled={busy === "tc"} onClick={() => act("tc", { action: "thread-check" }, async (j) => { await load(); setErr(j.newReplies ? "" : ""); })}>{busy === "tc" ? <><span className="hb-spin" />Checking Reddit</> : "Check Reddit replies now"}</button>
         </div>
       ) : (
@@ -9439,6 +9447,7 @@ function AcquisitionPage() {
             <div style={{ fontWeight: 800 }}>Creators asking for help on Reddit</div>
             <div className="hb-note">{redditRunning ? "Reading the newest posts" : reddit?.state === "done" ? `Last check ${timeAgo(reddit.finishedAt)}: ${reddit.added} new of ${reddit.read} posts in r/${(reddit.subs || []).join(", r/")}` : "Checked every morning at 8:00."} Answer in the comments with the reply below from a real account, never mass DMs.</div>
           </div>
+          {replyQueue.length > 0 && <button className="hb-btn" style={{ background: "#ff4500", color: "#fff" }} onClick={startQueue}>Reply queue ({replyQueue.length})</button>}
           <button className="hb-btn ghost" disabled={redditRunning || busy === "rd"} onClick={() => act("rd", { action: "reddit-scan", agency: "US" }, (j) => setReddit(j.reddit))}>{redditRunning ? <><span className="hb-spin" />Checking</> : "Check now"}</button>
         </div>
       )}
@@ -9469,6 +9478,7 @@ function AcquisitionPage() {
           );
         })}
       </div>
+      {queue && <AcqReplyQueue items={queue.map((id) => all.find((l) => l.id === id)).filter(Boolean)} onClose={() => { setQueue(null); load(); }} onPatch={patchLocal} />}
       {lead && <AcqLeadSheet lead={lead} onClose={() => setOpen(null)} onPatch={(p) => patchLocal(lead.id, p)} onDeleted={() => { setOpen(null); load(); }} />}
     </div>
   );
@@ -9502,6 +9512,106 @@ function AcqSettings({ cfg, agency, onSaved }) {
   );
 }
 const ACQ_FUNNEL = [["help", "Help"], ["trust", "Trust"], ["offer", "Offer"], ["move", "DM"], ["call", "Call"]];
+// where my next Reddit reply goes: her newest comment, else the post
+const acqReplyUrl = (lead) => {
+  const hers = (Array.isArray(lead.convo) ? lead.convo : []).filter((c) => c.from === "her" && c.url);
+  const u = hers.length ? hers[hers.length - 1].url : lead.source_detail;
+  return u ? String(u).replace(/^https?:\/\/(old\.|np\.)?reddit\.com/, "https://www.reddit.com") : null;
+};
+// copy first (inside the tap), then open Reddit; nothing is sent by Zion
+const acqCopyOpen = (text, url) => {
+  try { navigator.clipboard.writeText(text).catch(() => {}); } catch (e) {}
+  if (url) window.open(url, "_blank", "noopener");
+};
+function AcqReplyQueue({ items, onClose, onPatch }) {
+  const [i, setI] = useState(0);
+  const [text, setText] = useState("");
+  const [stage, setStage] = useState("help");
+  const [busy, setBusy] = useState("");
+  const [opened, setOpened] = useState(false);
+  const [done, setDone] = useState(0);
+  const [msg, setMsg] = useState("");
+  useEffect(() => { const prev = document.body.style.overflow; document.body.style.overflow = "hidden"; return () => { document.body.style.overflow = prev; }; }, []);
+  const lead = items[i];
+  const isNew = lead && lead.status === "new";
+  // load or write the text for the current lead
+  useEffect(() => {
+    if (!lead) return;
+    setOpened(false); setMsg("");
+    if (isNew) {
+      const first = String(lead.dm || "").replace(/^Reply for the post:\n/, "").split("\n\n---\nFollow-up:\n")[0];
+      setStage("help");
+      if (first) { setText(first); return; }
+      setText(""); setBusy("write");
+      acqFn({ action: "dm", id: lead.id }).then((j) => { onPatch(lead.id, { dm: j.dm }); setText(String(j.dm || "").replace(/^Reply for the post:\n/, "").split("\n\n---\nFollow-up:\n")[0]); }).catch((e) => setMsg(e.message)).finally(() => setBusy(""));
+    } else {
+      if (lead.suggestion?.reply) { setText(lead.suggestion.reply); setStage(lead.suggestion.stage || lead.funnel_stage || "help"); return; }
+      setText(""); setBusy("write");
+      acqFn({ action: "next-reply", id: lead.id }).then((j) => { onPatch(lead.id, { suggestion: j.suggestion }); setText(j.suggestion.reply); setStage(j.suggestion.stage || "help"); }).catch((e) => setMsg(e.message)).finally(() => setBusy(""));
+    }
+  }, [i, lead && lead.id]);
+  const next = () => setI((x) => x + 1);
+  const sent = async () => {
+    setBusy("sent");
+    try {
+      const j = await acqFn({ action: "add-message", id: lead.id, from: "me", text, stage });
+      onPatch(lead.id, { convo: [...(lead.convo || []), j.message], suggestion: null, unread: false, funnel_stage: stage, last_contact_at: j.message.at,
+        ...(isNew ? { status: "messaged", messaged_at: j.message.at } : {}) });
+      setDone((d) => d + 1); next();
+    } catch (e) { setMsg(e.message); }
+    setBusy("");
+  };
+  const convo = lead && Array.isArray(lead.convo) ? lead.convo : [];
+  const lastHer = [...convo].reverse().find((c) => c.from === "her");
+  return ReactDOM.createPortal((
+    <div className="aq-sheet" onClick={onClose}>
+      <div className="aq-panel hb" onClick={(e) => e.stopPropagation()}>
+        <div className="aq-head">
+          <button className="aq-back" onClick={onClose}><ChevronLeft size={15} />Back to leads</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 800, fontSize: 18 }}>Reddit reply queue</div>
+              <div className="hb-note">{lead ? `${i + 1} of ${items.length}` : "Finished"}, {done} sent</div>
+            </div>
+            <button className="hb-x" onClick={onClose} aria-label="Close"><X size={16} /></button>
+          </div>
+          <div style={{ height: 4, borderRadius: 4, background: "rgba(255,255,255,.08)", marginTop: 10, overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${Math.min(100, (i / Math.max(1, items.length)) * 100)}%`, background: "#ff4500", transition: "width .3s" }} />
+          </div>
+        </div>
+        {!lead ? (
+          <div className="hb-empty" style={{ marginTop: 20 }}><b>All done</b>{done ? `You sent ${done} repl${done === 1 ? "y" : "ies"}. Zion checks the threads every morning and pings Telegram when someone answers.` : "Nothing was sent."}
+            <div style={{ marginTop: 12 }}><button className="hb-btn" onClick={onClose}>Close</button></div></div>
+        ) : (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
+              <span className="aq-tag" style={{ color: "#fff", background: "#ff4500" }}>{isNew ? "First reply" : "She answered"}</span>
+              <b>{lead.handle}</b>
+              {lead.score != null && <span className="hb-note">score {lead.score}</span>}
+            </div>
+            <div className="hb-card" style={{ padding: 12, marginBottom: 10 }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>{lead.full_name}</div>
+              {isNew ? <div style={{ fontSize: 13, color: "#d9e2dd", lineHeight: 1.5, whiteSpace: "pre-wrap", maxHeight: 150, overflow: "auto" }}>{lead.bio}</div>
+                : lastHer && <div className="aq-bub her" style={{ maxWidth: "100%" }}>{lastHer.text}</div>}
+            </div>
+            <div className="hb-note" style={{ marginBottom: 4 }}>Your reply{!isNew ? `, step: ${(ACQ_FUNNEL.find((f) => f[0] === stage) || [, stage])[1]}` : ""}. You can edit it.</div>
+            {busy === "write" ? <div className="hb-note" style={{ padding: 14 }}><span className="hb-spin" />Writing the reply</div>
+              : <textarea className="sh-ta" style={{ minHeight: 120, fontSize: 14 }} value={text} onChange={(e) => setText(e.target.value)} />}
+            {msg && <div className="hb-note" style={{ color: "#ff8a8a", marginTop: 6 }}>{msg}</div>}
+            <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+              <button className="hb-btn" style={{ background: "#ff4500", color: "#fff" }} disabled={!text.trim() || busy === "write"} onClick={() => { acqCopyOpen(text, acqReplyUrl(lead)); setOpened(true); }}>
+                {opened ? "Copied, open again" : "1. Copy and open Reddit"}</button>
+              <button className="hb-btn" disabled={!opened || busy === "sent"} onClick={sent}>{busy === "sent" ? "Saving" : "2. Sent, next"}</button>
+              <button className="hb-btn ghost" onClick={next}>Skip</button>
+            </div>
+            <div className="hb-note" style={{ marginTop: 10 }}>On Reddit tap Reply under {isNew ? "her post" : "her comment"}, paste, send, then come back and tap Sent.</div>
+          </div>
+        )}
+      </div>
+    </div>
+  ), document.body);
+}
+
 function AcqConversation({ lead, onPatch }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState("");
@@ -9540,7 +9650,8 @@ function AcqConversation({ lead, onPatch }) {
             <div className="hb-note" style={{ marginBottom: 4 }}>Step: {(ACQ_FUNNEL.find((f) => f[0] === sug.stage) || [, sug.stage])[1]}{sug.tip ? `. ${sug.tip}` : ""}</div>
             <div className="aq-bub me" style={{ maxWidth: "100%", marginLeft: 0 }}>{sug.reply}</div>
             <div style={{ display: "flex", gap: 6 }}>
-              <button className="hb-btn sm" onClick={async () => { try { await navigator.clipboard.writeText(sug.reply); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch (e) {} }}>{copied ? "Copied" : "Copy"}</button>
+              {lead.source === "reddit" && acqReplyUrl(lead) && <button className="hb-btn sm" style={{ background: "#ff4500", color: "#fff" }} onClick={() => { acqCopyOpen(sug.reply, acqReplyUrl(lead)); setCopied(true); }}>{copied ? "Copied, opened" : "Copy and open Reddit"}</button>}
+              {lead.source !== "reddit" && <button className="hb-btn sm" onClick={async () => { try { await navigator.clipboard.writeText(sug.reply); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch (e) {} }}>{copied ? "Copied" : "Copy"}</button>}
               <button className="hb-btn ghost sm" disabled={busy === "me"} onClick={() => add("me", sug.reply, sug.stage)}>I sent this</button>
             </div>
           </div>
@@ -9641,7 +9752,9 @@ function AcqLeadSheet({ lead, onClose, onPatch, onDeleted }) {
             <>
               <div style={{ fontSize: 14, lineHeight: 1.55, whiteSpace: "pre-wrap", color: "#f2f5f0" }}>{parts[0]}</div>
               <div style={{ display: "flex", gap: 6, margin: "8px 0 12px" }}>
-                <button className="hb-btn sm" onClick={() => copy("a", parts[0])}>{copied === "a" ? "Copied" : lead.source === "reddit" ? "Copy reply" : "Copy DM"}</button>
+                {lead.source === "reddit" && lead.source_detail
+                  ? <button className="hb-btn sm" style={{ background: "#ff4500", color: "#fff" }} onClick={() => { acqCopyOpen(parts[0], acqReplyUrl(lead)); setCopied("a"); }}>{copied === "a" ? "Copied, opened" : "Copy and open Reddit"}</button>
+                  : <button className="hb-btn sm" onClick={() => copy("a", parts[0])}>{copied === "a" ? "Copied" : "Copy DM"}</button>}
                 {lead.status === "new" && <button className="hb-btn ghost sm" onClick={async () => {
                   try { const j = await acqFn({ action: "add-message", id: lead.id, from: "me", text: parts[0], stage: "help" }); onPatch({ status: "messaged", messaged_at: j.message.at, last_contact_at: j.message.at, funnel_stage: "help", convo: [...(lead.convo || []), j.message] }); } catch (e) {}
                 }}>{lead.source === "reddit" ? "I replied" : "Mark as messaged"}</button>}
