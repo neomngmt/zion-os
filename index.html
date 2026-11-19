@@ -15914,15 +15914,95 @@ async function knExtractAudio(file, onProgress) {
   return all;
 }
 const KN_STATUS = {
-  transcribing: ["Reading the video", "#f0be3c"],
+  transcribing: ["Reading", "#f0be3c"],
   uploading: ["Uploading", "#f0be3c"],
-  processing: ["Learning", "#38bdf8"],
+  processing: ["Learning", "#a78bfa"],
   ready: ["Learned", "#39e673"],
-  failed: ["Failed", "#E2725B"]
+  failed: ["Failed", "#ff7a6b"]
 };
+function KnConstellation({
+  count
+}) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const cv = ref.current;
+    if (!cv) return;
+    const ctx = cv.getContext("2d");
+    const still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let w = 0,
+      h = 0,
+      raf = 0;
+    const n = Math.max(18, Math.min(90, count + 18));
+    const pts = Array.from({
+      length: n
+    }, (_, i) => ({
+      x: Math.random(),
+      y: Math.random(),
+      vx: (Math.random() - 0.5) * 0.00018,
+      vy: (Math.random() - 0.5) * 0.00018,
+      r: i < count ? 1.9 : 1.1,
+      lit: i < count
+    }));
+    const size = () => {
+      const d = window.devicePixelRatio || 1;
+      w = cv.clientWidth;
+      h = cv.clientHeight;
+      cv.width = w * d;
+      cv.height = h * d;
+      ctx.setTransform(d, 0, 0, d, 0, 0);
+    };
+    size();
+    window.addEventListener("resize", size);
+    const draw = () => {
+      ctx.clearRect(0, 0, w, h);
+      for (const p of pts) {
+        if (!still) {
+          p.x += p.vx;
+          p.y += p.vy;
+          if (p.x < 0 || p.x > 1) p.vx *= -1;
+          if (p.y < 0 || p.y > 1) p.vy *= -1;
+        }
+      }
+      for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) {
+        const a = pts[i],
+          b = pts[j],
+          dx = (a.x - b.x) * w,
+          dy = (a.y - b.y) * h,
+          d = Math.hypot(dx, dy);
+        if (d < 120) {
+          ctx.strokeStyle = `rgba(57,230,115,${(1 - d / 120) * (a.lit && b.lit ? 0.22 : 0.08)})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(a.x * w, a.y * h);
+          ctx.lineTo(b.x * w, b.y * h);
+          ctx.stroke();
+        }
+      }
+      for (const p of pts) {
+        ctx.fillStyle = p.lit ? "rgba(57,230,115,.9)" : "rgba(167,139,250,.45)";
+        ctx.beginPath();
+        ctx.arc(p.x * w, p.y * h, p.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (!still) raf = requestAnimationFrame(draw);
+    };
+    draw();
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", size);
+    };
+  }, [count]);
+  return React.createElement("canvas", {
+    ref: ref,
+    className: "kn-canvas",
+    "aria-hidden": "true"
+  });
+}
 function KnowledgePage() {
   const [items, setItems] = useState(null);
+  const [tab, setTab] = useState("link");
   const [url, setUrl] = useState("");
+  const [paste, setPaste] = useState("");
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
@@ -15930,35 +16010,8 @@ function KnowledgePage() {
   const [open, setOpen] = useState(null);
   const [detail, setDetail] = useState(null);
   const [filter, setFilter] = useState("");
-  const [paste, setPaste] = useState("");
-  const addText = async e => {
-    e.preventDefault();
-    if (paste.trim().length < 200) {
-      setErr("Paste the whole transcript.");
-      return;
-    }
-    setBusy("tx");
-    setErr("");
-    setMsg("Neo is reading the call");
-    try {
-      const j = await knFn({
-        action: "add-text",
-        text: paste
-      });
-      setPaste("");
-      await load();
-      await knFn({
-        action: "process",
-        id: j.id
-      });
-      setMsg("Neo learned the call.");
-    } catch (e2) {
-      setErr(e2.message);
-      setMsg("");
-    }
-    setBusy("");
-    load();
-  };
+  const [topic, setTopic] = useState("");
+  const [drag, setDrag] = useState(false);
   const load = useCallback(async () => {
     try {
       const j = await knFn({
@@ -15987,8 +16040,21 @@ function KnowledgePage() {
       id: open
     }).then(j => setDetail(j.item)).catch(e => setErr(e.message));
   }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const k = e => {
+      if (e.key === "Escape") setOpen(null);
+    };
+    window.addEventListener("keydown", k);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", k);
+    };
+  }, [open]);
   const addYoutube = async e => {
-    e.preventDefault();
+    e && e.preventDefault();
     const links = url.split(/\s+/).map(x => x.trim()).filter(x => /youtu/.test(x));
     if (!links.length) {
       setErr("Paste a YouTube link.");
@@ -16023,11 +16089,40 @@ function KnowledgePage() {
     setMsg(ok ? `Neo learned ${ok} video${ok === 1 ? "" : "s"}.` : "");
     setBusy("");
   };
+  const addText = async e => {
+    e && e.preventDefault();
+    if (paste.trim().length < 200) {
+      setErr("Paste the whole transcript.");
+      return;
+    }
+    setBusy("tx");
+    setErr("");
+    setMsg("Neo is reading the call");
+    try {
+      const j = await knFn({
+        action: "add-text",
+        text: paste
+      });
+      setPaste("");
+      await load();
+      await knFn({
+        action: "process",
+        id: j.id
+      });
+      setMsg("Neo learned the call.");
+    } catch (e2) {
+      setErr(e2.message);
+      setMsg("");
+    }
+    setBusy("");
+    load();
+  };
   const uploadFile = async file => {
     if (!file) return;
     setErr("");
     setMsg("");
     setBusy("up");
+    setTab("file");
     const title = file.name.replace(/\.[a-z0-9]+$/i, "").replace(/[_-]+/g, " ");
     try {
       setUp({
@@ -16087,114 +16182,111 @@ function KnowledgePage() {
     setBusy("");
     await load();
   };
-  const list = (items || []).filter(k => !filter || `${k.title} ${(k.tags || []).join(" ")} ${k.summary || ""}`.toLowerCase().includes(filter.toLowerCase()));
-  const ready = (items || []).filter(k => k.status === "ready");
+  const all = items || [];
+  const ready = all.filter(k => k.status === "ready");
   const hours = Math.round(ready.reduce((a, k) => a + (k.duration_sec || 0), 0) / 360) / 10;
   const lessons = ready.reduce((a, k) => a + (k.insight_count || 0), 0);
-  const fmtDur = sec => !sec ? "" : sec >= 3600 ? `${Math.floor(sec / 3600)} h ${Math.round(sec % 3600 / 60)} min` : `${Math.round(sec / 60)} min`;
+  const topics = Object.entries(ready.flatMap(k => k.tags || []).reduce((o, t) => (o[t] = (o[t] || 0) + 1, o), {})).sort((a, b) => b[1] - a[1]).slice(0, 12);
+  const list = all.filter(k => (!topic || (k.tags || []).includes(topic)) && (!filter || `${k.title} ${(k.tags || []).join(" ")} ${k.summary || ""}`.toLowerCase().includes(filter.toLowerCase())));
+  const fmtDur = sec => !sec ? "" : sec >= 3600 ? `${Math.floor(sec / 3600)}h ${Math.round(sec % 3600 / 60)}m` : `${Math.round(sec / 60)} min`;
+  const kind = k => k.source_type === "youtube" ? "YouTube" : k.source_type === "fathom" ? "Fathom call" : k.source_type === "text" ? "Transcript" : "Recording";
+  const ytThumb = k => k.source_type === "youtube" && k.url && k.url.includes("v=") ? `https://i.ytimg.com/vi/${k.url.split("v=")[1]}/hqdefault.jpg` : null;
+  const TABS = [["link", "YouTube link"], ["text", "Transcript"], ["file", "Recording"]];
   return React.createElement("div", {
-    className: "hb kn-page"
-  }, React.createElement("style", null, HUB_CSS, SHOOT_CSS, KN_CSS), React.createElement("div", {
+    className: "hb kn"
+  }, React.createElement("style", null, HUB_CSS, SHOOT_CSS, KN_CSS), React.createElement("section", {
     className: "kn-hero"
+  }, React.createElement(KnConstellation, {
+    count: lessons
+  }), React.createElement("div", {
+    className: "kn-hero-in"
   }, React.createElement("div", {
-    style: {
-      flex: 1,
-      minWidth: 240
-    }
-  }, React.createElement("div", {
-    className: "kn-eyebrow"
-  }, "Neo Knowledge"), React.createElement("h2", {
-    className: "kn-h"
-  }, "Everything Neo has learned"), React.createElement("div", {
-    className: "hb-note",
-    style: {
-      maxWidth: 560
-    }
-  }, "Add YouTube videos and recordings of calls. Zion writes down what was said, pulls out every lesson, and Neo uses it when you ask him about outreach, chatting, recruiting or anything else. He tells you which video he learned it from.")), React.createElement("div", {
-    className: "kn-stats"
-  }, React.createElement("div", null, React.createElement("b", null, ready.length), React.createElement("span", null, "sources")), React.createElement("div", null, React.createElement("b", null, lessons), React.createElement("span", null, "lessons")), React.createElement("div", null, React.createElement("b", null, hours), React.createElement("span", null, "hours")))), React.createElement("div", {
-    className: "kn-add"
-  }, React.createElement("form", {
-    className: "hb-card",
-    onSubmit: addYoutube
-  }, React.createElement("div", {
-    className: "kn-add-h"
+    className: "kn-kicker"
   }, React.createElement("span", {
-    className: "kn-ico",
-    style: {
-      background: "#ff0033"
-    }
-  }, "▶"), React.createElement("div", null, React.createElement("b", null, "YouTube videos"), React.createElement("div", {
-    className: "hb-note"
-  }, "Paste one link or many. About 1 cent a video."))), React.createElement("textarea", {
-    className: "sh-ta",
-    style: {
-      minHeight: 70,
-      width: "100%",
-      display: "block",
-      boxSizing: "border-box"
+    className: "kn-dot"
+  }), "Neo Knowledge"), React.createElement("h1", {
+    className: "kn-title-xl"
+  }, "Neo's ", React.createElement("em", null, "memory")), React.createElement("p", {
+    className: "kn-lede"
+  }, "Every video and call you give him becomes lessons he uses when you ask about outreach, chatting, content or signing creators. He always says where he learned it."), React.createElement("div", {
+    className: "kn-figs"
+  }, React.createElement("div", null, React.createElement("b", null, ready.length), React.createElement("span", null, "sources")), React.createElement("div", null, React.createElement("b", null, lessons), React.createElement("span", null, "lessons")), React.createElement("div", null, React.createElement("b", null, hours), React.createElement("span", null, "hours"))))), React.createElement("section", {
+    className: `kn-composer ${drag ? "drag" : ""}`,
+    onDragOver: e => {
+      e.preventDefault();
+      if (!busy) setDrag(true);
     },
+    onDragLeave: () => setDrag(false),
+    onDrop: e => {
+      e.preventDefault();
+      setDrag(false);
+      if (!busy && e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]);
+    }
+  }, React.createElement("div", {
+    className: "kn-tabs",
+    role: "tablist"
+  }, TABS.map(([k, l]) => React.createElement("button", {
+    key: k,
+    role: "tab",
+    "aria-selected": tab === k,
+    className: tab === k ? "on" : "",
+    onClick: () => setTab(k),
+    disabled: !!busy && tab !== k
+  }, l)), React.createElement("span", {
+    className: "kn-tabs-note"
+  }, tab === "link" ? "about 1 cent a video" : tab === "text" ? "Fathom, Zoom or notes, almost free" : "about 20 cents an hour")), tab === "link" && React.createElement("form", {
+    className: "kn-row",
+    onSubmit: addYoutube
+  }, React.createElement("input", {
+    className: "kn-field",
     value: url,
     onChange: e => setUrl(e.target.value),
-    placeholder: "https://www.youtube.com/watch?v=..."
+    placeholder: "Paste one or more YouTube links"
   }), React.createElement("button", {
-    className: "hb-btn",
-    style: {
-      marginTop: 8,
-      display: "block"
-    },
+    className: "kn-go",
     disabled: !!busy || !url.trim()
   }, busy === "yt" ? React.createElement(React.Fragment, null, React.createElement("span", {
     className: "hb-spin"
-  }), "Learning") : "Teach Neo")), React.createElement("form", {
-    className: "hb-card",
+  }), "Learning") : "Teach Neo")), tab === "text" && React.createElement("form", {
     onSubmit: addText
-  }, React.createElement("div", {
-    className: "kn-add-h"
-  }, React.createElement("span", {
-    className: "kn-ico",
-    style: {
-      background: "#00b386"
-    }
-  }, "¶"), React.createElement("div", null, React.createElement("b", null, "Paste a transcript"), React.createElement("div", {
-    className: "hb-note"
-  }, "From Fathom, Zoom or notes. Transcript and summary together is best. Almost free."))), React.createElement("textarea", {
-    className: "sh-ta",
-    style: {
-      minHeight: 70,
-      width: "100%",
-      display: "block",
-      boxSizing: "border-box"
-    },
+  }, React.createElement("textarea", {
+    className: "kn-field kn-area",
     value: paste,
     onChange: e => setPaste(e.target.value),
-    placeholder: "Paste the whole transcript here"
-  }), React.createElement("button", {
-    className: "hb-btn",
+    placeholder: "Paste the whole transcript here. Transcript and summary together works best."
+  }), React.createElement("div", {
+    className: "kn-row",
     style: {
-      marginTop: 8,
-      display: "block"
-    },
+      justifyContent: "space-between",
+      marginTop: 10
+    }
+  }, React.createElement("span", {
+    className: "kn-mono"
+  }, paste.trim() ? `${paste.trim().split(/\s+/).length.toLocaleString("en-US")} words` : ""), React.createElement("button", {
+    className: "kn-go",
     disabled: !!busy || paste.trim().length < 200
   }, busy === "tx" ? React.createElement(React.Fragment, null, React.createElement("span", {
     className: "hb-spin"
-  }), "Learning") : "Teach Neo")), React.createElement("label", {
-    className: "hb-card kn-drop",
-    onDragOver: e => e.preventDefault(),
-    onDrop: e => {
-      e.preventDefault();
-      if (!busy) uploadFile(e.dataTransfer.files[0]);
-    }
+  }), "Learning") : "Teach Neo"))), tab === "file" && (up ? React.createElement("div", {
+    className: "kn-progress"
   }, React.createElement("div", {
-    className: "kn-add-h"
+    className: "kn-progress-top"
+  }, React.createElement("b", null, up.name), React.createElement("span", {
+    className: "kn-mono"
+  }, up.pct, "%")), React.createElement("div", {
+    className: "kn-bar"
   }, React.createElement("span", {
-    className: "kn-ico",
     style: {
-      background: "#7c5cff"
+      width: `${up.pct}%`
     }
-  }, "●"), React.createElement("div", null, React.createElement("b", null, "Call recordings"), React.createElement("div", {
-    className: "hb-note"
-  }, "MP4 or MOV screen recordings, or audio. A one hour call costs about 20 cents."))), React.createElement("input", {
+  })), React.createElement("div", {
+    className: "kn-mono",
+    style: {
+      marginTop: 8
+    }
+  }, up.stage, ". Keep this page open.")) : React.createElement("label", {
+    className: "kn-drop"
+  }, React.createElement("input", {
     type: "file",
     accept: "video/*,audio/*,.mp4,.mov,.m4a,.mp3,.wav,.webm",
     style: {
@@ -16205,143 +16297,113 @@ function KnowledgePage() {
       uploadFile(e.target.files[0]);
       e.target.value = "";
     }
-  }), up ? React.createElement("div", {
+  }), React.createElement("span", {
+    className: "kn-wave",
+    "aria-hidden": "true"
+  }, Array.from({
+    length: 28
+  }, (_, i) => React.createElement("i", {
+    key: i,
     style: {
-      marginTop: 6
+      height: `${18 + Math.abs(Math.sin(i * 1.7)) * 70}%`,
+      animationDelay: `${i * 60}ms`
     }
-  }, React.createElement("div", {
+  }))), React.createElement("b", null, "Drop a call recording here"), React.createElement("span", {
+    className: "kn-mono"
+  }, "MP4, MOV or audio, or tap to choose. Best on a computer."))), (msg || err) && React.createElement("div", {
+    className: "kn-flash",
     style: {
-      fontSize: 13,
-      fontWeight: 700,
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap"
+      color: err ? "#ff7a6b" : "#39e673"
     }
-  }, up.name), React.createElement("div", {
-    className: "hb-note",
-    style: {
-      margin: "4px 0 8px"
-    }
-  }, up.stage), React.createElement("div", {
-    className: "kn-bar"
-  }, React.createElement("span", {
-    style: {
-      width: `${up.pct}%`
-    }
-  })), React.createElement("div", {
-    className: "hb-note",
-    style: {
-      marginTop: 8
-    }
-  }, "Keep this page open until it says learned.")) : React.createElement("div", {
-    className: "kn-dropzone"
-  }, busy ? "Busy, wait a moment" : "Drop the file here or tap to choose"))), msg && React.createElement("div", {
-    className: "hb-note",
-    style: {
-      color: "#39e673",
-      marginBottom: 10
-    }
-  }, msg), err && React.createElement("div", {
-    className: "hb-note",
-    style: {
-      color: "#E2725B",
-      marginBottom: 10
-    }
-  }, err), React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 10,
-      margin: "18px 0 10px",
-      flexWrap: "wrap"
-    }
-  }, React.createElement("div", {
-    style: {
-      fontWeight: 800,
-      fontSize: 16,
-      flex: 1
-    }
-  }, "Library"), React.createElement("input", {
-    className: "hb-in",
-    style: {
-      maxWidth: 240
-    },
+  }, err || msg)), React.createElement("div", {
+    className: "kn-libhead"
+  }, React.createElement("h2", null, "Library"), React.createElement("input", {
+    className: "kn-field kn-search",
     value: filter,
     onChange: e => setFilter(e.target.value),
-    placeholder: "Search the library"
-  })), items === null ? React.createElement("div", {
-    className: "hb-note"
+    placeholder: "Search"
+  })), topics.length > 0 && React.createElement("div", {
+    className: "kn-chips"
+  }, React.createElement("button", {
+    className: !topic ? "on" : "",
+    onClick: () => setTopic("")
+  }, "All"), topics.map(([t, n]) => React.createElement("button", {
+    key: t,
+    className: topic === t ? "on" : "",
+    onClick: () => setTopic(topic === t ? "" : t)
+  }, t, React.createElement("em", null, n)))), items === null ? React.createElement("div", {
+    className: "kn-mono",
+    style: {
+      padding: 20
+    }
   }, "Loading") : !list.length ? React.createElement("div", {
-    className: "hb-empty"
-  }, React.createElement("b", null, "Nothing here yet"), "Add the first video or call above.") : React.createElement("div", {
+    className: "kn-empty"
+  }, React.createElement("b", null, all.length ? "Nothing matches" : "Neo has not learned anything yet"), React.createElement("span", null, all.length ? "Try another topic or word." : "Paste a YouTube link or a call transcript above.")) : React.createElement("div", {
     className: "kn-grid"
   }, list.map(k => {
     const [sl, sc] = KN_STATUS[k.status] || [k.status, "#8fa39a"];
-    return React.createElement("div", {
+    const thumb = ytThumb(k);
+    const working = ["transcribing", "processing", "uploading"].includes(k.status);
+    return React.createElement("article", {
       key: k.id,
-      className: "kn-card",
+      className: `kn-card ${k.status === "ready" ? "go" : ""}`,
       onClick: () => k.status === "ready" && setOpen(k.id),
-      style: {
-        cursor: k.status === "ready" ? "pointer" : "default"
+      tabIndex: k.status === "ready" ? 0 : -1,
+      onKeyDown: e => {
+        if (e.key === "Enter" && k.status === "ready") setOpen(k.id);
       }
     }, React.createElement("div", {
-      className: "kn-thumb",
-      style: k.source_type === "youtube" && k.url ? {
-        backgroundImage: `url(https://i.ytimg.com/vi/${k.url.split("v=")[1]}/mqdefault.jpg)`
+      className: `kn-cover ${thumb ? "" : "gen"}`,
+      style: thumb ? {
+        backgroundImage: `url(${thumb})`
       } : {}
-    }, k.source_type !== "youtube" && React.createElement("span", null, k.source_type === "fathom" ? "FATHOM" : "CALL"), React.createElement("i", {
+    }, !thumb && React.createElement("span", {
+      className: "kn-cover-wave",
+      "aria-hidden": "true"
+    }, Array.from({
+      length: 22
+    }, (_, i) => React.createElement("i", {
+      key: i,
       style: {
-        background: sc
+        height: `${14 + Math.abs(Math.sin((i + k.id.length) * 1.3)) * 60}%`
       }
-    }, ["transcribing", "processing", "uploading"].includes(k.status) && React.createElement("span", {
+    }))), React.createElement("span", {
+      className: "kn-status",
+      style: {
+        color: sc
+      }
+    }, working && React.createElement("span", {
       className: "hb-spin",
       style: {
         width: 9,
         height: 9
       }
-    }), sl)), React.createElement("div", {
+    }), React.createElement("i", {
       style: {
-        padding: 12
+        background: sc
       }
-    }, React.createElement("div", {
-      className: "kn-title"
-    }, k.title || k.file_name || "Untitled"), React.createElement("div", {
-      className: "hb-note",
-      style: {
-        marginTop: 4
-      }
-    }, [k.source_type === "youtube" ? "YouTube" : k.source_type === "fathom" ? "Fathom call" : "Call", fmtDur(k.duration_sec), k.insight_count ? `${k.insight_count} lessons` : null, k.status === "uploading" && k.progress ? `part ${k.progress.done || 0} of ${k.progress.parts}` : null].filter(Boolean).join(" · ")), k.status === "failed" && React.createElement("div", {
-      className: "hb-note",
-      style: {
-        color: "#E2725B",
-        marginTop: 6
-      }
-    }, k.error), k.summary && React.createElement("div", {
+    }), sl), React.createElement("span", {
+      className: "kn-kind"
+    }, kind(k))), React.createElement("div", {
+      className: "kn-body"
+    }, React.createElement("h3", null, k.title || k.file_name || "Untitled"), React.createElement("div", {
+      className: "kn-mono"
+    }, [fmtDur(k.duration_sec), k.insight_count ? `${k.insight_count} lessons` : null, k.status === "uploading" && k.progress ? `part ${k.progress.done || 0} of ${k.progress.parts}` : null, new Date(k.created_at).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short"
+    })].filter(Boolean).join("  ·  ")), k.status === "failed" && React.createElement("p", {
+      className: "kn-err"
+    }, k.error), k.summary && React.createElement("p", {
       className: "kn-sum"
-    }, k.summary), (k.tags || []).length > 0 && React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 4,
-        flexWrap: "wrap",
-        marginTop: 8
-      }
-    }, k.tags.slice(0, 5).map(t => React.createElement("span", {
-      key: t,
-      className: "kn-tag"
-    }, t))), React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 6,
-        marginTop: 10
-      },
+    }, k.summary), React.createElement("div", {
+      className: "kn-foot",
       onClick: e => e.stopPropagation()
-    }, k.status === "failed" && k.source_type === "youtube" && React.createElement("button", {
-      className: "hb-btn ghost sm",
-      onClick: async () => {
-        setUrl(k.url);
-      }
-    }, "Try again"), k.status === "processing" && React.createElement("button", {
-      className: "hb-btn ghost sm",
+    }, React.createElement("div", {
+      className: "kn-tags"
+    }, (k.tags || []).slice(0, 3).map(t => React.createElement("span", {
+      key: t
+    }, t))), k.status === "processing" && !working && React.createElement("button", {
+      className: "kn-link",
       onClick: async () => {
         try {
           await knFn({
@@ -16353,13 +16415,16 @@ function KnowledgePage() {
         }
         load();
       }
-    }, "Retry learning"), React.createElement("button", {
-      className: "hb-btn ghost sm",
-      style: {
-        marginLeft: "auto"
-      },
+    }, "Retry"), k.status === "failed" && k.source_type === "youtube" && React.createElement("button", {
+      className: "kn-link",
+      onClick: () => {
+        setTab("link");
+        setUrl(k.url);
+      }
+    }, "Try again"), React.createElement("button", {
+      className: "kn-link dim",
       onClick: async () => {
-        if (!window.confirm(`Remove "${k.title || k.file_name}" from Neo's knowledge?`)) return;
+        if (!window.confirm(`Remove "${k.title || k.file_name}" from Neo's memory?`)) return;
         await knFn({
           action: "delete",
           id: k.id
@@ -16368,134 +16433,170 @@ function KnowledgePage() {
       }
     }, "Remove"))));
   })), open && ReactDOM.createPortal(React.createElement("div", {
-    className: "aq-sheet",
+    className: "kn-sheet",
     onClick: () => setOpen(null)
-  }, React.createElement("div", {
-    className: "aq-panel hb",
+  }, React.createElement("style", null, KN_CSS), React.createElement("div", {
+    className: "kn-panel",
     onClick: e => e.stopPropagation()
-  }, React.createElement("style", null, HUB_CSS, SHOOT_CSS, ACQ_CSS, KN_CSS), React.createElement("div", {
-    className: "aq-head"
+  }, React.createElement("div", {
+    className: "kn-panel-head"
   }, React.createElement("button", {
-    className: "aq-back",
+    className: "kn-back",
     onClick: () => setOpen(null)
   }, React.createElement(ChevronLeft, {
     size: 15
-  }), "Back to library"), React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 10,
-      alignItems: "flex-start"
-    }
-  }, React.createElement("div", {
-    style: {
-      flex: 1,
-      minWidth: 0
-    }
-  }, React.createElement("div", {
-    style: {
-      fontWeight: 800,
-      fontSize: 18
-    }
-  }, detail?.title || "Loading"), detail?.url && React.createElement("a", {
-    className: "hb-note",
-    href: detail.url,
-    target: "_blank",
-    rel: "noopener noreferrer",
-    style: {
-      color: "#39e673"
-    }
-  }, detail.source_type === "fathom" ? "Open in Fathom" : "Open on YouTube")), React.createElement("button", {
-    className: "hb-x",
+  }), "Library"), React.createElement("button", {
+    className: "kn-x",
     onClick: () => setOpen(null),
     "aria-label": "Close"
   }, React.createElement(X, {
     size: 16
-  })))), detail && React.createElement(React.Fragment, null, React.createElement("div", {
-    className: "hb-card",
+  }))), !detail ? React.createElement("div", {
+    className: "kn-mono",
     style: {
-      padding: 14,
-      margin: "12px 0"
+      padding: 24
     }
-  }, React.createElement("div", {
-    className: "kn-eyebrow",
+  }, "Loading") : React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "kn-kicker",
     style: {
-      marginBottom: 6
+      marginTop: 6
     }
-  }, "Summary"), React.createElement("div", {
-    style: {
-      fontSize: 14,
-      lineHeight: 1.6
-    }
-  }, detail.summary)), React.createElement("div", {
-    className: "kn-eyebrow",
-    style: {
-      margin: "14px 0 8px"
-    }
-  }, "Lessons Neo learned (", (detail.insights || []).length, ")"), Object.entries((detail.insights || []).reduce((g, x) => ((g[x.topic] = g[x.topic] || []).push(x), g), {})).map(([topic, xs]) => React.createElement("div", {
-    key: topic,
-    style: {
-      marginBottom: 14
-    }
-  }, React.createElement("div", {
-    style: {
-      fontWeight: 800,
-      fontSize: 13,
-      color: "#39e673",
-      marginBottom: 6
-    }
-  }, topic), xs.map((x, i) => React.createElement("div", {
+  }, kind(detail), detail.duration_sec ? `  ·  ${fmtDur(detail.duration_sec)}` : ""), React.createElement("h2", {
+    className: "kn-panel-title"
+  }, detail.title), detail.url && React.createElement("a", {
+    className: "kn-link",
+    href: detail.url,
+    target: "_blank",
+    rel: "noopener noreferrer"
+  }, detail.source_type === "fathom" ? "Open in Fathom" : "Watch on YouTube"), React.createElement("p", {
+    className: "kn-panel-sum"
+  }, detail.summary), Object.entries((detail.insights || []).reduce((g, x) => ((g[x.topic] = g[x.topic] || []).push(x), g), {})).map(([t, xs]) => React.createElement("section", {
+    key: t,
+    className: "kn-topic"
+  }, React.createElement("h4", null, t, React.createElement("span", null, xs.length)), xs.map((x, i) => React.createElement("div", {
     key: i,
     className: "kn-lesson"
-  }, React.createElement("b", null, x.point), React.createElement("div", null, x.detail))))), React.createElement("details", {
-    style: {
-      marginTop: 10
-    }
-  }, React.createElement("summary", {
-    className: "hb-note",
-    style: {
-      cursor: "pointer"
-    }
-  }, "Full transcript"), React.createElement("div", {
-    style: {
-      fontSize: 13,
-      lineHeight: 1.6,
-      color: "#c9d3ce",
-      whiteSpace: "pre-wrap",
-      marginTop: 8
-    }
-  }, detail.transcript))))), document.body));
+  }, React.createElement("b", null, x.point), React.createElement("p", null, x.detail))))), React.createElement("details", {
+    className: "kn-transcript"
+  }, React.createElement("summary", null, "Full transcript"), React.createElement("div", null, detail.transcript))))), document.body));
 }
 const KN_CSS = `
-.kn-hero{ display:flex; gap:18px; align-items:flex-end; flex-wrap:wrap; padding:24px; border-radius:22px; margin-bottom:16px; border:1px solid rgba(255,255,255,.08);
-  background:radial-gradient(110% 140% at 0% 0%, rgba(124,92,255,.18), transparent 55%), radial-gradient(90% 120% at 100% 100%, rgba(57,230,115,.12), transparent 60%), #0d1310; }
-.kn-eyebrow{ font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#8fa39a; font-weight:700; }
-.kn-h{ font-size:28px; font-weight:900; margin:6px 0 8px; letter-spacing:-.01em; text-wrap:balance; }
-.kn-stats{ display:flex; gap:10px; }
-.kn-stats div{ min-width:86px; padding:12px 14px; border-radius:16px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07); }
-.kn-stats b{ display:block; font-size:26px; font-weight:900; font-variant-numeric:tabular-nums; }
-.kn-stats span{ font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#8fa39a; }
-.kn-add{ display:grid; grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr)); gap:14px; }
-.kn-page .sh-ta{ box-sizing:border-box; max-width:100%; color:#f2f5f0; background:rgba(0,0,0,.35); }
-.kn-page .sh-ta:focus{ border-color:rgba(57,230,115,.5); }
-.kn-add > *{ min-width:0; }
-.kn-add-h{ display:flex; gap:12px; align-items:center; margin-bottom:10px; }
-.kn-ico{ width:38px; height:38px; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:14px; flex-shrink:0; }
-.kn-drop{ cursor:pointer; display:block; }
-.kn-dropzone{ border:1.5px dashed rgba(124,92,255,.5); border-radius:14px; padding:22px 12px; text-align:center; color:#c9d3ce; font-size:13px; background:rgba(124,92,255,.05); }
-.kn-bar{ height:8px; border-radius:999px; background:rgba(255,255,255,.07); overflow:hidden; }
-.kn-bar span{ display:block; height:100%; background:linear-gradient(90deg,#7c5cff,#39e673); transition:width .4s; }
-.kn-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(min(280px,100%),1fr)); gap:14px; }
-.kn-card{ border-radius:18px; overflow:hidden; background:#0e1411; border:1px solid rgba(255,255,255,.07); transition:border-color .2s, transform .2s; }
-.kn-card:hover{ border-color:rgba(57,230,115,.35); transform:translateY(-2px); }
-.kn-thumb{ position:relative; aspect-ratio:16/8; background:linear-gradient(135deg,#1d1640,#0d2a1a) center/cover; display:flex; align-items:center; justify-content:center; }
-.kn-thumb > span{ font-weight:900; letter-spacing:.3em; color:rgba(255,255,255,.35); font-size:20px; }
-.kn-thumb i{ position:absolute; left:10px; top:10px; font-style:normal; font-size:11px; font-weight:800; color:#03110a; padding:3px 9px; border-radius:999px; display:flex; gap:6px; align-items:center; }
-.kn-title{ font-weight:800; font-size:15px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-.kn-sum{ font-size:12.5px; color:#c9d3ce; line-height:1.5; margin-top:8px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
-.kn-tag{ font-size:10.5px; padding:2px 8px; border-radius:999px; background:rgba(124,92,255,.14); color:#cfc4ff; }
-.kn-lesson{ padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06); margin-bottom:6px; font-size:13px; line-height:1.5; }
-.kn-lesson div{ color:#c9d3ce; margin-top:3px; }
-@media (max-width:600px){ .kn-hero{ padding:18px; } .kn-h{ font-size:22px; } .kn-stats div{ min-width:0; flex:1; } .kn-stats{ width:100%; } }
+.kn{ --kn-bg:#07090a; --kn-panel:#0c110f; --kn-line:rgba(255,255,255,.075); --kn-ink:#eef3ef; --kn-dim:#8b9a92; --kn-g:#39e673; --kn-v:#a78bfa; }
+.kn-sheet{ --kn-bg:#07090a; --kn-panel:#0c110f; --kn-line:rgba(255,255,255,.075); --kn-ink:#eef3ef; --kn-dim:#8b9a92; --kn-g:#39e673; --kn-v:#a78bfa; }
+.kn{ color:var(--kn-ink); }
+.kn-mono{ font-family:'JetBrains Mono', ui-monospace, monospace; font-size:11px; letter-spacing:.04em; color:var(--kn-dim); }
+.kn-kicker{ display:flex; align-items:center; gap:8px; font-family:'JetBrains Mono', ui-monospace, monospace; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--kn-dim); }
+.kn-dot{ width:7px; height:7px; border-radius:50%; background:var(--kn-g); box-shadow:0 0 12px var(--kn-g); animation:knPulse 2.4s ease-in-out infinite; }
+@keyframes knPulse{ 50%{ opacity:.35; } }
+
+.kn-hero{ position:relative; overflow:hidden; border-radius:28px; margin-bottom:18px; border:1px solid var(--kn-line);
+  background:radial-gradient(70% 90% at 15% 0%, rgba(57,230,115,.10), transparent 60%), radial-gradient(60% 80% at 100% 100%, rgba(167,139,250,.12), transparent 60%), var(--kn-bg); }
+.kn-canvas{ position:absolute; inset:0; width:100%; height:100%; opacity:.9; }
+.kn-hero-in{ position:relative; padding:44px 40px 36px; max-width:720px; }
+.kn-title-xl{ margin:14px 0 12px; font-family:'Playfair Display', Georgia, serif; font-weight:700; font-size:64px; line-height:.98; letter-spacing:-.02em; text-wrap:balance; }
+.kn-title-xl em{ font-style:italic; color:var(--kn-g); }
+.kn-lede{ margin:0; max-width:52ch; color:#c4cfc9; text-shadow:0 1px 12px #07090a, 0 0 2px #07090a; font-size:15px; line-height:1.6; }
+.kn-figs{ display:flex; gap:34px; margin-top:28px; }
+.kn-figs b{ display:block; font-size:34px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.kn-figs span{ font-family:'JetBrains Mono', ui-monospace, monospace; font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--kn-dim); }
+
+.kn-composer{ border-radius:22px; padding:16px; margin-bottom:30px; background:var(--kn-panel); border:1px solid var(--kn-line); transition:border-color .2s, box-shadow .2s; }
+.kn-composer.drag{ border-color:var(--kn-v); box-shadow:0 0 0 4px rgba(167,139,250,.12); }
+.kn-tabs{ display:flex; align-items:center; gap:4px; margin-bottom:14px; flex-wrap:wrap; }
+.kn-tabs button{ padding:8px 14px; border-radius:999px; font-size:13px; font-weight:600; color:var(--kn-dim); background:transparent; border:1px solid transparent; transition:all .2s; }
+.kn-tabs button:hover{ color:var(--kn-ink); }
+.kn-tabs button.on{ color:#05130b; background:var(--kn-g); }
+.kn-tabs button:disabled{ opacity:.4; }
+.kn-tabs-note{ margin-left:auto; font-family:'JetBrains Mono', ui-monospace, monospace; font-size:10.5px; color:var(--kn-dim); letter-spacing:.04em; }
+.kn-row{ display:flex; gap:10px; align-items:center; }
+.kn-field{ flex:1; min-width:0; box-sizing:border-box; width:100%; padding:14px 16px; border-radius:14px; font-size:14.5px; font-family:inherit; color:var(--kn-ink); background:rgba(0,0,0,.4); border:1px solid var(--kn-line); outline:none; transition:border-color .2s; }
+.kn-field::placeholder{ color:#5f6d66; }
+.kn-field:focus{ border-color:rgba(57,230,115,.45); }
+.kn-area{ min-height:140px; resize:vertical; line-height:1.55; display:block; }
+.kn-go{ flex-shrink:0; display:inline-flex; align-items:center; gap:8px; padding:13px 20px; border-radius:14px; font-weight:700; font-size:14px; color:#05130b; background:var(--kn-g); transition:transform .15s, opacity .2s; }
+.kn-go:hover:not(:disabled){ transform:translateY(-1px); }
+.kn-go:disabled{ opacity:.4; }
+.kn-drop{ display:flex; flex-direction:column; align-items:center; gap:8px; padding:30px 16px; border-radius:16px; border:1.5px dashed rgba(167,139,250,.35); background:rgba(167,139,250,.04); cursor:pointer; text-align:center; transition:background .2s; }
+.kn-drop:hover{ background:rgba(167,139,250,.08); }
+.kn-wave{ display:flex; align-items:center; gap:3px; height:40px; margin-bottom:6px; }
+.kn-wave i{ width:3px; border-radius:3px; background:linear-gradient(var(--kn-v), var(--kn-g)); animation:knWave 1.6s ease-in-out infinite; transform-origin:center; }
+@keyframes knWave{ 50%{ transform:scaleY(.45); } }
+.kn-progress{ padding:18px; border-radius:16px; background:rgba(0,0,0,.3); border:1px solid var(--kn-line); }
+.kn-progress-top{ display:flex; justify-content:space-between; gap:10px; margin-bottom:10px; font-size:14px; }
+.kn-progress-top b{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.kn-bar{ height:6px; border-radius:999px; background:rgba(255,255,255,.07); overflow:hidden; }
+.kn-bar span{ display:block; height:100%; border-radius:999px; background:linear-gradient(90deg, var(--kn-v), var(--kn-g)); transition:width .4s; }
+.kn-flash{ margin-top:12px; font-size:13px; }
+
+.kn-libhead{ display:flex; align-items:center; gap:14px; margin-bottom:12px; }
+.kn-libhead h2{ margin:0; flex:1; font-family:'Playfair Display', Georgia, serif; font-style:italic; font-size:30px; font-weight:700; }
+.kn-search{ max-width:240px; padding:10px 14px; font-size:13.5px; }
+.kn-chips{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:18px; }
+.kn-chips button{ display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; font-size:12.5px; color:#c4cfc9; background:rgba(255,255,255,.035); border:1px solid var(--kn-line); transition:all .2s; }
+.kn-chips button em{ font-style:normal; font-family:'JetBrains Mono', ui-monospace, monospace; font-size:10px; color:var(--kn-dim); }
+.kn-chips button.on{ color:#05130b; background:var(--kn-ink); border-color:var(--kn-ink); }
+.kn-chips button.on em{ color:#3b4741; }
+
+.kn-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap:16px; }
+.kn-card{ display:flex; flex-direction:column; border-radius:20px; overflow:hidden; background:var(--kn-panel); border:1px solid var(--kn-line); transition:transform .25s, border-color .25s, box-shadow .25s; outline:none; }
+.kn-card.go{ cursor:pointer; }
+.kn-card.go:hover, .kn-card.go:focus-visible{ transform:translateY(-3px); border-color:rgba(57,230,115,.3); box-shadow:0 18px 40px -20px rgba(57,230,115,.35); }
+.kn-cover{ position:relative; aspect-ratio:16/8.5; background:center/cover no-repeat; }
+.kn-cover::after{ content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(7,9,10,0) 40%, rgba(12,17,15,.95)); }
+.kn-cover.gen{ background:radial-gradient(80% 120% at 0% 0%, rgba(167,139,250,.35), transparent 60%), radial-gradient(80% 120% at 100% 100%, rgba(57,230,115,.25), transparent 60%), #0d1312; display:flex; align-items:center; justify-content:center; }
+.kn-cover-wave{ position:relative; z-index:1; display:flex; align-items:center; gap:4px; height:46%; opacity:.75; }
+.kn-cover-wave i{ width:4px; border-radius:4px; background:rgba(238,243,239,.75); }
+.kn-status{ position:absolute; z-index:2; left:12px; top:12px; display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; font-size:11px; font-weight:700; background:rgba(7,9,10,.75); backdrop-filter:blur(6px); }
+.kn-status i{ width:6px; height:6px; border-radius:50%; }
+.kn-kind{ position:absolute; z-index:2; right:12px; top:12px; padding:5px 10px; border-radius:999px; font-family:'JetBrains Mono', ui-monospace, monospace; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:#e6ece8; background:rgba(7,9,10,.6); backdrop-filter:blur(6px); }
+.kn-body{ display:flex; flex-direction:column; gap:8px; padding:4px 18px 16px; flex:1; }
+.kn-body h3{ margin:0; font-size:16.5px; font-weight:750; line-height:1.3; letter-spacing:-.005em; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.kn-sum{ margin:0; font-size:13px; color:#b9c5bf; line-height:1.55; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.kn-err{ margin:0; font-size:12.5px; color:#ff7a6b; }
+.kn-foot{ display:flex; align-items:center; gap:10px; margin-top:auto; padding-top:8px; }
+.kn-tags{ display:flex; gap:5px; flex-wrap:wrap; flex:1; min-width:0; }
+.kn-tags span{ font-size:11px; padding:3px 9px; border-radius:999px; color:#d6ccff; background:rgba(167,139,250,.12); }
+.kn-link{ font-size:12.5px; font-weight:600; color:var(--kn-g); background:none; padding:0; }
+.kn-link.dim{ color:var(--kn-dim); }
+.kn-link:hover{ text-decoration:underline; }
+.kn-empty{ display:flex; flex-direction:column; gap:6px; align-items:center; text-align:center; padding:50px 20px; border-radius:20px; border:1px dashed var(--kn-line); color:var(--kn-dim); }
+.kn-empty b{ color:var(--kn-ink); font-size:16px; }
+
+.kn-sheet{ position:fixed; inset:0; z-index:9999; display:flex; justify-content:flex-end; background:rgba(3,5,4,.6); backdrop-filter:blur(4px); animation:knFade .2s ease; }
+@keyframes knFade{ from{ opacity:0; } }
+.kn-panel{ width:min(680px, 100%); height:100%; overflow-y:auto; overscroll-behavior:contain; box-sizing:border-box; padding:0 32px 40px; background:var(--kn-bg); border-left:1px solid var(--kn-line); color:var(--kn-ink); animation:knSlide .3s cubic-bezier(.2,.8,.2,1); }
+@keyframes knSlide{ from{ transform:translateX(40px); opacity:0; } }
+.kn-panel-head{ position:sticky; top:0; z-index:2; display:flex; justify-content:space-between; align-items:center; padding:calc(16px + env(safe-area-inset-top)) 0 12px; background:linear-gradient(var(--kn-bg) 75%, transparent); }
+.kn-back{ display:inline-flex; align-items:center; gap:4px; font-size:13px; font-weight:600; color:var(--kn-ink); background:rgba(255,255,255,.05); border:1px solid var(--kn-line); padding:7px 12px 7px 9px; border-radius:999px; }
+.kn-x{ width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:50%; color:var(--kn-ink); background:rgba(255,255,255,.05); border:1px solid var(--kn-line); }
+.kn-panel-title{ margin:10px 0 8px; font-family:'Playfair Display', Georgia, serif; font-size:34px; line-height:1.1; font-weight:700; text-wrap:balance; }
+.kn-panel-sum{ font-size:15px; line-height:1.65; color:#d3ddd7; margin:18px 0 26px; padding:18px 20px; border-radius:18px; background:rgba(57,230,115,.05); border:1px solid rgba(57,230,115,.14); }
+.kn-topic{ margin-bottom:24px; }
+.kn-topic h4{ display:flex; align-items:center; gap:8px; margin:0 0 10px; font-family:'JetBrains Mono', ui-monospace, monospace; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--kn-g); }
+.kn-topic h4 span{ color:var(--kn-dim); letter-spacing:0; }
+.kn-lesson{ padding:14px 16px; border-radius:14px; background:var(--kn-panel); border:1px solid var(--kn-line); margin-bottom:8px; }
+.kn-lesson b{ display:block; font-size:14.5px; line-height:1.45; font-weight:650; }
+.kn-lesson p{ margin:6px 0 0; font-size:13.5px; line-height:1.6; color:#b9c5bf; }
+.kn-transcript{ margin-top:18px; }
+.kn-transcript summary{ cursor:pointer; font-family:'JetBrains Mono', ui-monospace, monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--kn-dim); }
+.kn-transcript div{ margin-top:12px; font-size:13px; line-height:1.7; color:#aab6b0; white-space:pre-wrap; }
+.kn button:focus-visible, .kn-sheet button:focus-visible{ outline:2px solid var(--kn-g); outline-offset:2px; }
+
+@media (max-width:640px){
+  .kn-hero-in{ padding:28px 20px 24px; }
+  .kn-title-xl{ font-size:44px; }
+  .kn-figs{ gap:22px; }
+  .kn-figs b{ font-size:26px; }
+  .kn-row{ flex-direction:column; align-items:stretch; }
+  .kn-go{ justify-content:center; }
+  .kn-canvas{ opacity:.35; }
+  .kn-tabs-note{ width:100%; margin:6px 0 0 4px; }
+  .kn-libhead h2{ font-size:24px; }
+  .kn-search{ max-width:150px; }
+  .kn-panel{ padding:0 18px 32px; }
+  .kn-panel-title{ font-size:27px; }
+}
+@media (prefers-reduced-motion:reduce){ .kn-dot, .kn-wave i{ animation:none; } .kn-panel, .kn-sheet{ animation:none; } }
 `;
 function AcquisitionPage() {
   const [agency, setAgency] = useState(() => {
@@ -31280,7 +31381,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">dc4k64</script>
+<script type="text/babel" id="zion-version">xbqdvs</script>
 <script>
 (function () {
   var last = 0;
