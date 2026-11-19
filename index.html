@@ -24159,7 +24159,9 @@ function NeoPage({
         c.pc && c.pc.close();
       } catch (e) {}
       try {
-        c.mic && c.mic.getTracks().forEach(t => t.stop());
+        c.mic && c.mic.getTracks().forEach(t => {
+          t.enabled = false;
+        });
       } catch (e) {}
       try {
         c.audio && (c.audio.srcObject = null);
@@ -24195,15 +24197,22 @@ function NeoPage({
       c.audio = document.createElement("audio");
       c.audio.autoplay = true;
       c.audio.setAttribute("playsinline", "");
-      c.mic = await navigator.mediaDevices.getUserMedia({
+      const live = window.__zionNeoMic && window.__zionNeoMic.getTracks().some(t => t.readyState === "live") ? window.__zionNeoMic : null;
+      c.mic = live || (await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true
         }
+      }));
+      window.__zionNeoMic = c.mic;
+      c.mic.getTracks().forEach(t => {
+        t.enabled = true;
       });
       if (callRef.current !== c) {
-        c.mic.getTracks().forEach(t => t.stop());
+        c.mic.getTracks().forEach(t => {
+          t.enabled = false;
+        });
         return;
       }
       const sess = await neoAgent({
@@ -31779,7 +31788,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1cv6yg8</script>
+<script type="text/babel" id="zion-version">1f6c0zl</script>
 <script>
 (function () {
   var last = 0;

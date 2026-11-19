@@ -14361,7 +14361,8 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
     if (c) {
       try { c.dc && c.dc.close(); } catch (e) {}
       try { c.pc && c.pc.close(); } catch (e) {}
-      try { c.mic && c.mic.getTracks().forEach((t) => t.stop()); } catch (e) {}
+      // the microphone is only muted, not released: a new request would make Safari ask for permission again
+      try { c.mic && c.mic.getTracks().forEach((t) => { t.enabled = false; }); } catch (e) {}
       try { c.audio && (c.audio.srcObject = null); } catch (e) {}
       try { c.ctx && c.ctx.close(); } catch (e) {}
       if (c.raf) cancelAnimationFrame(c.raf);
@@ -14380,8 +14381,11 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
       c.ctx = new (window.AudioContext || window.webkitAudioContext)();
       try { await c.ctx.resume(); } catch (e) {}
       c.audio = document.createElement("audio"); c.audio.autoplay = true; c.audio.setAttribute("playsinline", "");
-      c.mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
-      if (callRef.current !== c) { c.mic.getTracks().forEach((t) => t.stop()); return; }
+      const live = window.__zionNeoMic && window.__zionNeoMic.getTracks().some((t) => t.readyState === "live") ? window.__zionNeoMic : null;
+      c.mic = live || await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      window.__zionNeoMic = c.mic;
+      c.mic.getTracks().forEach((t) => { t.enabled = true; });
+      if (callRef.current !== c) { c.mic.getTracks().forEach((t) => { t.enabled = false; }); return; }
       const sess = await neoAgent({ realtime: true, voice: (() => { try { return localStorage.getItem("zionNeoVoice2") || "cedar"; } catch (e) { return "cedar"; } })() });
       if (callRef.current !== c) return;
       const pc = new RTCPeerConnection(); c.pc = pc;
