@@ -1070,7 +1070,7 @@ canvas { display: block; }
   --z-h1:#39e673; --z-h2:#38bdf8; --z-h3:#a78bfa; --z-h4:#ff5db1; --z-h5:#f0be3c;
   --z-card:rgba(15,20,23,.66); --z-card2:rgba(20,26,30,.7); --z-sheet:rgba(9,12,14,.97);
   --z-line:rgba(255,255,255,.075);
-  --bg-surface:rgba(18,24,27,.55); --bg-panel:rgba(10,13,16,.5);
+  --bg-surface:#0e1310; --bg-panel:#0a0f0c;
   --border:rgba(255,255,255,.085); --border2:rgba(255,255,255,.15);
 }
 html[data-zpage="dashboard"]{ --z-h1:#39e673; --z-h2:#38bdf8; --z-h3:#a78bfa; --z-h4:#f0be3c; }
@@ -1085,21 +1085,8 @@ html[data-zpage="x"], html[data-zpage="tiktok"], html[data-zpage="threads"], htm
 html[data-zrole="creator"][data-zpage]{ --z-h1:#ff5db1; --z-h2:#f0be3c; --z-h3:#a78bfa; --z-h4:#38bdf8; --z-h5:#ff7a45; }
 html[data-zpage="editor"]{ --z-h1:#c6f432; --z-h2:#38bdf8; --z-h3:#a78bfa; --z-h4:#ff5db1; }
 
-body{ background-color:#05070a !important; }
-body::before{
-  content:""; position:fixed; z-index:0; pointer-events:none; inset:-12vmax;
-  background:
-    radial-gradient(38vmax 34vmax at 30% 18%, color-mix(in srgb, var(--z-h1) 50%, transparent), transparent 70%),
-    radial-gradient(36vmax 32vmax at 80% 16%, color-mix(in srgb, var(--z-h3) 52%, transparent), transparent 70%),
-    radial-gradient(40vmax 36vmax at 78% 84%, color-mix(in srgb, var(--z-h4) 44%, transparent), transparent 70%),
-    radial-gradient(38vmax 34vmax at 28% 84%, color-mix(in srgb, var(--z-h2) 48%, transparent), transparent 70%),
-    radial-gradient(26vmax 22vmax at 52% 50%, color-mix(in srgb, var(--z-h5) 16%, transparent), transparent 70%);
-  opacity:.85; animation:zAurora 46s ease-in-out infinite alternate; will-change:transform;
-}
-body::after{ content:""; position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.05;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
-@keyframes zAurora{ 0%{ transform:translate3d(0,0,0) rotate(0deg) scale(1); } 50%{ transform:translate3d(3vmax,-2vmax,0) rotate(8deg) scale(1.06); } 100%{ transform:translate3d(-3vmax,2vmax,0) rotate(-6deg) scale(1.02); } }
-@media (prefers-reduced-motion:reduce){ body::before{ animation:none; } }
+body{ background-color:#07090a !important; }
+/* the colourful aurora background was removed on the owner's request: it made the panel and menu edges visible */
 #root{ position:relative; z-index:1; }
 .c-bg-app{ background-color:transparent !important; }
 
@@ -31513,7 +31500,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1jwid45</script>
+<script type="text/babel" id="zion-version">ngo7an</script>
 <script>
 (function () {
   var last = 0;
