@@ -9517,12 +9517,12 @@ function AcqSettings({ cfg, agency, onSaved }) {
 // ---- the written outreach plan: every channel, its tool, its daily target ----
 const ACQ_PLAN_DEFAULT = {
   US: [
-    { name: "X DMs", tool: "XReacher", icon: "X", color: "#e7e9ea", daily: 50, target: "50 DMs a day", status: "live", how: "XReacher sends 50 DMs a day on X to creators. Answer the replies yourself, put the good ones into Ongoing in Zion." },
-    { name: "Instagram DMs", tool: "10 scout accounts", icon: "IG", color: "#e1306c", daily: 500, target: "500 DMs a day, 50 per account", status: "live", how: "10 scout accounts, 50 DMs each a day. Leads and the DM text come from Instagram outreach in Zion. New accounts start lower and warm up." },
-    { name: "Personal brand", tool: "Own IG, TikTok, X", icon: "ME", color: "#f0be3c", daily: 10, target: "1 video + 5 to 10 messages a day", status: "live", how: "Post videos about running OF creators: results, behind the scenes, tips. Every day send a few personal messages to creators who engage." },
-    { name: "Reddit", tool: "Reply queue in Zion", icon: "r/", color: "#ff4500", daily: 10, target: "5 to 15 replies a day", status: "live", how: "Creators asking for help in r/onlyfansadvice. Open the Reply queue, paste, send, tap Sent. Real help first, no selling in the first reply." },
-    { name: "Model referrals", tool: "Contacts in Zion", icon: "♥", color: "#39e673", daily: 0, target: "Ask every model once a month", status: "live", how: "Ask each signed model if she knows a creator who wants help. Add every name in Contacts so nobody gets lost." },
-    { name: "Agency brand", tool: "Agency listings", icon: "★", color: "#38bdf8", daily: 0, target: "Keep every listing fresh", status: "live", how: "The agency is listed on several websites. Keep results, photos and contact up to date and answer every inbound fast." },
+    { name: "X DMs", tool: "XReacher", icon: "X", color: "#e7e9ea", daily: 50, target: "50 DMs a day", status: "building", how: "XReacher sends 50 DMs a day on X to creators. Answer the replies yourself, put the good ones into Ongoing in Zion." },
+    { name: "Instagram DMs", tool: "10 scout accounts", icon: "IG", color: "#e1306c", daily: 500, target: "500 DMs a day, 50 per account", status: "building", how: "10 scout accounts, 50 DMs each a day. Leads and the DM text come from Instagram outreach in Zion. New accounts start lower and warm up." },
+    { name: "Personal brand", tool: "Own IG, TikTok, X", icon: "ME", color: "#f0be3c", daily: 10, target: "1 video + 5 to 10 messages a day", status: "building", how: "Post videos about running OF creators: results, behind the scenes, tips. Every day send a few personal messages to creators who engage." },
+    { name: "Reddit", tool: "Reply queue in Zion", icon: "r/", color: "#ff4500", daily: 10, target: "5 to 15 replies a day", status: "building", how: "Creators asking for help in r/onlyfansadvice. Open the Reply queue, paste, send, tap Sent. Real help first, no selling in the first reply." },
+    { name: "Model referrals", tool: "Contacts in Zion", icon: "♥", color: "#39e673", daily: 0, target: "Ask every model once a month", status: "building", how: "Ask each signed model if she knows a creator who wants help. Add every name in Contacts so nobody gets lost." },
+    { name: "Agency brand", tool: "Agency listings", icon: "★", color: "#38bdf8", daily: 0, target: "Keep every listing fresh", status: "building", how: "The agency is listed on several websites. Keep results, photos and contact up to date and answer every inbound fast." },
     { name: "Meta ads", tool: "Lead ads", icon: "f", color: "#1877f2", daily: 0, target: "Later", status: "later", how: "Paid lead ads once the other channels run on their own. Leads import into Meta ads in Zion." },
   ],
   CZ: [
@@ -9530,7 +9530,7 @@ const ACQ_PLAN_DEFAULT = {
     { name: "Contacts", tool: "Referrals", icon: "♥", color: "#39e673", daily: 0, target: "Ask every model once a month", status: "live", how: "Recommendations from models and friends. Add every name in Contacts." },
   ],
 };
-const ACQ_PLAN_STATUS = { live: ["Running now", "#39e673"], building: ["Getting ready", "#f0be3c"], later: ["Later", "#8fa39a"] };
+const ACQ_PLAN_STATUS = { live: ["Running now", "#39e673"], building: ["Planned", "#f0be3c"], later: ["Later", "#8fa39a"] };
 const ACQ_PLAN_CSS = `
 .ap-hero{ position:relative; overflow:hidden; border-radius:22px; padding:24px; margin-bottom:16px; border:1px solid rgba(255,255,255,.08);
   background:radial-gradient(120% 140% at 0% 0%, rgba(57,230,115,.16), transparent 55%), radial-gradient(100% 120% at 100% 100%, rgba(225,48,108,.14), transparent 60%), #0d1310; }
@@ -9562,7 +9562,9 @@ function AcqPlan({ agency, cfg, onSaved }) {
   const [msg, setMsg] = useState("");
   useEffect(() => { setDraft(base); }, [agency, cfg]);
   const plan = edit ? draft : base;
-  const live = plan.filter((c) => c.status === "live");
+  // the goal counts what runs now plus what is planned
+  const live = plan.filter((c) => c.status !== "later");
+  const running = plan.filter((c) => c.status === "live").reduce((a, c) => a + (Number(c.daily) || 0), 0);
   const daily = live.reduce((a, c) => a + (Number(c.daily) || 0), 0);
   const withVol = live.filter((c) => Number(c.daily) > 0);
   const set = (i, k, v) => setDraft((d) => d.map((c, j) => (j === i ? { ...c, [k]: v } : c)));
@@ -9591,12 +9593,12 @@ function AcqPlan({ agency, cfg, onSaved }) {
       <div className="ap-hero">
         <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 220 }}>
-            <div className="ap-sub">{agency === "US" ? "US agency" : "CZ agency"} outreach plan</div>
+            <div className="ap-sub">{agency === "US" ? "US agency" : "CZ agency"} outreach plan, the goal</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
               <span className="ap-big">{daily.toLocaleString("en-US")}</span>
-              <span style={{ fontWeight: 700, color: "#c9d3ce" }}>creators reached a day</span>
+              <span style={{ fontWeight: 700, color: "#c9d3ce" }}>creators a day when it all runs</span>
             </div>
-            <div className="hb-note" style={{ marginTop: 6 }}>{(daily * 7).toLocaleString("en-US")} a week, {(daily * 30).toLocaleString("en-US")} a month, from {live.length} running channel{live.length === 1 ? "" : "s"}</div>
+            <div className="hb-note" style={{ marginTop: 6 }}>{(daily * 7).toLocaleString("en-US")} a week, {(daily * 30).toLocaleString("en-US")} a month, from {live.length} channel{live.length === 1 ? "" : "s"}. Running today: {running.toLocaleString("en-US")} a day</div>
           </div>
           {!edit && <button className="hb-btn ghost sm" onClick={() => { setDraft(base); setEdit(true); }}>Edit plan</button>}
         </div>
