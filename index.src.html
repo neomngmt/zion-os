@@ -13353,6 +13353,45 @@ function CreatorSettingsPanel({ model, record }) {
   );
 }
 
+// XReacher (X DM outreach) connected to Zion through its MCP server; one sign in, the token stays on the server
+async function xrFn(body) {
+  let token = "";
+  try { token = (JSON.parse(localStorage.getItem("agencyos_session") || "{}")).token || ""; } catch (e) {}
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/xreacher`, { method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, "x-zion-token": token }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+}
+function XreacherConnect() {
+  const [st, setSt] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const load = () => xrFn({ action: "status" }).then(setSt).catch((e) => setErr(e.message));
+  useEffect(() => { load(); }, []);
+  const connect = async () => {
+    setBusy(true); setErr("");
+    try { const j = await xrFn({ action: "auth-start" }); window.location.href = j.url; } catch (e) { setErr(e.message); setBusy(false); }
+  };
+  return (
+    <div className="border-t c-border pt-6 mb-8">
+      <div className="flex items-center gap-2 mb-1.5">
+        <span style={{ width: 22, height: 22, borderRadius: 6, background: "#e7e9ea", color: "#03110a", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 12 }}>X</span>
+        <span className="text-sm c-text font-medium">XReacher</span>
+        {st && <span className="fs-10 font-mono px-2 py-0.5 rounded" style={{ background: st.connected ? "rgba(57,230,115,.15)" : "rgba(255,255,255,.06)", color: st.connected ? "#39e673" : "#8fa39a" }}>{st.connected ? "Connected" : "Not connected"}</span>}
+      </div>
+      <p className="c-muted text-xs mb-3">X DM outreach. Once connected, Zion reads how many messages went out, who replied and the reply rate, and shows it in Acquisition. Zion only reads, it never sends messages.</p>
+      <div className="flex gap-2 flex-wrap">
+        <button onClick={connect} disabled={busy}
+          className="py-2 px-4 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold">{busy ? "Opening XReacher" : st && st.connected ? "Connect again" : "Connect XReacher"}</button>
+        {st && st.connected && <button onClick={async () => { if (!window.confirm("Disconnect XReacher from Zion?")) return; await xrFn({ action: "disconnect" }).catch(() => {}); load(); }}
+          className="py-2 px-4 rounded-lg border c-border c-muted text-xs font-mono uppercase tracking-wide">Disconnect</button>}
+      </div>
+      {st && st.connected && st.since && <p className="fs-10 c-faint font-mono mt-2">Connected {new Date(st.since).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</p>}
+      {err && <p className="text-xs mt-2" style={{ color: "#E2725B" }}>{err}</p>}
+    </div>
+  );
+}
+
 function SettingsPanel({ settings, persistSettings }) {
   const [pinCZ, setPinCZ] = useState(settings.adminPinCZ || "");
   const [pinUS, setPinUS] = useState(settings.adminPinUS || "");
@@ -13402,6 +13441,8 @@ function SettingsPanel({ settings, persistSettings }) {
         {saved && <p className="c-success text-xs font-mono mt-3">Saved.</p>}
         <p className="fs-10 c-faint font-mono mt-4">Model passwords are set per creator in Model Manager.</p>
       </div>
+
+      <XreacherConnect />
 
       <div className="border-t c-border pt-6 mb-8">
         <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Creator Bible URL</label>
