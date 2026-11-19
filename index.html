@@ -15970,12 +15970,62 @@ async function acqFn(body) {
 }
 const ACQ_STAGES = [["new", "New"], ["messaged", "Messaged"], ["replied", "Replied"], ["call", "Call"], ["signed", "Signed"], ["lost", "Not interested"], ["skip", "Skipped"]];
 const ACQ_CSS = `
-.ad-row{ display:grid; grid-template-columns:minmax(150px,1.6fr) repeat(7,minmax(56px,1fr)); gap:8px; align-items:center; padding:11px 10px; border-top:1px solid rgba(255,255,255,.05); font-variant-numeric:tabular-nums; cursor:pointer; border-radius:10px; transition:background .2s; font-size:13.5px; }
-.ad-row:hover{ background:rgba(255,255,255,.04); }
-.ad-row > span:not(:first-child){ text-align:right; }
-.ad-row.h{ border-top:0; cursor:default; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#6f8279; padding-bottom:4px; }
-.ad-row.h:hover, .ad-row.t:hover{ background:none; }
-.ad-row.t{ cursor:default; font-weight:800; border-top:1px solid rgba(255,255,255,.14); }
+.ad-hero{ position:relative; overflow:hidden; border-radius:24px; padding:22px; margin-bottom:16px; border:1px solid rgba(57,230,115,.2);
+  background:radial-gradient(120% 140% at 0% 0%, rgba(57,230,115,.13), transparent 55%), radial-gradient(90% 120% at 100% 0%, rgba(45,212,191,.08), transparent 60%), #0b100d; }
+.ad-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:18px; }
+.ad-eyebrow{ font-size:10.5px; letter-spacing:.2em; text-transform:uppercase; color:#7fae93; font-weight:700; }
+.ad-title{ font-size:30px; font-weight:900; letter-spacing:-.03em; line-height:1.05; margin-top:2px; }
+.ad-seg{ display:inline-flex; padding:4px; gap:2px; border-radius:14px; background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.07); flex-wrap:wrap; }
+.ad-seg button{ padding:7px 13px; border-radius:10px; font-size:12.5px; font-weight:700; color:#8fa39a; transition:all .2s; }
+.ad-seg button:hover{ color:#e9f1ec; }
+.ad-seg button.on{ background:linear-gradient(120deg,#39e673,#12b34c); color:#03110a; box-shadow:0 4px 16px rgba(57,230,115,.25); }
+.ad-bigs{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:22px; }
+.ad-big{ position:relative; overflow:hidden; text-align:left; padding:16px 16px 14px; justify-content:flex-end; border-radius:18px; background:rgba(14,19,16,.85); border:1px solid rgba(255,255,255,.07); display:flex; flex-direction:column; gap:3px; min-height:132px; transition:transform .2s, border-color .2s; color:inherit; }
+.ad-big:hover{ transform:translateY(-2px); border-color:rgba(57,230,115,.4); }
+.ad-big.on{ border-color:#39e673; box-shadow:0 0 0 2px rgba(57,230,115,.2) inset; }
+.ad-big.hot{ background:linear-gradient(160deg, rgba(57,230,115,.16), rgba(14,19,16,.9) 70%); border-color:rgba(57,230,115,.35); }
+.ad-big b{ font-size:40px; font-weight:900; letter-spacing:-.04em; line-height:1; font-variant-numeric:tabular-nums; }
+.ad-big-l{ font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:#9fbcab; font-weight:700; }
+.ad-big-s{ font-size:11.5px; color:#7d8f86; }
+.ad-spark{ position:absolute; right:14px; top:16px; width:44%; height:42px; opacity:.95; }
+.ad-sec{ font-size:10.5px; letter-spacing:.2em; text-transform:uppercase; color:#7fae93; font-weight:700; margin:0 2px 10px; }
+.ad-chans{ display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px; }
+.ad-chan{ text-align:left; padding:14px; border-radius:18px; background:rgba(14,19,16,.85); border:1px solid rgba(255,255,255,.07); color:inherit; transition:transform .2s, border-color .2s; position:relative; overflow:hidden; }
+.ad-chan::before{ content:""; position:absolute; inset:0 0 auto 0; height:2px; background:linear-gradient(90deg, var(--c), transparent 70%); opacity:.9; }
+.ad-chan:hover{ transform:translateY(-2px); border-color:rgba(255,255,255,.16); }
+.ad-chan-top{ display:flex; align-items:center; gap:9px; margin-bottom:12px; }
+.ad-dot{ width:10px; height:10px; border-radius:50%; background:var(--c); box-shadow:0 0 12px var(--c); flex-shrink:0; }
+.ad-chan-name{ font-weight:800; font-size:15px; flex:1; min-width:0; }
+.ad-chan-name small{ display:block; font-weight:500; font-size:11px; color:#7d8f86; }
+.ad-rep{ font-size:11px; font-weight:800; padding:3px 9px; border-radius:999px; background:rgba(57,230,115,.14); color:#a8f5c4; white-space:nowrap; }
+.ad-chan-nums{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
+.ad-chan-nums b{ display:block; font-size:19px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.ad-chan-nums span{ font-size:9px; letter-spacing:.06em; text-transform:uppercase; color:#6f8279; white-space:nowrap; }
+.ad-chan-bar{ height:4px; border-radius:999px; background:rgba(255,255,255,.06); margin:12px 0 8px; overflow:hidden; }
+.ad-chan-bar i{ display:block; height:100%; border-radius:999px; background:linear-gradient(90deg,#12b34c,#39e673); }
+.ad-chan-foot{ font-size:11.5px; color:#7d8f86; }
+.ad-quiet{ font-size:12px; color:#6f8279; margin:12px 2px 0; }
+.ad-quiet button{ color:#9fbcab; margin-left:5px; text-decoration:underline; text-decoration-color:rgba(255,255,255,.15); text-underline-offset:3px; }
+.ad-quiet button:hover{ color:#e9f1ec; }
+.ad-pipe{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:18px; padding-top:16px; border-top:1px solid rgba(255,255,255,.06); }
+.ad-pipe button{ display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:14px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06); text-align:left; color:inherit; transition:border-color .2s; }
+.ad-pipe button:hover{ border-color:rgba(57,230,115,.35); }
+.ad-pipe button.on{ border-color:#39e673; }
+.ad-pipe b{ font-size:22px; font-weight:900; min-width:30px; font-variant-numeric:tabular-nums; color:#a8f5c4; }
+.ad-pipe span{ font-size:13px; font-weight:700; }
+.ad-pipe small{ display:block; font-size:11px; font-weight:500; color:#6f8279; }
+@media (max-width:900px){ .ad-bigs{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:600px){
+  .ad-hero{ padding:16px; border-radius:20px; }
+  .ad-title{ font-size:24px; }
+  .ad-big{ min-height:112px; padding:13px; }
+  .ad-big b{ font-size:30px; }
+  .ad-big-s{ max-width:100%; }
+  .ad-spark{ display:none; }
+  .ad-pipe{ grid-template-columns:1fr; }
+  .ad-seg button{ padding:6px 9px; font-size:11.5px; }
+}
+@media (prefers-reduced-motion:reduce){ .ad-big, .ad-chan{ transition:none; } }
 .aq-top{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
 .aq-kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-bottom:16px; }
 .aq-kpi{ border-radius:16px; padding:13px; background:#0e1310; border:1px solid rgba(255,255,255,.08); }
@@ -17795,7 +17845,9 @@ function XOutreachPanel({
   }, "Read only. Reply in X."))));
 }
 function XOverviewCard({
-  onOpen
+  onOpen,
+  leads = [],
+  onOpenLead
 }) {
   const [d, setD] = useState(null);
   useEffect(() => {
@@ -17809,26 +17861,15 @@ function XOverviewCard({
   if (!d || d.failed) return null;
   const n = v => Number(v || 0).toLocaleString("en-US");
   if (!d.connected) return React.createElement("div", {
-    className: "hb-card",
+    className: "xo-card",
     style: {
-      marginBottom: 16,
       display: "flex",
       alignItems: "center",
-      gap: 10,
+      gap: 12,
       flexWrap: "wrap"
     }
   }, React.createElement("span", {
-    style: {
-      width: 30,
-      height: 30,
-      borderRadius: 9,
-      background: "#e7e9ea",
-      color: "#03110a",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontWeight: 900
-    }
+    className: "xo-logo"
   }, "X"), React.createElement("div", {
     style: {
       flex: 1,
@@ -17839,122 +17880,129 @@ function XOverviewCard({
     onClick: onOpen
   }, "Open X outreach"));
   const sy = d.sync || {};
-  const camps = sy.campaigns || [];
-  const keys = Object.keys(d.daily || {}).filter(k => k !== "_filled").sort();
-  const today = (d.daily || {})[keys[keys.length - 1]] || {};
-  const sumC = (k, f) => camps.reduce((a, c) => a + ((c[k] || {})[f] || 0), 0);
-  const first = today.contacted ?? sumC("today", "contacted");
-  const fu = today.followups ?? sumC("today", "followups");
-  const rep = today.replies ?? sumC("today", "replies");
-  const limit = camps.filter(c => c.status === "active").reduce((a, c) => a + (c.daily_limit || 0), 0);
-  const last7 = keys.slice(-7).map(k => d.daily[k]);
-  const max = Math.max(1, ...last7.map(x => (x.contacted || 0) + (x.followups || 0)));
+  const T = xrNums(d, "today"),
+    W = xrNums(d, "7"),
+    A = xrNums(d, "all");
+  const limit = (sy.campaigns || []).filter(c => c.status === "active").reduce((a, c) => a + (c.daily_limit || 0), 0);
+  const keys = Object.keys(d.daily || {}).filter(k => k !== "_filled").sort().slice(-14);
+  const days = keys.map(k => ({
+    k,
+    ...d.daily[k]
+  }));
+  const max = Math.max(1, ...days.map(x => (x.contacted || 0) + (x.followups || 0)));
+  const recent = leads.filter(l => acqHerAt(l)).sort((a, b) => acqHerAt(b) - acqHerAt(a)).slice(0, 4);
+  const pct = (a, b) => b ? `${(Math.round(a / b * 1000) / 10).toLocaleString("en-US")}%` : "0%";
+  const left = (sy.lists || []).filter(l => (l.campaigns || []).length).reduce((a, l) => a + Math.max(0, (l.people || 0) - (l.contacted || 0)), 0);
   return React.createElement("div", {
-    className: "hb-card",
-    style: {
-      marginBottom: 16,
-      borderColor: "rgba(231,233,234,.28)",
-      background: "linear-gradient(160deg, rgba(231,233,234,.07), #0e1310 55%)"
-    }
+    className: "xo-card"
   }, React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 10,
-      flexWrap: "wrap",
-      marginBottom: 12
-    }
+    className: "xo-head"
   }, React.createElement("span", {
-    style: {
-      width: 30,
-      height: 30,
-      borderRadius: 9,
-      background: "#e7e9ea",
-      color: "#03110a",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontWeight: 900
-    }
+    className: "xo-logo"
   }, "X"), React.createElement("div", {
     style: {
       flex: 1,
-      minWidth: 200
+      minWidth: 180
     }
   }, React.createElement("div", {
+    className: "ad-eyebrow"
+  }, "X outreach"), React.createElement("div", {
     style: {
-      fontWeight: 800,
-      fontSize: 16
+      fontWeight: 900,
+      fontSize: 20,
+      letterSpacing: "-.02em"
     }
-  }, "X outreach today: ", n(first), " DMs, ", n(fu), " follow-ups, ", n(rep), " ", rep === 1 ? "reply" : "replies"), React.createElement("div", {
-    className: "hb-note"
-  }, sy.at ? `XReacher, synced ${timeAgo(sy.at)}` : "XReacher")), React.createElement("button", {
+  }, "Today on ", (sy.accounts || [])[0]?.handle || "X")), React.createElement("span", {
+    className: "hb-note",
+    style: {
+      fontSize: 11.5
+    }
+  }, sy.at ? `synced ${timeAgo(sy.at)}` : ""), React.createElement("button", {
     className: "hb-btn sm",
     onClick: onOpen
   }, "Open X outreach")), React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 18,
-      alignItems: "flex-end",
-      flexWrap: "wrap"
-    }
+    className: "xo-grid"
   }, React.createElement("div", {
-    style: {
-      flex: 1,
-      minWidth: 200
-    }
+    className: "xo-today"
   }, React.createElement("div", {
+    className: "xo-nums"
+  }, React.createElement("div", null, React.createElement("b", null, n(T.contacted)), React.createElement("span", null, "DMs")), React.createElement("div", null, React.createElement("b", null, n(T.followups)), React.createElement("span", null, "Follow-ups")), React.createElement("div", null, React.createElement("b", {
     style: {
-      display: "flex",
-      justifyContent: "space-between",
-      fontSize: 12.5,
-      marginBottom: 6
+      color: "#a8f5c4"
     }
-  }, React.createElement("span", null, "New creators today"), React.createElement("b", {
-    style: {
-      fontVariantNumeric: "tabular-nums"
-    }
-  }, n(first), limit ? ` / ${limit}` : "")), React.createElement("div", {
-    style: {
-      height: 8,
-      borderRadius: 999,
-      background: "rgba(255,255,255,.07)",
-      overflow: "hidden"
-    }
+  }, n(T.replies)), React.createElement("span", null, "Replies"))), limit > 0 && React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "xo-lim"
+  }, React.createElement("span", null, "Daily limit"), React.createElement("b", null, n(T.contacted), " / ", limit)), React.createElement("div", {
+    className: "xr-meter"
   }, React.createElement("i", {
     style: {
-      display: "block",
-      height: "100%",
-      borderRadius: 999,
-      width: `${limit ? Math.min(100, first / limit * 100) : 0}%`,
-      background: "linear-gradient(90deg,#12b34c,#39e673)"
+      width: `${Math.min(100, T.contacted / limit * 100)}%`
     }
-  })), React.createElement("div", {
-    className: "hb-note",
+  }))), React.createElement("div", {
+    className: "xo-mini"
+  }, React.createElement("div", null, React.createElement("span", null, "Last 7 days"), React.createElement("b", null, n(W.contacted), " DMs, ", n(W.replies), " replies")), React.createElement("div", null, React.createElement("span", null, "All time"), React.createElement("b", null, n(A.contacted), " DMs, ", pct(A.replies, A.contacted), " replied")), React.createElement("div", null, React.createElement("span", null, "Left in lead lists"), React.createElement("b", null, n(left), " creators")))), React.createElement("div", {
+    className: "xo-chart"
+  }, React.createElement("div", {
+    className: "xo-bars"
+  }, days.map((x, i) => React.createElement("div", {
+    key: x.k,
+    className: "xo-bar",
+    title: `${xrDay(x.k)}: ${x.contacted} DMs, ${x.followups} follow-ups, ${x.replies} replies`
+  }, x.replies > 0 && React.createElement("em", null, x.replies), React.createElement("i", {
+    className: "f",
     style: {
-      fontSize: 11,
-      marginTop: 5
+      height: `${(x.followups || 0) / max * 82}%`
     }
-  }, n(first), " DMs, ", n(fu), " follow-ups. Last 7 days: ", n(sumC("week", "contacted")), " DMs, ", n(sumC("week", "followups")), " follow-ups, ", n(sumC("week", "replies")), " replies.")), React.createElement("div", {
-    title: "Messages per day, last 7 days",
+  }), React.createElement("i", {
+    className: `c ${i === days.length - 1 ? "now" : ""}`,
     style: {
-      display: "flex",
-      alignItems: "flex-end",
-      gap: 3,
-      height: 44,
-      width: 120
+      height: `${(x.contacted || 0) / max * 82}%`
     }
-  }, last7.map((x, i) => React.createElement("div", {
-    key: i,
+  })))), React.createElement("div", {
+    className: "xr-axis"
+  }, React.createElement("span", null, days[0] ? xrDay(days[0].k) : ""), React.createElement("span", null, "DMs bright, follow-ups dark, replies on top"), React.createElement("span", null, "Today")))), recent.length > 0 && React.createElement("div", {
+    className: "xo-recent"
+  }, React.createElement("span", {
+    className: "ad-eyebrow",
     style: {
-      flex: 1,
-      height: `${((x.contacted || 0) + (x.followups || 0)) / max * 100}%`,
-      minHeight: 2,
-      borderRadius: 3,
-      background: i === last7.length - 1 ? "#39e673" : "rgba(57,230,115,.35)"
+      marginRight: 4
     }
-  })))));
+  }, "Replied lately"), recent.map(l => React.createElement("button", {
+    key: l.id,
+    onClick: () => onOpenLead && onOpenLead(l.id)
+  }, React.createElement("i", null, (l.handle || "?").slice(0, 1).toUpperCase()), "@", l.handle, React.createElement("small", null, timeAgo(acqHerAt(l)))))));
 }
+const XO_CSS = `
+.xo-card{ border-radius:24px; padding:20px; margin-bottom:16px; border:1px solid rgba(231,233,234,.14);
+  background:radial-gradient(100% 140% at 100% 0%, rgba(231,233,234,.07), transparent 55%), #0b100d; }
+.xo-head{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+.xo-logo{ width:40px; height:40px; border-radius:12px; background:#e7e9ea; color:#03110a; display:inline-flex; align-items:center; justify-content:center; font-weight:900; font-size:18px; flex-shrink:0; }
+.xo-grid{ display:grid; grid-template-columns:minmax(260px,1fr) minmax(0,1.4fr); gap:16px; }
+.xo-today{ padding:14px; border-radius:18px; background:rgba(14,19,16,.85); border:1px solid rgba(255,255,255,.07); }
+.xo-nums{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:14px; }
+.xo-nums b{ display:block; font-size:30px; font-weight:900; letter-spacing:-.03em; font-variant-numeric:tabular-nums; line-height:1.05; }
+.xo-nums span{ font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#7d8f86; }
+.xo-lim{ display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:6px; color:#9fbcab; }
+.xo-lim b{ color:#f2f5f0; font-variant-numeric:tabular-nums; }
+.xo-mini{ display:grid; gap:7px; margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,255,255,.06); }
+.xo-mini div{ display:flex; justify-content:space-between; gap:10px; font-size:12.5px; }
+.xo-mini span{ color:#7d8f86; }
+.xo-mini b{ font-weight:700; font-variant-numeric:tabular-nums; text-align:right; }
+.xo-chart{ padding:14px 14px 10px; border-radius:18px; background:rgba(14,19,16,.85); border:1px solid rgba(255,255,255,.07); display:flex; flex-direction:column; justify-content:flex-end; }
+.xo-bars{ display:flex; align-items:flex-end; gap:5px; height:170px; }
+.xo-bar{ flex:1; height:100%; display:flex; flex-direction:column; justify-content:flex-end; position:relative; }
+.xo-bar i{ display:block; border-radius:5px; }
+.xo-bar i.f{ background:rgba(57,230,115,.25); margin-bottom:2px; }
+.xo-bar i.c{ background:linear-gradient(180deg,#39e673,#12b34c); opacity:.75; }
+.xo-bar i.c.now{ opacity:1; box-shadow:0 0 14px rgba(57,230,115,.45); }
+.xo-bar em{ position:absolute; top:0; left:50%; transform:translateX(-50%); font-style:normal; font-size:10px; font-weight:800; color:#03110a; background:#a8f5c4; border-radius:999px; padding:0 5px; }
+.xo-recent{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:14px; }
+.xo-recent button{ display:inline-flex; align-items:center; gap:7px; padding:5px 11px 5px 5px; border-radius:999px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); font-size:12.5px; font-weight:700; color:inherit; }
+.xo-recent button:hover{ border-color:rgba(57,230,115,.4); }
+.xo-recent i{ width:22px; height:22px; border-radius:50%; background:#1b2420; color:#a8f5c4; display:inline-flex; align-items:center; justify-content:center; font-style:normal; font-size:11px; }
+.xo-recent small{ color:#6f8279; font-weight:500; }
+@media (max-width:760px){ .xo-grid{ grid-template-columns:1fr; } .xo-bars{ height:120px; gap:3px; } .xo-card{ padding:16px; border-radius:20px; } }
+`;
 function AcquisitionPage() {
   const [agency, setAgency] = useState(() => {
     try {
@@ -18207,7 +18255,7 @@ function AcquisitionPage() {
   }[run.state] || "" : "";
   return React.createElement("div", {
     className: "hb aq-page"
-  }, React.createElement("style", null, HUB_CSS, SHOOT_CSS, ACQ_CSS), React.createElement("div", {
+  }, React.createElement("style", null, HUB_CSS, SHOOT_CSS, ACQ_CSS, XO_CSS, XR_CSS), React.createElement("div", {
     className: "aq-top"
   }, React.createElement("div", {
     style: {
@@ -18285,22 +18333,23 @@ function AcquisitionPage() {
       return Math.max(0, c - (inP(l.messaged_at) ? 1 : 0));
     };
     const rows = SECTIONS.filter(([k]) => !["overview", "plan", "ongoing"].includes(k) && (agency === "US" || k !== "xout")).map(([k, label, color]) => {
-      const L = all.filter(l => sectionOf(l) === k);
+      const Ls = all.filter(l => sectionOf(l) === k);
       const isX = k === "xout" && xn;
-      const repL = L.filter(l => {
+      const repL = Ls.filter(l => {
         const t = acqHerAt(l);
         return t != null && t >= since;
       }).length;
       return {
         k,
-        label: k === "xout" ? "X (XReacher)" : label,
+        label: k === "xout" ? "X" : k === "instagram" ? "Instagram" : label,
+        sub: k === "xout" ? "XReacher" : k === "reddit" ? "r/onlyfansadvice" : k === "meta" ? "Lead ads" : "",
         color,
-        found: L.filter(l => inP(k === "meta" ? l.lead_at || l.created_at : l.created_at)).length,
-        dms: isX ? xn.contacted : L.filter(l => inP(l.messaged_at)).length,
-        fu: isX ? xn.followups : L.reduce((a2, l) => a2 + meFollow(l), 0),
+        found: Ls.filter(l => inP(k === "meta" ? l.lead_at || l.created_at : l.created_at)).length,
+        dms: isX ? xn.contacted : Ls.filter(l => inP(l.messaged_at)).length,
+        fu: isX ? xn.followups : Ls.reduce((a2, l) => a2 + meFollow(l), 0),
         rep: isX ? Math.max(xn.replies, repL) : repL,
-        talking: L.filter(l => ["replied", "call"].includes(l.status)).length,
-        signed: L.filter(l => l.status === "signed").length
+        talking: Ls.filter(l => ["replied", "call"].includes(l.status)).length,
+        signed: Ls.filter(l => l.status === "signed").length
       };
     });
     const T = rows.reduce((t, r) => ({
@@ -18308,16 +18357,96 @@ function AcquisitionPage() {
       fu: t.fu + r.fu,
       rep: t.rep + r.rep,
       signed: t.signed + r.signed,
-      found: t.found + r.found
+      found: t.found + r.found,
+      talking: t.talking + r.talking
     }), {
       dms: 0,
       fu: 0,
       rep: 0,
       signed: 0,
-      found: 0
+      found: 0,
+      talking: 0
     });
     const pct = (a2, b2) => b2 ? `${(Math.round(a2 / b2 * 1000) / 10).toLocaleString("en-US")}%` : "0%";
     const xLimit = (xr?.sync?.campaigns || []).filter(c => c.status === "active").reduce((a2, c) => a2 + (c.daily_limit || 0), 0);
+    const dayKey = d => {
+      const z = new Date(d);
+      return `${z.getFullYear()}-${String(z.getMonth() + 1).padStart(2, "0")}-${String(z.getDate()).padStart(2, "0")}`;
+    };
+    const days14 = Array.from({
+      length: 14
+    }, (_, i) => dayKey(Date.now() - (13 - i) * 86400000));
+    const xd = xr && xr.daily || {};
+    const handBy = field => {
+      const m = {};
+      all.forEach(l => {
+        if (l.source !== "x" && l[field]) {
+          const k = dayKey(Date.parse(l[field]));
+          m[k] = (m[k] || 0) + 1;
+        }
+      });
+      return m;
+    };
+    const hm = handBy("messaged_at");
+    const repBy = {};
+    all.forEach(l => {
+      if (l.source === "x") return;
+      const t = acqHerAt(l);
+      if (t) {
+        const k = dayKey(t);
+        repBy[k] = (repBy[k] || 0) + 1;
+      }
+    });
+    const trend = {
+      messaged: days14.map(k => ((xd[k] || {}).contacted || 0) + (hm[k] || 0)),
+      followups: days14.map(k => (xd[k] || {}).followups || 0),
+      replies: days14.map(k => ((xd[k] || {}).replies || 0) + (repBy[k] || 0))
+    };
+    const Spark = ({
+      data
+    }) => {
+      const max = Math.max(1, ...data);
+      const w = 120,
+        h = 34;
+      const pts = data.map((v, i) => [i / (data.length - 1) * w, h - 3 - v / max * (h - 8)]);
+      const d = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+      return React.createElement("svg", {
+        className: "ad-spark",
+        viewBox: `0 0 ${w} ${h}`,
+        preserveAspectRatio: "none",
+        "aria-hidden": "true"
+      }, React.createElement("defs", null, React.createElement("linearGradient", {
+        id: "adSpG",
+        x1: "0",
+        x2: "0",
+        y1: "0",
+        y2: "1"
+      }, React.createElement("stop", {
+        offset: "0",
+        stopColor: "#39e673",
+        stopOpacity: ".35"
+      }), React.createElement("stop", {
+        offset: "1",
+        stopColor: "#39e673",
+        stopOpacity: "0"
+      }))), React.createElement("path", {
+        d: `${d} L${w},${h} L0,${h} Z`,
+        fill: "url(#adSpG)"
+      }), React.createElement("path", {
+        d: d,
+        fill: "none",
+        stroke: "#39e673",
+        strokeWidth: "2",
+        strokeLinejoin: "round",
+        strokeLinecap: "round",
+        vectorEffect: "non-scaling-stroke"
+      }), React.createElement("circle", {
+        cx: pts[pts.length - 1][0],
+        cy: pts[pts.length - 1][1],
+        r: "3",
+        fill: "#a8f5c4"
+      }));
+    };
     const Big = ({
       k,
       v,
@@ -18325,64 +18454,34 @@ function AcquisitionPage() {
       sub,
       hot
     }) => React.createElement("button", {
-      className: `aq-kpi ${hot ? "hot" : ""} ${kpi === k ? "on" : ""}`,
-      style: {
-        textAlign: "left",
-        cursor: "pointer"
-      },
+      className: `ad-big ${hot ? "hot" : ""} ${kpi === k ? "on" : ""}`,
       onClick: () => setKpi(kpi === k ? null : k)
-    }, React.createElement("b", {
-      style: {
-        fontSize: 30
-      }
-    }, v), React.createElement("span", null, l), sub && React.createElement("div", {
-      className: "hb-note",
-      style: {
-        marginTop: 4,
-        fontSize: 11
-      }
-    }, sub));
+    }, React.createElement("span", {
+      className: "ad-big-l"
+    }, l), React.createElement("b", null, v), React.createElement("span", {
+      className: "ad-big-s"
+    }, sub), trend[k] && React.createElement(Spark, {
+      data: trend[k]
+    }));
+    const active = rows.filter(r => r.found || r.dms || r.fu || r.rep || r.talking || r.signed).sort((a2, b2) => b2.dms + b2.fu + b2.rep * 10 - (a2.dms + a2.fu + a2.rep * 10));
+    const quiet = rows.filter(r => !active.includes(r));
+    const maxDms = Math.max(1, ...active.map(r => r.dms + r.fu));
     return React.createElement("div", {
-      className: "hb-card",
-      style: {
-        marginBottom: 16
-      }
+      className: "ad-hero"
     }, React.createElement("div", {
-      style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        flexWrap: "wrap",
-        marginBottom: 14
-      }
-    }, React.createElement("div", {
-      style: {
-        flex: 1,
-        minWidth: 180
-      }
-    }, React.createElement("div", {
-      style: {
-        fontWeight: 800,
-        fontSize: 18
-      }
-    }, "Outreach, ", perWord), React.createElement("div", {
-      className: "hb-note"
-    }, "Every channel in one place. Tap a number for the people, tap a channel to open it.")), React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 6,
-        flexWrap: "wrap"
-      }
+      className: "ad-head"
+    }, React.createElement("div", null, React.createElement("div", {
+      className: "ad-eyebrow"
+    }, "Outreach"), React.createElement("div", {
+      className: "ad-title"
+    }, per === "today" ? "Today" : per === "all" ? "All time" : `Last ${per} days`)), React.createElement("div", {
+      className: "ad-seg"
     }, ACQ_PERIODS.map(([k, l]) => React.createElement("button", {
       key: k,
-      className: `hb-chip ${per === k ? "on" : ""}`,
+      className: per === k ? "on" : "",
       onClick: () => pickPer(k)
     }, l)))), React.createElement("div", {
-      className: "aq-kpis",
-      style: {
-        gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
-        marginBottom: 14
-      }
+      className: "ad-bigs"
     }, React.createElement(Big, {
       hot: true,
       k: "messaged",
@@ -18393,7 +18492,7 @@ function AcquisitionPage() {
       k: "followups",
       v: n(T.fu),
       l: "Follow-ups",
-      sub: "to creators who did not answer yet"
+      sub: "to creators who did not answer"
     }), React.createElement(Big, {
       k: "replies",
       v: n(T.rep),
@@ -18403,85 +18502,48 @@ function AcquisitionPage() {
       k: "signed",
       v: n(T.signed),
       l: "Signed",
-      sub: "creators who signed, all time"
+      sub: `${n(T.talking)} talking right now`
     })), React.createElement("div", {
+      className: "ad-sec"
+    }, "By channel"), React.createElement("div", {
+      className: "ad-chans"
+    }, active.map(r => React.createElement("button", {
+      key: r.k,
+      className: "ad-chan",
       style: {
-        overflowX: "auto",
-        margin: "0 -4px"
-      }
+        "--c": r.color
+      },
+      onClick: () => setSection(r.k)
     }, React.createElement("div", {
+      className: "ad-chan-top"
+    }, React.createElement("span", {
+      className: "ad-dot"
+    }), React.createElement("span", {
+      className: "ad-chan-name"
+    }, r.label, r.sub && React.createElement("small", null, r.sub)), r.rep > 0 && React.createElement("span", {
+      className: "ad-rep"
+    }, r.rep, " ", r.rep === 1 ? "reply" : "replies")), React.createElement("div", {
+      className: "ad-chan-nums"
+    }, React.createElement("div", null, React.createElement("b", null, n(r.dms)), React.createElement("span", null, "DMs")), React.createElement("div", null, React.createElement("b", null, n(r.fu)), React.createElement("span", null, "Follow-ups")), React.createElement("div", null, React.createElement("b", null, r.dms ? pct(r.rep, r.dms) : "0%"), React.createElement("span", null, "Reply rate")), React.createElement("div", null, React.createElement("b", null, n(r.found)), React.createElement("span", null, "New leads"))), React.createElement("div", {
+      className: "ad-chan-bar"
+    }, React.createElement("i", {
       style: {
-        minWidth: 620
+        width: `${(r.dms + r.fu) / maxDms * 100}%`
       }
-    }, React.createElement("div", {
-      className: "ad-row h"
-    }, React.createElement("span", null, "Channel"), React.createElement("span", null, "New leads"), React.createElement("span", null, "DMs"), React.createElement("span", null, "Follow-ups"), React.createElement("span", null, "Replies"), React.createElement("span", null, "Reply rate"), React.createElement("span", null, "Talking"), React.createElement("span", null, "Signed")), rows.map(r => {
-      const zero = !r.found && !r.dms && !r.fu && !r.rep && !r.talking && !r.signed;
-      return React.createElement("div", {
-        key: r.k,
-        className: "ad-row",
-        style: {
-          opacity: zero ? 0.45 : 1
-        },
-        onClick: () => setSection(r.k)
-      }, React.createElement("span", {
-        style: {
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          fontWeight: 700,
-          minWidth: 0
-        }
-      }, React.createElement("i", {
-        style: {
-          width: 9,
-          height: 9,
-          borderRadius: "50%",
-          background: r.color,
-          flexShrink: 0
-        }
-      }), React.createElement("span", {
-        style: {
-          minWidth: 0
-        }
-      }, React.createElement("span", {
-        style: {
-          display: "block",
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis"
-        }
-      }, r.label), r.k === "xout" && xn && per === "today" && xLimit ? React.createElement("span", {
-        className: "hb-note",
-        style: {
-          display: "block",
-          fontWeight: 500,
-          fontSize: 11
-        }
-      }, n(r.dms), " of ", xLimit, " daily limit") : null)), React.createElement("span", null, n(r.found)), React.createElement("span", null, n(r.dms)), React.createElement("span", null, n(r.fu)), React.createElement("span", {
-        style: {
-          color: r.rep ? "#a8f5c4" : undefined,
-          fontWeight: r.rep ? 800 : 400
-        }
-      }, n(r.rep)), React.createElement("span", null, r.dms ? pct(r.rep, r.dms) : ""), React.createElement("span", null, n(r.talking)), React.createElement("span", null, n(r.signed)));
-    }), React.createElement("div", {
-      className: "ad-row t"
-    }, React.createElement("span", null, "Total"), React.createElement("span", null, n(T.found)), React.createElement("span", null, n(T.dms)), React.createElement("span", null, n(T.fu)), React.createElement("span", null, n(T.rep)), React.createElement("span", null, T.dms ? pct(T.rep, T.dms) : ""), React.createElement("span", null, n(rows.reduce((a2, r) => a2 + r.talking, 0))), React.createElement("span", null, n(T.signed))))), React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 8,
-        flexWrap: "wrap",
-        marginTop: 14
-      }
-    }, [["good", "Good new leads"], ["talking", "Talking now"], ["due", "Follow-ups due by you"]].map(([k, l]) => React.createElement("button", {
+    })), React.createElement("div", {
+      className: "ad-chan-foot"
+    }, r.k === "xout" && xn && per === "today" && xLimit ? `${n(r.dms)} of ${xLimit} daily limit` : `${n(r.talking)} talking, ${n(r.signed)} signed`)))), quiet.length > 0 && React.createElement("div", {
+      className: "ad-quiet"
+    }, "No activity ", per === "today" ? "today" : "in this period", ": ", quiet.map((r, i) => React.createElement("button", {
+      key: r.k,
+      onClick: () => setSection(r.k)
+    }, r.label, i < quiet.length - 1 ? "," : ""))), React.createElement("div", {
+      className: "ad-pipe"
+    }, [["good", "Good new leads", "Reddit qualified and X replies"], ["talking", "Talking now", "replied or call booked"], ["due", "Follow-ups due", "waiting on you"]].map(([k, l, s2]) => React.createElement("button", {
       key: k,
-      className: `hb-chip ${kpi === k ? "on" : ""}`,
+      className: kpi === k ? "on" : "",
       onClick: () => setKpi(kpi === k ? null : k)
-    }, l, " ", React.createElement("b", {
-      style: {
-        marginLeft: 4
-      }
-    }, kpiLists[k].list.length)))));
+    }, React.createElement("b", null, kpiLists[k].list.length), React.createElement("span", null, l, React.createElement("small", null, s2))))));
   })(), section === "overview" && !kpi && agency === "US" && React.createElement("div", {
     className: "hb-card",
     style: {
@@ -18564,7 +18626,11 @@ function AcquisitionPage() {
       background: scoreColor(l.score),
       color: (l.score || 0) >= 45 ? "#03110a" : "#c9d3ce"
     }
-  }, l.score ?? "?")))), section === "newof" && React.createElement("div", {
+  }, l.score ?? "?")))), section === "overview" && !kpi && agency === "US" && React.createElement(XOverviewCard, {
+    onOpen: () => setSection("xout"),
+    leads: all.filter(l => l.source === "x"),
+    onOpenLead: setOpen
+  }), section === "newof" && React.createElement("div", {
     className: "hb-card",
     style: {
       marginBottom: 16,
@@ -33227,7 +33293,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1txib4v</script>
+<script type="text/babel" id="zion-version">kmv37h</script>
 <script>
 (function () {
   var last = 0;
