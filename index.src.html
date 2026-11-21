@@ -15498,7 +15498,8 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
 
       {/* all the quick stats — mobile only now; desktop shows this same data
           in the HUD panels flanking the orb above instead */}
-      <div className="grid grid-cols-2 sm:hidden gap-5 mt-10 neo-fade-in" style={{ animationDelay: "0.7s" }}>
+      {/* removed 2026-11-21: the owner found these numbers irrelevant on the Neo page */}
+      {false && (<div className="grid grid-cols-2 sm:hidden gap-5 mt-10 neo-fade-in" style={{ animationDelay: "0.7s" }}>
         <div className="text-center sm:text-left">
           <div className="fs-9 tracking-widest" style={{ color: textDim, letterSpacing: "1.5px" }}>{session.role === "admin" ? "ACTIVE MODELS" : "MESSAGES (7D)"}</div>
           <div className="text-2xl font-bold" style={{ color: neoGreen, textShadow: `0 0 8px ${neoGreen}88` }}>{session.role === "admin" ? models.length : messages7d.toLocaleString()}</div>
@@ -15523,7 +15524,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
           <div className="fs-9 tracking-widest" style={{ color: textDim, letterSpacing: "1.5px" }}>ACTIVE SUBS</div>
           <div className="text-2xl font-bold" style={{ color: neoGreen, textShadow: `0 0 8px ${neoGreen}88` }}>{activeSubs.toLocaleString()}</div>
         </div>
-      </div>
+      </div>)}
 
       <NeoChat compact={session.role === "admin"} messages={messages} setMessages={setMessages} thinking={thinking} onSend={(t) => send(t, "text")} canAct={session.role === "admin"} />
 
@@ -15531,7 +15532,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
           model roster — actually gated by role now, not just labeled "team
           only": a creator logged in just to talk to Neo about her own
           numbers should never see the rest of the roster. */}
-      {session.role === "admin" && (
+      {false && session.role === "admin" && (
       <>
       {/* financial strip — shown on all screen sizes now, it reads nicer as a full-width strip than the small circular ring */}
       <div className="flex items-center gap-7 flex-wrap mt-8 pt-5 pb-5 neo-fade-in" style={{ borderTop: `1px solid ${border}`, animationDelay: "0.85s", transform: "translateY(-20px)", paddingLeft: 4, paddingRight: 4, maxWidth: "100%", boxSizing: "border-box" }}>

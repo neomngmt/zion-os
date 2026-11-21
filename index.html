@@ -26505,7 +26505,7 @@ function NeoPage({
       width: 280,
       flexShrink: 0
     }
-  })), React.createElement("div", {
+  })), false && React.createElement("div", {
     className: "grid grid-cols-2 sm:hidden gap-5 mt-10 neo-fade-in",
     style: {
       animationDelay: "0.7s"
@@ -26601,7 +26601,7 @@ function NeoPage({
     thinking: thinking,
     onSend: t => send(t, "text"),
     canAct: session.role === "admin"
-  }), session.role === "admin" && React.createElement(React.Fragment, null, React.createElement("div", {
+  }), false && session.role === "admin" && React.createElement(React.Fragment, null, React.createElement("div", {
     className: "flex items-center gap-7 flex-wrap mt-8 pt-5 pb-5 neo-fade-in",
     style: {
       borderTop: `1px solid ${border}`,
@@ -34497,7 +34497,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">eq4eje</script>
+<script type="text/babel" id="zion-version">1mxfb2g</script>
 <script>
 (function () {
   var last = 0;
