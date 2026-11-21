@@ -18395,6 +18395,87 @@ function CustomStatusChip({ status }) {
   return <span className="fs-9 font-mono uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: `${s.color}26`, color: s.color }}>{s.label}</span>;
 }
 
+// screenshots are made smaller in the browser before the AI reads them (faster, cheaper); they are not stored
+function cuShrink(file, maxSide = 1600) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const c = document.createElement("canvas"); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Could not open that image")); };
+    img.src = url;
+  });
+}
+const cuDue = (d) => {
+  if (!d) return null;
+  const days = Math.round((Date.parse(`${d}T12:00:00`) - Date.parse(`${new Date().toISOString().slice(0, 10)}T12:00:00`)) / 86400000);
+  return { days, text: days < 0 ? `${-days} day${days === -1 ? "" : "s"} late` : days === 0 ? "due today" : days === 1 ? "due tomorrow" : `due in ${days} days` };
+};
+const CU_CSS = `
+.cu-wrap{ max-width:980px; }
+.cu-top{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
+.cu-stats{ display:flex; gap:10px; flex-wrap:wrap; flex:1; }
+.cu-stat{ padding:10px 14px; border-radius:16px; background:#0e1310; border:1px solid rgba(255,255,255,.07); min-width:110px; }
+.cu-stat b{ display:block; color:#f2f5f0; font-size:22px; font-weight:900; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.cu-stat span{ font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#7d8f86; font-weight:700; }
+.cu-new{ border-radius:24px; padding:20px; margin-bottom:22px; border:1px solid rgba(57,230,115,.22);
+  background:radial-gradient(110% 140% at 0% 0%, rgba(57,230,115,.12), transparent 55%), #0b100d; animation:hbIn .35s cubic-bezier(.16,1,.3,1) both; }
+.cu-grid{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.15fr); gap:18px; }
+.cu-drop{ position:relative; border-radius:18px; border:1.5px dashed rgba(57,230,115,.35); background:rgba(8,12,10,.6); min-height:260px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:18px; cursor:pointer; transition:border-color .2s, background .2s; }
+.cu-drop:hover, .cu-drop.over{ border-color:#39e673; background:rgba(57,230,115,.06); }
+.cu-drop .big{ font-size:15px; font-weight:800; margin-top:10px; color:#f2f5f0; }
+.cu-in::placeholder{ color:#4d5c55; }
+.cu-drop .small{ font-size:12px; color:#7d8f86; margin-top:4px; max-width:260px; }
+.cu-icon{ width:52px; height:52px; border-radius:16px; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,rgba(57,230,115,.25),rgba(18,179,76,.08)); color:#a8f5c4; }
+.cu-thumbs{ display:grid; grid-template-columns:repeat(auto-fill,minmax(78px,1fr)); gap:8px; width:100%; }
+.cu-thumb{ position:relative; aspect-ratio:9/16; border-radius:12px; overflow:hidden; border:1px solid rgba(255,255,255,.1); background:#111 center/cover no-repeat; }
+.cu-thumb button{ position:absolute; top:4px; right:4px; width:22px; height:22px; border-radius:50%; background:rgba(0,0,0,.7); color:#fff; font-size:13px; line-height:22px; }
+.cu-add{ aspect-ratio:9/16; border-radius:12px; border:1.5px dashed rgba(255,255,255,.15); display:flex; align-items:center; justify-content:center; color:#7d8f86; font-size:22px; }
+.cu-reading{ position:absolute; inset:0; border-radius:18px; background:rgba(5,9,7,.78); backdrop-filter:blur(3px); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; font-weight:800; color:#f2f5f0; }
+.cu-scan{ width:60%; height:3px; border-radius:999px; background:linear-gradient(90deg,transparent,#39e673,transparent); background-size:200% 100%; animation:cuScan 1.2s linear infinite; }
+@keyframes cuScan{ from{ background-position:200% 0; } to{ background-position:-200% 0; } }
+.cu-f label{ display:block; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#7d8f86; font-weight:700; margin:0 0 5px 2px; }
+.cu-in{ width:100%; background:#0a0f0c; border:1px solid rgba(255,255,255,.1); border-radius:12px; padding:10px 12px; font-size:14px; color:#f2f5f0; outline:none; transition:border-color .2s; }
+.cu-in:focus{ border-color:#39e673; }
+.cu-in.ai{ border-color:rgba(57,230,115,.45); box-shadow:0 0 0 3px rgba(57,230,115,.08); }
+textarea.cu-in{ resize:vertical; line-height:1.55; }
+.cu-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.cu-hint{ border-radius:12px; padding:10px 12px; font-size:12.5px; background:rgba(240,190,60,.08); border:1px solid rgba(240,190,60,.3); color:#f3d99a; }
+.cu-paid{ display:inline-flex; padding:3px; border-radius:12px; background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.08); }
+.cu-paid button{ padding:7px 12px; border-radius:9px; font-size:12.5px; font-weight:700; color:#8fa39a; }
+.cu-paid button.on{ background:linear-gradient(120deg,#39e673,#12b34c); color:#03110a; }
+.cu-sec{ display:flex; align-items:center; gap:8px; font-size:10.5px; letter-spacing:.18em; text-transform:uppercase; color:#7fae93; font-weight:800; margin:6px 2px 10px; }
+.cu-sec i{ width:8px; height:8px; border-radius:50%; }
+.cu-cards{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; margin-bottom:24px; }
+.cu-card{ position:relative; overflow:hidden; border-radius:20px; padding:16px; color:#f2f5f0; background:#0e1310; border:1px solid rgba(255,255,255,.07); display:flex; flex-direction:column; gap:10px; }
+.cu-card::before{ content:""; position:absolute; inset:0 0 auto 0; height:2px; background:linear-gradient(90deg,var(--c),transparent 75%); }
+.cu-card-top{ display:flex; align-items:center; gap:10px; }
+.cu-ava{ width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:900; color:#03110a; background:linear-gradient(135deg,#a8f5c4,#39e673); flex-shrink:0; }
+.cu-price{ margin-left:auto; font-size:22px; font-weight:900; letter-spacing:-.02em; color:#a8f5c4; font-variant-numeric:tabular-nums; }
+.cu-title{ font-size:15px; font-weight:800; line-height:1.35; color:#f2f5f0; }
+.cu-notes{ margin:0; padding:0; list-style:none; display:grid; gap:5px; }
+.cu-notes li{ position:relative; padding-left:16px; font-size:13px; color:#c9d3ce; line-height:1.45; }
+.cu-notes li::before{ content:""; position:absolute; left:2px; top:8px; width:6px; height:6px; border-radius:50%; background:#39e673; }
+.cu-meta{ display:flex; gap:6px; flex-wrap:wrap; }
+.cu-chip{ font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px; background:rgba(255,255,255,.06); color:#c9d3ce; }
+.cu-chip.late{ background:rgba(226,114,91,.15); color:#ff9b85; }
+.cu-chip.soon{ background:rgba(240,190,60,.14); color:#f3d99a; }
+.cu-empty{ border-radius:20px; padding:34px 20px; text-align:center; background:#0e1310; border:1px dashed rgba(255,255,255,.1); color:#7d8f86; font-size:13.5px; }
+@media (max-width:760px){ .cu-grid{ grid-template-columns:1fr; } .cu-drop{ min-height:180px; } .cu-new{ padding:16px; border-radius:20px; } }
+`;
+// split a saved description into a title line and the notes (lines starting with a dot or a dash)
+const cuParse = (text) => {
+  const lines = String(text || "").split("\n").map((l) => l.trim()).filter(Boolean);
+  const notes = lines.filter((l) => /^[•\-*]\s*/.test(l)).map((l) => l.replace(/^[•\-*]\s*/, ""));
+  const rest = lines.filter((l) => !/^[•\-*]\s*/.test(l));
+  return { title: rest[0] || "", extra: rest.slice(1), notes };
+};
+
 function CustomsAdminPage({ models }) {
   const { rows, loading, reload } = useCustoms(null);
   const names = new Set((models || []).map((m) => m.name));
@@ -18404,9 +18485,52 @@ function CustomsAdminPage({ models }) {
   const [f, setF] = useState(blank);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [shots, setShots] = useState([]);
+  const [reading, setReading] = useState(false);
+  const [aiDone, setAiDone] = useState(false);
+  const [unclear, setUnclear] = useState("");
+  const [over, setOver] = useState(false);
+  const fileRef = useRef(null);
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
-  const field = "w-full c-bg-app border c-border rounded-lg px-2.5 py-2 text-sm c-text outline-none focus-border-accent";
 
+  const addFiles = async (files) => {
+    const imgs = [...files].filter((x) => /^image\//.test(x.type)).slice(0, 8 - shots.length);
+    if (!imgs.length) return;
+    try { const urls = await Promise.all(imgs.map((x) => cuShrink(x))); setShots((s2) => [...s2, ...urls].slice(0, 8)); } catch (e) { setErr(e.message); }
+  };
+  // Cmd+V with a screenshot while the form is open
+  useEffect(() => {
+    if (!open) return;
+    const onPaste = (e) => { const fl = [...(e.clipboardData?.files || [])]; if (fl.length) { e.preventDefault(); addFiles(fl); } };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [open, shots.length]);
+
+  const readAI = async () => {
+    if (!shots.length) return;
+    setReading(true); setErr(""); setUnclear("");
+    try {
+      let token = ""; try { token = (JSON.parse(localStorage.getItem("agencyos_session") || "{}")).token || ""; } catch (e) {}
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/custom-read`, { method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, "x-zion-token": token }, body: JSON.stringify({ images: shots, models: (models || []).map((m) => m.name) }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+      setF((p) => ({
+        ...p,
+        model: j.model_guess || p.model,
+        description: [j.title, ...(j.notes || []).map((x) => `• ${x}`)].filter(Boolean).join("\n"),
+        fan: j.fan_name || p.fan,
+        price: j.price != null ? String(j.price) : p.price,
+        deadline: j.deadline || p.deadline,
+        sold: j.paid != null ? j.paid : p.sold,
+      }));
+      setUnclear(j.unclear || ""); setAiDone(true);
+    } catch (e) { setErr(e.message); }
+    setReading(false);
+  };
+  // read as soon as screenshots are added
+  useEffect(() => { if (shots.length && !aiDone && !reading) { const t = setTimeout(readAI, 600); return () => clearTimeout(t); } }, [shots.length]);
+
+  const reset = () => { setF(blank); setShots([]); setAiDone(false); setUnclear(""); setErr(""); };
   const create = async () => {
     if (!f.model || !f.description.trim()) { setErr("Choose a model and describe the custom."); return; }
     setBusy(true); setErr("");
@@ -18419,7 +18543,7 @@ function CustomsAdminPage({ models }) {
     const { error } = await supabaseClient.from("customs").insert(row);
     if (error) { setErr(error.message); setBusy(false); return; }
     await customNotify(id, "created");
-    setF(blank); setOpen(false); setBusy(false);
+    reset(); setOpen(false); setBusy(false);
     reload();
   };
   const update = async (c, patch, event) => {
@@ -18430,63 +18554,112 @@ function CustomsAdminPage({ models }) {
   };
 
   const groups = [["sold", "To make"], ["in_progress", "In progress"], ["requested", "Not paid yet"], ["delivered", "Delivered"], ["cancelled", "Cancelled"]];
+  const month = new Date().toISOString().slice(0, 7);
+  const soldMonth = list.filter((c) => c.status !== "cancelled" && c.status !== "requested" && String(c.sold_at || c.created_at).slice(0, 7) === month).reduce((t, c) => t + (Number(c.price) || 0), 0);
+  const cnt = (st) => list.filter((c) => c.status === st).length;
 
   return (
-    <div className="max-w-3xl">
-      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-        <p className="fs-13 c-muted">Custom content requests. When you add one, the model gets a push in the app right away.</p>
-        <button onClick={() => setOpen((v) => !v)} className="px-3 py-2 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase font-semibold">{open ? "Close" : "New custom"}</button>
+    <div className="cu-wrap">
+      <style>{HUB_CSS}{CU_CSS}</style>
+      <div className="cu-top">
+        <div className="cu-stats">
+          <div className="cu-stat"><b>{cnt("sold")}</b><span>To make</span></div>
+          <div className="cu-stat"><b>{cnt("in_progress")}</b><span>In progress</span></div>
+          <div className="cu-stat"><b>{cnt("requested")}</b><span>Not paid yet</span></div>
+          <div className="cu-stat"><b style={{ color: "#a8f5c4" }}>${Math.round(soldMonth).toLocaleString("en-US")}</b><span>Sold this month</span></div>
+        </div>
+        <button onClick={() => { if (open) reset(); setOpen((v) => !v); }} className="hb-btn">{open ? "Close" : "+ New custom"}</button>
       </div>
 
       {open && (
-        <div className="c-bg-surface border c-border rounded-xl p-4 mb-5 space-y-2.5">
-          <select value={f.model} onChange={(e) => set("model", e.target.value)} className={field}>
-            {(models || []).map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
-          </select>
-          <textarea value={f.description} onChange={(e) => set("description", e.target.value)} rows={4} placeholder="What the fan wants, as exact as possible" className={field} />
-          <div className="grid grid-cols-2 gap-2.5">
-            <input value={f.fan} onChange={(e) => set("fan", e.target.value)} placeholder="Fan name (only you and the model see it)" className={field} />
-            <input type="number" value={f.price} onChange={(e) => set("price", e.target.value)} placeholder="Price in USD" className={field} />
+        <div className="cu-new">
+          <div className="cu-grid">
+            <div>
+              <div className={`cu-drop ${over ? "over" : ""}`} onClick={() => !shots.length && fileRef.current && fileRef.current.click()}
+                onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
+                onDrop={(e) => { e.preventDefault(); setOver(false); addFiles(e.dataTransfer.files); }}>
+                <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} />
+                {!shots.length ? (<>
+                  <div className="cu-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="9" cy="9" r="2" /><path d="M21 15l-5-5L5 21" /></svg></div>
+                  <div className="big">Drop the chat screenshots here</div>
+                  <div className="small">Or tap to choose them, or paste with Cmd+V. The AI reads what the fan wants and fills in everything.</div>
+                </>) : (
+                  <div className="cu-thumbs">
+                    {shots.map((u, i) => <div key={i} className="cu-thumb" style={{ backgroundImage: `url(${u})` }}><button onClick={(e) => { e.stopPropagation(); setShots((s2) => s2.filter((_, j) => j !== i)); setAiDone(false); }}>×</button></div>)}
+                    {shots.length < 8 && <button className="cu-add" onClick={(e) => { e.stopPropagation(); fileRef.current && fileRef.current.click(); }}>+</button>}
+                  </div>
+                )}
+                {reading && <div className="cu-reading"><div className="cu-scan" />Reading the chat</div>}
+              </div>
+              {shots.length > 0 && !reading && <button className="hb-btn ghost sm" style={{ marginTop: 10 }} onClick={readAI}>{aiDone ? "Read again" : "Read with AI"}</button>}
+              <div className="hb-note" style={{ fontSize: 11, marginTop: 8 }}>The screenshots are only read by the AI, they are not saved and the model never sees them.</div>
+            </div>
+            <div className="cu-f" style={{ display: "grid", gap: 12, alignContent: "start" }}>
+              <div><label>Model</label>
+                <select value={f.model} onChange={(e) => set("model", e.target.value)} className="cu-in">
+                  {(models || []).map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
+                </select></div>
+              <div><label>What to make (the model sees this)</label>
+                <textarea value={f.description} onChange={(e) => set("description", e.target.value)} rows={9} placeholder={"5 min video in red lingerie\n• Say his name Mike at the start\n• Mostly from behind"} className={`cu-in ${aiDone ? "ai" : ""}`} /></div>
+              {unclear && <div className="cu-hint"><b>Check with the fan:</b> {unclear}</div>}
+              <div className="cu-row">
+                <div><label>Fan</label><input value={f.fan} onChange={(e) => set("fan", e.target.value)} placeholder="Fan name" className={`cu-in ${aiDone && f.fan ? "ai" : ""}`} /></div>
+                <div><label>Price (USD)</label><input type="number" value={f.price} onChange={(e) => set("price", e.target.value)} placeholder="0" className={`cu-in ${aiDone && f.price ? "ai" : ""}`} /></div>
+              </div>
+              <div className="cu-row" style={{ alignItems: "end" }}>
+                <div><label>Deadline</label><input type="date" value={f.deadline} onChange={(e) => set("deadline", e.target.value)} className={`cu-in ${aiDone && f.deadline ? "ai" : ""}`} /></div>
+                <div><label>Payment</label>
+                  <div className="cu-paid"><button className={f.sold ? "on" : ""} onClick={() => set("sold", true)}>Paid</button><button className={!f.sold ? "on" : ""} onClick={() => set("sold", false)}>Not paid yet</button></div></div>
+              </div>
+              {err && <div className="fs-12" style={{ color: "#ff6b6b" }}>{err}</div>}
+              <button onClick={create} disabled={busy || reading} className="hb-btn" style={{ justifySelf: "start" }}>{busy ? "Saving" : "Save and notify the model"}</button>
+            </div>
           </div>
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <label className="fs-12 c-muted flex items-center gap-2">Deadline <input type="date" value={f.deadline} onChange={(e) => set("deadline", e.target.value)} className="c-bg-app border c-border rounded-lg px-2 py-1.5 text-sm c-text" /></label>
-            <label className="fs-12 c-text flex items-center gap-2"><input type="checkbox" checked={f.sold} onChange={(e) => set("sold", e.target.checked)} /> Already paid (sold)</label>
-          </div>
-          {err && <div className="fs-12" style={{ color: "#ff6b6b" }}>{err}</div>}
-          <button onClick={create} disabled={busy} className="px-3 py-2 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase font-semibold">{busy ? "Saving..." : "Save and notify the model"}</button>
         </div>
       )}
       {err && !open && <div className="fs-12 mb-3" style={{ color: "#ff6b6b" }}>{err}</div>}
 
       {loading && <div className="fs-13 c-muted">Loading...</div>}
-      {!loading && list.length === 0 && <div className="c-bg-surface border c-border rounded-xl px-4 py-6 text-center fs-13 c-muted">No customs yet.</div>}
+      {!loading && list.length === 0 && <div className="cu-empty">No customs yet. Tap “New custom” and drop the chat screenshots in.</div>}
 
       {groups.map(([st, title]) => {
         const items = list.filter((c) => c.status === st);
         if (!items.length) return null;
+        const color = (CUSTOM_STATUS[st] || {}).color || "#39e673";
         return (
-          <div key={st} className="mb-5">
-            <div className="fs-10 font-mono uppercase tracking-widest c-faint mb-2">{title} ({items.length})</div>
-            <div className="space-y-2.5">
-              {items.map((c) => (
-                <div key={c.id} className="c-bg-surface border c-border rounded-xl px-4 py-3.5">
-                  <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                    <span className="fs-14 font-semibold c-text">{c.model}</span>
-                    <CustomStatusChip status={c.status} />
-                    {c.price != null && <span className="fs-12 font-mono c-accent">${Number(c.price).toLocaleString("en-US")}</span>}
-                    {c.deadline && <span className="fs-11 font-mono c-muted">due {c.deadline}</span>}
-                    <span className="fs-10 font-mono c-faint ml-auto">{new Date(c.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+          <div key={st}>
+            <div className="cu-sec"><i style={{ background: color }} />{title} ({items.length})</div>
+            <div className="cu-cards">
+              {items.map((c) => {
+                const p2 = cuParse(c.description); const due = st === "delivered" || st === "cancelled" ? null : cuDue(c.deadline);
+                return (
+                  <div key={c.id} className="cu-card" style={{ "--c": color }}>
+                    <div className="cu-card-top">
+                      <div className="cu-ava">{String(c.model || "?").slice(0, 1)}</div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 800 }}>{c.model}</div>
+                        <div className="hb-note" style={{ fontSize: 11 }}>{c.fan_label ? `for ${c.fan_label}, ` : ""}{new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
+                      </div>
+                      {c.price != null && <div className="cu-price">${Number(c.price).toLocaleString("en-US")}</div>}
+                    </div>
+                    {p2.title && <div className="cu-title">{p2.title}</div>}
+                    {p2.extra.length > 0 && <div className="fs-13 c-muted" style={{ whiteSpace: "pre-wrap" }}>{p2.extra.join("\n")}</div>}
+                    {p2.notes.length > 0 && <ul className="cu-notes">{p2.notes.map((x, i) => <li key={i}>{x}</li>)}</ul>}
+                    <div className="cu-meta">
+                      <CustomStatusChip status={c.status} />
+                      {due && <span className={`cu-chip ${due.days < 0 ? "late" : due.days <= 1 ? "soon" : ""}`}>{due.text}</span>}
+                    </div>
+                    {c.delivery_url && <a href={c.delivery_url} target="_blank" rel="noopener noreferrer" className="fs-12 font-mono c-accent">Open delivered custom &rarr;</a>}
+                    {c.delivery_note && <div className="fs-11 c-muted">Note from the model: {c.delivery_note}</div>}
+                    {(c.status === "requested" || c.status === "sold" || c.status === "in_progress") && (
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {c.status === "requested" && <button onClick={() => update(c, { status: "sold", sold_at: new Date().toISOString() }, "sold")} className="hb-btn sm">Mark as paid</button>}
+                        <button onClick={() => { if (window.confirm("Cancel this custom?")) update(c, { status: "cancelled" }); }} className="hb-btn ghost sm">Cancel</button>
+                      </div>
+                    )}
                   </div>
-                  {c.fan_label && <div className="fs-11 c-muted mb-1">Fan: {c.fan_label}</div>}
-                  <div className="fs-12 c-text leading-relaxed" style={{ whiteSpace: "pre-wrap" }}>{c.description}</div>
-                  {c.delivery_url && <a href={c.delivery_url} target="_blank" rel="noopener noreferrer" className="fs-12 font-mono c-accent mt-2 inline-block">Open delivered custom &rarr;</a>}
-                  {c.delivery_note && <div className="fs-11 c-muted mt-1">Note from the model: {c.delivery_note}</div>}
-                  <div className="flex gap-2 mt-3 flex-wrap">
-                    {c.status === "requested" && <button onClick={() => update(c, { status: "sold", sold_at: new Date().toISOString() }, "sold")} className="px-3 py-1.5 rounded-lg c-bg-accent c-onaccent fs-11 font-mono uppercase font-semibold">Mark as sold</button>}
-                    {(c.status === "requested" || c.status === "sold" || c.status === "in_progress") && <button onClick={() => update(c, { status: "cancelled" })} className="px-3 py-1.5 rounded-lg border c-border c-muted fs-11 font-mono uppercase">Cancel</button>}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         );
@@ -18530,7 +18703,11 @@ function CustomsCreatorPage({ model, record }) {
         {c.deadline && <span className="fs-11 font-mono c-muted ml-auto">due {c.deadline}</span>}
       </div>
       {c.fan_label && <div className="fs-11 c-muted mb-1">For: {c.fan_label}</div>}
-      <div className="fs-13 c-text leading-relaxed" style={{ whiteSpace: "pre-wrap" }}>{c.description}</div>
+      {(() => { const p2 = cuParse(c.description); return (<>
+        {p2.title && <div className="fs-14 font-bold c-text mb-1">{p2.title}</div>}
+        {p2.extra.length > 0 && <div className="fs-13 c-text leading-relaxed" style={{ whiteSpace: "pre-wrap" }}>{p2.extra.join("\n")}</div>}
+        {p2.notes.length > 0 && <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>{p2.notes.map((x, i) => <li key={i} className="fs-13 c-text leading-relaxed">{x}</li>)}</ul>}
+      </>); })()}
       {c.status === "requested" && <div className="fs-11 c-muted mt-2">The fan has not paid yet. You will get a notification when it is sold.</div>}
       {c.delivery_url && <a href={c.delivery_url} target="_blank" rel="noopener noreferrer" className="fs-12 font-mono c-accent mt-2 inline-block">Your delivered custom &rarr;</a>}
       {c.status === "sold" && <button onClick={() => start(c)} className="mt-3 px-3 py-1.5 rounded-lg c-bg-accent c-onaccent fs-11 font-mono uppercase font-semibold">Start working</button>}
