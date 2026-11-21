@@ -9369,32 +9369,41 @@ async function acqFn(body) {
 }
 const ACQ_STAGES = [["new", "New"], ["messaged", "Messaged"], ["replied", "Replied"], ["call", "Call"], ["signed", "Signed"], ["lost", "Not interested"], ["skip", "Skipped"]];
 const ACQ_CSS = `
-.oh-chart{ padding:16px 16px 10px; border-radius:18px; background:rgba(8,12,10,.7); border:1px solid rgba(255,255,255,.07); margin-bottom:22px; }
-.oh-chart-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+.oh-chart{ padding:18px 18px 12px; border-radius:20px; background:linear-gradient(180deg, rgba(57,230,115,.05), rgba(8,12,10,.75) 40%); border:1px solid rgba(255,255,255,.07); margin-bottom:22px; }
+.oh-chart-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
 .oh-chart-sum{ font-size:13px; color:#7d8f86; margin-top:4px; }
-.oh-chart-sum b{ font-size:20px; color:#f2f5f0; font-weight:900; margin:0 4px 0 10px; font-variant-numeric:tabular-nums; }
+.oh-chart-sum b{ font-size:22px; color:#f2f5f0; font-weight:900; margin:0 4px 0 12px; font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
 .oh-chart-sum b:first-child{ margin-left:0; }
 .oh-chart-sum b.r{ color:#a8f5c4; }
-.oh-legend{ display:flex; gap:14px; font-size:11.5px; color:#8fa39a; }
+.oh-legend{ display:flex; gap:14px; font-size:11.5px; color:#8fa39a; flex-wrap:wrap; }
 .oh-legend span{ display:inline-flex; align-items:center; gap:6px; }
 .oh-legend i{ width:10px; height:10px; border-radius:3px; display:inline-block; }
-.oh-legend i.c{ background:#39e673; } .oh-legend i.f{ background:rgba(57,230,115,.28); } .oh-legend i.l{ border-radius:50%; background:#a8f5c4; }
-.oh-plot{ position:relative; height:230px; }
-.oh-grid{ position:absolute; left:0; right:0; border-top:1px dashed rgba(255,255,255,.06); pointer-events:none; }
-.oh-grid span{ position:absolute; left:0; top:-14px; font-size:9.5px; color:#56665e; font-variant-numeric:tabular-nums; }
-.oh-bars{ position:absolute; inset:0 0 0 22px; display:flex; align-items:flex-end; gap:4px; }
-.oh-col{ flex:1; min-width:0; height:100%; display:flex; flex-direction:column; justify-content:flex-end; border-radius:6px; cursor:default; transition:background .15s; }
+.oh-legend i.c{ background:linear-gradient(180deg,#5ef08f,#12b34c); } .oh-legend i.f{ background:rgba(57,230,115,.25); } .oh-legend i.l{ border-radius:50%; background:#a8f5c4; box-shadow:0 0 8px rgba(168,245,196,.6); }
+.oh-plot{ position:relative; height:240px; }
+.oh-grid{ position:absolute; left:0; right:0; border-top:1px solid rgba(255,255,255,.045); pointer-events:none; }
+.oh-grid span{ position:absolute; left:0; top:-14px; font-size:9.5px; color:#4f5d56; font-variant-numeric:tabular-nums; }
+.oh-bars{ position:absolute; inset:0 0 0 24px; display:flex; align-items:stretch; }
+.oh-col{ flex:1; min-width:0; height:100%; display:flex; justify-content:center; border-radius:10px; cursor:default; transition:background .15s; }
 .oh-col:hover, .oh-col.on{ background:rgba(255,255,255,.035); }
-.oh-col i{ display:block; border-radius:5px; }
-.oh-col i.f{ background:rgba(57,230,115,.24); margin-bottom:2px; }
-.oh-col i.c{ background:linear-gradient(180deg,#39e673,#0f9e43); opacity:.8; }
-.oh-col.now i.c, .oh-col.on i.c{ opacity:1; box-shadow:0 0 16px rgba(57,230,115,.35); }
-.oh-line{ position:absolute; inset:0 0 0 22px; width:calc(100% - 22px); height:100%; pointer-events:none; overflow:visible; }
-.oh-rdot{ position:absolute; transform:translate(-50%,50%); margin-left:11px; pointer-events:none; font-size:10px; font-weight:900; color:#03110a; background:#a8f5c4; border-radius:999px; min-width:18px; height:18px; display:flex; align-items:center; justify-content:center; box-shadow:0 0 0 3px #0b100d; }
-.oh-tip{ position:absolute; top:-8px; transform:translateX(-50%); z-index:3; pointer-events:none; background:#0b100d; border:1px solid rgba(57,230,115,.35); border-radius:10px; padding:7px 10px; font-size:12px; white-space:nowrap; box-shadow:0 8px 24px rgba(0,0,0,.45); }
+.oh-col.now{ background:linear-gradient(180deg, transparent, rgba(57,230,115,.06)); }
+.oh-stack{ width:min(60%, 30px); height:100%; display:flex; flex-direction:column; justify-content:flex-end; }
+.oh-stack i{ display:block; width:100%; border-radius:8px; transition:height .5s cubic-bezier(.2,.8,.2,1); }
+.oh-stack i.f{ background:rgba(57,230,115,.22); margin-bottom:3px; }
+.oh-stack i.c{ background:linear-gradient(180deg,#5ef08f,#0f9e43); opacity:.85; }
+.oh-col.now .oh-stack i.c, .oh-col.on .oh-stack i.c{ opacity:1; box-shadow:0 0 18px rgba(57,230,115,.4); }
+.oh-line{ display:none; }
+.oh-rdot{ position:absolute; transform:translate(-50%,50%); margin-left:12px; pointer-events:none; font-size:10px; font-weight:900; color:#03110a; background:#a8f5c4; border-radius:999px; min-width:20px; height:20px; padding:0 5px; display:flex; align-items:center; justify-content:center; box-shadow:0 0 0 3px #0b100d, 0 0 14px rgba(168,245,196,.55); }
+.oh-tip{ position:absolute; top:-8px; transform:translateX(-50%); z-index:3; pointer-events:none; background:#0b100d; border:1px solid rgba(57,230,115,.35); border-radius:12px; padding:8px 11px; font-size:12px; white-space:nowrap; box-shadow:0 10px 30px rgba(0,0,0,.5); }
 .oh-tip b{ display:block; font-size:11px; color:#8fa39a; font-weight:600; margin-bottom:2px; }
-.oh-axis{ display:flex; justify-content:space-between; font-size:10.5px; color:#6f8279; margin:8px 0 0 22px; }
-@media (max-width:600px){ .oh-plot{ height:160px; } .oh-bars{ gap:2px; } .oh-chart-sum b{ font-size:16px; margin-left:6px; } .oh-rdot{ min-width:15px; height:15px; font-size:9px; } }
+.oh-days{ display:flex; margin:8px 0 0 24px; }
+.oh-days span{ flex:1; min-width:0; text-align:center; font-size:10.5px; color:#5f6f67; line-height:1.25; white-space:nowrap; }
+.oh-days span em{ display:block; font-style:normal; color:#8fa39a; font-weight:700; font-variant-numeric:tabular-nums; }
+.oh-days span.now{ color:#a8f5c4; font-weight:800; }
+.oh-big-top{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.oh-delta{ font-size:10.5px; font-weight:800; padding:2px 7px; border-radius:999px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.oh-delta.up{ color:#a8f5c4; background:rgba(57,230,115,.14); }
+.oh-delta.down{ color:#ffb4a1; background:rgba(226,114,91,.15); }
+@media (max-width:600px){ .oh-plot{ height:170px; } .oh-stack{ width:70%; } .oh-chart-sum b{ font-size:17px; margin-left:6px; } .oh-rdot{ min-width:16px; height:16px; font-size:9px; } .oh-days span{ font-size:9px; } .oh-chart{ padding:14px 12px 10px; } }
 .oh-hero{ position:relative; overflow:hidden; border-radius:24px; padding:22px; margin-bottom:16px; border:1px solid rgba(57,230,115,.2);
   background:radial-gradient(120% 140% at 0% 0%, rgba(57,230,115,.13), transparent 55%), radial-gradient(90% 120% at 100% 0%, rgba(45,212,191,.08), transparent 60%), #0b100d; }
 .oh-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:18px; }
@@ -9405,16 +9414,16 @@ const ACQ_CSS = `
 .oh-seg button:hover{ color:#e9f1ec; }
 .oh-seg button.on{ background:linear-gradient(120deg,#39e673,#12b34c); color:#03110a; box-shadow:0 4px 16px rgba(57,230,115,.25); }
 .oh-bigs{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:22px; }
-.oh-big{ position:relative; overflow:hidden; text-align:left; padding:16px 16px 14px; justify-content:flex-end; border-radius:18px; background:rgba(14,19,16,.85); border:1px solid rgba(255,255,255,.07); display:flex; flex-direction:column; gap:3px; min-height:132px; transition:transform .2s, border-color .2s; color:inherit; }
+.oh-big{ position:relative; overflow:hidden; text-align:left; padding:16px 16px 30px; justify-content:flex-start; border-radius:18px; background:rgba(14,19,16,.85); border:1px solid rgba(255,255,255,.07); display:flex; flex-direction:column; gap:3px; min-height:132px; transition:transform .2s, border-color .2s; color:inherit; }
 .oh-big:hover{ transform:translateY(-2px); border-color:rgba(57,230,115,.4); }
 .oh-big.on{ border-color:#39e673; box-shadow:0 0 0 2px rgba(57,230,115,.2) inset; }
 .oh-big.hot{ background:linear-gradient(160deg, rgba(57,230,115,.16), rgba(14,19,16,.9) 70%); border-color:rgba(57,230,115,.35); }
 .oh-big b{ font-size:40px; font-weight:900; letter-spacing:-.04em; line-height:1; font-variant-numeric:tabular-nums; }
 .oh-big-l{ font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:#9fbcab; font-weight:700; }
 .oh-big-s{ font-size:11.5px; color:#7d8f86; }
-.oh-spark{ position:absolute; right:14px; top:16px; width:44%; height:42px; opacity:.95; }
+.oh-spark{ position:absolute; left:0; right:0; bottom:0; width:100%; height:34px; opacity:.55; pointer-events:none; }
 .oh-sec{ font-size:10.5px; letter-spacing:.2em; text-transform:uppercase; color:#7fae93; font-weight:700; margin:0 2px 10px; }
-.oh-chans{ display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px; }
+.oh-chans{ display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; }
 .oh-chan{ text-align:left; padding:14px; border-radius:18px; background:rgba(14,19,16,.85); border:1px solid rgba(255,255,255,.07); color:inherit; transition:transform .2s, border-color .2s; position:relative; overflow:hidden; }
 .oh-chan::before{ content:""; position:absolute; inset:0 0 auto 0; height:2px; background:linear-gradient(90deg, var(--c), transparent 70%); opacity:.9; }
 .oh-chan:hover{ transform:translateY(-2px); border-color:rgba(255,255,255,.16); }
@@ -9423,8 +9432,10 @@ const ACQ_CSS = `
 .oh-chan-name{ font-weight:800; font-size:15px; flex:1; min-width:0; }
 .oh-chan-name small{ display:block; font-weight:500; font-size:11px; color:#7d8f86; }
 .oh-rep{ font-size:11px; font-weight:800; padding:3px 9px; border-radius:999px; background:rgba(57,230,115,.14); color:#a8f5c4; white-space:nowrap; }
-.oh-chan-nums{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
-.oh-chan-nums b{ display:block; font-size:19px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.oh-chan-nums{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:0; }
+.oh-chan-nums > div{ padding:0 10px; border-left:1px solid rgba(255,255,255,.07); min-width:0; }
+.oh-chan-nums > div:first-child{ padding-left:0; border-left:0; }
+.oh-chan-nums b{ display:block; font-size:24px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
 .oh-chan-nums span{ font-size:9px; letter-spacing:.06em; text-transform:uppercase; color:#6f8279; white-space:nowrap; }
 .oh-chan-bar{ height:4px; border-radius:999px; background:rgba(255,255,255,.06); margin:12px 0 8px; overflow:hidden; }
 .oh-chan-bar i{ display:block; height:100%; border-radius:999px; background:linear-gradient(90deg,#12b34c,#39e673); }
@@ -10449,8 +10460,10 @@ function OhChart({ series }) {
         <div className="oh-bars">
           {series.map((d, i) => (
             <div key={d.k} className={`oh-col ${hov === i ? "on" : ""} ${i === series.length - 1 ? "now" : ""}`} onMouseEnter={() => setHov(i)} onClick={() => setHov(i)}>
-              <i className="f" style={{ height: `${(d.fu / max) * 86}%` }} />
-              <i className="c" style={{ height: `${(d.dms / max) * 86}%` }} />
+              <div className="oh-stack">
+                <i className="f" style={{ height: `${(d.fu / max) * 86}%` }} />
+                <i className="c" style={{ height: `${(d.dms / max) * 86}%` }} />
+              </div>
             </div>
           ))}
         </div>
@@ -10461,7 +10474,13 @@ function OhChart({ series }) {
           </div>
         )}
       </div>
-      <div className="oh-axis"><span>{label(series[0].k)}</span><span>{label(series[Math.floor(series.length / 2)].k)}</span><span>Today</span></div>
+      <div className="oh-days">
+        {series.map((d, i) => {
+          const dt = new Date(`${d.k}T12:00:00`);
+          const show = series.length <= 14 || i % 5 === 0 || i === series.length - 1;
+          return <span key={d.k} className={i === series.length - 1 ? "now" : ""}>{show ? (i === series.length - 1 ? "Today" : series.length <= 14 ? <>{dt.toLocaleDateString("en-US", { weekday: "short" })}<em>{dt.getDate()}</em></> : label(d.k)) : ""}</span>;
+        })}
+      </div>
     </div>
   );
 }
@@ -10662,14 +10681,26 @@ function AcquisitionPage() {
             </svg>
           );
         };
-        const Big = ({ k, v, l, sub, hot }) => (
-          <button className={`oh-big ${hot ? "hot" : ""} ${kpi === k ? "on" : ""}`} onClick={() => setKpi(kpi === k ? null : k)}>
-            <span className="oh-big-l">{l}</span>
-            <b>{v}</b>
-            <span className="oh-big-s">{sub}</span>
-            {false && trend[k] && <Spark data={trend[k]} />}
-          </button>
-        );
+        // the same days just before, to show if it goes up or down
+        const back = per === "today" ? 1 : per === "7" ? 7 : per === "30" ? 30 : 0;
+        const sumDays = (from, to, f) => { let t = 0; for (let i = from; i < to; i++) { const k = dayKey(Date.now() - i * 86400000); t += f(k); } return t; };
+        const fDms = (k) => ((xd[k] || {}).contacted || 0) + (hm[k] || 0), fFu = (k) => (xd[k] || {}).followups || 0, fRep = (k) => ((xd[k] || {}).replies || 0) + (repBy[k] || 0);
+        const delta = (f) => { if (!back) return null; const cur = sumDays(0, back, f), prev = sumDays(back, back * 2, f); if (!prev && !cur) return null; return { cur, prev, pct: prev ? Math.round(((cur - prev) / prev) * 100) : null }; };
+        const deltas = { messaged: delta(fDms), followups: delta(fFu), replies: delta(fRep) };
+        const prevWord = per === "today" ? "yesterday" : `the ${back} days before`;
+        const Big = ({ k, v, l, sub, hot }) => {
+          const d = deltas[k];
+          return (
+            <button className={`oh-big ${hot ? "hot" : ""} ${kpi === k ? "on" : ""}`} onClick={() => setKpi(kpi === k ? null : k)}>
+              <span className="oh-big-top"><span className="oh-big-l">{l}</span>
+                {d && (d.pct == null ? <span className="oh-delta up">new</span> : <span className={`oh-delta ${d.pct >= 0 ? "up" : "down"}`}>{d.pct >= 0 ? "▲" : "▼"} {Math.abs(d.pct)}%</span>)}
+              </span>
+              <b>{v}</b>
+              <span className="oh-big-s">{sub}{d && d.pct != null ? `, ${d.prev.toLocaleString("en-US")} ${prevWord}` : ""}</span>
+              {trend[k] && trend[k].some((x) => x > 0) && <Spark data={trend[k]} />}
+            </button>
+          );
+        };
         const active = rows.filter((r) => r.found || r.dms || r.fu || r.rep || r.talking || r.signed).sort((a2, b2) => (b2.dms + b2.fu + b2.rep * 10) - (a2.dms + a2.fu + a2.rep * 10));
         const quiet = rows.filter((r) => !active.includes(r));
         const maxDms = Math.max(1, ...active.map((r) => r.dms + r.fu));
