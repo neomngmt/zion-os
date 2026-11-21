@@ -16106,6 +16106,13 @@ const ACQ_CSS = `
 .oh-seg button{ padding:7px 13px; border-radius:10px; font-size:12.5px; font-weight:700; color:#8fa39a; transition:all .2s; }
 .oh-seg button:hover{ color:#e9f1ec; }
 .oh-seg button.on{ background:linear-gradient(120deg,#39e673,#12b34c); color:#03110a; box-shadow:0 4px 16px rgba(57,230,115,.25); }
+.oh-chtabs{ display:flex; gap:6px; flex-wrap:wrap; margin:-6px 0 16px; }
+.oh-chtabs button{ display:inline-flex; align-items:center; gap:7px; padding:7px 12px; border-radius:999px; font-size:12.5px; font-weight:700; color:#c9d3ce; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); transition:all .2s; }
+.oh-chtabs button i{ width:8px; height:8px; border-radius:50%; background:var(--c); box-shadow:0 0 8px var(--c); }
+.oh-chtabs button:hover{ border-color:rgba(255,255,255,.2); color:#f2f5f0; }
+.oh-chtabs button.on{ background:linear-gradient(120deg,#39e673,#12b34c); color:#03110a; border-color:transparent; }
+.oh-chtabs button.on i{ background:#03110a; box-shadow:none; }
+.oh-chtabs .oh-open{ margin-left:auto; color:#a8f5c4; border-color:rgba(57,230,115,.3); }
 .oh-bigs{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:22px; }
 .oh-big{ position:relative; overflow:hidden; text-align:left; padding:16px 16px 30px; justify-content:flex-start; border-radius:18px; background:rgba(14,19,16,.85); border:1px solid rgba(255,255,255,.07); display:flex; flex-direction:column; gap:3px; min-height:132px; transition:transform .2s, border-color .2s; color:inherit; }
 .oh-big:hover{ transform:translateY(-2px); border-color:rgba(57,230,115,.4); }
@@ -18251,6 +18258,19 @@ function AcquisitionPage() {
       return "today";
     }
   });
+  const [ch, setCh] = useState(() => {
+    try {
+      return localStorage.getItem("zionAcqCh") || "all";
+    } catch (e) {
+      return "all";
+    }
+  });
+  const pickCh = c => {
+    setCh(c);
+    try {
+      localStorage.setItem("zionAcqCh", c);
+    } catch (e) {}
+  };
   const pickPer = p => {
     setPer(p);
     try {
@@ -18622,10 +18642,13 @@ function AcquisitionPage() {
     const chartDays = Array.from({
       length: span
     }, (_, i) => dayKey(Date.now() - (span - 1 - i) * 86400000));
+    const chan = ch !== "all" && rows.some(r => r.k === ch) ? ch : "all";
+    const inclX = chan === "all" || chan === "xout";
+    const mine = l => l.source !== "x" && (chan === "all" || sectionOf(l) === chan);
     const handBy = field => {
       const m = {};
       all.forEach(l => {
-        if (l.source !== "x" && l[field]) {
+        if (mine(l) && l[field]) {
           const k = dayKey(Date.parse(l[field]));
           m[k] = (m[k] || 0) + 1;
         }
@@ -18635,24 +18658,46 @@ function AcquisitionPage() {
     const hm = handBy("messaged_at");
     const repBy = {};
     all.forEach(l => {
-      if (l.source === "x") return;
+      if (!mine(l)) return;
       const t = acqHerAt(l);
       if (t) {
         const k = dayKey(t);
         repBy[k] = (repBy[k] || 0) + 1;
       }
     });
+    const fuBy = {};
+    all.forEach(l => {
+      if (!mine(l)) return;
+      const c = (Array.isArray(l.convo) ? l.convo : []).filter(m => m.from === "me" && m.at);
+      c.slice(1).forEach(m => {
+        const k = dayKey(Date.parse(m.at));
+        fuBy[k] = (fuBy[k] || 0) + 1;
+      });
+    });
+    const xv = (k, f) => inclX ? (xd[k] || {})[f] || 0 : 0;
     const series = chartDays.map(k => ({
       k,
-      dms: ((xd[k] || {}).contacted || 0) + (hm[k] || 0),
-      fu: (xd[k] || {}).followups || 0,
-      rep: ((xd[k] || {}).replies || 0) + (repBy[k] || 0)
+      dms: xv(k, "contacted") + (hm[k] || 0),
+      fu: xv(k, "followups") + (fuBy[k] || 0),
+      rep: xv(k, "replies") + (repBy[k] || 0)
     }));
     const trend = {
-      messaged: days14.map(k => ((xd[k] || {}).contacted || 0) + (hm[k] || 0)),
-      followups: days14.map(k => (xd[k] || {}).followups || 0),
-      replies: days14.map(k => ((xd[k] || {}).replies || 0) + (repBy[k] || 0))
+      messaged: days14.map(k => xv(k, "contacted") + (hm[k] || 0)),
+      followups: days14.map(k => xv(k, "followups") + (fuBy[k] || 0)),
+      replies: days14.map(k => xv(k, "replies") + (repBy[k] || 0))
     };
+    const R = chan === "all" ? T : (() => {
+      const r = rows.find(x => x.k === chan);
+      return {
+        dms: r.dms,
+        fu: r.fu,
+        rep: r.rep,
+        signed: r.signed,
+        found: r.found,
+        talking: r.talking
+      };
+    })();
+    const chanRow = rows.find(x => x.k === chan);
     const Spark = ({
       data
     }) => {
@@ -18698,9 +18743,9 @@ function AcquisitionPage() {
         fill: "#a8f5c4"
       }));
     };
-    const fDms = k => ((xd[k] || {}).contacted || 0) + (hm[k] || 0),
-      fFu = k => (xd[k] || {}).followups || 0,
-      fRep = k => ((xd[k] || {}).replies || 0) + (repBy[k] || 0);
+    const fDms = k => xv(k, "contacted") + (hm[k] || 0),
+      fFu = k => xv(k, "followups") + (fuBy[k] || 0),
+      fRep = k => xv(k, "replies") + (repBy[k] || 0);
     const delta = f => {
       if (!back) return null;
       const cur = sumDays(0, back, f),
@@ -18754,7 +18799,7 @@ function AcquisitionPage() {
       className: "oh-head"
     }, React.createElement("div", null, React.createElement("div", {
       className: "oh-eyebrow"
-    }, "Outreach"), React.createElement("div", {
+    }, chan === "all" ? "Outreach, all channels and accounts" : `Outreach on ${chanRow.label}`), React.createElement("div", {
       className: "oh-title"
     }, per === "today" ? "Today" : per === "all" ? "All time" : `Last ${per} days`)), React.createElement("div", {
       className: "oh-seg"
@@ -18763,31 +18808,46 @@ function AcquisitionPage() {
       className: per === k ? "on" : "",
       onClick: () => pickPer(k)
     }, l)))), React.createElement("div", {
+      className: "oh-chtabs"
+    }, React.createElement("button", {
+      className: chan === "all" ? "on" : "",
+      onClick: () => pickCh("all")
+    }, "All channels"), rows.map(r => React.createElement("button", {
+      key: r.k,
+      className: chan === r.k ? "on" : "",
+      style: {
+        "--c": r.color
+      },
+      onClick: () => pickCh(r.k)
+    }, React.createElement("i", null), r.label)), chan !== "all" && React.createElement("button", {
+      className: "oh-open",
+      onClick: () => setSection(chan)
+    }, "Open ", chanRow.label, " leads")), React.createElement("div", {
       className: "oh-bigs"
     }, React.createElement(Big, {
       hot: true,
       k: "messaged",
-      v: n(T.dms),
+      v: n(R.dms),
       l: "DMs sent",
       sub: "first message to a new creator"
     }), React.createElement(Big, {
       k: "followups",
-      v: n(T.fu),
+      v: n(R.fu),
       l: "Follow-ups",
       sub: "to creators who did not answer"
     }), React.createElement(Big, {
       k: "replies",
-      v: n(T.rep),
+      v: n(R.rep),
       l: "Replies",
-      sub: `${pct(T.rep, T.dms)} of DMs answered`
+      sub: `${pct(R.rep, R.dms)} of DMs answered`
     }), React.createElement(Big, {
       k: "signed",
-      v: n(T.signed),
+      v: n(R.signed),
       l: "Signed",
-      sub: `${n(T.talking)} talking right now`
+      sub: `${n(R.talking)} talking right now${chan === "xout" && per === "today" && xLimit ? `, ${n(R.dms)} of ${xLimit} daily limit` : ""}`
     })), React.createElement(OhChart, {
       series: series
-    }), React.createElement("div", {
+    }), chan === "all" && React.createElement(React.Fragment, null, React.createElement("div", {
       className: "oh-sec"
     }, "By channel"), React.createElement("div", {
       className: "oh-chans"
@@ -18797,7 +18857,7 @@ function AcquisitionPage() {
       style: {
         "--c": r.color
       },
-      onClick: () => setSection(r.k)
+      onClick: () => pickCh(r.k)
     }, React.createElement("div", {
       className: "oh-chan-top"
     }, React.createElement("span", {
@@ -18820,8 +18880,8 @@ function AcquisitionPage() {
       className: "oh-quiet"
     }, "No activity ", per === "today" ? "today" : "in this period", ": ", quiet.map((r, i) => React.createElement("button", {
       key: r.k,
-      onClick: () => setSection(r.k)
-    }, r.label, i < quiet.length - 1 ? "," : ""))), React.createElement("div", {
+      onClick: () => pickCh(r.k)
+    }, r.label, i < quiet.length - 1 ? "," : "")))), React.createElement("div", {
       className: "oh-pipe"
     }, [["good", "Good new leads", "Reddit qualified and X replies"], ["talking", "Talking now", "replied or call booked"], ["due", "Follow-ups due", "waiting on you"]].map(([k, l, s2]) => React.createElement("button", {
       key: k,
@@ -34669,7 +34729,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">15it7vj</script>
+<script type="text/babel" id="zion-version">s3y3r0</script>
 <script>
 (function () {
   var last = 0;
