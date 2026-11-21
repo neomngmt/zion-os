@@ -31164,7 +31164,7 @@ async function cuDrive(body) {
   return j;
 }
 const cuSize = b => b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b > 1e6 ? `${Math.round(b / 1e6)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`;
-function cuPut(url, file, onProgress) {
+function cuPut(url, file, onProgress, resume) {
   const CH = 16 * 1024 * 1024,
     total = file.size;
   const send = (start, end) => new Promise((resolve, reject) => {
@@ -31190,6 +31190,16 @@ function cuPut(url, file, onProgress) {
   return (async () => {
     let pos = 0,
       tries = 0;
+    if (resume) {
+      try {
+        pos = await send(0, 0);
+        onProgress(pos);
+      } catch (e) {
+        if (e.status && e.status < 500) throw Object.assign(e, {
+          expired: true
+        });
+      }
+    }
     while (pos < total || !total && tries === 0) {
       try {
         pos = await send(pos, Math.min(total, pos + CH));
@@ -31226,6 +31236,10 @@ function CuUpload({
     if (!list.length) return;
     setErr("");
     setBusy(true);
+    let lock = null;
+    try {
+      lock = navigator.wakeLock ? await navigator.wakeLock.request("screen") : null;
+    } catch (e) {}
     const base = items.length;
     setItems(it => [...it, ...list.map(f => ({
       name: f.name,
@@ -31236,24 +31250,29 @@ function CuUpload({
     let ok = 0;
     for (let i = 0; i < list.length; i++) {
       const f = list[i];
+      const key = `zionCuUp:${c.id}:${f.name}:${f.size}`;
       try {
-        const {
-          uploadUrl
-        } = await cuDrive({
-          action: "upload",
-          id: c.id,
-          name: f.name,
-          type: f.type,
-          size: f.size
-        });
+        let saved = null;
+        try {
+          saved = JSON.parse(localStorage.getItem(key) || "null");
+        } catch (e) {}
+        if (saved && Date.now() - saved.at > 5 * 86400000) saved = null;
         const t0 = Date.now();
-        let samples = [[t0, 0]];
-        await cuPut(uploadUrl, f, sent => {
+        let samples = null;
+        const onP = sent => {
           const now = Date.now();
+          if (!samples) samples = [[now, sent]];
           samples.push([now, sent]);
           samples = samples.filter(([t]) => now - t < 8000);
           const [ta, sa] = samples[0];
           const speed = now > ta ? (sent - sa) / (now - ta) * 1000 : 0;
+          try {
+            localStorage.setItem(key, JSON.stringify({
+              url: (saved || {}).url,
+              at: (saved || {}).at || t0,
+              p: f.size ? sent / f.size : 0
+            }));
+          } catch (e) {}
           setItems(it => it.map((x, j) => j === base + i ? {
             ...x,
             p: f.size ? sent / f.size : 1,
@@ -31261,7 +31280,42 @@ function CuUpload({
             speed,
             left: speed > 0 ? (f.size - sent) / speed : null
           } : x));
-        });
+        };
+        let resumed = false;
+        if (saved && saved.url) {
+          try {
+            await cuPut(saved.url, f, onP, true);
+            resumed = true;
+          } catch (e) {
+            if (!e.expired) throw e;
+            saved = null;
+          }
+        }
+        if (!resumed) {
+          const {
+            uploadUrl
+          } = await cuDrive({
+            action: "upload",
+            id: c.id,
+            name: f.name,
+            type: f.type,
+            size: f.size
+          });
+          saved = {
+            url: uploadUrl,
+            at: Date.now()
+          };
+          try {
+            localStorage.setItem(key, JSON.stringify({
+              ...saved,
+              p: 0
+            }));
+          } catch (e) {}
+          await cuPut(uploadUrl, f, onP);
+        }
+        try {
+          localStorage.removeItem(key);
+        } catch (e) {}
         setItems(it => it.map((x, j) => j === base + i ? {
           ...x,
           p: 1,
@@ -31276,9 +31330,25 @@ function CuUpload({
         } : x));
       }
     }
+    try {
+      lock && lock.release();
+    } catch (e) {}
     setBusy(false);
     if (ok && onUploaded) onUploaded();
   };
+  const stopped = (() => {
+    try {
+      return Object.keys(localStorage).filter(k => k.startsWith(`zionCuUp:${c.id}:`)).map(k => {
+        const v = JSON.parse(localStorage.getItem(k) || "{}");
+        return {
+          name: k.split(":").slice(2, -1).join(":"),
+          p: v.p || 0
+        };
+      });
+    } catch (e) {
+      return [];
+    }
+  })();
   return React.createElement("div", {
     className: "cu-up"
   }, React.createElement("input", {
@@ -31313,12 +31383,18 @@ function CuUpload({
     }
   })), !x.done && !x.failed && React.createElement("div", {
     className: "cu-up-speed"
-  }, React.createElement("span", null, x.speed ? `${(x.speed / 1e6).toFixed(1)} MB/s` : "starting"), React.createElement("span", null, x.left != null ? `${cuTime(x.left)} left` : "")))), busy && React.createElement("div", {
+  }, React.createElement("span", null, x.speed ? `${(x.speed / 1e6).toFixed(1)} MB/s` : "starting"), React.createElement("span", null, x.left != null ? `${cuTime(x.left)} left` : "")))), !busy && stopped.length > 0 && items.length === 0 && stopped.map(x => React.createElement("div", {
+    key: x.name,
+    className: "cu-hint",
+    style: {
+      fontSize: 12
+    }
+  }, "The upload of ", x.name, " stopped at ", Math.round(x.p * 100), "%. Tap ", label || "Upload", " and choose the same video, it continues from there.")), busy && React.createElement("div", {
     className: "hb-note",
     style: {
       fontSize: 11
     }
-  }, "Keep Zion open until it says uploaded. If the signal drops, it carries on by itself."), err && React.createElement("div", {
+  }, "If you close Zion, nothing is lost: open it again, tap ", label || "Upload", " and choose the same video, it continues where it stopped."), err && React.createElement("div", {
     className: "fs-12",
     style: {
       color: "#ff6b6b"
@@ -31838,7 +31914,7 @@ function CustomsAdminPage({
         className: "fs-12 font-mono c-accent"
       }, "Open delivered custom →"), c.delivery_note && React.createElement("div", {
         className: "fs-11 c-muted"
-      }, "Note from the model: ", c.delivery_note), c.status !== "cancelled" && React.createElement(CuUpload, {
+      }, "Note from the model: ", c.delivery_note), !["cancelled", "delivered"].includes(c.status) && React.createElement(CuUpload, {
         c: c,
         compact: true,
         onUploaded: async () => {
@@ -31869,7 +31945,7 @@ function CustomsAdminPage({
           });
         },
         className: "hb-btn ghost sm"
-      }, "Cancel"), React.createElement("button", {
+      }, "Cancel"), c.status !== "delivered" && React.createElement("button", {
         onClick: async () => {
           if (!window.confirm(`Delete this custom for ${c.model} for good? The model will not see it anymore. Its Drive folder stays, delete that in Drive if you want.`)) return;
           try {
@@ -31962,6 +32038,23 @@ function CustomsCreatorPage({
   const [err, setErr] = useState("");
   const uploaded = async c => {
     setErr("");
+    if (c.price != null && c.status !== "delivered") setParty({
+      amount: Number(c.price),
+      share: sharePct != null ? Math.round(Number(c.price) * sharePct / 100) : null
+    });
+    const {
+      error
+    } = await supabaseClient.from("customs").update({
+      status: "delivered",
+      delivery_url: c.drive_url || null,
+      delivered_at: new Date().toISOString()
+    }).eq("id", c.id).neq("status", "delivered");
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+    reload();
+    customNotify(c.id, "delivered");
     try {
       await cuDrive({
         action: "files",
@@ -31970,25 +32063,10 @@ function CustomsCreatorPage({
     } catch (e) {}
     const {
       data
-    } = await supabaseClient.from("customs").select("drive_url, status").eq("id", c.id).maybeSingle();
-    if (data && data.status !== "delivered") {
-      const {
-        error
-      } = await supabaseClient.from("customs").update({
-        status: "delivered",
-        delivery_url: data.drive_url || null,
-        delivered_at: new Date().toISOString()
-      }).eq("id", c.id);
-      if (error) {
-        setErr(error.message);
-        return;
-      }
-      await customNotify(c.id, "delivered");
-      if (c.price != null) setParty({
-        amount: Number(c.price),
-        share: sharePct != null ? Math.round(Number(c.price) * sharePct / 100) : null
-      });
-    }
+    } = await supabaseClient.from("customs").select("drive_url").eq("id", c.id).maybeSingle();
+    if (data && data.drive_url && !c.drive_url) await supabaseClient.from("customs").update({
+      delivery_url: data.drive_url
+    }).eq("id", c.id);
     reload();
   };
   const active = rows.filter(c => ["sold", "in_progress", "requested"].includes(c.status));
@@ -34281,7 +34359,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1yn6p0o</script>
+<script type="text/babel" id="zion-version">q5novb</script>
 <script>
 (function () {
   var last = 0;

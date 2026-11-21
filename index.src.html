@@ -18575,7 +18575,7 @@ async function cuDrive(body) {
 }
 const cuSize = (b) => (b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b > 1e6 ? `${Math.round(b / 1e6)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`);
 // resumable upload straight to Google Drive in 16 MB pieces: a dropped connection only repeats the last piece
-function cuPut(url, file, onProgress) {
+function cuPut(url, file, onProgress, resume) {
   const CH = 16 * 1024 * 1024, total = file.size;
   const send = (start, end) => new Promise((resolve, reject) => {
     const x = new XMLHttpRequest();
@@ -18592,6 +18592,7 @@ function cuPut(url, file, onProgress) {
   });
   return (async () => {
     let pos = 0, tries = 0;
+    if (resume) { try { pos = await send(0, 0); onProgress(pos); } catch (e) { if (e.status && e.status < 500) throw Object.assign(e, { expired: true }); } }
     while (pos < total || (!total && tries === 0)) {
       try {
         pos = await send(pos, Math.min(total, pos + CH));
@@ -18619,26 +18620,45 @@ function CuUpload({ c, onUploaded, compact, label }) {
     const list = [...files];
     if (!list.length) return;
     setErr(""); setBusy(true);
+    // the phone does not go to sleep while the video uploads
+    let lock = null; try { lock = navigator.wakeLock ? await navigator.wakeLock.request("screen") : null; } catch (e) {}
     const base = items.length;
     setItems((it) => [...it, ...list.map((f) => ({ name: f.name, size: f.size, p: 0, done: false }))]);
     let ok = 0;
     for (let i = 0; i < list.length; i++) {
       const f = list[i];
+      const key = `zionCuUp:${c.id}:${f.name}:${f.size}`;
       try {
-        const { uploadUrl } = await cuDrive({ action: "upload", id: c.id, name: f.name, type: f.type, size: f.size });
-        const t0 = Date.now(); let samples = [[t0, 0]];
-        await cuPut(uploadUrl, f, (sent) => {
-          const now = Date.now(); samples.push([now, sent]); samples = samples.filter(([t]) => now - t < 8000);
+        let saved = null; try { saved = JSON.parse(localStorage.getItem(key) || "null"); } catch (e) {}
+        if (saved && Date.now() - saved.at > 5 * 86400000) saved = null;
+        const t0 = Date.now(); let samples = null;
+        const onP = (sent) => {
+          const now = Date.now(); if (!samples) samples = [[now, sent]]; samples.push([now, sent]); samples = samples.filter(([t]) => now - t < 8000);
           const [ta, sa] = samples[0]; const speed = now > ta ? ((sent - sa) / (now - ta)) * 1000 : 0;
+          try { localStorage.setItem(key, JSON.stringify({ url: (saved || {}).url, at: (saved || {}).at || t0, p: f.size ? sent / f.size : 0 })); } catch (e) {}
           setItems((it) => it.map((x, j) => (j === base + i ? { ...x, p: f.size ? sent / f.size : 1, sent, speed, left: speed > 0 ? (f.size - sent) / speed : null } : x)));
-        });
+        };
+        let resumed = false;
+        if (saved && saved.url) {
+          try { await cuPut(saved.url, f, onP, true); resumed = true; } catch (e) { if (!e.expired) throw e; saved = null; }
+        }
+        if (!resumed) {
+          const { uploadUrl } = await cuDrive({ action: "upload", id: c.id, name: f.name, type: f.type, size: f.size });
+          saved = { url: uploadUrl, at: Date.now() };
+          try { localStorage.setItem(key, JSON.stringify({ ...saved, p: 0 })); } catch (e) {}
+          await cuPut(uploadUrl, f, onP);
+        }
+        try { localStorage.removeItem(key); } catch (e) {}
         setItems((it) => it.map((x, j) => (j === base + i ? { ...x, p: 1, done: true } : x)));
         ok++;
       } catch (e) { setErr(e.message); setItems((it) => it.map((x, j) => (j === base + i ? { ...x, failed: true } : x))); }
     }
+    try { lock && lock.release(); } catch (e) {}
     setBusy(false);
     if (ok && onUploaded) onUploaded();
   };
+  // an upload that stopped half way (Zion was closed): show it, choosing the same video continues it
+  const stopped = (() => { try { return Object.keys(localStorage).filter((k) => k.startsWith(`zionCuUp:${c.id}:`)).map((k) => { const v = JSON.parse(localStorage.getItem(k) || "{}"); return { name: k.split(":").slice(2, -1).join(":"), p: v.p || 0 }; }); } catch (e) { return []; } })();
   return (
     <div className="cu-up">
       <input ref={ref} type="file" multiple accept="video/*,image/*,audio/*" style={{ display: "none" }} onChange={(e) => { start(e.target.files); e.target.value = ""; }} />
@@ -18650,7 +18670,8 @@ function CuUpload({ c, onUploaded, compact, label }) {
           {!x.done && !x.failed && <div className="cu-up-speed"><span>{x.speed ? `${(x.speed / 1e6).toFixed(1)} MB/s` : "starting"}</span><span>{x.left != null ? `${cuTime(x.left)} left` : ""}</span></div>}
         </div>
       ))}
-      {busy && <div className="hb-note" style={{ fontSize: 11 }}>Keep Zion open until it says uploaded. If the signal drops, it carries on by itself.</div>}
+      {!busy && stopped.length > 0 && items.length === 0 && stopped.map((x) => <div key={x.name} className="cu-hint" style={{ fontSize: 12 }}>The upload of {x.name} stopped at {Math.round(x.p * 100)}%. Tap {label || "Upload"} and choose the same video, it continues from there.</div>)}
+      {busy && <div className="hb-note" style={{ fontSize: 11 }}>If you close Zion, nothing is lost: open it again, tap {label || "Upload"} and choose the same video, it continues where it stopped.</div>}
       {err && <div className="fs-12" style={{ color: "#ff6b6b" }}>{err}</div>}
     </div>
   );
@@ -18887,11 +18908,11 @@ function CustomsAdminPage({ models }) {
                     {c.drive_url && <a href={c.drive_url} target="_blank" rel="noopener noreferrer" className="cu-drive">Drive folder{c.drive_files ? `, ${c.drive_files} file${c.drive_files === 1 ? "" : "s"}` : ""} &rarr;</a>}
                     {c.delivery_url && c.delivery_url !== c.drive_url && <a href={c.delivery_url} target="_blank" rel="noopener noreferrer" className="fs-12 font-mono c-accent">Open delivered custom &rarr;</a>}
                     {c.delivery_note && <div className="fs-11 c-muted">Note from the model: {c.delivery_note}</div>}
-                    {c.status !== "cancelled" && <CuUpload c={c} compact onUploaded={async () => { try { await cuDrive({ action: "files", id: c.id }); } catch (e) {} reload(); }} />}
+                    {!["cancelled", "delivered"].includes(c.status) && <CuUpload c={c} compact onUploaded={async () => { try { await cuDrive({ action: "files", id: c.id }); } catch (e) {} reload(); }} />}
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       {c.status === "requested" && <button onClick={() => update(c, { status: "sold", sold_at: new Date().toISOString() }, "sold")} className="hb-btn sm">Mark as paid</button>}
                       {(c.status === "requested" || c.status === "sold" || c.status === "in_progress") && <button onClick={() => { if (window.confirm("Cancel this custom?")) update(c, { status: "cancelled" }); }} className="hb-btn ghost sm">Cancel</button>}
-                      <button onClick={async () => { if (!window.confirm(`Delete this custom for ${c.model} for good? The model will not see it anymore. Its Drive folder stays, delete that in Drive if you want.`)) return; try { await cuDrive({ action: "delete", id: c.id }); reload(); } catch (e) { setErr(e.message); } }} className="hb-btn ghost sm" style={{ color: "#ff9b85" }}>Delete</button>
+                      {c.status !== "delivered" && <button onClick={async () => { if (!window.confirm(`Delete this custom for ${c.model} for good? The model will not see it anymore. Its Drive folder stays, delete that in Drive if you want.`)) return; try { await cuDrive({ action: "delete", id: c.id }); reload(); } catch (e) { setErr(e.message); } }} className="hb-btn ghost sm" style={{ color: "#ff9b85" }}>Delete</button>}
                     </div>
                   </div>
                 );
@@ -18940,14 +18961,15 @@ function CustomsCreatorPage({ model, record }) {
   // once the video is in her Drive folder the custom is delivered and the manager gets a notification
   const uploaded = async (c) => {
     setErr("");
+    // the party starts the moment the upload hits 100%, the custom is marked done right behind it
+    if (c.price != null && c.status !== "delivered") setParty({ amount: Number(c.price), share: sharePct != null ? Math.round(Number(c.price) * sharePct / 100) : null });
+    const { error } = await supabaseClient.from("customs").update({ status: "delivered", delivery_url: c.drive_url || null, delivered_at: new Date().toISOString() }).eq("id", c.id).neq("status", "delivered");
+    if (error) { setErr(error.message); return; }
+    reload();
+    customNotify(c.id, "delivered");
     try { await cuDrive({ action: "files", id: c.id }); } catch (e) {}
-    const { data } = await supabaseClient.from("customs").select("drive_url, status").eq("id", c.id).maybeSingle();
-    if (data && data.status !== "delivered") {
-      const { error } = await supabaseClient.from("customs").update({ status: "delivered", delivery_url: data.drive_url || null, delivered_at: new Date().toISOString() }).eq("id", c.id);
-      if (error) { setErr(error.message); return; }
-      await customNotify(c.id, "delivered");
-      if (c.price != null) setParty({ amount: Number(c.price), share: sharePct != null ? Math.round(Number(c.price) * sharePct / 100) : null });
-    }
+    const { data } = await supabaseClient.from("customs").select("drive_url").eq("id", c.id).maybeSingle();
+    if (data && data.drive_url && !c.drive_url) await supabaseClient.from("customs").update({ delivery_url: data.drive_url }).eq("id", c.id);
     reload();
   };
 
