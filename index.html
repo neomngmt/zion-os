@@ -9560,7 +9560,8 @@ function HubReelSheet({
   reel,
   model,
   onClose,
-  onChange
+  onChange,
+  readOnly
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -9668,7 +9669,7 @@ function HubReelSheet({
     style: {
       padding: "30px 18px"
     }
-  }, React.createElement("b", null, "No breakdown yet"), "The AI looks at the cover, the caption, the spoken words and the numbers, then writes how ", model, " can shoot her own version. Takes about 20 seconds.", React.createElement("div", {
+  }, React.createElement("b", null, "No breakdown yet"), "The AI looks at the cover, the caption, the spoken words and the numbers, then writes how ", model, " can shoot her own version. Takes about 20 seconds.", !readOnly && React.createElement("div", {
     style: {
       marginTop: 14
     }
@@ -9763,7 +9764,7 @@ function HubReelSheet({
     }
   }, x))), a.adapt.caption && React.createElement("p", {
     className: "hb-note"
-  }, "Caption: ", a.adapt.caption)), React.createElement("p", {
+  }, "Caption: ", a.adapt.caption)), !readOnly && React.createElement("p", {
     className: "hb-note",
     style: {
       marginTop: 12
@@ -30174,8 +30175,12 @@ function StyleBadge({
     }
   }, st)));
 }
-function TrendsHub() {
+function TrendsHub({
+  models = [],
+  creator = null
+}) {
   const T = "__trends";
+  const [likeModel, setLikeModel] = useState(() => models[0] && models[0].name || "");
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
   const [note, setNote] = useState("");
@@ -30189,7 +30194,9 @@ function TrendsHub() {
   const [findNiche, setFindNiche] = useState("Gothic");
   const load = useCallback(async () => {
     try {
-      setData(await hubFn({
+      setData(await hubFn(creator ? {
+        action: "trends-view"
+      } : {
         action: "overview",
         model: T
       }));
@@ -30197,7 +30204,10 @@ function TrendsHub() {
     } catch (e) {
       setErr(e.message);
     }
-  }, []);
+  }, [creator]);
+  useEffect(() => {
+    if (creator && data && niche === "all" && (data.profiles || []).some(p => p.niche === `Like ${creator}`)) setNiche(`Like ${creator}`);
+  }, [creator, data]);
   useEffect(() => {
     load();
   }, [load]);
@@ -30242,7 +30252,7 @@ function TrendsHub() {
     ...r,
     niche: nicheOf.get(r.handle) || "Other"
   }));
-  const niches = [...new Set(active.map(p => p.niche || "Other"))].sort();
+  const niches = [...new Set(active.map(p => p.niche || "Other"))].sort((a, b) => b.startsWith("Like ") - a.startsWith("Like ") || a.localeCompare(b));
   const formats = REEL_STYLES.filter(st => reels.some(r => r.style === st));
   const shown = reels.filter(r => (niche === "all" || r.niche === niche) && (fmt === "all" || (fmt === "saved" ? r.saved : r.style === fmt))).sort((a, b) => (b.multiple || 0) - (a.multiple || 0));
   const cost = Math.max(0.1, Math.round(active.length * 0.03 * 10) / 10);
@@ -30260,7 +30270,7 @@ function TrendsHub() {
     }
   }, React.createElement("div", {
     className: "hb-note"
-  }, "What took off in the last 7 days: reels that beat their own account's normal views, from ", active.length, " public OFM accounts across ", niches.length, " niches.")), [["reels", "Reels"], ["profiles", `Profiles ${active.length}`]].map(([k, l]) => React.createElement("button", {
+  }, creator ? "Reels that took off this week on accounts like yours. Tap one to see why it worked and how you can film it." : `What took off in the last 7 days: reels that beat their own account's normal views, from ${active.length} public creator accounts across ${niches.length} niches.`)), !creator && [["reels", "Reels"], ["profiles", `Profiles ${active.length}`]].map(([k, l]) => React.createElement("button", {
     key: k,
     className: `hb-chip ${tab === k ? "on" : ""}`,
     onClick: () => setTab(k)
@@ -30276,7 +30286,7 @@ function TrendsHub() {
     className: "hb-empty"
   }, React.createElement("span", {
     className: "hb-spin"
-  })) : tab === "reels" ? React.createElement(React.Fragment, null, React.createElement("div", {
+  })) : tab === "reels" ? React.createElement(React.Fragment, null, !creator && React.createElement("div", {
     className: "hb-card",
     style: {
       marginBottom: 14,
@@ -30353,7 +30363,7 @@ function TrendsHub() {
       className: "h"
     }, "@", r.handle, ", ", r.niche), React.createElement("div", {
       className: "v"
-    }, igK(r.views), React.createElement("small", null, "views")))), React.createElement("button", {
+    }, igK(r.views), React.createElement("small", null, "views")))), !creator && React.createElement("button", {
       className: `hb-star ${r.saved ? "on" : ""}`,
       title: r.saved ? "Saved" : "Save",
       "aria-label": "Save",
@@ -30376,7 +30386,7 @@ function TrendsHub() {
       color: r.saved ? "#3a2a00" : "#fff"
     })), React.createElement("div", {
       className: "hb-body"
-    }, React.createElement(StyleBadge, {
+    }, !creator && React.createElement(StyleBadge, {
       reel: r,
       onChange: st => setData(d => ({
         ...d,
@@ -30389,7 +30399,7 @@ function TrendsHub() {
       className: `hb-hook ${a ? "" : "dim"}`
     }, a ? a.hook : r.caption || "No caption"), React.createElement("div", {
       className: "hb-acts"
-    }, React.createElement("button", {
+    }, (!creator || a) && React.createElement("button", {
       className: `hb-btn sm ${a ? "" : "ghost"}`,
       onClick: () => setOpen(r.id)
     }, a ? "Why it worked" : "Break it down"))));
@@ -30445,7 +30455,7 @@ function TrendsHub() {
     },
     value: findNiche,
     onChange: e => setFindNiche(e.target.value)
-  }, ["Gothic", "Asian", "Gym and fitness", "MILF and moms", "Feet", "Couples", "Cosplay", "Alt and tattooed", "Skits and humor", "Girl next door"].map(n => React.createElement("option", {
+  }, ["Gothic", "Asian", "Gym and fitness", "MILF and moms", "Feet", "Cosplay", "Alt and tattooed", "Skits and humor", "Girl next door"].map(n => React.createElement("option", {
     key: n,
     value: n
   }, n))), React.createElement("button", {
@@ -30462,7 +30472,79 @@ function TrendsHub() {
     className: "hb-spin"
   }), "Searching") : `Find ${findNiche} accounts`), React.createElement("span", {
     className: "hb-note"
-  }, "about 0.15 USD")), React.createElement("form", {
+  }, "about 0.15 USD")), models.length > 0 && React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      alignItems: "center",
+      marginTop: 12
+    }
+  }, React.createElement("span", {
+    className: "hb-note"
+  }, "Or accounts like our model:"), React.createElement("select", {
+    className: "hb-in",
+    style: {
+      maxWidth: 220,
+      flex: "0 1 220px"
+    },
+    value: likeModel,
+    onChange: e => setLikeModel(e.target.value)
+  }, models.map(m => React.createElement("option", {
+    key: m.name,
+    value: m.name
+  }, m.name))), React.createElement("button", {
+    className: "hb-btn ghost",
+    disabled: busy === "like" || !likeModel,
+    onClick: () => act("like", {
+      action: "suggest",
+      like: likeModel
+    }, async j => {
+      await load();
+      setNote(j.added ? `${j.added} accounts like ${likeModel} suggested below.` : j.note || `Nothing new found like ${likeModel}.`);
+    })
+  }, busy === "like" ? React.createElement(React.Fragment, null, React.createElement("span", {
+    className: "hb-spin"
+  }), "Looking, about two minutes") : `Find accounts like ${likeModel}`), React.createElement("span", {
+    className: "hb-note"
+  }, "uses her Instagram from Model Manager")), React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      alignItems: "center",
+      marginTop: 12
+    }
+  }, React.createElement("span", {
+    className: "hb-note"
+  }, "Only real women creators stay: no men, couples, brands, agencies, fan pages or AI models."), React.createElement("button", {
+    className: "hb-btn ghost sm",
+    disabled: busy === "clean",
+    onClick: async () => {
+      setBusy("clean");
+      setErr("");
+      let gone = 0,
+        kept = 0;
+      try {
+        for (let i = 0; i < 10; i++) {
+          const j = await hubFn({
+            action: "trends-clean",
+            model: T
+          });
+          gone += j.removed || 0;
+          kept += j.kept || 0;
+          if (!j.left) break;
+        }
+        setNote(`Checked again: ${kept} kept, ${gone} removed.`);
+        await load();
+      } catch (e) {
+        setErr(e.message);
+      }
+      setBusy("");
+    }
+  }, busy === "clean" ? React.createElement(React.Fragment, null, React.createElement("span", {
+    className: "hb-spin"
+  }), "Checking every account") : "Check the list again")), React.createElement("form", {
     style: {
       display: "flex",
       gap: 8,
@@ -30644,6 +30726,7 @@ function TrendsHub() {
   }, React.createElement(X, {
     size: 15
   }))))))), open && reels.find(r => r.id === open) && React.createElement(HubReelSheet, {
+    readOnly: !!creator,
     reel: reels.find(r => r.id === open),
     model: T,
     onClose: () => setOpen(null),
@@ -30944,6 +31027,10 @@ const NAV_CREATOR = [{
   id: "customs",
   label: "Custom Content",
   icon: Gift
+}, {
+  id: "weeklytrends",
+  label: "Trends",
+  icon: Flame
 }, {
   id: "neo",
   label: "Neo",
@@ -34486,7 +34573,11 @@ function App() {
   }), currentView === "customs" && !isAdmin && React.createElement(CustomsCreatorPage, {
     model: restrictModel,
     record: models.find(mm => mm.name === restrictModel)
-  }), currentView === "reelsorter" && isAdmin && React.createElement(ReelSorterPage, null), currentView === "titlegen" && isAdmin && React.createElement(TitleGeneratorPage, null), currentView === "acquisition" && isAdmin && React.createElement(AcquisitionPage, null), currentView === "knowledge" && isAdmin && React.createElement(KnowledgePage, null), currentView === "weeklytrends" && isAdmin && React.createElement(TrendsHub, null), currentView === "trending" && React.createElement(CreatorTrending, {
+  }), currentView === "reelsorter" && isAdmin && React.createElement(ReelSorterPage, null), currentView === "titlegen" && isAdmin && React.createElement(TitleGeneratorPage, null), currentView === "acquisition" && isAdmin && React.createElement(AcquisitionPage, null), currentView === "knowledge" && isAdmin && React.createElement(KnowledgePage, null), currentView === "weeklytrends" && isAdmin && React.createElement(TrendsHub, {
+    models: agencyModels
+  }), currentView === "weeklytrends" && !isAdmin && React.createElement(TrendsHub, {
+    creator: restrictModel
+  }), currentView === "trending" && React.createElement(CreatorTrending, {
     trends: trends,
     agency: session.agency
   }), currentView === "models" && React.createElement(ModelManager, {
@@ -34510,7 +34601,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1mqi1e3</script>
+<script type="text/babel" id="zion-version">583ui2</script>
 <script>
 (function () {
   var last = 0;
