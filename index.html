@@ -16092,6 +16092,7 @@ const ACQ_CSS = `
 .oh-days span em{ display:block; font-style:normal; color:#8fa39a; font-weight:700; font-variant-numeric:tabular-nums; }
 .oh-days span.now{ color:#a8f5c4; font-weight:800; }
 .oh-big-top{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.oh-big-prev{ font-size:11px; color:#5f6f67; margin-top:2px; font-variant-numeric:tabular-nums; }
 .oh-delta{ font-size:10.5px; font-weight:800; padding:2px 7px; border-radius:999px; white-space:nowrap; font-variant-numeric:tabular-nums; }
 .oh-delta.up{ color:#a8f5c4; background:rgba(57,230,115,.14); }
 .oh-delta.down{ color:#ffb4a1; background:rgba(226,114,91,.15); }
@@ -18164,7 +18165,7 @@ function OhChart({
     className: "oh-chart-head"
   }, React.createElement("div", null, React.createElement("div", {
     className: "oh-eyebrow"
-  }, "Last ", series.length, " days"), React.createElement("div", {
+  }, "Day by day, last ", series.length, " days"), React.createElement("div", {
     className: "oh-chart-sum"
   }, React.createElement("b", null, tot.dms.toLocaleString("en-US")), " DMs ", React.createElement("b", null, tot.fu.toLocaleString("en-US")), " follow-ups ", React.createElement("b", {
     className: "r"
@@ -18558,9 +18559,28 @@ function AcquisitionPage() {
       const c = (Array.isArray(l.convo) ? l.convo : []).filter(m => m.from === "me" && m.at && Date.parse(m.at) >= since).length;
       return Math.max(0, c - (inP(l.messaged_at) ? 1 : 0));
     };
+    const dayKey = d => {
+      const z = new Date(d);
+      return `${z.getFullYear()}-${String(z.getMonth() + 1).padStart(2, "0")}-${String(z.getDate()).padStart(2, "0")}`;
+    };
+    const xd = xr && xr.daily || {};
+    const back = per === "today" ? 1 : per === "7" ? 7 : per === "30" ? 30 : 0;
+    const sumDays = (from, to, f) => {
+      let t = 0;
+      for (let i = from; i < to; i++) {
+        const k = dayKey(Date.now() - i * 86400000);
+        t += f(k);
+      }
+      return t;
+    };
+    const xn2 = xn && back ? {
+      contacted: sumDays(0, back, k => (xd[k] || {}).contacted || 0),
+      followups: sumDays(0, back, k => (xd[k] || {}).followups || 0),
+      replies: sumDays(0, back, k => (xd[k] || {}).replies || 0)
+    } : xn;
     const rows = SECTIONS.filter(([k]) => !["overview", "plan", "ongoing"].includes(k) && (agency === "US" || k !== "xout")).map(([k, label, color]) => {
       const Ls = all.filter(l => sectionOf(l) === k);
-      const isX = k === "xout" && xn;
+      const isX = k === "xout" && xn2;
       const repL = Ls.filter(l => {
         const t = acqHerAt(l);
         return t != null && t >= since;
@@ -18571,9 +18591,9 @@ function AcquisitionPage() {
         sub: k === "xout" ? "XReacher" : k === "reddit" ? "r/onlyfansadvice" : k === "meta" ? "Lead ads" : "",
         color,
         found: Ls.filter(l => inP(k === "meta" ? l.lead_at || l.created_at : l.created_at)).length,
-        dms: isX ? xn.contacted : Ls.filter(l => inP(l.messaged_at)).length,
-        fu: isX ? xn.followups : Ls.reduce((a2, l) => a2 + meFollow(l), 0),
-        rep: isX ? Math.max(xn.replies, repL) : repL,
+        dms: isX ? xn2.contacted : Ls.filter(l => inP(l.messaged_at)).length,
+        fu: isX ? xn2.followups : Ls.reduce((a2, l) => a2 + meFollow(l), 0),
+        rep: isX ? Math.max(xn2.replies, repL) : repL,
         talking: Ls.filter(l => ["replied", "call"].includes(l.status)).length,
         signed: Ls.filter(l => l.status === "signed").length
       };
@@ -18595,10 +18615,6 @@ function AcquisitionPage() {
     });
     const pct = (a2, b2) => b2 ? `${(Math.round(a2 / b2 * 1000) / 10).toLocaleString("en-US")}%` : "0%";
     const xLimit = (xr?.sync?.campaigns || []).filter(c => c.status === "active").reduce((a2, c) => a2 + (c.daily_limit || 0), 0);
-    const dayKey = d => {
-      const z = new Date(d);
-      return `${z.getFullYear()}-${String(z.getMonth() + 1).padStart(2, "0")}-${String(z.getDate()).padStart(2, "0")}`;
-    };
     const days14 = Array.from({
       length: 14
     }, (_, i) => dayKey(Date.now() - (13 - i) * 86400000));
@@ -18606,7 +18622,6 @@ function AcquisitionPage() {
     const chartDays = Array.from({
       length: span
     }, (_, i) => dayKey(Date.now() - (span - 1 - i) * 86400000));
-    const xd = xr && xr.daily || {};
     const handBy = field => {
       const m = {};
       all.forEach(l => {
@@ -18683,15 +18698,6 @@ function AcquisitionPage() {
         fill: "#a8f5c4"
       }));
     };
-    const back = per === "today" ? 1 : per === "7" ? 7 : per === "30" ? 30 : 0;
-    const sumDays = (from, to, f) => {
-      let t = 0;
-      for (let i = from; i < to; i++) {
-        const k = dayKey(Date.now() - i * 86400000);
-        t += f(k);
-      }
-      return t;
-    };
     const fDms = k => ((xd[k] || {}).contacted || 0) + (hm[k] || 0),
       fFu = k => (xd[k] || {}).followups || 0,
       fRep = k => ((xd[k] || {}).replies || 0) + (repBy[k] || 0);
@@ -18729,11 +18735,13 @@ function AcquisitionPage() {
         className: "oh-big-l"
       }, l), d && (d.pct == null ? React.createElement("span", {
         className: "oh-delta up"
-      }, "new") : React.createElement("span", {
+      }, "+", d.cur.toLocaleString("en-US")) : React.createElement("span", {
         className: `oh-delta ${d.pct >= 0 ? "up" : "down"}`
       }, d.pct >= 0 ? "▲" : "▼", " ", Math.abs(d.pct), "%"))), React.createElement("b", null, v), React.createElement("span", {
         className: "oh-big-s"
-      }, sub, d && d.pct != null ? `, ${d.prev.toLocaleString("en-US")} ${prevWord}` : ""), trend[k] && trend[k].some(x => x > 0) && React.createElement(Spark, {
+      }, sub), d && React.createElement("span", {
+        className: "oh-big-prev"
+      }, d.prev.toLocaleString("en-US"), " ", prevWord), trend[k] && trend[k].some(x => x > 0) && React.createElement(Spark, {
         data: trend[k]
       }));
     };
@@ -34661,7 +34669,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1yqlsym</script>
+<script type="text/babel" id="zion-version">15it7vj</script>
 <script>
 (function () {
   var last = 0;
