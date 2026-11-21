@@ -18735,11 +18735,17 @@ const cuSize = (b) => (b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b > 1e6 ? `${Mat
 // resumable upload straight to Google Drive in 16 MB pieces: a dropped connection only repeats the last piece
 function cuPut(url, file, onProgress, resume) {
   const CH = 16 * 1024 * 1024, total = file.size;
+  // when she comes back from another app (Instagram...), a piece that hung while Zion was in the background is restarted
+  let cur = null, lastMove = Date.now();
+  const onBack = () => { if (document.visibilityState === "visible" && cur && Date.now() - lastMove > 4000) { try { cur.abort(); } catch (e) {} } };
+  document.addEventListener("visibilitychange", onBack);
   const send = (start, end) => new Promise((resolve, reject) => {
     const x = new XMLHttpRequest();
+    cur = x; lastMove = Date.now();
     x.open("PUT", url);
     if (total) x.setRequestHeader("Content-Range", start === end ? `bytes */${total}` : `bytes ${start}-${end - 1}/${total}`);
-    x.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(start + e.loaded); };
+    x.upload.onprogress = (e) => { lastMove = Date.now(); if (e.lengthComputable) onProgress(start + e.loaded); };
+    x.onabort = () => reject(new Error("The upload paused, carrying on"));
     x.onload = () => {
       if (x.status === 200 || x.status === 201) return resolve(total);
       if (x.status === 308) { const m = /bytes=0-(\d+)/.exec(x.getResponseHeader("Range") || ""); return resolve(m ? Number(m[1]) + 1 : 0); }
@@ -18749,6 +18755,7 @@ function cuPut(url, file, onProgress, resume) {
     x.send(start === end ? null : file.slice(start, end));
   });
   return (async () => {
+   try {
     let pos = 0, tries = 0;
     if (resume) { try { pos = await send(0, 0); onProgress(pos); } catch (e) { if (e.status && e.status < 500) throw Object.assign(e, { expired: true }); } }
     while (pos < total || (!total && tries === 0)) {
@@ -18765,6 +18772,7 @@ function cuPut(url, file, onProgress, resume) {
         try { pos = await send(pos, pos); } catch (e2) { /* try again */ }
       }
     }
+   } finally { cur = null; document.removeEventListener("visibilitychange", onBack); }
   })();
 }
 const cuTime = (sec) => (sec >= 3600 ? `${Math.floor(sec / 3600)} h ${Math.round((sec % 3600) / 60)} min` : sec >= 60 ? `${Math.floor(sec / 60)} min ${Math.round(sec % 60)} s` : `${Math.max(1, Math.round(sec))} s`);
@@ -18780,6 +18788,8 @@ function CuUpload({ c, onUploaded, compact, label }) {
     setErr(""); setBusy(true);
     // the phone does not go to sleep while the video uploads
     let lock = null; try { lock = navigator.wakeLock ? await navigator.wakeLock.request("screen") : null; } catch (e) {}
+    const relock = async () => { if (document.visibilityState === "visible" && navigator.wakeLock) { try { lock = await navigator.wakeLock.request("screen"); } catch (e) {} } };
+    document.addEventListener("visibilitychange", relock);
     window.__zionBusy = true;
     const base = items.length;
     setItems((it) => [...it, ...list.map((f) => ({ name: f.name, size: f.size, p: 0, done: false }))]);
@@ -18812,6 +18822,7 @@ function CuUpload({ c, onUploaded, compact, label }) {
         ok++;
       } catch (e) { setErr(e.message); setItems((it) => it.map((x, j) => (j === base + i ? { ...x, failed: true } : x))); }
     }
+    document.removeEventListener("visibilitychange", relock);
     try { lock && lock.release(); } catch (e) {}
     window.__zionBusy = false;
     setBusy(false);
@@ -18831,7 +18842,7 @@ function CuUpload({ c, onUploaded, compact, label }) {
         </div>
       ))}
       {!busy && stopped.length > 0 && items.length === 0 && stopped.map((x) => <div key={x.name} className="cu-hint" style={{ fontSize: 12 }}>The upload of {x.name} stopped at {Math.round(x.p * 100)}%. Tap {label || "Upload"} and choose the same video, it continues from there.</div>)}
-      {busy && <div className="hb-note" style={{ fontSize: 11 }}>If you close Zion, nothing is lost: open it again, tap {label || "Upload"} and choose the same video, it continues where it stopped.</div>}
+      {busy && <div className="hb-note" style={{ fontSize: 11 }}>You can switch to another app, the upload carries on when you come back to Zion. If you close Zion, nothing is lost: open it again, tap {label || "Upload"} and choose the same video, it continues where it stopped.</div>}
       {err && <div className="fs-12" style={{ color: "#ff6b6b" }}>{err}</div>}
     </div>
   );

@@ -31493,13 +31493,27 @@ const cuSize = b => b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b > 1e6 ? `${Math.r
 function cuPut(url, file, onProgress, resume) {
   const CH = 16 * 1024 * 1024,
     total = file.size;
+  let cur = null,
+    lastMove = Date.now();
+  const onBack = () => {
+    if (document.visibilityState === "visible" && cur && Date.now() - lastMove > 4000) {
+      try {
+        cur.abort();
+      } catch (e) {}
+    }
+  };
+  document.addEventListener("visibilitychange", onBack);
   const send = (start, end) => new Promise((resolve, reject) => {
     const x = new XMLHttpRequest();
+    cur = x;
+    lastMove = Date.now();
     x.open("PUT", url);
     if (total) x.setRequestHeader("Content-Range", start === end ? `bytes */${total}` : `bytes ${start}-${end - 1}/${total}`);
     x.upload.onprogress = e => {
+      lastMove = Date.now();
       if (e.lengthComputable) onProgress(start + e.loaded);
     };
+    x.onabort = () => reject(new Error("The upload paused, carrying on"));
     x.onload = () => {
       if (x.status === 200 || x.status === 201) return resolve(total);
       if (x.status === 308) {
@@ -31514,35 +31528,40 @@ function cuPut(url, file, onProgress, resume) {
     x.send(start === end ? null : file.slice(start, end));
   });
   return (async () => {
-    let pos = 0,
-      tries = 0;
-    if (resume) {
-      try {
-        pos = await send(0, 0);
-        onProgress(pos);
-      } catch (e) {
-        if (e.status && e.status < 500) throw Object.assign(e, {
-          expired: true
-        });
-      }
-    }
-    while (pos < total || !total && tries === 0) {
-      try {
-        pos = await send(pos, Math.min(total, pos + CH));
-        onProgress(pos);
+    try {
+      let pos = 0,
         tries = 0;
-        if (!total) break;
-      } catch (e) {
-        if (e.status && e.status < 500 && e.status !== 408 && e.status !== 429) throw e;
-        if (++tries > 10) throw e;
-        await new Promise(r => setTimeout(r, Math.min(30000, 1500 * 2 ** tries)));
-        if (typeof navigator !== "undefined" && navigator.onLine === false) await new Promise(r => window.addEventListener("online", r, {
-          once: true
-        }));
+      if (resume) {
         try {
-          pos = await send(pos, pos);
-        } catch (e2) {}
+          pos = await send(0, 0);
+          onProgress(pos);
+        } catch (e) {
+          if (e.status && e.status < 500) throw Object.assign(e, {
+            expired: true
+          });
+        }
       }
+      while (pos < total || !total && tries === 0) {
+        try {
+          pos = await send(pos, Math.min(total, pos + CH));
+          onProgress(pos);
+          tries = 0;
+          if (!total) break;
+        } catch (e) {
+          if (e.status && e.status < 500 && e.status !== 408 && e.status !== 429) throw e;
+          if (++tries > 10) throw e;
+          await new Promise(r => setTimeout(r, Math.min(30000, 1500 * 2 ** tries)));
+          if (typeof navigator !== "undefined" && navigator.onLine === false) await new Promise(r => window.addEventListener("online", r, {
+            once: true
+          }));
+          try {
+            pos = await send(pos, pos);
+          } catch (e2) {}
+        }
+      }
+    } finally {
+      cur = null;
+      document.removeEventListener("visibilitychange", onBack);
     }
   })();
 }
@@ -31566,6 +31585,14 @@ function CuUpload({
     try {
       lock = navigator.wakeLock ? await navigator.wakeLock.request("screen") : null;
     } catch (e) {}
+    const relock = async () => {
+      if (document.visibilityState === "visible" && navigator.wakeLock) {
+        try {
+          lock = await navigator.wakeLock.request("screen");
+        } catch (e) {}
+      }
+    };
+    document.addEventListener("visibilitychange", relock);
     window.__zionBusy = true;
     const base = items.length;
     setItems(it => [...it, ...list.map(f => ({
@@ -31657,6 +31684,7 @@ function CuUpload({
         } : x));
       }
     }
+    document.removeEventListener("visibilitychange", relock);
     try {
       lock && lock.release();
     } catch (e) {}
@@ -31722,7 +31750,7 @@ function CuUpload({
     style: {
       fontSize: 11
     }
-  }, "If you close Zion, nothing is lost: open it again, tap ", label || "Upload", " and choose the same video, it continues where it stopped."), err && React.createElement("div", {
+  }, "You can switch to another app, the upload carries on when you come back to Zion. If you close Zion, nothing is lost: open it again, tap ", label || "Upload", " and choose the same video, it continues where it stopped."), err && React.createElement("div", {
     className: "fs-12",
     style: {
       color: "#ff6b6b"
@@ -34760,7 +34788,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">vi5u1l</script>
+<script type="text/babel" id="zion-version">1u7xi9s</script>
 <script>
 (function () {
   var last = 0;
