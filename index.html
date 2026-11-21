@@ -31245,6 +31245,7 @@ function CuUpload({
     try {
       lock = navigator.wakeLock ? await navigator.wakeLock.request("screen") : null;
     } catch (e) {}
+    window.__zionBusy = true;
     const base = items.length;
     setItems(it => [...it, ...list.map(f => ({
       name: f.name,
@@ -31338,6 +31339,7 @@ function CuUpload({
     try {
       lock && lock.release();
     } catch (e) {}
+    window.__zionBusy = false;
     setBusy(false);
     if (ok && onUploaded) onUploaded();
   };
@@ -31591,6 +31593,12 @@ function CustomsAdminPage({
     }
     setReading(false);
   };
+  useEffect(() => {
+    window.__zionBusy = open && (shots.length > 0 || !!f.description);
+    return () => {
+      window.__zionBusy = false;
+    };
+  }, [open, shots.length, f.description]);
   useEffect(() => {
     if (shots.length && !aiDone && !reading) {
       const t = setTimeout(readAI, 600);
@@ -34364,7 +34372,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">bwod0i</script>
+<script type="text/babel" id="zion-version">79tfd0</script>
 <script>
 (function () {
   var last = 0;

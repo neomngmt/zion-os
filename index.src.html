@@ -18627,6 +18627,7 @@ function CuUpload({ c, onUploaded, compact, label }) {
     setErr(""); setBusy(true);
     // the phone does not go to sleep while the video uploads
     let lock = null; try { lock = navigator.wakeLock ? await navigator.wakeLock.request("screen") : null; } catch (e) {}
+    window.__zionBusy = true;
     const base = items.length;
     setItems((it) => [...it, ...list.map((f) => ({ name: f.name, size: f.size, p: 0, done: false }))]);
     let ok = 0;
@@ -18659,6 +18660,7 @@ function CuUpload({ c, onUploaded, compact, label }) {
       } catch (e) { setErr(e.message); setItems((it) => it.map((x, j) => (j === base + i ? { ...x, failed: true } : x))); }
     }
     try { lock && lock.release(); } catch (e) {}
+    window.__zionBusy = false;
     setBusy(false);
     if (ok && onUploaded) onUploaded();
   };
@@ -18789,6 +18791,7 @@ function CustomsAdminPage({ models }) {
     } catch (e) { setErr(e.message); }
     setReading(false);
   };
+  useEffect(() => { window.__zionBusy = open && (shots.length > 0 || !!f.description); return () => { window.__zionBusy = false; }; }, [open, shots.length, f.description]);
   // read as soon as screenshots are added
   useEffect(() => { if (shots.length && !aiDone && !reading) { const t = setTimeout(readAI, 600); return () => clearTimeout(t); } }, [shots.length]);
 
