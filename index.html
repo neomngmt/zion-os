@@ -31053,6 +31053,11 @@ const CU_CSS = `
 .cu-f label{ display:block; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#7d8f86; font-weight:700; margin:0 0 5px 2px; }
 .cu-in{ width:100%; background:#0a0f0c; border:1px solid rgba(255,255,255,.1); border-radius:12px; padding:10px 12px; font-size:14px; color:#f2f5f0; outline:none; transition:border-color .2s; }
 .cu-in:focus{ border-color:#39e673; }
+.cu-in{ box-sizing:border-box; max-width:100%; min-width:0; }
+.cu-f > div{ min-width:0; }
+/* iPhone draws date fields wider than the screen unless they lose the native look */
+input[type="date"].cu-in{ -webkit-appearance:none; appearance:none; display:block; width:100%; min-height:44px; text-align:left; }
+input[type="date"].cu-in::-webkit-date-and-time-value{ text-align:left; }
 .cu-in.ai{ border-color:rgba(57,230,115,.45); box-shadow:0 0 0 3px rgba(57,230,115,.08); }
 textarea.cu-in{ resize:vertical; line-height:1.55; }
 .cu-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
@@ -34359,7 +34364,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">q5novb</script>
+<script type="text/babel" id="zion-version">bwod0i</script>
 <script>
 (function () {
   var last = 0;
