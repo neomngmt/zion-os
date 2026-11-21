@@ -121,11 +121,24 @@ function neoLiveGreet() {
   const c = neoLive.c;
   if (!c || !c.dc || c.dc.readyState !== "open" || !neoLive.h || !c.mic) { neoLive.greetPending = true; if (c && !c.mic) neoLiveMic().then(() => setTimeout(() => { if (neoLive.greetPending) neoLiveGreet(); }, 50)).catch(() => {}); return; }
   neoLive.greetPending = false;
+  if (c.greeted) return;
+  c.greeted = true;
+  try { c.mic.getTracks().forEach((t) => { t.enabled = false; }); } catch (e) {}
   try { c.dc.send(JSON.stringify({ type: "response.create" })); } catch (e) {}
+  c.greetTimer = setTimeout(() => neoLiveGreetDone(c), 9000); // in case the greeting never plays
+}
+function neoLiveGreetDone(c) {
+  if (!c || c.greetDone) return;
+  c.greetDone = true;
+  clearTimeout(c.greetTimer);
+  if (neoLive.c !== c) return;
+  try { c.mic && c.mic.getTracks().forEach((t) => { t.enabled = true; }); } catch (e) {}
+  try { c.dc && c.dc.readyState === "open" && c.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" })); } catch (e) {}
 }
 function neoLiveEnd() {
   const c = neoLive.c; neoLive.c = null; neoLive.greetPending = false;
   if (c) {
+    clearTimeout(c.greetTimer);
     try { c.dc && c.dc.close(); } catch (e) {}
     try { c.pc && c.pc.close(); } catch (e) {}
     // the microphone is only muted, not released: asking again would make Safari ask for permission again
@@ -157,7 +170,7 @@ async function neoLiveStart(agency) {
     // the microphone joins the call as soon as it is allowed, the connection does not wait for it
     micP.then((m) => {
       if (neoLive.c !== c) return;
-      c.mic = m; m.getTracks().forEach((t) => { t.enabled = true; });
+      c.mic = m; m.getTracks().forEach((t) => { t.enabled = !!c.greetDone; });
       tr.sender.replaceTrack(m.getTracks()[0]).catch(() => {});
     }).catch((e) => { if (neoLive.c === c) { neoLiveEmit("error", "Allow the microphone for Zion to talk to Neo."); neoLiveEnd(); } });
     pc.ontrack = (e) => {
@@ -187,7 +200,7 @@ async function neoLiveStart(agency) {
         case "input_audio_buffer.speech_stopped": neoLiveEmit("phase", "thinking"); break;
         case "output_audio_buffer.started": neoLiveEmit("phase", "speaking"); break;
         case "output_audio_buffer.stopped":
-        case "output_audio_buffer.cleared": neoLiveEmit("phase", "listening"); break;
+        case "output_audio_buffer.cleared": neoLiveEmit("phase", "listening"); if (c.greeted && !c.greetDone) setTimeout(() => neoLiveGreetDone(c), 250); break;
         case "response.function_call_arguments.done": {
           let args = {}; try { args = JSON.parse(ev.arguments || "{}"); } catch (e) {}
           const job = (async () => {
@@ -19627,7 +19640,7 @@ function App() {
   useEffect(() => {
     // Only replay the boot animation the first time Neo is opened per
     // browser session — it used to run in full on every single visit.
-    if (view === "neo" && prevViewRef.current !== "neo") {
+    if (view === "neo" && prevViewRef.current !== "neo" && neoLiveMicReady()) {
       let seen = false;
       try { seen = sessionStorage.getItem("neoBooted") === "1"; } catch {}
       if (!seen) {
@@ -19879,16 +19892,20 @@ function App() {
               return (
                 <button key={n.id} onClick={() => {
                   if (n.id === "neo") {
-                    primeNeoAudioUnlock();
+                    // only the microphone question first: no sound, no animation, no call until it is allowed
                     let seen = false;
                     try { seen = sessionStorage.getItem("neoBooted") === "1"; } catch {}
-                    const boot = () => { if (!seen) { setNeoBooting(true); try { sessionStorage.setItem("neoBooted", "1"); } catch {} } };
-                    if (neoLiveMicReady()) boot();
+                    const go = () => {
+                      if (!seen) { setNeoBooting(true); try { sessionStorage.setItem("neoBooted", "1"); } catch {} }
+                      primeNeoAudioUnlock();
+                      neoLiveStart(session.agency);
+                    };
+                    neoLiveKey(session.agency).catch(() => {}); // silent, only gets the key ready
+                    if (neoLiveMicReady()) go();
                     else {
                       setNeoMicAsk(true);
-                      neoLiveMic().then(() => { setNeoMicAsk(false); boot(); }).catch(() => setNeoMicAsk(false));
+                      neoLiveMic().then(() => { setNeoMicAsk(false); go(); }).catch(() => setNeoMicAsk(false));
                     }
-                    neoLiveStart(session.agency);
                   }
                   setView(n.id); setMobileNavOpen(false);
                 }}

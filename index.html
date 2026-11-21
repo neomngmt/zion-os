@@ -169,9 +169,33 @@ function neoLiveGreet() {
     return;
   }
   neoLive.greetPending = false;
+  if (c.greeted) return;
+  c.greeted = true;
+  try {
+    c.mic.getTracks().forEach(t => {
+      t.enabled = false;
+    });
+  } catch (e) {}
   try {
     c.dc.send(JSON.stringify({
       type: "response.create"
+    }));
+  } catch (e) {}
+  c.greetTimer = setTimeout(() => neoLiveGreetDone(c), 9000);
+}
+function neoLiveGreetDone(c) {
+  if (!c || c.greetDone) return;
+  c.greetDone = true;
+  clearTimeout(c.greetTimer);
+  if (neoLive.c !== c) return;
+  try {
+    c.mic && c.mic.getTracks().forEach(t => {
+      t.enabled = true;
+    });
+  } catch (e) {}
+  try {
+    c.dc && c.dc.readyState === "open" && c.dc.send(JSON.stringify({
+      type: "input_audio_buffer.clear"
     }));
   } catch (e) {}
 }
@@ -180,6 +204,7 @@ function neoLiveEnd() {
   neoLive.c = null;
   neoLive.greetPending = false;
   if (c) {
+    clearTimeout(c.greetTimer);
     try {
       c.dc && c.dc.close();
     } catch (e) {}
@@ -233,7 +258,7 @@ async function neoLiveStart(agency) {
       if (neoLive.c !== c) return;
       c.mic = m;
       m.getTracks().forEach(t => {
-        t.enabled = true;
+        t.enabled = !!c.greetDone;
       });
       tr.sender.replaceTrack(m.getTracks()[0]).catch(() => {});
     }).catch(e => {
@@ -296,6 +321,7 @@ async function neoLiveStart(agency) {
         case "output_audio_buffer.stopped":
         case "output_audio_buffer.cleared":
           neoLiveEmit("phase", "listening");
+          if (c.greeted && !c.greetDone) setTimeout(() => neoLiveGreetDone(c), 250);
           break;
         case "response.function_call_arguments.done":
           {
@@ -33920,7 +33946,7 @@ function App() {
     };
   }, [session && session.token]);
   useEffect(() => {
-    if (view === "neo" && prevViewRef.current !== "neo") {
+    if (view === "neo" && prevViewRef.current !== "neo" && neoLiveMicReady()) {
       let seen = false;
       try {
         seen = sessionStorage.getItem("neoBooted") === "1";
@@ -34316,27 +34342,28 @@ function App() {
       key: n.id,
       onClick: () => {
         if (n.id === "neo") {
-          primeNeoAudioUnlock();
           let seen = false;
           try {
             seen = sessionStorage.getItem("neoBooted") === "1";
           } catch {}
-          const boot = () => {
+          const go = () => {
             if (!seen) {
               setNeoBooting(true);
               try {
                 sessionStorage.setItem("neoBooted", "1");
               } catch {}
             }
+            primeNeoAudioUnlock();
+            neoLiveStart(session.agency);
           };
-          if (neoLiveMicReady()) boot();else {
+          neoLiveKey(session.agency).catch(() => {});
+          if (neoLiveMicReady()) go();else {
             setNeoMicAsk(true);
             neoLiveMic().then(() => {
               setNeoMicAsk(false);
-              boot();
+              go();
             }).catch(() => setNeoMicAsk(false));
           }
-          neoLiveStart(session.agency);
         }
         setView(n.id);
         setMobileNavOpen(false);
@@ -34470,7 +34497,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">pvxk6n</script>
+<script type="text/babel" id="zion-version">eq4eje</script>
 <script>
 (function () {
   var last = 0;
