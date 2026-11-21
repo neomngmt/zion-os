@@ -932,6 +932,12 @@ h1.text-2xl, h1.text-3xl, h2.text-2xl, .page-title{ background:linear-gradient(1
   .neo-topbar > div{ font-size:17px !important; }
   .neo-leave{ padding:7px 10px !important; font-size:10px !important; letter-spacing:.12em !important; }
 }
+/* the phone menu: a bit narrower and lower rows */
+@media (max-width:639px){
+  .zion-aside{ width:204px !important; }
+  .zion-aside nav .tap{ padding-top:7px !important; padding-bottom:7px !important; font-size:12.5px !important; }
+  .zion-aside nav .tap svg{ width:16px; height:16px; }
+}
 /* thin quiet scrollbars */
 *::-webkit-scrollbar{ width:9px; height:9px; }
 *::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:9px; border:2px solid transparent; background-clip:padding-box; }
@@ -19944,12 +19950,12 @@ function App() {
 
         {/* Sidebar — slides in from the left on phones when the top-right
             menu button is tapped; always visible (static) from sm up. */}
-        <aside className={`fixed inset-y-0 left-0 z-50 w-56 shadow-2xl flex c-bg-panel flex-shrink-0 flex-col transition-transform duration-300 ease-out sm:static sm:z-auto sm:shadow-none sm:translate-x-0 ${currentView === "editor" && editorMenuHidden ? "sm:hidden" : ""} ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}`} style={{ paddingTop: "env(safe-area-inset-top)" }}>
+        <aside className={`zion-aside fixed inset-y-0 left-0 z-50 w-56 shadow-2xl flex c-bg-panel flex-shrink-0 flex-col transition-transform duration-300 ease-out sm:static sm:z-auto sm:shadow-none sm:translate-x-0 ${currentView === "editor" && editorMenuHidden ? "sm:hidden" : ""} ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}`} style={{ paddingTop: "env(safe-area-inset-top)" }}>
           {mobileNavOpen && (
-            <div className="sm:hidden flex items-center justify-center pt-6 pb-5">
-              <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center" }}>
-                <ZionWordmark height={25} />
-                <span style={{ fontFamily: "'Dancing Script', cursive", fontWeight: 700, color: "var(--accent, #39ffa0)", textShadow: "0 0 3px currentColor, 0 0 6px currentColor", lineHeight: 1, whiteSpace: "nowrap", fontSize: "11px", marginTop: "6px", alignSelf: "flex-end", WebkitClipPath: "inset(0 100% 0 0)", clipPath: "inset(0 100% 0 0)", animation: "writeOn 1.2s steps(20,end) forwards, neoFlicker 3.5s ease-in-out infinite 1.2s" }}>by neomngmt</span>
+            <div className="sm:hidden flex items-center justify-center pt-5 pb-4" style={{ width: "100%" }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                <ZionWordmark height={21} />
+                <span style={{ fontFamily: "'Dancing Script', cursive", fontWeight: 700, color: "var(--accent, #39ffa0)", textShadow: "0 0 3px currentColor, 0 0 6px currentColor", lineHeight: 1, whiteSpace: "nowrap", fontSize: "10.5px", marginTop: "6px", alignSelf: "center", WebkitClipPath: "inset(0 100% 0 0)", clipPath: "inset(0 100% 0 0)", animation: "writeOn 1.2s steps(20,end) forwards, neoFlicker 3.5s ease-in-out infinite 1.2s" }}>by neomngmt</span>
               </div>
             </div>
           )}
