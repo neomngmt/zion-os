@@ -18528,6 +18528,16 @@ textarea.cu-in{ resize:vertical; line-height:1.55; }
 .cu-overall-row > div:first-child{ padding-left:0; border-left:0; }
 .cu-overall-row b{ display:block; font-size:24px; font-weight:900; letter-spacing:-.02em; color:#f2f5f0; font-variant-numeric:tabular-nums; line-height:1.1; }
 .cu-overall-row span{ font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:#7d8f86; font-weight:700; white-space:nowrap; }
+.cu-party{ position:fixed; inset:0; z-index:400; display:flex; align-items:center; justify-content:center; background:radial-gradient(circle at 50% 45%, rgba(57,230,115,.28), rgba(2,6,4,.94) 60%); animation:cuFade .3s ease both; overflow:hidden; }
+.cu-party-card{ text-align:center; animation:cuPop .55s cubic-bezier(.2,1.4,.4,1) both; padding:20px; }
+.cu-party-l{ font-size:14px; letter-spacing:.3em; text-transform:uppercase; color:#a8f5c4; font-weight:800; }
+.cu-party-n{ font-size:84px; font-weight:900; letter-spacing:-.04em; line-height:1; margin-top:8px; font-variant-numeric:tabular-nums; background:linear-gradient(180deg,#ffffff,#39e673); -webkit-background-clip:text; background-clip:text; color:transparent; filter:drop-shadow(0 8px 40px rgba(57,230,115,.45)); }
+.cu-party-s{ font-size:15px; color:#d9e2dd; margin-top:10px; font-weight:600; }
+.cu-party-bits i{ position:absolute; top:-20px; width:9px; height:16px; border-radius:3px; animation:cuFall linear both; }
+@keyframes cuFade{ from{ opacity:0; } to{ opacity:1; } }
+@keyframes cuPop{ from{ opacity:0; transform:scale(.6); } to{ opacity:1; transform:scale(1); } }
+@keyframes cuFall{ to{ transform:translateY(110vh) rotate(540deg); opacity:.2; } }
+@media (prefers-reduced-motion:reduce){ .cu-party-bits{ display:none; } .cu-party-card{ animation:none; } }
 .cu-empty{ border-radius:20px; padding:34px 20px; text-align:center; background:#0e1310; border:1px dashed rgba(255,255,255,.1); color:#7d8f86; font-size:13.5px; }
 @media (max-width:760px){ .cu-grid{ grid-template-columns:1fr; } .cu-drop{ min-height:180px; } .cu-new{ padding:16px; border-radius:20px; } }
 @media (max-width:600px){
@@ -18748,7 +18758,6 @@ function CustomsAdminPage({ models }) {
         fan: j.fan_name || p.fan,
         price: j.price != null ? String(j.price) : p.price,
         deadline: j.deadline || p.deadline,
-        sold: j.paid != null ? j.paid : p.sold,
       }));
       setUnclear(j.unclear || ""); setAiDone(true);
     } catch (e) { setErr(e.message); }
@@ -18765,7 +18774,7 @@ function CustomsAdminPage({ models }) {
     const row = {
       id, model: f.model, fan_label: f.fan.trim() || null, description: f.description.trim(),
       price: f.price !== "" ? Number(f.price) : null, deadline: f.deadline || null,
-      status: f.sold ? "sold" : "requested", sold_at: f.sold ? new Date().toISOString() : null,
+      status: "sold", sold_at: new Date().toISOString(),
     };
     const { error } = await supabaseClient.from("customs").insert(row);
     if (error) { setErr(error.message); setBusy(false); return; }
@@ -18782,7 +18791,7 @@ function CustomsAdminPage({ models }) {
     reload();
   };
 
-  const groups = [["sold", "To make"], ["in_progress", "In progress"], ["requested", "Not paid yet"], ["delivered", "Delivered"], ["cancelled", "Cancelled"]];
+  const groups = [[["sold", "in_progress", "requested"], "To make"], [["delivered"], "Already made"], [["cancelled"], "Cancelled"]];
   const month = new Date().toISOString().slice(0, 7);
   const soldMonth = list.filter((c) => c.status !== "cancelled" && c.status !== "requested" && String(c.sold_at || c.created_at).slice(0, 7) === month).reduce((t, c) => t + (Number(c.price) || 0), 0);
   const cnt = (st) => list.filter((c) => c.status === st).length;
@@ -18792,9 +18801,8 @@ function CustomsAdminPage({ models }) {
       <style>{HUB_CSS}{CU_CSS}</style>
       <div className="cu-top">
         <div className="cu-stats">
-          <div className="cu-stat"><b>{cnt("sold")}</b><span>To make</span></div>
-          <div className="cu-stat"><b>{cnt("in_progress")}</b><span>In progress</span></div>
-          <div className="cu-stat"><b>{cnt("requested")}</b><span>Not paid yet</span></div>
+          <div className="cu-stat"><b>{cnt("sold") + cnt("in_progress") + cnt("requested")}</b><span>To make</span></div>
+          <div className="cu-stat"><b>{cnt("delivered")}</b><span>Already made</span></div>
           <div className="cu-stat"><b style={{ color: "#a8f5c4" }}>${Math.round(soldMonth).toLocaleString("en-US")}</b><span>Sold this month</span></div>
         </div>
         <button onClick={() => { if (open) reset(); setOpen((v) => !v); }} className="hb-btn">{open ? "Close" : "+ New custom"}</button>
@@ -18835,11 +18843,7 @@ function CustomsAdminPage({ models }) {
                 <div><label>Fan</label><input value={f.fan} onChange={(e) => set("fan", e.target.value)} placeholder="Fan name" className={`cu-in ${aiDone && f.fan ? "ai" : ""}`} /></div>
                 <div><label>Price (USD)</label><input type="number" value={f.price} onChange={(e) => set("price", e.target.value)} placeholder="0" className={`cu-in ${aiDone && f.price ? "ai" : ""}`} /></div>
               </div>
-              <div className="cu-row" style={{ alignItems: "end" }}>
-                <div><label>Deadline</label><input type="date" value={f.deadline} onChange={(e) => set("deadline", e.target.value)} className={`cu-in ${aiDone && f.deadline ? "ai" : ""}`} /></div>
-                <div><label>Payment</label>
-                  <div className="cu-paid"><button className={f.sold ? "on" : ""} onClick={() => set("sold", true)}>Paid</button><button className={!f.sold ? "on" : ""} onClick={() => set("sold", false)}>Not paid yet</button></div></div>
-              </div>
+              <div><label>Deadline</label><input type="date" value={f.deadline} onChange={(e) => set("deadline", e.target.value)} className={`cu-in ${aiDone && f.deadline ? "ai" : ""}`} /></div>
               {err && <div className="fs-12" style={{ color: "#ff6b6b" }}>{err}</div>}
               <button onClick={create} disabled={busy || reading} className="hb-btn" style={{ justifySelf: "start" }}>{busy ? "Saving" : "Save and notify the model"}</button>
             </div>
@@ -18851,12 +18855,13 @@ function CustomsAdminPage({ models }) {
       {loading && <div className="fs-13 c-muted">Loading...</div>}
       {!loading && list.length === 0 && <div className="cu-empty">No customs yet. Tap “New custom” and drop the chat screenshots in.</div>}
 
-      {groups.map(([st, title]) => {
-        const items = list.filter((c) => c.status === st);
+      {groups.map(([sts, title]) => {
+        const st = sts[0];
+        const items = list.filter((c) => sts.includes(c.status));
         if (!items.length) return null;
         const color = (CUSTOM_STATUS[st] || {}).color || "#39e673";
         return (
-          <div key={st}>
+          <div key={title}>
             <div className="cu-sec"><i style={{ background: color }} />{title} ({items.length})</div>
             <div className="cu-cards">
               {items.map((c) => {
@@ -18899,6 +18904,33 @@ function CustomsAdminPage({ models }) {
   );
 }
 
+// "You sold $200": full screen moment after the model uploads a custom
+function CuParty({ amount, share, onClose }) {
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    const t0 = performance.now(); let raf;
+    const tick = (t) => { const k = Math.min(1, (t - t0) / 1100); setShown(Math.round(amount * (1 - Math.pow(1 - k, 3)))); if (k < 1) raf = requestAnimationFrame(tick); };
+    raf = requestAnimationFrame(tick);
+    const close = setTimeout(onClose, 4200);
+    try { navigator.vibrate && navigator.vibrate([30, 40, 60]); } catch (e) {}
+    return () => { cancelAnimationFrame(raf); clearTimeout(close); };
+  }, []);
+  const bits = Array.from({ length: 36 }, (_, i) => i);
+  return (
+    <div className="cu-party" onClick={onClose}>
+      <div className="cu-party-bits" aria-hidden="true">
+        {bits.map((i) => <i key={i} style={{ left: `${(i * 37) % 100}%`, animationDelay: `${(i % 9) * 0.07}s`, animationDuration: `${1.6 + (i % 5) * 0.25}s`, background: i % 3 === 0 ? "#a8f5c4" : i % 3 === 1 ? "#39e673" : "#12b34c", transform: `rotate(${i * 23}deg)` }} />)}
+      </div>
+      <div className="cu-party-card">
+        <div className="cu-party-l">You sold</div>
+        <div className="cu-party-n">${shown.toLocaleString("en-US")}</div>
+        {share != null && <div className="cu-party-s">your share about ${share.toLocaleString("en-US")}</div>}
+        <div className="cu-party-s" style={{ marginTop: 14, opacity: .7 }}>Sent to your manager. Nice work!</div>
+      </div>
+    </div>
+  );
+}
+
 function CustomsCreatorPage({ model, record }) {
   const { rows, loading, reload } = useCustoms(model);
   useOpenCustom(rows);
@@ -18914,6 +18946,7 @@ function CustomsCreatorPage({ model, record }) {
       const { error } = await supabaseClient.from("customs").update({ status: "delivered", delivery_url: data.drive_url || null, delivered_at: new Date().toISOString() }).eq("id", c.id);
       if (error) { setErr(error.message); return; }
       await customNotify(c.id, "delivered");
+      if (c.price != null) setParty({ amount: Number(c.price), share: sharePct != null ? Math.round(Number(c.price) * sharePct / 100) : null });
     }
     reload();
   };
@@ -18922,7 +18955,10 @@ function CustomsCreatorPage({ model, record }) {
   const done = rows.filter((c) => ["delivered", "cancelled"].includes(c.status));
   const toMake = active.filter((c) => c.status !== "requested");
   // every paid custom counts, made or not yet (not paid yet and cancelled do not)
-  const earned = rows.filter((c) => ["sold", "in_progress", "delivered"].includes(c.status)).reduce((t, c) => t + (Number(c.price) || 0), 0);
+  const month = new Date().toISOString().slice(0, 7);
+  // her customs count once she uploaded them
+  const soldMonth = rows.filter((c) => c.status === "delivered" && String(c.delivered_at || c.sold_at || c.created_at).slice(0, 7) === month).reduce((t, c) => t + (Number(c.price) || 0), 0);
+  const [party, setParty] = useState(null);
 
   const card = (c) => {
     const p2 = cuParse(c.description);
@@ -18969,16 +19005,17 @@ function CustomsCreatorPage({ model, record }) {
         <div className="cu-overall-l">Overall</div>
         <div className="cu-overall-row">
           <div><b>{toMake.length}</b><span>To make</span></div>
-          <div><b>{done.filter((c) => c.status === "delivered").length}</b><span>Delivered</span></div>
-          {sharePct != null && <div><b style={{ color: "#a8f5c4" }}>${Math.round(earned * sharePct / 100).toLocaleString("en-US")}</b><span>You earned</span></div>}
+          <div><b>{done.filter((c) => c.status === "delivered").length}</b><span>Already made</span></div>
+          <div><b style={{ color: "#a8f5c4" }}>$<CountUp value={soldMonth} /></b><span>Sold this month</span></div>
         </div>
       </div>
+      {party && <CuParty {...party} onClose={() => setParty(null)} />}
       {err && <div className="fs-12 mb-3" style={{ color: "#ff6b6b" }}>{err}</div>}
       {loading && <div className="fs-13 c-muted">Loading...</div>}
       {!loading && rows.length === 0 && <div className="cu-empty">No custom requests right now. You get a notification when a new one comes in.</div>}
       {active.length > 0 && <div style={{ display: "grid", gap: 12, marginBottom: 24 }}>{active.map(card)}</div>}
       {done.length > 0 && (<>
-        <div className="cu-sec"><i style={{ background: "#9aa8ff" }} />Done ({done.length})</div>
+        <div className="cu-sec"><i style={{ background: "#9aa8ff" }} />Already made ({done.length})</div>
         <div style={{ display: "grid", gap: 12 }}>{done.map(card)}</div>
       </>)}
     </div>

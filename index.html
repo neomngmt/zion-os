@@ -31105,6 +31105,16 @@ textarea.cu-in{ resize:vertical; line-height:1.55; }
 .cu-overall-row > div:first-child{ padding-left:0; border-left:0; }
 .cu-overall-row b{ display:block; font-size:24px; font-weight:900; letter-spacing:-.02em; color:#f2f5f0; font-variant-numeric:tabular-nums; line-height:1.1; }
 .cu-overall-row span{ font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:#7d8f86; font-weight:700; white-space:nowrap; }
+.cu-party{ position:fixed; inset:0; z-index:400; display:flex; align-items:center; justify-content:center; background:radial-gradient(circle at 50% 45%, rgba(57,230,115,.28), rgba(2,6,4,.94) 60%); animation:cuFade .3s ease both; overflow:hidden; }
+.cu-party-card{ text-align:center; animation:cuPop .55s cubic-bezier(.2,1.4,.4,1) both; padding:20px; }
+.cu-party-l{ font-size:14px; letter-spacing:.3em; text-transform:uppercase; color:#a8f5c4; font-weight:800; }
+.cu-party-n{ font-size:84px; font-weight:900; letter-spacing:-.04em; line-height:1; margin-top:8px; font-variant-numeric:tabular-nums; background:linear-gradient(180deg,#ffffff,#39e673); -webkit-background-clip:text; background-clip:text; color:transparent; filter:drop-shadow(0 8px 40px rgba(57,230,115,.45)); }
+.cu-party-s{ font-size:15px; color:#d9e2dd; margin-top:10px; font-weight:600; }
+.cu-party-bits i{ position:absolute; top:-20px; width:9px; height:16px; border-radius:3px; animation:cuFall linear both; }
+@keyframes cuFade{ from{ opacity:0; } to{ opacity:1; } }
+@keyframes cuPop{ from{ opacity:0; transform:scale(.6); } to{ opacity:1; transform:scale(1); } }
+@keyframes cuFall{ to{ transform:translateY(110vh) rotate(540deg); opacity:.2; } }
+@media (prefers-reduced-motion:reduce){ .cu-party-bits{ display:none; } .cu-party-card{ animation:none; } }
 .cu-empty{ border-radius:20px; padding:34px 20px; text-align:center; background:#0e1310; border:1px dashed rgba(255,255,255,.1); color:#7d8f86; font-size:13.5px; }
 @media (max-width:760px){ .cu-grid{ grid-template-columns:1fr; } .cu-drop{ min-height:180px; } .cu-new{ padding:16px; border-radius:20px; } }
 @media (max-width:600px){
@@ -31491,8 +31501,7 @@ function CustomsAdminPage({
         description: [j.title, ...(j.notes || []).map(x => `• ${x}`)].filter(Boolean).join("\n"),
         fan: j.fan_name || p.fan,
         price: j.price != null ? String(j.price) : p.price,
-        deadline: j.deadline || p.deadline,
-        sold: j.paid != null ? j.paid : p.sold
+        deadline: j.deadline || p.deadline
       }));
       setUnclear(j.unclear || "");
       setAiDone(true);
@@ -31529,8 +31538,8 @@ function CustomsAdminPage({
       description: f.description.trim(),
       price: f.price !== "" ? Number(f.price) : null,
       deadline: f.deadline || null,
-      status: f.sold ? "sold" : "requested",
-      sold_at: f.sold ? new Date().toISOString() : null
+      status: "sold",
+      sold_at: new Date().toISOString()
     };
     const {
       error
@@ -31572,7 +31581,7 @@ function CustomsAdminPage({
     if (event) await customNotify(c.id, event);
     reload();
   };
-  const groups = [["sold", "To make"], ["in_progress", "In progress"], ["requested", "Not paid yet"], ["delivered", "Delivered"], ["cancelled", "Cancelled"]];
+  const groups = [[["sold", "in_progress", "requested"], "To make"], [["delivered"], "Already made"], [["cancelled"], "Cancelled"]];
   const month = new Date().toISOString().slice(0, 7);
   const soldMonth = list.filter(c => c.status !== "cancelled" && c.status !== "requested" && String(c.sold_at || c.created_at).slice(0, 7) === month).reduce((t, c) => t + (Number(c.price) || 0), 0);
   const cnt = st => list.filter(c => c.status === st).length;
@@ -31584,11 +31593,9 @@ function CustomsAdminPage({
     className: "cu-stats"
   }, React.createElement("div", {
     className: "cu-stat"
-  }, React.createElement("b", null, cnt("sold")), React.createElement("span", null, "To make")), React.createElement("div", {
+  }, React.createElement("b", null, cnt("sold") + cnt("in_progress") + cnt("requested")), React.createElement("span", null, "To make")), React.createElement("div", {
     className: "cu-stat"
-  }, React.createElement("b", null, cnt("in_progress")), React.createElement("span", null, "In progress")), React.createElement("div", {
-    className: "cu-stat"
-  }, React.createElement("b", null, cnt("requested")), React.createElement("span", null, "Not paid yet")), React.createElement("div", {
+  }, React.createElement("b", null, cnt("delivered")), React.createElement("span", null, "Already made")), React.createElement("div", {
     className: "cu-stat"
   }, React.createElement("b", {
     style: {
@@ -31727,25 +31734,12 @@ function CustomsAdminPage({
     onChange: e => set("price", e.target.value),
     placeholder: "0",
     className: `cu-in ${aiDone && f.price ? "ai" : ""}`
-  }))), React.createElement("div", {
-    className: "cu-row",
-    style: {
-      alignItems: "end"
-    }
-  }, React.createElement("div", null, React.createElement("label", null, "Deadline"), React.createElement("input", {
+  }))), React.createElement("div", null, React.createElement("label", null, "Deadline"), React.createElement("input", {
     type: "date",
     value: f.deadline,
     onChange: e => set("deadline", e.target.value),
     className: `cu-in ${aiDone && f.deadline ? "ai" : ""}`
-  })), React.createElement("div", null, React.createElement("label", null, "Payment"), React.createElement("div", {
-    className: "cu-paid"
-  }, React.createElement("button", {
-    className: f.sold ? "on" : "",
-    onClick: () => set("sold", true)
-  }, "Paid"), React.createElement("button", {
-    className: !f.sold ? "on" : "",
-    onClick: () => set("sold", false)
-  }, "Not paid yet")))), err && React.createElement("div", {
+  })), err && React.createElement("div", {
     className: "fs-12",
     style: {
       color: "#ff6b6b"
@@ -31766,12 +31760,13 @@ function CustomsAdminPage({
     className: "fs-13 c-muted"
   }, "Loading..."), !loading && list.length === 0 && React.createElement("div", {
     className: "cu-empty"
-  }, "No customs yet. Tap “New custom” and drop the chat screenshots in."), groups.map(([st, title]) => {
-    const items = list.filter(c => c.status === st);
+  }, "No customs yet. Tap “New custom” and drop the chat screenshots in."), groups.map(([sts, title]) => {
+    const st = sts[0];
+    const items = list.filter(c => sts.includes(c.status));
     if (!items.length) return null;
     const color = (CUSTOM_STATUS[st] || {}).color || "#39e673";
     return React.createElement("div", {
-      key: st
+      key: title
     }, React.createElement("div", {
       className: "cu-sec"
     }, React.createElement("i", {
@@ -31895,6 +31890,64 @@ function CustomsAdminPage({
     })));
   }));
 }
+function CuParty({
+  amount,
+  share,
+  onClose
+}) {
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    const t0 = performance.now();
+    let raf;
+    const tick = t => {
+      const k = Math.min(1, (t - t0) / 1100);
+      setShown(Math.round(amount * (1 - Math.pow(1 - k, 3))));
+      if (k < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    const close = setTimeout(onClose, 4200);
+    try {
+      navigator.vibrate && navigator.vibrate([30, 40, 60]);
+    } catch (e) {}
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(close);
+    };
+  }, []);
+  const bits = Array.from({
+    length: 36
+  }, (_, i) => i);
+  return React.createElement("div", {
+    className: "cu-party",
+    onClick: onClose
+  }, React.createElement("div", {
+    className: "cu-party-bits",
+    "aria-hidden": "true"
+  }, bits.map(i => React.createElement("i", {
+    key: i,
+    style: {
+      left: `${i * 37 % 100}%`,
+      animationDelay: `${i % 9 * 0.07}s`,
+      animationDuration: `${1.6 + i % 5 * 0.25}s`,
+      background: i % 3 === 0 ? "#a8f5c4" : i % 3 === 1 ? "#39e673" : "#12b34c",
+      transform: `rotate(${i * 23}deg)`
+    }
+  }))), React.createElement("div", {
+    className: "cu-party-card"
+  }, React.createElement("div", {
+    className: "cu-party-l"
+  }, "You sold"), React.createElement("div", {
+    className: "cu-party-n"
+  }, "$", shown.toLocaleString("en-US")), share != null && React.createElement("div", {
+    className: "cu-party-s"
+  }, "your share about $", share.toLocaleString("en-US")), React.createElement("div", {
+    className: "cu-party-s",
+    style: {
+      marginTop: 14,
+      opacity: .7
+    }
+  }, "Sent to your manager. Nice work!")));
+}
 function CustomsCreatorPage({
   model,
   record
@@ -31931,13 +31984,19 @@ function CustomsCreatorPage({
         return;
       }
       await customNotify(c.id, "delivered");
+      if (c.price != null) setParty({
+        amount: Number(c.price),
+        share: sharePct != null ? Math.round(Number(c.price) * sharePct / 100) : null
+      });
     }
     reload();
   };
   const active = rows.filter(c => ["sold", "in_progress", "requested"].includes(c.status));
   const done = rows.filter(c => ["delivered", "cancelled"].includes(c.status));
   const toMake = active.filter(c => c.status !== "requested");
-  const earned = rows.filter(c => ["sold", "in_progress", "delivered"].includes(c.status)).reduce((t, c) => t + (Number(c.price) || 0), 0);
+  const month = new Date().toISOString().slice(0, 7);
+  const soldMonth = rows.filter(c => c.status === "delivered" && String(c.delivered_at || c.sold_at || c.created_at).slice(0, 7) === month).reduce((t, c) => t + (Number(c.price) || 0), 0);
+  const [party, setParty] = useState(null);
   const card = c => {
     const p2 = cuParse(c.description);
     const st = CUSTOM_STATUS[c.status] || CUSTOM_STATUS.sold;
@@ -32034,11 +32093,16 @@ function CustomsCreatorPage({
     className: "cu-overall-l"
   }, "Overall"), React.createElement("div", {
     className: "cu-overall-row"
-  }, React.createElement("div", null, React.createElement("b", null, toMake.length), React.createElement("span", null, "To make")), React.createElement("div", null, React.createElement("b", null, done.filter(c => c.status === "delivered").length), React.createElement("span", null, "Delivered")), sharePct != null && React.createElement("div", null, React.createElement("b", {
+  }, React.createElement("div", null, React.createElement("b", null, toMake.length), React.createElement("span", null, "To make")), React.createElement("div", null, React.createElement("b", null, done.filter(c => c.status === "delivered").length), React.createElement("span", null, "Already made")), React.createElement("div", null, React.createElement("b", {
     style: {
       color: "#a8f5c4"
     }
-  }, "$", Math.round(earned * sharePct / 100).toLocaleString("en-US")), React.createElement("span", null, "You earned")))), err && React.createElement("div", {
+  }, "$", React.createElement(CountUp, {
+    value: soldMonth
+  })), React.createElement("span", null, "Sold this month")))), party && React.createElement(CuParty, {
+    ...party,
+    onClose: () => setParty(null)
+  }), err && React.createElement("div", {
     className: "fs-12 mb-3",
     style: {
       color: "#ff6b6b"
@@ -32059,7 +32123,7 @@ function CustomsCreatorPage({
     style: {
       background: "#9aa8ff"
     }
-  }), "Done (", done.length, ")"), React.createElement("div", {
+  }), "Already made (", done.length, ")"), React.createElement("div", {
     style: {
       display: "grid",
       gap: 12
@@ -34217,7 +34281,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">r86aqz</script>
+<script type="text/babel" id="zion-version">1n3w11d</script>
 <script>
 (function () {
   var last = 0;
