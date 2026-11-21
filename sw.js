@@ -22,8 +22,10 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   event.waitUntil((async () => {
+    const url = new URL((event.notification.data && event.notification.data.url) || "./", self.registration.scope).href;
     const list = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    for (const c of list) { if ("focus" in c) { await c.focus(); return; } }
-    await self.clients.openWindow(new URL((event.notification.data && event.notification.data.url) || "./", self.registration.scope).href);
+    // Zion is already open: bring it up and tell it which page (and custom) to show
+    for (const c of list) { if ("focus" in c) { await c.focus(); try { c.postMessage({ type: "zion-open", url }); } catch (e) {} return; } }
+    await self.clients.openWindow(url);
   })());
 });
