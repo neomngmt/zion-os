@@ -31728,7 +31728,7 @@ function CustomsAdminPage({
           } catch (e) {}
           reload();
         }
-      }), (c.status === "requested" || c.status === "sold" || c.status === "in_progress") && React.createElement("div", {
+      }), React.createElement("div", {
         style: {
           display: "flex",
           gap: 8,
@@ -31740,14 +31740,26 @@ function CustomsAdminPage({
           sold_at: new Date().toISOString()
         }, "sold"),
         className: "hb-btn sm"
-      }, "Mark as paid"), React.createElement("button", {
+      }, "Mark as paid"), (c.status === "requested" || c.status === "sold" || c.status === "in_progress") && React.createElement("button", {
         onClick: () => {
           if (window.confirm("Cancel this custom?")) update(c, {
             status: "cancelled"
           });
         },
         className: "hb-btn ghost sm"
-      }, "Cancel")));
+      }, "Cancel"), React.createElement("button", {
+        onClick: async () => {
+          if (!window.confirm(`Delete this custom for ${c.model} for good? The model will not see it anymore. Its Drive folder stays, delete that in Drive if you want.`)) return;
+          const {
+            error
+          } = await supabaseClient.from("customs").delete().eq("id", c.id);
+          if (error) setErr(error.message);else reload();
+        },
+        className: "hb-btn ghost sm",
+        style: {
+          color: "#ff9b85"
+        }
+      }, "Delete")));
     })));
   }));
 }
@@ -34075,7 +34087,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">n1gggh</script>
+<script type="text/babel" id="zion-version">1homa48</script>
 <script>
 (function () {
   var last = 0;

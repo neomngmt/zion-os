@@ -18796,12 +18796,11 @@ function CustomsAdminPage({ models }) {
                     {c.delivery_url && c.delivery_url !== c.drive_url && <a href={c.delivery_url} target="_blank" rel="noopener noreferrer" className="fs-12 font-mono c-accent">Open delivered custom &rarr;</a>}
                     {c.delivery_note && <div className="fs-11 c-muted">Note from the model: {c.delivery_note}</div>}
                     {c.status !== "cancelled" && <CuUpload c={c} compact onUploaded={async () => { try { await cuDrive({ action: "files", id: c.id }); } catch (e) {} reload(); }} />}
-                    {(c.status === "requested" || c.status === "sold" || c.status === "in_progress") && (
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        {c.status === "requested" && <button onClick={() => update(c, { status: "sold", sold_at: new Date().toISOString() }, "sold")} className="hb-btn sm">Mark as paid</button>}
-                        <button onClick={() => { if (window.confirm("Cancel this custom?")) update(c, { status: "cancelled" }); }} className="hb-btn ghost sm">Cancel</button>
-                      </div>
-                    )}
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {c.status === "requested" && <button onClick={() => update(c, { status: "sold", sold_at: new Date().toISOString() }, "sold")} className="hb-btn sm">Mark as paid</button>}
+                      {(c.status === "requested" || c.status === "sold" || c.status === "in_progress") && <button onClick={() => { if (window.confirm("Cancel this custom?")) update(c, { status: "cancelled" }); }} className="hb-btn ghost sm">Cancel</button>}
+                      <button onClick={async () => { if (!window.confirm(`Delete this custom for ${c.model} for good? The model will not see it anymore. Its Drive folder stays, delete that in Drive if you want.`)) return; const { error } = await supabaseClient.from("customs").delete().eq("id", c.id); if (error) setErr(error.message); else reload(); }} className="hb-btn ghost sm" style={{ color: "#ff9b85" }}>Delete</button>
+                    </div>
                   </div>
                 );
               })}
