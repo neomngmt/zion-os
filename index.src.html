@@ -18521,6 +18521,13 @@ textarea.cu-in{ resize:vertical; line-height:1.55; }
 .cu-view-img img{ max-width:min(100%,720px); height:auto; border-radius:12px; }
 .cu-view-nav{ display:flex; justify-content:center; gap:10px; margin-top:10px; }
 .cu-view-msg{ flex:1; display:flex; align-items:center; justify-content:center; gap:8px; color:#c9d3ce; }
+.cu-overall{ border-radius:20px; padding:14px 16px; margin-bottom:16px; border:1px solid rgba(57,230,115,.2); background:radial-gradient(120% 160% at 0% 0%, rgba(57,230,115,.12), transparent 60%), #0e1310; }
+.cu-overall-l{ font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:#7fae93; font-weight:800; margin-bottom:8px; }
+.cu-overall-row{ display:grid; grid-auto-flow:column; grid-auto-columns:1fr; }
+.cu-overall-row > div{ padding:0 10px; border-left:1px solid rgba(255,255,255,.08); min-width:0; }
+.cu-overall-row > div:first-child{ padding-left:0; border-left:0; }
+.cu-overall-row b{ display:block; font-size:24px; font-weight:900; letter-spacing:-.02em; color:#f2f5f0; font-variant-numeric:tabular-nums; line-height:1.1; }
+.cu-overall-row span{ font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:#7d8f86; font-weight:700; white-space:nowrap; }
 .cu-empty{ border-radius:20px; padding:34px 20px; text-align:center; background:#0e1310; border:1px dashed rgba(255,255,255,.1); color:#7d8f86; font-size:13.5px; }
 @media (max-width:760px){ .cu-grid{ grid-template-columns:1fr; } .cu-drop{ min-height:180px; } .cu-new{ padding:16px; border-radius:20px; } }
 @media (max-width:600px){
@@ -18941,11 +18948,12 @@ function CustomsCreatorPage({ model, record }) {
   return (
     <div className="cu-wrap" style={{ maxWidth: 760 }}>
       <style>{HUB_CSS}{CU_CSS}</style>
-      <div className="cu-top">
-        <div className="cu-stats">
-          <div className="cu-stat"><b>{toMake.length}</b><span>To make</span></div>
-          <div className="cu-stat"><b>{done.filter((c) => c.status === "delivered").length}</b><span>Delivered</span></div>
-          {sharePct != null && <div className="cu-stat"><b style={{ color: "#a8f5c4" }}>${Math.round(earned * sharePct / 100).toLocaleString("en-US")}</b><span>Earned from customs</span></div>}
+      <div className="cu-overall">
+        <div className="cu-overall-l">Overall</div>
+        <div className="cu-overall-row">
+          <div><b>{toMake.length}</b><span>To make</span></div>
+          <div><b>{done.filter((c) => c.status === "delivered").length}</b><span>Delivered</span></div>
+          {sharePct != null && <div><b style={{ color: "#a8f5c4" }}>${Math.round(earned * sharePct / 100).toLocaleString("en-US")}</b><span>You earned</span></div>}
         </div>
       </div>
       {err && <div className="fs-12 mb-3" style={{ color: "#ff6b6b" }}>{err}</div>}
