@@ -892,11 +892,12 @@ body{ background-color:#07090a !important; }
 .z-grad{ background:linear-gradient(100deg, var(--z-h1), var(--z-h2) 45%, var(--z-h3)); -webkit-background-clip:text; background-clip:text; color:transparent; }
 h1.text-2xl, h1.text-3xl, h2.text-2xl, .page-title{ background:linear-gradient(100deg, #fff, color-mix(in srgb, var(--z-h1) 70%, #fff) 60%, var(--z-h3)); -webkit-background-clip:text; background-clip:text; color:transparent; }
 
-/* thin colourful scrollbars */
+/* thin quiet scrollbars */
 *::-webkit-scrollbar{ width:9px; height:9px; }
-*::-webkit-scrollbar-thumb{ background:linear-gradient(var(--z-h1), var(--z-h3)); border-radius:9px; border:2px solid transparent; background-clip:padding-box; }
+*::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:9px; border:2px solid transparent; background-clip:padding-box; }
+*::-webkit-scrollbar-thumb:hover{ background:rgba(255,255,255,.26); border:2px solid transparent; background-clip:padding-box; }
 *::-webkit-scrollbar-track{ background:transparent; }
-::selection{ background:color-mix(in srgb, var(--z-h1) 40%, transparent); }
+::selection{ background:rgba(57,230,115,.35); }
 
 `;
 
