@@ -13844,7 +13844,7 @@ function LoginScreen({ models, onLogin }) {
                   </button>
                 </div>
                 <input type="password" value={teamPin} onChange={(e) => setTeamPin(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && submitTeam()} autoFocus
+                  onKeyDown={(e) => e.key === "Enter" && submitTeam()} autoFocus={!("ontouchstart" in window)}
                   className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2.5 text-sm c-text mb-4 outline-none focus-border-accent transition-colors duration-150" />
                 <button onClick={submitTeam} disabled={submitting}
                   className="tap w-full py-2.5 rounded-lg c-bg-accent c-onaccent text-xs font-mono uppercase tracking-wide font-semibold hover-bg-accent2 transition-colors duration-150 disabled:opacity-60">
@@ -13856,12 +13856,12 @@ function LoginScreen({ models, onLogin }) {
             <div key="creator" className="anim-card-in">
               <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Your name</label>
               <input value={creatorName} onChange={(e) => { setCreatorName(e.target.value); setError(""); }}
-                placeholder="Type your name" autoFocus
+                placeholder="Type your name" autoComplete="username" autoCapitalize="words"
                 className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2.5 text-sm c-text mb-3 outline-none focus-border-accent transition-colors duration-150" />
               <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">
                 {needsRegistration ? "Choose a password" : "Password"}
               </label>
-              <input type="password" value={creatorPassword} onChange={(e) => setCreatorPassword(e.target.value)}
+              <input type="password" autoComplete={needsRegistration ? "new-password" : "current-password"} value={creatorPassword} onChange={(e) => setCreatorPassword(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && submitCreator()}
                 className="w-full c-bg-app border c-border rounded-lg px-2.5 py-2.5 text-sm c-text mb-1 outline-none focus-border-accent transition-colors duration-150" />
               {needsRegistration && (

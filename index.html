@@ -23958,7 +23958,7 @@ function LoginScreen({
     value: teamPin,
     onChange: e => setTeamPin(e.target.value),
     onKeyDown: e => e.key === "Enter" && submitTeam(),
-    autoFocus: true,
+    autoFocus: !("ontouchstart" in window),
     className: "w-full c-bg-app border c-border rounded-lg px-2.5 py-2.5 text-sm c-text mb-4 outline-none focus-border-accent transition-colors duration-150"
   }), React.createElement("button", {
     onClick: submitTeam,
@@ -23976,12 +23976,14 @@ function LoginScreen({
       setError("");
     },
     placeholder: "Type your name",
-    autoFocus: true,
+    autoComplete: "username",
+    autoCapitalize: "words",
     className: "w-full c-bg-app border c-border rounded-lg px-2.5 py-2.5 text-sm c-text mb-3 outline-none focus-border-accent transition-colors duration-150"
   }), React.createElement("label", {
     className: "block fs-10 uppercase tracking-wide c-muted font-mono mb-1"
   }, needsRegistration ? "Choose a password" : "Password"), React.createElement("input", {
     type: "password",
+    autoComplete: needsRegistration ? "new-password" : "current-password",
     value: creatorPassword,
     onChange: e => setCreatorPassword(e.target.value),
     onKeyDown: e => e.key === "Enter" && submitCreator(),
@@ -34749,7 +34751,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1p46yaf</script>
+<script type="text/babel" id="zion-version">ezq9gj</script>
 <script>
 (function () {
   var last = 0;
