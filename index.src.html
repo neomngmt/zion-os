@@ -18808,11 +18808,15 @@ function CustomsAdminPage({ models }) {
     };
     const { error } = await supabaseClient.from("customs").insert(row);
     if (error) { setErr(error.message); setBusy(false); return; }
-    await customNotify(id, "created");
-    try { await cuDrive({ action: "folder", id }); } catch (e) { /* the folder can still be made on the first upload */ }
-    if (shots.length) { try { await cuDrive({ action: "shots-save", id, images: shots }); } catch (e) { /* the custom is saved either way */ } }
+    // the custom is saved: close the form right away, the push, the Drive folder and the screenshots follow in the background
+    const imgs = shots;
     reset(); setOpen(false); setBusy(false);
     reload();
+    Promise.all([
+      customNotify(id, "created"),
+      cuDrive({ action: "folder", id }).catch(() => {}), // the folder can still be made on the first upload
+      imgs.length ? cuDrive({ action: "shots-save", id, images: imgs }).catch(() => {}) : null,
+    ]).then(() => reload());
   };
   const update = async (c, patch, event) => {
     const { error } = await supabaseClient.from("customs").update(patch).eq("id", c.id);

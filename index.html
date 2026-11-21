@@ -31639,26 +31639,19 @@ function CustomsAdminPage({
       setBusy(false);
       return;
     }
-    await customNotify(id, "created");
-    try {
-      await cuDrive({
-        action: "folder",
-        id
-      });
-    } catch (e) {}
-    if (shots.length) {
-      try {
-        await cuDrive({
-          action: "shots-save",
-          id,
-          images: shots
-        });
-      } catch (e) {}
-    }
+    const imgs = shots;
     reset();
     setOpen(false);
     setBusy(false);
     reload();
+    Promise.all([customNotify(id, "created"), cuDrive({
+      action: "folder",
+      id
+    }).catch(() => {}), imgs.length ? cuDrive({
+      action: "shots-save",
+      id,
+      images: imgs
+    }).catch(() => {}) : null]).then(() => reload());
   };
   const update = async (c, patch, event) => {
     const {
@@ -34398,7 +34391,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">10wl2pk</script>
+<script type="text/babel" id="zion-version">bx3k61</script>
 <script>
 (function () {
   var last = 0;
