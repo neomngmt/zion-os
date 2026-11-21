@@ -912,6 +912,13 @@ h1.text-2xl, h1.text-3xl, h2.text-2xl, .page-title{ background:linear-gradient(1
 .neo-mic-ask .s{ font-size:14px; color:#8fa39a; max-width:280px; line-height:1.5; }
 @keyframes neoMicIn{ from{ opacity:0; } to{ opacity:1; } }
 @keyframes neoMicPulse{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.08); } }
+/* Neo on a phone: the title keeps clear of the fixed Leave Neo button */
+@media (max-width:640px){
+  .neo-topbar{ padding-right:118px; min-height:40px; }
+  .neo-topbar .neo-sub, .neo-topbar .neo-clock-wrap{ display:none; }
+  .neo-topbar > div{ font-size:17px !important; }
+  .neo-leave{ padding:7px 10px !important; font-size:10px !important; letter-spacing:.12em !important; }
+}
 /* thin quiet scrollbars */
 *::-webkit-scrollbar{ width:9px; height:9px; }
 *::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:9px; border:2px solid transparent; background-clip:padding-box; }
@@ -15351,11 +15358,11 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
   return (
     <div className="-m-6 p-6" style={{ background: "rgba(3,8,5,0.72)", minHeight: "calc(100vh - 160px)", fontFamily: "'JetBrains Mono', monospace" }}>
       {/* mini topbar */}
-      <div className="flex items-center justify-between pb-3 mb-5 neo-fade-in relative" style={{ borderBottom: `1px solid ${border}`, animationDelay: "0.05s", zIndex: 1 }}>
+      <div className="neo-topbar flex items-center justify-between pb-3 mb-5 neo-fade-in relative" style={{ borderBottom: `1px solid ${border}`, animationDelay: "0.05s", zIndex: 1 }}>
         <div className="font-bold tracking-widest" style={{ color: neoGreen, textShadow: `0 0 8px ${neoGreen}88`, fontSize: "20px" }}>
-          NEO <span style={{ color: textDim, fontWeight: 400 }}>// ZION OS INTELLIGENCE SYSTEM</span>
+          NEO <span style={{ color: textDim, fontWeight: 400 }}>// ZION OS<span className="neo-sub"> INTELLIGENCE SYSTEM</span></span>
         </div>
-        <NeoClock />
+        <span className="neo-clock-wrap"><NeoClock /></span>
       </div>
 
       {/* status row — simple flow, no absolute positioning so it can never end up far from the orb */}
@@ -19740,7 +19747,7 @@ function App() {
           {neoBooting && !neoMicAsk && <NeoBootSequence onDone={() => setNeoBooting(false)} />}
           <CircuitBoardBG />
           <button onClick={() => setView("dashboard")}
-            className="tap fixed top-4 right-4 z-[110] flex items-center gap-2 px-3 py-2 rounded-lg border font-mono fs-11 uppercase tracking-widest transition-colors"
+            className="tap neo-leave fixed top-4 right-4 z-[110] flex items-center gap-2 px-3 py-2 rounded-lg border font-mono fs-11 uppercase tracking-widest transition-colors"
             style={{ top: "calc(1rem + env(safe-area-inset-top))", borderColor: "rgba(57,230,115,0.35)", color: "#39e673", background: "rgba(3,7,5,0.6)", backdropFilter: "blur(6px)" }}>
             <X size={14} /> Leave Neo
           </button>
