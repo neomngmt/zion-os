@@ -18479,8 +18479,9 @@ const CU_CSS = `
 .cu-in{ box-sizing:border-box; max-width:100%; min-width:0; }
 .cu-f > div{ min-width:0; }
 /* iPhone draws date fields wider than the screen unless they lose the native look */
-input[type="date"].cu-in{ -webkit-appearance:none; appearance:none; display:block; width:100%; min-height:44px; text-align:left; }
-input[type="date"].cu-in::-webkit-date-and-time-value{ text-align:left; }
+.cu-date{ position:relative; display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:44px; overflow:hidden; cursor:pointer; color:#f2f5f0; }
+.cu-date svg{ color:#7d8f86; flex-shrink:0; }
+.cu-date input{ position:absolute; inset:0; width:100%; height:100%; opacity:0; border:0; padding:0; margin:0; -webkit-appearance:none; appearance:none; cursor:pointer; font-size:16px; }
 .cu-in.ai{ border-color:rgba(57,230,115,.45); box-shadow:0 0 0 3px rgba(57,230,115,.08); }
 textarea.cu-in{ resize:vertical; line-height:1.55; }
 .cu-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
@@ -18872,7 +18873,14 @@ function CustomsAdminPage({ models }) {
                 <div><label>Fan</label><input value={f.fan} onChange={(e) => set("fan", e.target.value)} placeholder="Fan name" className={`cu-in ${aiDone && f.fan ? "ai" : ""}`} /></div>
                 <div><label>Price (USD)</label><input type="number" value={f.price} onChange={(e) => set("price", e.target.value)} placeholder="0" className={`cu-in ${aiDone && f.price ? "ai" : ""}`} /></div>
               </div>
-              <div><label>Deadline</label><input type="date" value={f.deadline} onChange={(e) => set("deadline", e.target.value)} className={`cu-in ${aiDone && f.deadline ? "ai" : ""}`} /></div>
+              <div><label>Deadline</label>
+                {/* the phone's own date picker sits invisible on top of a normal looking field, so it can never be wider than the screen */}
+                <div className={`cu-in cu-date ${aiDone && f.deadline ? "ai" : ""}`}>
+                  <span>{f.deadline ? new Date(`${f.deadline}T12:00:00`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : "Pick a date"}</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
+                  <input type="date" value={f.deadline} onChange={(e) => set("deadline", e.target.value)} aria-label="Deadline" />
+                </div>
+              </div>
               {err && <div className="fs-12" style={{ color: "#ff6b6b" }}>{err}</div>}
               <button onClick={create} disabled={busy || reading} className="hb-btn" style={{ justifySelf: "start" }}>{busy ? "Saving" : "Save and notify the model"}</button>
             </div>
