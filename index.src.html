@@ -7635,6 +7635,19 @@ const MM_CSS = `
 .mm-edit{ position:absolute; top:14px; right:14px; width:30px; height:30px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#c9d3ce; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); opacity:0; transform:translateZ(40px) scale(.8); transition:opacity .25s, transform .25s; }
 .mm-card:hover .mm-edit, .mm-card:focus-visible .mm-edit{ opacity:1; transform:translateZ(40px) scale(1); }
 @media (max-width:700px){ .mm-stats{ grid-template-columns:1fr 1fr 1fr; gap:8px; } .mm-stat{ padding:10px 11px; } .mm-stat .v{ font-size:22px; } .mm-grid{ grid-template-columns:1fr; } .mm-edit{ opacity:1; transform:none; } .mm-pct{ margin-right:38px; } }
+@media (max-width:700px){
+  .mm-grid{ grid-template-columns:minmax(0,1fr); }
+  .mm-cardwrap, .mm-card{ min-width:0; max-width:100%; }
+  .mm-card{ padding:14px; }
+  .mm-head{ gap:10px; min-width:0; }
+  .mm-head > div{ min-width:0; }
+  .mm-ava{ width:48px; height:48px; }
+  .mm-name{ font-size:16.5px; overflow-wrap:anywhere; }
+  .mm-pct{ margin-right:34px; flex-shrink:0; }
+  .mm-pct b{ font-size:19px; }
+  .mm-nets{ gap:6px; }
+  .mm-net{ padding:8px; }
+}
 @media (hover:none){ .mm-edit{ opacity:1; transform:none; } .mm-pct{ margin-right:38px; } }
 @media (prefers-reduced-motion: reduce){ .mm-bg i, .mm-bg b, .mm-net.on .dot{ animation:none; } .mm-cardwrap, .mm-stat, .mm-net, .mm-miss{ animation-duration:.01s; animation-delay:0s; } .mm-card::after{ display:none; } .mm-ava .ring{ animation-duration:.01s; animation-delay:0s; } .mm-card{ transform:none !important; } }
 `;
