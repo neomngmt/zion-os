@@ -18921,7 +18921,8 @@ function CustomsCreatorPage({ model, record }) {
   const active = rows.filter((c) => ["sold", "in_progress", "requested"].includes(c.status));
   const done = rows.filter((c) => ["delivered", "cancelled"].includes(c.status));
   const toMake = active.filter((c) => c.status !== "requested");
-  const earned = rows.filter((c) => c.status === "delivered").reduce((t, c) => t + (Number(c.price) || 0), 0);
+  // every paid custom counts, made or not yet (not paid yet and cancelled do not)
+  const earned = rows.filter((c) => ["sold", "in_progress", "delivered"].includes(c.status)).reduce((t, c) => t + (Number(c.price) || 0), 0);
 
   const card = (c) => {
     const p2 = cuParse(c.description);

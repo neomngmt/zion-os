@@ -31937,7 +31937,7 @@ function CustomsCreatorPage({
   const active = rows.filter(c => ["sold", "in_progress", "requested"].includes(c.status));
   const done = rows.filter(c => ["delivered", "cancelled"].includes(c.status));
   const toMake = active.filter(c => c.status !== "requested");
-  const earned = rows.filter(c => c.status === "delivered").reduce((t, c) => t + (Number(c.price) || 0), 0);
+  const earned = rows.filter(c => ["sold", "in_progress", "delivered"].includes(c.status)).reduce((t, c) => t + (Number(c.price) || 0), 0);
   const card = c => {
     const p2 = cuParse(c.description);
     const st = CUSTOM_STATUS[c.status] || CUSTOM_STATUS.sold;
@@ -34217,7 +34217,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1vw5mfr</script>
+<script type="text/babel" id="zion-version">r86aqz</script>
 <script>
 (function () {
   var last = 0;
