@@ -18504,7 +18504,8 @@ textarea.cu-in{ resize:vertical; line-height:1.55; }
 .cu-up-name{ display:flex; justify-content:space-between; gap:10px; font-size:12px; }
 .cu-up-name span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#e9f1ec; }
 .cu-up-name small{ color:#7d8f86; white-space:nowrap; font-variant-numeric:tabular-nums; }
-.cu-up-bar{ height:5px; border-radius:999px; background:rgba(255,255,255,.07); overflow:hidden; }
+.cu-up-speed{ display:flex; justify-content:space-between; font-size:11px; color:#7d8f86; font-variant-numeric:tabular-nums; }
+.cu-up-bar{ height:8px; border-radius:999px; background:rgba(255,255,255,.07); overflow:hidden; }
 .cu-up-bar i{ display:block; height:100%; border-radius:999px; background:linear-gradient(90deg,#12b34c,#39e673); transition:width .2s; }
 .cu-drive{ display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#a8f5c4; }
 .cu-glow{ border-color:#39e673 !important; box-shadow:0 0 0 3px rgba(57,230,115,.35), 0 0 40px -6px rgba(57,230,115,.5) !important; }
@@ -18532,17 +18533,41 @@ async function cuDrive(body) {
   return j;
 }
 const cuSize = (b) => (b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b > 1e6 ? `${Math.round(b / 1e6)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`);
+// resumable upload straight to Google Drive in 16 MB pieces: a dropped connection only repeats the last piece
 function cuPut(url, file, onProgress) {
-  return new Promise((resolve, reject) => {
+  const CH = 16 * 1024 * 1024, total = file.size;
+  const send = (start, end) => new Promise((resolve, reject) => {
     const x = new XMLHttpRequest();
     x.open("PUT", url);
-    x.setRequestHeader("Content-Type", file.type || "application/octet-stream");
-    x.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
-    x.onload = () => (x.status >= 200 && x.status < 300 ? resolve() : reject(new Error(`Upload failed (${x.status})`)));
+    if (total) x.setRequestHeader("Content-Range", start === end ? `bytes */${total}` : `bytes ${start}-${end - 1}/${total}`);
+    x.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(start + e.loaded); };
+    x.onload = () => {
+      if (x.status === 200 || x.status === 201) return resolve(total);
+      if (x.status === 308) { const m = /bytes=0-(\d+)/.exec(x.getResponseHeader("Range") || ""); return resolve(m ? Number(m[1]) + 1 : 0); }
+      reject(Object.assign(new Error(`Upload failed (${x.status})`), { status: x.status }));
+    };
     x.onerror = () => reject(new Error("Upload failed, check the internet connection"));
-    x.send(file);
+    x.send(start === end ? null : file.slice(start, end));
   });
+  return (async () => {
+    let pos = 0, tries = 0;
+    while (pos < total || (!total && tries === 0)) {
+      try {
+        pos = await send(pos, Math.min(total, pos + CH));
+        onProgress(pos); tries = 0;
+        if (!total) break;
+      } catch (e) {
+        if (e.status && e.status < 500 && e.status !== 408 && e.status !== 429) throw e;
+        if (++tries > 10) throw e;
+        // wait, then ask Google how much arrived and carry on from there
+        await new Promise((r) => setTimeout(r, Math.min(30000, 1500 * 2 ** tries)));
+        if (typeof navigator !== "undefined" && navigator.onLine === false) await new Promise((r) => window.addEventListener("online", r, { once: true }));
+        try { pos = await send(pos, pos); } catch (e2) { /* try again */ }
+      }
+    }
+  })();
 }
+const cuTime = (sec) => (sec >= 3600 ? `${Math.floor(sec / 3600)} h ${Math.round((sec % 3600) / 60)} min` : sec >= 60 ? `${Math.floor(sec / 60)} min ${Math.round(sec % 60)} s` : `${Math.max(1, Math.round(sec))} s`);
 // the upload box: pick files, they go one by one into the custom's Drive folder with a progress bar
 function CuUpload({ c, onUploaded, compact, label }) {
   const [items, setItems] = useState([]);
@@ -18560,7 +18585,12 @@ function CuUpload({ c, onUploaded, compact, label }) {
       const f = list[i];
       try {
         const { uploadUrl } = await cuDrive({ action: "upload", id: c.id, name: f.name, type: f.type, size: f.size });
-        await cuPut(uploadUrl, f, (p) => setItems((it) => it.map((x, j) => (j === base + i ? { ...x, p } : x))));
+        const t0 = Date.now(); let samples = [[t0, 0]];
+        await cuPut(uploadUrl, f, (sent) => {
+          const now = Date.now(); samples.push([now, sent]); samples = samples.filter(([t]) => now - t < 8000);
+          const [ta, sa] = samples[0]; const speed = now > ta ? ((sent - sa) / (now - ta)) * 1000 : 0;
+          setItems((it) => it.map((x, j) => (j === base + i ? { ...x, p: f.size ? sent / f.size : 1, sent, speed, left: speed > 0 ? (f.size - sent) / speed : null } : x)));
+        });
         setItems((it) => it.map((x, j) => (j === base + i ? { ...x, p: 1, done: true } : x)));
         ok++;
       } catch (e) { setErr(e.message); setItems((it) => it.map((x, j) => (j === base + i ? { ...x, failed: true } : x))); }
@@ -18574,10 +18604,12 @@ function CuUpload({ c, onUploaded, compact, label }) {
       <button className="hb-btn sm" disabled={busy} onClick={() => ref.current && ref.current.click()}>{busy ? <><span className="hb-spin" />Uploading</> : label || (compact ? "Upload files" : "Upload the custom to Drive")}</button>
       {items.map((x, i) => (
         <div key={i} className="cu-up-row">
-          <div className="cu-up-name"><span>{x.name}</span><small>{x.failed ? "failed" : x.done ? "uploaded" : `${Math.round(x.p * 100)}% of ${cuSize(x.size)}`}</small></div>
+          <div className="cu-up-name"><span>{x.name}</span><small>{x.failed ? "failed" : x.done ? `uploaded, ${cuSize(x.size)}` : `${Math.round(x.p * 100)}% of ${cuSize(x.size)}`}</small></div>
           <div className="cu-up-bar"><i style={{ width: `${Math.round(x.p * 100)}%`, background: x.failed ? "#E2725B" : undefined }} /></div>
+          {!x.done && !x.failed && <div className="cu-up-speed"><span>{x.speed ? `${(x.speed / 1e6).toFixed(1)} MB/s` : "starting"}</span><span>{x.left != null ? `${cuTime(x.left)} left` : ""}</span></div>}
         </div>
       ))}
+      {busy && <div className="hb-note" style={{ fontSize: 11 }}>Keep Zion open until it says uploaded. If the signal drops, it carries on by itself.</div>}
       {err && <div className="fs-12" style={{ color: "#ff6b6b" }}>{err}</div>}
     </div>
   );
