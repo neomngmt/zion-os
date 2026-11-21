@@ -31049,12 +31049,17 @@ function CustomsAdminPage({
   } = useCustoms(null);
   const names = new Set((models || []).map(m => m.name));
   const list = rows.filter(r => names.has(r.model));
+  const in3 = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 3);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })();
   const blank = {
     model: models && models[0] && models[0].name || "",
     fan: "",
     description: "",
     price: "",
-    deadline: "",
+    deadline: in3,
     sold: true
   };
   const [open, setOpen] = useState(false);
@@ -33764,7 +33769,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1kha86r</script>
+<script type="text/babel" id="zion-version">13zty17</script>
 <script>
 (function () {
   var last = 0;

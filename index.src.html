@@ -18480,7 +18480,9 @@ function CustomsAdminPage({ models }) {
   const { rows, loading, reload } = useCustoms(null);
   const names = new Set((models || []).map((m) => m.name));
   const list = rows.filter((r) => names.has(r.model));
-  const blank = { model: (models && models[0] && models[0].name) || "", fan: "", description: "", price: "", deadline: "", sold: true };
+  // the deadline is 3 days from today unless the fan asked for a date in the chat
+  const in3 = (() => { const d = new Date(); d.setDate(d.getDate() + 3); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
+  const blank = { model: (models && models[0] && models[0].name) || "", fan: "", description: "", price: "", deadline: in3, sold: true };
   const [open, setOpen] = useState(false);
   const [f, setF] = useState(blank);
   const [busy, setBusy] = useState(false);
