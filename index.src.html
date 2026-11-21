@@ -18909,9 +18909,9 @@ function CuParty({ amount, share, onClose }) {
   const [shown, setShown] = useState(0);
   useEffect(() => {
     const t0 = performance.now(); let raf;
-    const tick = (t) => { const k = Math.min(1, (t - t0) / 1100); setShown(Math.round(amount * (1 - Math.pow(1 - k, 3)))); if (k < 1) raf = requestAnimationFrame(tick); };
+    const tick = (t) => { const k = Math.min(1, (t - t0) / 1900); setShown(Math.round(amount * (1 - Math.pow(1 - k, 3)))); if (k < 1) raf = requestAnimationFrame(tick); };
     raf = requestAnimationFrame(tick);
-    const close = setTimeout(onClose, 4200);
+    const close = setTimeout(onClose, 5000);
     try { navigator.vibrate && navigator.vibrate([30, 40, 60]); } catch (e) {}
     return () => { cancelAnimationFrame(raf); clearTimeout(close); };
   }, []);

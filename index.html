@@ -31900,12 +31900,12 @@ function CuParty({
     const t0 = performance.now();
     let raf;
     const tick = t => {
-      const k = Math.min(1, (t - t0) / 1100);
+      const k = Math.min(1, (t - t0) / 1900);
       setShown(Math.round(amount * (1 - Math.pow(1 - k, 3))));
       if (k < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    const close = setTimeout(onClose, 4200);
+    const close = setTimeout(onClose, 5000);
     try {
       navigator.vibrate && navigator.vibrate([30, 40, 60]);
     } catch (e) {}
@@ -34281,7 +34281,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1n3w11d</script>
+<script type="text/babel" id="zion-version">1yn6p0o</script>
 <script>
 (function () {
   var last = 0;
