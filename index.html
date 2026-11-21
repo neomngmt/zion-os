@@ -31090,8 +31090,32 @@ textarea.cu-in{ resize:vertical; line-height:1.55; }
 .cu-up-box .hb-btn{ justify-self:start; padding:11px 22px; font-size:14px; font-weight:800; }
 .cu-done-row{ display:flex; justify-content:space-between; gap:10px; font-size:12.5px; color:#9aa8ff; font-weight:700; }
 .cu-done-row a{ color:#a8f5c4; }
+.cu-view{ position:fixed; inset:0; z-index:300; background:rgba(2,5,3,.92); backdrop-filter:blur(6px); display:flex; flex-direction:column; padding:calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom)); }
+.cu-view-top{ display:flex; justify-content:space-between; align-items:center; color:#c9d3ce; font-size:13px; font-weight:700; margin-bottom:10px; }
+.cu-view-top button, .cu-view-nav button{ padding:9px 16px; border-radius:12px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); color:#f2f5f0; font-weight:700; font-size:13px; }
+.cu-view-nav button:disabled{ opacity:.35; }
+.cu-view-img{ flex:1; min-height:0; overflow:auto; display:flex; justify-content:center; align-items:flex-start; -webkit-overflow-scrolling:touch; }
+.cu-view-img img{ max-width:min(100%,720px); height:auto; border-radius:12px; }
+.cu-view-nav{ display:flex; justify-content:center; gap:10px; margin-top:10px; }
+.cu-view-msg{ flex:1; display:flex; align-items:center; justify-content:center; gap:8px; color:#c9d3ce; }
 .cu-empty{ border-radius:20px; padding:34px 20px; text-align:center; background:#0e1310; border:1px dashed rgba(255,255,255,.1); color:#7d8f86; font-size:13.5px; }
 @media (max-width:760px){ .cu-grid{ grid-template-columns:1fr; } .cu-drop{ min-height:180px; } .cu-new{ padding:16px; border-radius:20px; } }
+@media (max-width:600px){
+  .cu-top{ margin-bottom:14px; }
+  .cu-stats{ display:grid; grid-template-columns:repeat(auto-fit,minmax(96px,1fr)); gap:8px; width:100%; }
+  .cu-stat{ min-width:0; padding:10px 11px; border-radius:14px; }
+  .cu-stat b{ font-size:20px; }
+  .cu-stat span{ font-size:8.5px; letter-spacing:.08em; }
+  .cu-top > .hb-btn{ width:100%; justify-content:center; padding:13px; font-size:14px; font-weight:800; }
+  .cu-cards{ grid-template-columns:1fr; }
+  .cu-card{ padding:14px; border-radius:18px; gap:11px; }
+  .cu-title{ font-size:16px !important; }
+  .cu-notes li{ font-size:14px; line-height:1.5; }
+  .cu-card .hb-btn{ width:100%; justify-content:center; padding:12px; font-size:13.5px; }
+  .cu-up-box{ padding:10px; }
+  .cu-up-box .hb-btn{ padding:15px; font-size:16px; border-radius:14px; }
+  .cu-drop .small{ font-size:12.5px; }
+}
 `;
 const cuParse = text => {
   const lines = String(text || "").split("\n").map(l => l.trim()).filter(Boolean);
@@ -31284,6 +31308,67 @@ function CuUpload({
     }
   }, err));
 }
+function CuShots({
+  c
+}) {
+  const [urls, setUrls] = useState(null);
+  const [open, setOpen] = useState(false);
+  const [i, setI] = useState(0);
+  const [err, setErr] = useState("");
+  if (!c.shots) return null;
+  const show = async () => {
+    setOpen(true);
+    setErr("");
+    setI(0);
+    if (urls) return;
+    try {
+      const j = await cuDrive({
+        action: "shots",
+        id: c.id
+      });
+      setUrls(j.urls || []);
+    } catch (e) {
+      setErr(e.message);
+      setUrls([]);
+    }
+  };
+  return React.createElement(React.Fragment, null, React.createElement("button", {
+    className: "hb-btn ghost sm",
+    onClick: show,
+    style: {
+      justifySelf: "start"
+    }
+  }, "See the screens (", c.shots, ")"), open && React.createElement("div", {
+    className: "cu-view",
+    onClick: () => setOpen(false)
+  }, React.createElement("div", {
+    className: "cu-view-top",
+    onClick: e => e.stopPropagation()
+  }, React.createElement("span", null, urls && urls.length ? `${i + 1} of ${urls.length}` : ""), React.createElement("button", {
+    onClick: () => setOpen(false)
+  }, "Close")), !urls && React.createElement("div", {
+    className: "cu-view-msg"
+  }, React.createElement("span", {
+    className: "hb-spin"
+  }), "Loading"), err && React.createElement("div", {
+    className: "cu-view-msg"
+  }, err), urls && urls.length > 0 && React.createElement("div", {
+    className: "cu-view-img",
+    onClick: e => e.stopPropagation()
+  }, React.createElement("img", {
+    src: urls[i],
+    alt: `Chat screenshot ${i + 1}`
+  })), urls && urls.length > 1 && React.createElement("div", {
+    className: "cu-view-nav",
+    onClick: e => e.stopPropagation()
+  }, React.createElement("button", {
+    disabled: i === 0,
+    onClick: () => setI(i - 1)
+  }, "Previous"), React.createElement("button", {
+    disabled: i === urls.length - 1,
+    onClick: () => setI(i + 1)
+  }, "Next"))));
+}
 function CustomsAdminPage({
   models
 }) {
@@ -31431,6 +31516,15 @@ function CustomsAdminPage({
         id
       });
     } catch (e) {}
+    if (shots.length) {
+      try {
+        await cuDrive({
+          action: "shots-save",
+          id,
+          images: shots
+        });
+      } catch (e) {}
+    }
     reset();
     setOpen(false);
     setBusy(false);
@@ -31531,7 +31625,7 @@ function CustomsAdminPage({
     className: "big"
   }, "Drop the chat screenshots here"), React.createElement("div", {
     className: "small"
-  }, "Or tap to choose them, or paste with Cmd+V. The AI reads what the fan wants and fills in everything.")) : React.createElement("div", {
+  }, "Tap to choose them from your photos (on a computer you can also paste with Cmd+V). The AI reads what the fan wants and fills in everything.")) : React.createElement("div", {
     className: "cu-thumbs"
   }, shots.map((u, i) => React.createElement("div", {
     key: i,
@@ -31567,7 +31661,7 @@ function CustomsAdminPage({
       fontSize: 11,
       marginTop: 8
     }
-  }, "The screenshots are only read by the AI, they are not saved and the model never sees them.")), React.createElement("div", {
+  }, "The screenshots are saved with the custom, so the model can open them with “See the screens”.")), React.createElement("div", {
     className: "cu-f",
     style: {
       display: "grid",
@@ -31704,7 +31798,9 @@ function CustomsAdminPage({
         status: c.status
       }), due && React.createElement("span", {
         className: `cu-chip ${due.days < 0 ? "late" : due.days <= 1 ? "soon" : ""}`
-      }, due.text)), c.drive_url && React.createElement("a", {
+      }, due.text)), React.createElement(CuShots, {
+        c: c
+      }), c.drive_url && React.createElement("a", {
         href: c.drive_url,
         target: "_blank",
         rel: "noopener noreferrer",
@@ -31750,10 +31846,15 @@ function CustomsAdminPage({
       }, "Cancel"), React.createElement("button", {
         onClick: async () => {
           if (!window.confirm(`Delete this custom for ${c.model} for good? The model will not see it anymore. Its Drive folder stays, delete that in Drive if you want.`)) return;
-          const {
-            error
-          } = await supabaseClient.from("customs").delete().eq("id", c.id);
-          if (error) setErr(error.message);else reload();
+          try {
+            await cuDrive({
+              action: "delete",
+              id: c.id
+            });
+            reload();
+          } catch (e) {
+            setErr(e.message);
+          }
         },
         className: "hb-btn ghost sm",
         style: {
@@ -31866,7 +31967,9 @@ function CustomsCreatorPage({
       className: "cu-notes"
     }, p2.notes.map((x, i) => React.createElement("li", {
       key: i
-    }, x))), c.status === "requested" && React.createElement("div", {
+    }, x))), React.createElement(CuShots, {
+      c: c
+    }), c.status === "requested" && React.createElement("div", {
       className: "hb-note",
       style: {
         fontSize: 12
@@ -34087,7 +34190,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1homa48</script>
+<script type="text/babel" id="zion-version">1cycy0l</script>
 <script>
 (function () {
   var last = 0;
