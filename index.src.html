@@ -104,11 +104,22 @@ function neoLiveKey(agency, force) {
     .finally(() => { neoLive.keyP = null; });
   return neoLive.keyP;
 }
+// the microphone first: asked for on the Neo tap, before the boot animation; a live one is reused (no second prompt)
+function neoLiveMic() {
+  const live = window.__zionNeoMic && window.__zionNeoMic.getTracks().some((t) => t.readyState === "live") ? window.__zionNeoMic : null;
+  if (live) return Promise.resolve(live);
+  if (neoLive.micP) return neoLive.micP;
+  neoLive.micP = navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
+    .then((m) => { window.__zionNeoMic = m; return m; })
+    .finally(() => { neoLive.micP = null; });
+  return neoLive.micP;
+}
+const neoLiveMicReady = () => !!(window.__zionNeoMic && window.__zionNeoMic.getTracks().some((t) => t.readyState === "live"));
 const neoLiveEmit = (name, ...a) => { try { neoLive.h && neoLive.h[name] && neoLive.h[name](...a); } catch (e) {} };
 const neoLiveSetState = (st) => { neoLive.state = st; neoLiveEmit("state", st); };
 function neoLiveGreet() {
   const c = neoLive.c;
-  if (!c || !c.dc || c.dc.readyState !== "open" || !neoLive.h) { neoLive.greetPending = true; return; }
+  if (!c || !c.dc || c.dc.readyState !== "open" || !neoLive.h || !c.mic) { neoLive.greetPending = true; if (c && !c.mic) neoLiveMic().then(() => setTimeout(() => { if (neoLive.greetPending) neoLiveGreet(); }, 50)).catch(() => {}); return; }
   neoLive.greetPending = false;
   try { c.dc.send(JSON.stringify({ type: "response.create" })); } catch (e) {}
 }
@@ -139,12 +150,16 @@ async function neoLiveStart(agency) {
     c.audio = document.createElement("audio"); c.audio.autoplay = true; c.audio.setAttribute("playsinline", "");
     const keyP = neoLiveKey(agency); // in parallel with the microphone
     keyP.catch(() => {}); // a failure is handled where the key is awaited
-    const live = window.__zionNeoMic && window.__zionNeoMic.getTracks().some((t) => t.readyState === "live") ? window.__zionNeoMic : null;
-    c.mic = live || await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
-    window.__zionNeoMic = c.mic;
-    c.mic.getTracks().forEach((t) => { t.enabled = true; });
-    if (neoLive.c !== c) { c.mic.getTracks().forEach((t) => { t.enabled = false; }); return; }
+    const micP = neoLiveMic();
+    micP.catch(() => {});
     const pc = new RTCPeerConnection(); c.pc = pc;
+    const tr = pc.addTransceiver("audio", { direction: "sendrecv" });
+    // the microphone joins the call as soon as it is allowed, the connection does not wait for it
+    micP.then((m) => {
+      if (neoLive.c !== c) return;
+      c.mic = m; m.getTracks().forEach((t) => { t.enabled = true; });
+      tr.sender.replaceTrack(m.getTracks()[0]).catch(() => {});
+    }).catch((e) => { if (neoLive.c === c) { neoLiveEmit("error", "Allow the microphone for Zion to talk to Neo."); neoLiveEnd(); } });
     pc.ontrack = (e) => {
       const stream = e.streams[0];
       c.audio.srcObject = stream; c.audio.play().catch(() => {});
@@ -162,7 +177,6 @@ async function neoLiveStart(agency) {
         tick();
       } catch (e) {}
     };
-    pc.addTrack(c.mic.getTracks()[0], c.mic);
     const dc = pc.createDataChannel("oai-events"); c.dc = dc;
     const send = (o) => { try { dc.readyState === "open" && dc.send(JSON.stringify(o)); } catch (e) {} };
     dc.onopen = () => { neoLiveSetState("live"); if (neoLive.greetPending) neoLiveGreet(); };
@@ -892,6 +906,12 @@ body{ background-color:#07090a !important; }
 .z-grad{ background:linear-gradient(100deg, var(--z-h1), var(--z-h2) 45%, var(--z-h3)); -webkit-background-clip:text; background-clip:text; color:transparent; }
 h1.text-2xl, h1.text-3xl, h2.text-2xl, .page-title{ background:linear-gradient(100deg, #fff, color-mix(in srgb, var(--z-h1) 70%, #fff) 60%, var(--z-h3)); -webkit-background-clip:text; background-clip:text; color:transparent; }
 
+.neo-mic-ask{ position:fixed; inset:0; z-index:90; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center; padding:24px; background:radial-gradient(circle at 50% 45%, rgba(57,230,115,.14), #050806 62%); animation:neoMicIn .3s ease both; }
+.neo-mic-ask svg{ animation:neoMicPulse 1.6s ease-in-out infinite; filter:drop-shadow(0 0 24px rgba(57,230,115,.45)); }
+.neo-mic-ask .t{ font-size:20px; font-weight:800; color:#f2f5f0; letter-spacing:-.01em; }
+.neo-mic-ask .s{ font-size:14px; color:#8fa39a; max-width:280px; line-height:1.5; }
+@keyframes neoMicIn{ from{ opacity:0; } to{ opacity:1; } }
+@keyframes neoMicPulse{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.08); } }
 /* thin quiet scrollbars */
 *::-webkit-scrollbar{ width:9px; height:9px; }
 *::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:9px; border:2px solid transparent; background-clip:padding-box; }
@@ -19587,7 +19607,16 @@ function App() {
   const [editorMenuHidden, setEditorMenuHidden] = useState(() => { try { return localStorage.getItem("zionEditorMenuHidden") === "1"; } catch (e) { return false; } });
   const toggleEditorMenu = () => setEditorMenuHidden((v) => { const n = !v; try { localStorage.setItem("zionEditorMenuHidden", n ? "1" : "0"); } catch (e) {} return n; });
   const [neoBooting, setNeoBooting] = useState(false);
+  const [neoMicAsk, setNeoMicAsk] = useState(false);
   const prevViewRef = useRef(null);
+  // keep a Neo key warm while Zion is open, so opening Neo connects at once (a key costs nothing until it is used)
+  useEffect(() => {
+    if (!session || !session.token) return;
+    const warm = () => { if (document.visibilityState === "visible" && !neoLive.c) neoLiveKey(session.agency).catch(() => {}); };
+    const t0 = setTimeout(warm, 4000);
+    const t = setInterval(warm, 80000);
+    return () => { clearTimeout(t0); clearInterval(t); };
+  }, [session && session.token]);
   useEffect(() => {
     // Only replay the boot animation the first time Neo is opened per
     // browser session — it used to run in full on every single visit.
@@ -19701,7 +19730,14 @@ function App() {
 
       {currentView === "neo" ? (
         <div className="fixed inset-0 z-40" style={{ background: "#030705", overflowX: "hidden", maxWidth: "100vw", paddingTop: "env(safe-area-inset-top)" }}>
-          {neoBooting && <NeoBootSequence onDone={() => setNeoBooting(false)} />}
+          {neoMicAsk && (
+            <div className="neo-mic-ask">
+              <svg viewBox="0 0 24 24" width="64" height="64" fill="none" aria-hidden="true"><path d="M12 1L23 12L12 23L1 12Z" stroke="#39e673" strokeWidth="1.5" /><path d="M12 7L17 12L12 17L7 12Z" fill="#39e673" /></svg>
+              <div className="t">Allow the microphone</div>
+              <div className="s">Neo needs to hear you. Tap Allow, then Neo starts.</div>
+            </div>
+          )}
+          {neoBooting && !neoMicAsk && <NeoBootSequence onDone={() => setNeoBooting(false)} />}
           <CircuitBoardBG />
           <button onClick={() => setView("dashboard")}
             className="tap fixed top-4 right-4 z-[110] flex items-center gap-2 px-3 py-2 rounded-lg border font-mono fs-11 uppercase tracking-widest transition-colors"
@@ -19709,7 +19745,7 @@ function App() {
             <X size={14} /> Leave Neo
           </button>
           <div className="relative z-10 h-full overflow-y-auto overflow-x-hidden px-4 md:px-6 py-4 md:py-6 sm:pt-10 neo-scroll-container" style={{ maxWidth: "100vw" }}>
-            {!neoBooting && (
+            {!neoBooting && !neoMicAsk && (
               <NeoPage agency={session.agency} session={session} onNavigate={setView}
                 onSignOut={() => { clearSavedSession(); setSession(null); setView(null); setOnboardingDismissed(false); }}
                 cards={scopedCards} tasks={scopedTasks} models={agencyModels} stats={scopedStats} reels={scopedReels} trends={trends} bufferDailyStats={bufferDailyStats} bufferTopPosts={bufferTopPosts} inflowwDailyStats={inflowwDailyStats} igGraphStats={igGraphStats} settings={settings} persistSettings={persistSettings} />
@@ -19839,9 +19875,11 @@ function App() {
                     primeNeoAudioUnlock();
                     let seen = false;
                     try { seen = sessionStorage.getItem("neoBooted") === "1"; } catch {}
-                    if (!seen) {
-                      setNeoBooting(true);
-                      try { sessionStorage.setItem("neoBooted", "1"); } catch {}
+                    const boot = () => { if (!seen) { setNeoBooting(true); try { sessionStorage.setItem("neoBooted", "1"); } catch {} } };
+                    if (neoLiveMicReady()) boot();
+                    else {
+                      setNeoMicAsk(true);
+                      neoLiveMic().then(() => { setNeoMicAsk(false); boot(); }).catch(() => setNeoMicAsk(false));
                     }
                     neoLiveStart(session.agency);
                   }
