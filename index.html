@@ -1853,6 +1853,7 @@ const modelsToJS = r => ({
   ofUrl: r.of_url || "",
   driveUrl: r.drive_url || "",
   reelsDriveUrl: r.reels_drive_url || "",
+  customsDriveUrl: r.customs_drive_url || "",
   bio: r.bio || "",
   bioReceivedAt: r.bio_received_at ? new Date(r.bio_received_at).getTime() : null,
   alwaysOnboard: !!r.always_onboard,
@@ -1892,6 +1893,7 @@ const modelsToDB = m => ({
   of_url: m.ofUrl || "",
   drive_url: m.driveUrl || "",
   reels_drive_url: m.reelsDriveUrl || "",
+  customs_drive_url: m.customsDriveUrl || "",
   bio: m.bio || "",
   bio_received_at: m.bioReceivedAt ? new Date(m.bioReceivedAt).toISOString() : null,
   always_onboard: !!m.alwaysOnboard,
@@ -15022,6 +15024,20 @@ function ModelDetail({
     placeholder: "Drive folder where a new subfolder is made for every sent reel list"
   }), form.reelsDriveUrl ? React.createElement("a", {
     href: form.reelsDriveUrl,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    className: "md-open"
+  }, "Open") : null)), React.createElement("div", {
+    className: "md-f"
+  }, React.createElement("label", null, "Customs folder"), React.createElement("div", {
+    className: "md-affix r"
+  }, React.createElement("input", {
+    className: `${inp} mono`,
+    value: form.customsDriveUrl || "",
+    onChange: e => set("customsDriveUrl", e.target.value),
+    placeholder: "Drive folder where a new subfolder is made for every custom"
+  }), form.customsDriveUrl ? React.createElement("a", {
+    href: form.customsDriveUrl,
     target: "_blank",
     rel: "noopener noreferrer",
     className: "md-open"
@@ -31027,6 +31043,14 @@ textarea.cu-in{ resize:vertical; line-height:1.55; }
 .cu-chip{ font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px; background:rgba(255,255,255,.06); color:#c9d3ce; }
 .cu-chip.late{ background:rgba(226,114,91,.15); color:#ff9b85; }
 .cu-chip.soon{ background:rgba(240,190,60,.14); color:#f3d99a; }
+.cu-up{ display:grid; gap:8px; }
+.cu-up-row{ display:grid; gap:4px; }
+.cu-up-name{ display:flex; justify-content:space-between; gap:10px; font-size:12px; }
+.cu-up-name span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#e9f1ec; }
+.cu-up-name small{ color:#7d8f86; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.cu-up-bar{ height:5px; border-radius:999px; background:rgba(255,255,255,.07); overflow:hidden; }
+.cu-up-bar i{ display:block; height:100%; border-radius:999px; background:linear-gradient(90deg,#12b34c,#39e673); transition:width .2s; }
+.cu-drive{ display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#a8f5c4; }
 .cu-empty{ border-radius:20px; padding:34px 20px; text-align:center; background:#0e1310; border:1px dashed rgba(255,255,255,.1); color:#7d8f86; font-size:13.5px; }
 @media (max-width:760px){ .cu-grid{ grid-template-columns:1fr; } .cu-drop{ min-height:180px; } .cu-new{ padding:16px; border-radius:20px; } }
 `;
@@ -31040,6 +31064,133 @@ const cuParse = text => {
     notes
   };
 };
+async function cuDrive(body) {
+  let token = "";
+  try {
+    token = JSON.parse(localStorage.getItem("agencyos_session") || "{}").token || "";
+  } catch (e) {}
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/custom-drive`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      "x-zion-token": token
+    },
+    body: JSON.stringify(body)
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+}
+const cuSize = b => b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b > 1e6 ? `${Math.round(b / 1e6)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`;
+function cuPut(url, file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open("PUT", url);
+    x.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+    x.upload.onprogress = e => {
+      if (e.lengthComputable) onProgress(e.loaded / e.total);
+    };
+    x.onload = () => x.status >= 200 && x.status < 300 ? resolve() : reject(new Error(`Upload failed (${x.status})`));
+    x.onerror = () => reject(new Error("Upload failed, check the internet connection"));
+    x.send(file);
+  });
+}
+function CuUpload({
+  c,
+  onUploaded,
+  compact
+}) {
+  const [items, setItems] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const ref = useRef(null);
+  const start = async files => {
+    const list = [...files];
+    if (!list.length) return;
+    setErr("");
+    setBusy(true);
+    const base = items.length;
+    setItems(it => [...it, ...list.map(f => ({
+      name: f.name,
+      size: f.size,
+      p: 0,
+      done: false
+    }))]);
+    let ok = 0;
+    for (let i = 0; i < list.length; i++) {
+      const f = list[i];
+      try {
+        const {
+          uploadUrl
+        } = await cuDrive({
+          action: "upload",
+          id: c.id,
+          name: f.name,
+          type: f.type,
+          size: f.size
+        });
+        await cuPut(uploadUrl, f, p => setItems(it => it.map((x, j) => j === base + i ? {
+          ...x,
+          p
+        } : x)));
+        setItems(it => it.map((x, j) => j === base + i ? {
+          ...x,
+          p: 1,
+          done: true
+        } : x));
+        ok++;
+      } catch (e) {
+        setErr(e.message);
+        setItems(it => it.map((x, j) => j === base + i ? {
+          ...x,
+          failed: true
+        } : x));
+      }
+    }
+    setBusy(false);
+    if (ok && onUploaded) onUploaded();
+  };
+  return React.createElement("div", {
+    className: "cu-up"
+  }, React.createElement("input", {
+    ref: ref,
+    type: "file",
+    multiple: true,
+    accept: "video/*,image/*,audio/*",
+    style: {
+      display: "none"
+    },
+    onChange: e => {
+      start(e.target.files);
+      e.target.value = "";
+    }
+  }), React.createElement("button", {
+    className: "hb-btn sm",
+    disabled: busy,
+    onClick: () => ref.current && ref.current.click()
+  }, busy ? React.createElement(React.Fragment, null, React.createElement("span", {
+    className: "hb-spin"
+  }), "Uploading") : compact ? "Upload files" : "Upload the custom to Drive"), items.map((x, i) => React.createElement("div", {
+    key: i,
+    className: "cu-up-row"
+  }, React.createElement("div", {
+    className: "cu-up-name"
+  }, React.createElement("span", null, x.name), React.createElement("small", null, x.failed ? "failed" : x.done ? "uploaded" : `${Math.round(x.p * 100)}% of ${cuSize(x.size)}`)), React.createElement("div", {
+    className: "cu-up-bar"
+  }, React.createElement("i", {
+    style: {
+      width: `${Math.round(x.p * 100)}%`,
+      background: x.failed ? "#E2725B" : undefined
+    }
+  })))), err && React.createElement("div", {
+    className: "fs-12",
+    style: {
+      color: "#ff6b6b"
+    }
+  }, err));
+}
 function CustomsAdminPage({
   models
 }) {
@@ -31180,6 +31331,12 @@ function CustomsAdminPage({
       return;
     }
     await customNotify(id, "created");
+    try {
+      await cuDrive({
+        action: "folder",
+        id
+      });
+    } catch (e) {}
     reset();
     setOpen(false);
     setBusy(false);
@@ -31452,14 +31609,31 @@ function CustomsAdminPage({
         status: c.status
       }), due && React.createElement("span", {
         className: `cu-chip ${due.days < 0 ? "late" : due.days <= 1 ? "soon" : ""}`
-      }, due.text)), c.delivery_url && React.createElement("a", {
+      }, due.text)), c.drive_url && React.createElement("a", {
+        href: c.drive_url,
+        target: "_blank",
+        rel: "noopener noreferrer",
+        className: "cu-drive"
+      }, "Drive folder", c.drive_files ? `, ${c.drive_files} file${c.drive_files === 1 ? "" : "s"}` : "", " →"), c.delivery_url && c.delivery_url !== c.drive_url && React.createElement("a", {
         href: c.delivery_url,
         target: "_blank",
         rel: "noopener noreferrer",
         className: "fs-12 font-mono c-accent"
       }, "Open delivered custom →"), c.delivery_note && React.createElement("div", {
         className: "fs-11 c-muted"
-      }, "Note from the model: ", c.delivery_note), (c.status === "requested" || c.status === "sold" || c.status === "in_progress") && React.createElement("div", {
+      }, "Note from the model: ", c.delivery_note), c.status !== "cancelled" && React.createElement(CuUpload, {
+        c: c,
+        compact: true,
+        onUploaded: async () => {
+          try {
+            await cuDrive({
+              action: "files",
+              id: c.id
+            });
+          } catch (e) {}
+          reload();
+        }
+      }), (c.status === "requested" || c.status === "sold" || c.status === "in_progress") && React.createElement("div", {
         style: {
           display: "flex",
           gap: 8,
@@ -31582,7 +31756,24 @@ function CustomsCreatorPage({
     className: "mt-3 px-3 py-1.5 rounded-lg c-bg-accent c-onaccent fs-11 font-mono uppercase font-semibold"
   }, "Deliver it"), c.status === "in_progress" && delivering === c.id && React.createElement("div", {
     className: "mt-3 space-y-2"
-  }, React.createElement("input", {
+  }, React.createElement(CuUpload, {
+    c: c,
+    onUploaded: async () => {
+      try {
+        await cuDrive({
+          action: "files",
+          id: c.id
+        });
+      } catch (e) {}
+      const {
+        data
+      } = await supabaseClient.from("customs").select("drive_url").eq("id", c.id).maybeSingle();
+      if (data?.drive_url) setLink(data.drive_url);
+      reload();
+    }
+  }), React.createElement("div", {
+    className: "fs-11 c-muted"
+  }, "Upload the finished custom above, or paste a link instead:"), React.createElement("input", {
     value: link,
     onChange: e => setLink(e.target.value),
     placeholder: "Link to the finished custom (Drive, Dropbox...)",
@@ -31611,7 +31802,7 @@ function CustomsCreatorPage({
   }, "Cancel"))));
   return React.createElement("div", {
     className: "max-w-2xl"
-  }, React.createElement("p", {
+  }, React.createElement("style", null, HUB_CSS, CU_CSS), React.createElement("p", {
     className: "fs-13 c-muted mb-5"
   }, "Custom content requests for you. You get a notification when a new one comes in."), err && delivering == null && React.createElement("div", {
     className: "fs-12 mb-3",
@@ -33140,7 +33331,7 @@ function App() {
     value: models,
     loading: modelsLoading,
     persist: persistModels
-  } = useSupaTable("models", "name", [], modelsToJS, modelsToDB, "name, note, onboarded, added_at, ig_handle, ig_extra_handles, x_handle, tiktok_handle, of_url, drive_url, reels_drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank, disabled_platforms, agency_cut_pct, goal_note, goal_auto_value, notif_prefs, about, fb_url, threads_handle, snap_handle");
+  } = useSupaTable("models", "name", [], modelsToJS, modelsToDB, "name, note, onboarded, added_at, ig_handle, ig_extra_handles, x_handle, tiktok_handle, of_url, drive_url, reels_drive_url, customs_drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank, disabled_platforms, agency_cut_pct, goal_note, goal_auto_value, notif_prefs, about, fb_url, threads_handle, snap_handle");
   const {
     value: tasks,
     loading: tasksLoading,
@@ -33770,7 +33961,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">jwtfgr</script>
+<script type="text/babel" id="zion-version">18yz20e</script>
 <script>
 (function () {
   var last = 0;

@@ -1267,7 +1267,7 @@ const modelsToJS = (r) => ({
   name: r.name, note: r.note || "", onboarded: !!r.onboarded,
   agency: r.agency || "CZ", addedAt: r.added_at ? new Date(r.added_at).getTime() : Date.now(),
   igHandle: r.ig_handle || "", igExtraHandles: Array.isArray(r.ig_extra_handles) ? r.ig_extra_handles : [], fbUrl: r.fb_url || "", threadsHandle: r.threads_handle || "", snapHandle: r.snap_handle || "", xHandle: r.x_handle || "", tiktokHandle: r.tiktok_handle || "",
-  ofUrl: r.of_url || "", driveUrl: r.drive_url || "", reelsDriveUrl: r.reels_drive_url || "", bio: r.bio || "",
+  ofUrl: r.of_url || "", driveUrl: r.drive_url || "", reelsDriveUrl: r.reels_drive_url || "", customsDriveUrl: r.customs_drive_url || "", bio: r.bio || "",
   bioReceivedAt: r.bio_received_at ? new Date(r.bio_received_at).getTime() : null,
   alwaysOnboard: !!r.always_onboard,
   bufferChannelId: r.buffer_channel_id || "", bufferChannelIdIg: r.buffer_channel_id_ig || "",
@@ -1290,7 +1290,7 @@ const modelsToDB = (m) => ({
   name: m.name, note: m.note || "", onboarded: !!m.onboarded,
   agency: m.agency || "CZ", added_at: m.addedAt ? new Date(m.addedAt).toISOString() : new Date().toISOString(),
   ig_handle: m.igHandle || "", ig_extra_handles: Array.isArray(m.igExtraHandles) ? m.igExtraHandles : [], fb_url: m.fbUrl || "", threads_handle: m.threadsHandle || "", snap_handle: m.snapHandle || "", x_handle: m.xHandle || "", tiktok_handle: m.tiktokHandle || "",
-  of_url: m.ofUrl || "", drive_url: m.driveUrl || "", reels_drive_url: m.reelsDriveUrl || "", bio: m.bio || "",
+  of_url: m.ofUrl || "", drive_url: m.driveUrl || "", reels_drive_url: m.reelsDriveUrl || "", customs_drive_url: m.customsDriveUrl || "", bio: m.bio || "",
   bio_received_at: m.bioReceivedAt ? new Date(m.bioReceivedAt).toISOString() : null,
   always_onboard: !!m.alwaysOnboard,
   buffer_channel_id: m.bufferChannelId || "", buffer_channel_id_ig: m.bufferChannelIdIg || "",
@@ -8681,6 +8681,13 @@ function ModelDetail({ model, onClose, onSave, onSetPin, onToggleAlwaysOnboard, 
               <div className="md-affix r">
                 <input className={`${inp} mono`} value={form.reelsDriveUrl || ""} onChange={(e) => set("reelsDriveUrl", e.target.value)} placeholder="Drive folder where a new subfolder is made for every sent reel list" />
                 {form.reelsDriveUrl ? <a href={form.reelsDriveUrl} target="_blank" rel="noopener noreferrer" className="md-open">Open</a> : null}
+              </div>
+            </div>
+            <div className="md-f">
+              <label>Customs folder</label>
+              <div className="md-affix r">
+                <input className={`${inp} mono`} value={form.customsDriveUrl || ""} onChange={(e) => set("customsDriveUrl", e.target.value)} placeholder="Drive folder where a new subfolder is made for every custom" />
+                {form.customsDriveUrl ? <a href={form.customsDriveUrl} target="_blank" rel="noopener noreferrer" className="md-open">Open</a> : null}
               </div>
             </div>
             <div className="md-f">
@@ -18466,6 +18473,14 @@ textarea.cu-in{ resize:vertical; line-height:1.55; }
 .cu-chip{ font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px; background:rgba(255,255,255,.06); color:#c9d3ce; }
 .cu-chip.late{ background:rgba(226,114,91,.15); color:#ff9b85; }
 .cu-chip.soon{ background:rgba(240,190,60,.14); color:#f3d99a; }
+.cu-up{ display:grid; gap:8px; }
+.cu-up-row{ display:grid; gap:4px; }
+.cu-up-name{ display:flex; justify-content:space-between; gap:10px; font-size:12px; }
+.cu-up-name span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#e9f1ec; }
+.cu-up-name small{ color:#7d8f86; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.cu-up-bar{ height:5px; border-radius:999px; background:rgba(255,255,255,.07); overflow:hidden; }
+.cu-up-bar i{ display:block; height:100%; border-radius:999px; background:linear-gradient(90deg,#12b34c,#39e673); transition:width .2s; }
+.cu-drive{ display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#a8f5c4; }
 .cu-empty{ border-radius:20px; padding:34px 20px; text-align:center; background:#0e1310; border:1px dashed rgba(255,255,255,.1); color:#7d8f86; font-size:13.5px; }
 @media (max-width:760px){ .cu-grid{ grid-template-columns:1fr; } .cu-drop{ min-height:180px; } .cu-new{ padding:16px; border-radius:20px; } }
 `;
@@ -18476,6 +18491,66 @@ const cuParse = (text) => {
   const rest = lines.filter((l) => !/^[•\-*]\s*/.test(l));
   return { title: rest[0] || "", extra: rest.slice(1), notes };
 };
+
+// ---- Drive: a folder per custom, files uploaded from Zion straight into it ----
+async function cuDrive(body) {
+  let token = ""; try { token = (JSON.parse(localStorage.getItem("agencyos_session") || "{}")).token || ""; } catch (e) {}
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/custom-drive`, { method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, "x-zion-token": token }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+}
+const cuSize = (b) => (b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b > 1e6 ? `${Math.round(b / 1e6)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`);
+function cuPut(url, file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open("PUT", url);
+    x.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+    x.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+    x.onload = () => (x.status >= 200 && x.status < 300 ? resolve() : reject(new Error(`Upload failed (${x.status})`)));
+    x.onerror = () => reject(new Error("Upload failed, check the internet connection"));
+    x.send(file);
+  });
+}
+// the upload box: pick files, they go one by one into the custom's Drive folder with a progress bar
+function CuUpload({ c, onUploaded, compact }) {
+  const [items, setItems] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const ref = useRef(null);
+  const start = async (files) => {
+    const list = [...files];
+    if (!list.length) return;
+    setErr(""); setBusy(true);
+    const base = items.length;
+    setItems((it) => [...it, ...list.map((f) => ({ name: f.name, size: f.size, p: 0, done: false }))]);
+    let ok = 0;
+    for (let i = 0; i < list.length; i++) {
+      const f = list[i];
+      try {
+        const { uploadUrl } = await cuDrive({ action: "upload", id: c.id, name: f.name, type: f.type, size: f.size });
+        await cuPut(uploadUrl, f, (p) => setItems((it) => it.map((x, j) => (j === base + i ? { ...x, p } : x))));
+        setItems((it) => it.map((x, j) => (j === base + i ? { ...x, p: 1, done: true } : x)));
+        ok++;
+      } catch (e) { setErr(e.message); setItems((it) => it.map((x, j) => (j === base + i ? { ...x, failed: true } : x))); }
+    }
+    setBusy(false);
+    if (ok && onUploaded) onUploaded();
+  };
+  return (
+    <div className="cu-up">
+      <input ref={ref} type="file" multiple accept="video/*,image/*,audio/*" style={{ display: "none" }} onChange={(e) => { start(e.target.files); e.target.value = ""; }} />
+      <button className="hb-btn sm" disabled={busy} onClick={() => ref.current && ref.current.click()}>{busy ? <><span className="hb-spin" />Uploading</> : compact ? "Upload files" : "Upload the custom to Drive"}</button>
+      {items.map((x, i) => (
+        <div key={i} className="cu-up-row">
+          <div className="cu-up-name"><span>{x.name}</span><small>{x.failed ? "failed" : x.done ? "uploaded" : `${Math.round(x.p * 100)}% of ${cuSize(x.size)}`}</small></div>
+          <div className="cu-up-bar"><i style={{ width: `${Math.round(x.p * 100)}%`, background: x.failed ? "#E2725B" : undefined }} /></div>
+        </div>
+      ))}
+      {err && <div className="fs-12" style={{ color: "#ff6b6b" }}>{err}</div>}
+    </div>
+  );
+}
 
 function CustomsAdminPage({ models }) {
   const { rows, loading, reload } = useCustoms(null);
@@ -18546,6 +18621,7 @@ function CustomsAdminPage({ models }) {
     const { error } = await supabaseClient.from("customs").insert(row);
     if (error) { setErr(error.message); setBusy(false); return; }
     await customNotify(id, "created");
+    try { await cuDrive({ action: "folder", id }); } catch (e) { /* the folder can still be made on the first upload */ }
     reset(); setOpen(false); setBusy(false);
     reload();
   };
@@ -18652,8 +18728,10 @@ function CustomsAdminPage({ models }) {
                       <CustomStatusChip status={c.status} />
                       {due && <span className={`cu-chip ${due.days < 0 ? "late" : due.days <= 1 ? "soon" : ""}`}>{due.text}</span>}
                     </div>
-                    {c.delivery_url && <a href={c.delivery_url} target="_blank" rel="noopener noreferrer" className="fs-12 font-mono c-accent">Open delivered custom &rarr;</a>}
+                    {c.drive_url && <a href={c.drive_url} target="_blank" rel="noopener noreferrer" className="cu-drive">Drive folder{c.drive_files ? `, ${c.drive_files} file${c.drive_files === 1 ? "" : "s"}` : ""} &rarr;</a>}
+                    {c.delivery_url && c.delivery_url !== c.drive_url && <a href={c.delivery_url} target="_blank" rel="noopener noreferrer" className="fs-12 font-mono c-accent">Open delivered custom &rarr;</a>}
                     {c.delivery_note && <div className="fs-11 c-muted">Note from the model: {c.delivery_note}</div>}
+                    {c.status !== "cancelled" && <CuUpload c={c} compact onUploaded={async () => { try { await cuDrive({ action: "files", id: c.id }); } catch (e) {} reload(); }} />}
                     {(c.status === "requested" || c.status === "sold" || c.status === "in_progress") && (
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                         {c.status === "requested" && <button onClick={() => update(c, { status: "sold", sold_at: new Date().toISOString() }, "sold")} className="hb-btn sm">Mark as paid</button>}
@@ -18717,6 +18795,8 @@ function CustomsCreatorPage({ model, record }) {
       {c.status === "in_progress" && delivering !== c.id && <button onClick={() => { setDelivering(c.id); setErr(""); }} className="mt-3 px-3 py-1.5 rounded-lg c-bg-accent c-onaccent fs-11 font-mono uppercase font-semibold">Deliver it</button>}
       {c.status === "in_progress" && delivering === c.id && (
         <div className="mt-3 space-y-2">
+          <CuUpload c={c} onUploaded={async () => { try { await cuDrive({ action: "files", id: c.id }); } catch (e) {} const { data } = await supabaseClient.from("customs").select("drive_url").eq("id", c.id).maybeSingle(); if (data?.drive_url) setLink(data.drive_url); reload(); }} />
+          <div className="fs-11 c-muted">Upload the finished custom above, or paste a link instead:</div>
           <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="Link to the finished custom (Drive, Dropbox...)" className={field} />
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note for your manager (optional)" className={field} />
           {err && <div className="fs-12" style={{ color: "#ff6b6b" }}>{err}</div>}
@@ -18731,6 +18811,7 @@ function CustomsCreatorPage({ model, record }) {
 
   return (
     <div className="max-w-2xl">
+      <style>{HUB_CSS}{CU_CSS}</style>
       <p className="fs-13 c-muted mb-5">Custom content requests for you. You get a notification when a new one comes in.</p>
       {err && delivering == null && <div className="fs-12 mb-3" style={{ color: "#ff6b6b" }}>{err}</div>}
       {loading && <div className="fs-13 c-muted">Loading...</div>}
@@ -19229,7 +19310,7 @@ function IgStudioPage({ models, onlyStudio }) {
 function App() {
   const { value: cards, loading: cardsLoading, persist: persistCards } = useSupaTable("cards", "id", [], cardsToJS, cardsToDB);
   const { value: models, loading: modelsLoading, persist: persistModels } = useSupaTable("models", "name", [], modelsToJS, modelsToDB,
-    "name, note, onboarded, added_at, ig_handle, ig_extra_handles, x_handle, tiktok_handle, of_url, drive_url, reels_drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank, disabled_platforms, agency_cut_pct, goal_note, goal_auto_value, notif_prefs, about, fb_url, threads_handle, snap_handle");
+    "name, note, onboarded, added_at, ig_handle, ig_extra_handles, x_handle, tiktok_handle, of_url, drive_url, reels_drive_url, customs_drive_url, bio, bio_received_at, always_onboard, agency, buffer_channel_id, buffer_channel_id_ig, buffer_channel_id_x, buffer_channel_id_tiktok, buffer_channel_id_fb, onlyfansapi_account_id, onlyfansapi_username, inspo_profiles, infloww_creator_id_free, infloww_creator_id_paid, notif_last_seen, monthly_goal, ig_user_id, ig_token_expires_at, ig_connected_at, x_caption_bank, disabled_platforms, agency_cut_pct, goal_note, goal_auto_value, notif_prefs, about, fb_url, threads_handle, snap_handle");
   const { value: tasks, loading: tasksLoading, persist: persistTasks } = useSupaTable("tasks", "id", [], tasksToJS, tasksToDB);
   const { value: stats, loading: statsLoading, persist: persistStats } = useSupaTable("stats", "id", [], statsToJS, statsToDB);
   const { value: reels, loading: reelsLoading, persist: persistReels } = useSupaTable("reels", "id", [], reelsToJS, reelsToDB);
