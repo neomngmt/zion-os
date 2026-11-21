@@ -18793,6 +18793,26 @@ function AcquisitionPage() {
     const active = rows.filter(r => r.found || r.dms || r.fu || r.rep || r.talking || r.signed).sort((a2, b2) => b2.dms + b2.fu + b2.rep * 10 - (a2.dms + a2.fu + a2.rep * 10));
     const quiet = rows.filter(r => !active.includes(r));
     const maxDms = Math.max(1, ...active.map(r => r.dms + r.fu));
+    const everything = all.some(l => l.messaged_at || acqHerAt(l)) || agency === "US" && xr && xr.connected;
+    if (!everything) return React.createElement("div", {
+      className: "oh-hero",
+      style: {
+        padding: "18px 22px"
+      }
+    }, React.createElement("div", {
+      className: "oh-eyebrow"
+    }, "Outreach, ", agency, " agency"), React.createElement("div", {
+      style: {
+        fontWeight: 800,
+        fontSize: 17,
+        marginTop: 4
+      }
+    }, "Nothing running here yet"), React.createElement("div", {
+      className: "hb-note",
+      style: {
+        marginTop: 4
+      }
+    }, "The numbers and the chart show up as soon as the first DMs go out for the ", agency, " agency."));
     return React.createElement("div", {
       className: "oh-hero"
     }, React.createElement("div", {
@@ -34729,7 +34749,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">s3y3r0</script>
+<script type="text/babel" id="zion-version">1p46yaf</script>
 <script>
 (function () {
   var last = 0;

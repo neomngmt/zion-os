@@ -10725,6 +10725,15 @@ function AcquisitionPage() {
         const active = rows.filter((r) => r.found || r.dms || r.fu || r.rep || r.talking || r.signed).sort((a2, b2) => (b2.dms + b2.fu + b2.rep * 10) - (a2.dms + a2.fu + a2.rep * 10));
         const quiet = rows.filter((r) => !active.includes(r));
         const maxDms = Math.max(1, ...active.map((r) => r.dms + r.fu));
+        // an agency with no outreach at all (CZ right now): a short note instead of a dashboard full of zeros
+        const everything = all.some((l) => l.messaged_at || acqHerAt(l)) || (agency === "US" && xr && xr.connected);
+        if (!everything) return (
+          <div className="oh-hero" style={{ padding: "18px 22px" }}>
+            <div className="oh-eyebrow">Outreach, {agency} agency</div>
+            <div style={{ fontWeight: 800, fontSize: 17, marginTop: 4 }}>Nothing running here yet</div>
+            <div className="hb-note" style={{ marginTop: 4 }}>The numbers and the chart show up as soon as the first DMs go out for the {agency} agency.</div>
+          </div>
+        );
         return (
           <div className="oh-hero">
             <div className="oh-head">
