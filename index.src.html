@@ -18647,16 +18647,32 @@ function CuUpload({ c, onUploaded, compact, label }) {
 }
 
 // "See the screens": the fan chat screenshots saved with the custom, opened in a full screen viewer
+// the links are fetched and the images downloaded in the background as soon as the card is on screen,
+// so "See the screens" opens instantly; the links live an hour, they are kept for 50 minutes
+const cuShotCache = {};
+function cuShotsLoad(id) {
+  const hit = cuShotCache[id];
+  if (hit && Date.now() - hit.at < 50 * 60000) return hit.p;
+  const p = cuDrive({ action: "shots", id }).then((j) => {
+    const urls = j.urls || [];
+    urls.forEach((u) => { const im = new Image(); im.decoding = "async"; im.src = u; });
+    return urls;
+  });
+  cuShotCache[id] = { at: Date.now(), p };
+  p.catch(() => { delete cuShotCache[id]; });
+  return p;
+}
 function CuShots({ c }) {
   const [urls, setUrls] = useState(null);
   const [open, setOpen] = useState(false);
   const [i, setI] = useState(0);
   const [err, setErr] = useState("");
+  useEffect(() => { if (c.shots) cuShotsLoad(c.id).then(setUrls).catch(() => {}); }, [c.id, c.shots]);
   if (!c.shots) return null;
   const show = async () => {
     setOpen(true); setErr(""); setI(0);
     if (urls) return;
-    try { const j = await cuDrive({ action: "shots", id: c.id }); setUrls(j.urls || []); } catch (e) { setErr(e.message); setUrls([]); }
+    try { setUrls(await cuShotsLoad(c.id)); } catch (e) { setErr(e.message); setUrls([]); }
   };
   return (<>
     <button className="hb-btn ghost sm" onClick={show} style={{ justifySelf: "start" }}>See the screens ({c.shots})</button>
