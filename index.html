@@ -99,7 +99,8 @@ function zionMidnight() {
   for (const k of ["toLocaleString", "toLocaleDateString", "toLocaleTimeString"]) {
     const orig = Date.prototype[k];
     Date.prototype[k] = function (locales, opts) {
-      return orig.call(this, locales, opts && opts.timeZone ? opts : {
+      if (opts && opts.timeZone || this.getHours() === 0 && this.getMinutes() === 0 && this.getSeconds() === 0 && this.getMilliseconds() === 0) return orig.call(this, locales, opts);
+      return orig.call(this, locales, {
         ...(opts || {}),
         timeZone: ZION_TZ
       });
@@ -34850,7 +34851,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">16lqyb1</script>
+<script type="text/babel" id="zion-version">w0dxx3</script>
 <script>
 (function () {
   var last = 0;

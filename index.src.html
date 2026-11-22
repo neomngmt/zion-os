@@ -74,7 +74,12 @@ function zionMidnight() {
 (() => {
   for (const k of ["toLocaleString", "toLocaleDateString", "toLocaleTimeString"]) {
     const orig = Date.prototype[k];
-    Date.prototype[k] = function (locales, opts) { return orig.call(this, locales, opts && opts.timeZone ? opts : { ...(opts || {}), timeZone: ZION_TZ }); };
+    // a Date at exactly the phone's midnight is a calendar day built in code (new Date(y, m, d)), not a moment:
+    // it keeps its own day, otherwise "1. 11." would show as "31. 10." (October) on a phone east of Prague
+    Date.prototype[k] = function (locales, opts) {
+      if ((opts && opts.timeZone) || (this.getHours() === 0 && this.getMinutes() === 0 && this.getSeconds() === 0 && this.getMilliseconds() === 0)) return orig.call(this, locales, opts);
+      return orig.call(this, locales, { ...(opts || {}), timeZone: ZION_TZ });
+    };
   }
 })();
 
