@@ -243,6 +243,7 @@ async function neoLiveStart(agency) {
           let args = {}; try { args = JSON.parse(ev.arguments || "{}"); } catch (e) {}
           const job = (async () => {
             if (ev.name === "navigate") { neoLiveEmit("navigate", args.page); return "Opened."; }
+            if (ev.name === "ask_to_type") { c.quietNext = true; neoLiveMute(true); neoLiveEmit("askType", { prompt: String(args.what || "") }); return "The typing window is open. Say nothing until his typed answer arrives."; }
             if (ev.name === "weekly_report_upload") { c.quietNext = true; neoLiveMute(true); neoLiveEmit("reportOpen"); return "The upload window is open. Say nothing until the screenshots message."; }
             if (ev.name === "weekly_report_build") neoLiveEmit("reportBuilding", args.report_id);
             try {
@@ -14895,6 +14896,48 @@ function NeoBootSequence({ onDone }) {
 const NEO_VOICES = [["cedar", "Cedar, calm male"], ["ash", "Ash, warm male"], ["ballad", "Ballad, soft male"], ["echo", "Echo, clear male"], ["onyx", "Onyx, deep male (old)"], ["verse", "Verse, lively male"],
   ["marin", "Marin, natural female"], ["coral", "Coral, friendly female"], ["sage", "Sage, calm female"], ["nova", "Nova, bright female"], ["shimmer", "Shimmer, soft female"], ["alloy", "Alloy, neutral"], ["fable", "Fable, storyteller"]];
 const neoVoice = () => { try { return localStorage.getItem("zionNeoVoice2") || "verse"; } catch (e) { return "verse"; } };
+// ---------- "Write it down for me" window: Neo opens it in a live call when he did not catch a name or word ----------
+function NeoTypeWindow({ prompt, onDone }) {
+  const [text, setText] = useState("");
+  const ref = useRef(null);
+  useEffect(() => { const t = setTimeout(() => ref.current && ref.current.focus(), 350); return () => clearTimeout(t); }, []);
+  const G = "#39e673";
+  const send = () => onDone(text.trim());
+  const css = `
+@keyframes ntIn { 0% { opacity: 0; transform: translateY(24px) scale(.96); filter: blur(8px); } 100% { opacity: 1; transform: none; filter: none; } }
+@keyframes ntFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ntGlow { 0%, 100% { box-shadow: 0 0 0 1px rgba(57,230,115,.3), 0 20px 60px rgba(0,0,0,.6), 0 0 40px rgba(57,230,115,.08); } 50% { box-shadow: 0 0 0 1px rgba(57,230,115,.6), 0 20px 60px rgba(0,0,0,.6), 0 0 60px rgba(57,230,115,.22); } }
+@keyframes ntCaret { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
+@keyframes ntScan { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+.nt-card { animation: ntIn .5s cubic-bezier(.2,.9,.25,1) both, ntGlow 2.8s ease-in-out .5s infinite; }
+.nt-card::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: linear-gradient(90deg, transparent, ${G}, transparent); animation: ntScan 2.2s linear infinite; }
+.nt-in:focus { border-color: rgba(57,230,115,.7) !important; box-shadow: 0 0 0 3px rgba(57,230,115,.12); }
+@media (prefers-reduced-motion: reduce) { .nt-card, .nt-card::after { animation: none !important; } }
+`;
+  return ReactDOM.createPortal((
+    <div style={{ position: "fixed", inset: 0, zIndex: 310, fontFamily: "'Inter', system-ui, sans-serif", display: "flex", alignItems: "center", justifyContent: "center", padding: "calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom))", background: "rgba(0,0,0,.6)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", animation: "ntFade .3s ease both" }}>
+      <style>{css}</style>
+      <form className="nt-card" onSubmit={(e) => { e.preventDefault(); send(); }}
+        style={{ position: "relative", overflow: "hidden", width: 520, maxWidth: "100%", borderRadius: 20, background: "rgba(4,10,7,.97)", padding: "22px 22px 18px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ width: 9, height: 9, borderRadius: 9, background: G, boxShadow: `0 0 10px ${G}`, animation: "ntCaret 1.2s ease-in-out infinite" }} />
+          <span style={{ fontSize: 10, letterSpacing: "3px", color: G, textTransform: "uppercase", flex: 1 }}>Neo is waiting</span>
+          <button type="button" onClick={() => onDone("")} aria-label="Close" style={{ color: "#6f8a7a", fontSize: 20, lineHeight: 1, padding: 4 }}>×</button>
+        </div>
+        <div style={{ fontSize: 22, fontWeight: 300, color: "#f2f5f0", marginTop: 10, lineHeight: 1.3 }}>Write it down for me</div>
+        <div style={{ fontSize: 13, color: "#8fa597", marginTop: 4 }}>{prompt ? `I did not catch ${prompt}.` : "I did not catch that."}</div>
+        <textarea ref={ref} className="nt-in" value={text} onChange={(e) => setText(e.target.value)} rows={2}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+          placeholder="Type it here"
+          style={{ width: "100%", boxSizing: "border-box", marginTop: 16, resize: "none", background: "#06100b", color: "#f2f5f0", border: "1px solid rgba(57,230,115,.25)", borderRadius: 12, padding: "12px 14px", fontSize: 17, outline: "none", transition: "border-color .2s, box-shadow .2s", fontFamily: "inherit" }} />
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+          <button type="submit" disabled={!text.trim()} style={{ fontWeight: 700, fontSize: 14, padding: "10px 20px", borderRadius: 12, background: G, color: "#03110a", opacity: text.trim() ? 1 : 0.45, transition: "opacity .2s" }}>Send to Neo</button>
+        </div>
+      </form>
+    </div>
+  ), document.body);
+}
+
 // ---------- Weekly report window (admin, opened by Neo's weekly_report_start) ----------
 // Drop or pick the OnlyFans / Oopsie screenshots, they upload straight to the private weekly-reports bucket,
 // then Neo is told they are in and asks the questions. Shrinks to a small status card while Neo talks and
@@ -15580,6 +15623,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
   // ---------- the live call (neoLive, module level) shown on this page ----------
   const [callState, setCallState] = useState(neoLive.state);
   const [weeklyReport, setWeeklyReport] = useState(null);
+  const [typeAsk, setTypeAsk] = useState(null);
   const [callError, setCallError] = useState("");
   const callRef = { get current() { return neoLive.c; } };
   useEffect(() => {
@@ -15595,6 +15639,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
       pending: (x) => setMessages((all) => [...all, { role: "neo", text: "", pending: [{ id: `rt${Date.now()}${Math.random().toString(36).slice(2, 6)}`, ...x, state: "ask" }] }]),
       report: (r) => setWeeklyReport({ id: r.report_id, model: r.model, week: r.week_number, period: r.period, stage: "ready" }),
       reportOpen: () => setWeeklyReport((w) => (w ? { ...w, stage: "drop" } : w)),
+      askType: (x) => setTypeAsk({ prompt: x.prompt, key: Date.now() }),
       reportBuilding: () => setWeeklyReport((w) => (w ? { ...w, stage: "building" } : w)),
       reportDone: (r) => setWeeklyReport((w) => ({ ...(w || { model: "", week: "" }), stage: "done", url: r.url, file: r.file, telegram: r.telegram })),
       reportFailed: (m) => setWeeklyReport((w) => (w ? { ...w, stage: "failed", error: String(m || "").slice(0, 200) } : w)),
@@ -15873,6 +15918,10 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
       </div>)}
 
       {session.role === "admin" && weeklyReport && <WeeklyReportWindow report={weeklyReport} setReport={setWeeklyReport} />}
+      {typeAsk && <NeoTypeWindow key={typeAsk.key} prompt={typeAsk.prompt} onDone={(text) => {
+        setTypeAsk(null); neoLiveMute(false);
+        neoLiveTell(text ? `[Zion] He typed it for you: "${text}". Use exactly this spelling, say a short thanks and continue.` : "[Zion] He closed the typing window without writing. Continue.");
+      }} />}
       <NeoChat compact={session.role === "admin"} messages={messages} setMessages={setMessages} thinking={thinking} onSend={(t) => send(t, "text")} canAct={session.role === "admin"} />
 
       {/* agency stats (team only) + primary objective strip + 3-card grid +

@@ -413,6 +413,14 @@ async function neoLiveStart(agency) {
                 neoLiveEmit("navigate", args.page);
                 return "Opened.";
               }
+              if (ev.name === "ask_to_type") {
+                c.quietNext = true;
+                neoLiveMute(true);
+                neoLiveEmit("askType", {
+                  prompt: String(args.what || "")
+                });
+                return "The typing window is open. Say nothing until his typed answer arrives.";
+              }
               if (ev.name === "weekly_report_upload") {
                 c.quietNext = true;
                 neoLiveMute(true);
@@ -25635,6 +25643,155 @@ const neoVoice = () => {
     return "verse";
   }
 };
+function NeoTypeWindow({
+  prompt,
+  onDone
+}) {
+  const [text, setText] = useState("");
+  const ref = useRef(null);
+  useEffect(() => {
+    const t = setTimeout(() => ref.current && ref.current.focus(), 350);
+    return () => clearTimeout(t);
+  }, []);
+  const G = "#39e673";
+  const send = () => onDone(text.trim());
+  const css = `
+@keyframes ntIn { 0% { opacity: 0; transform: translateY(24px) scale(.96); filter: blur(8px); } 100% { opacity: 1; transform: none; filter: none; } }
+@keyframes ntFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ntGlow { 0%, 100% { box-shadow: 0 0 0 1px rgba(57,230,115,.3), 0 20px 60px rgba(0,0,0,.6), 0 0 40px rgba(57,230,115,.08); } 50% { box-shadow: 0 0 0 1px rgba(57,230,115,.6), 0 20px 60px rgba(0,0,0,.6), 0 0 60px rgba(57,230,115,.22); } }
+@keyframes ntCaret { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
+@keyframes ntScan { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+.nt-card { animation: ntIn .5s cubic-bezier(.2,.9,.25,1) both, ntGlow 2.8s ease-in-out .5s infinite; }
+.nt-card::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: linear-gradient(90deg, transparent, ${G}, transparent); animation: ntScan 2.2s linear infinite; }
+.nt-in:focus { border-color: rgba(57,230,115,.7) !important; box-shadow: 0 0 0 3px rgba(57,230,115,.12); }
+@media (prefers-reduced-motion: reduce) { .nt-card, .nt-card::after { animation: none !important; } }
+`;
+  return ReactDOM.createPortal(React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 310,
+      fontFamily: "'Inter', system-ui, sans-serif",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom))",
+      background: "rgba(0,0,0,.6)",
+      backdropFilter: "blur(6px)",
+      WebkitBackdropFilter: "blur(6px)",
+      animation: "ntFade .3s ease both"
+    }
+  }, React.createElement("style", null, css), React.createElement("form", {
+    className: "nt-card",
+    onSubmit: e => {
+      e.preventDefault();
+      send();
+    },
+    style: {
+      position: "relative",
+      overflow: "hidden",
+      width: 520,
+      maxWidth: "100%",
+      borderRadius: 20,
+      background: "rgba(4,10,7,.97)",
+      padding: "22px 22px 18px"
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 9,
+      height: 9,
+      borderRadius: 9,
+      background: G,
+      boxShadow: `0 0 10px ${G}`,
+      animation: "ntCaret 1.2s ease-in-out infinite"
+    }
+  }), React.createElement("span", {
+    style: {
+      fontSize: 10,
+      letterSpacing: "3px",
+      color: G,
+      textTransform: "uppercase",
+      flex: 1
+    }
+  }, "Neo is waiting"), React.createElement("button", {
+    type: "button",
+    onClick: () => onDone(""),
+    "aria-label": "Close",
+    style: {
+      color: "#6f8a7a",
+      fontSize: 20,
+      lineHeight: 1,
+      padding: 4
+    }
+  }, "×")), React.createElement("div", {
+    style: {
+      fontSize: 22,
+      fontWeight: 300,
+      color: "#f2f5f0",
+      marginTop: 10,
+      lineHeight: 1.3
+    }
+  }, "Write it down for me"), React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "#8fa597",
+      marginTop: 4
+    }
+  }, prompt ? `I did not catch ${prompt}.` : "I did not catch that."), React.createElement("textarea", {
+    ref: ref,
+    className: "nt-in",
+    value: text,
+    onChange: e => setText(e.target.value),
+    rows: 2,
+    onKeyDown: e => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        send();
+      }
+    },
+    placeholder: "Type it here",
+    style: {
+      width: "100%",
+      boxSizing: "border-box",
+      marginTop: 16,
+      resize: "none",
+      background: "#06100b",
+      color: "#f2f5f0",
+      border: "1px solid rgba(57,230,115,.25)",
+      borderRadius: 12,
+      padding: "12px 14px",
+      fontSize: 17,
+      outline: "none",
+      transition: "border-color .2s, box-shadow .2s",
+      fontFamily: "inherit"
+    }
+  }), React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "flex-end",
+      marginTop: 12
+    }
+  }, React.createElement("button", {
+    type: "submit",
+    disabled: !text.trim(),
+    style: {
+      fontWeight: 700,
+      fontSize: 14,
+      padding: "10px 20px",
+      borderRadius: 12,
+      background: G,
+      color: "#03110a",
+      opacity: text.trim() ? 1 : 0.45,
+      transition: "opacity .2s"
+    }
+  }, "Send to Neo")))), document.body);
+}
 const WR_SLOTS = [{
   slot: "sales",
   label: "Earnings",
@@ -26924,6 +27081,7 @@ function NeoPage({
   };
   const [callState, setCallState] = useState(neoLive.state);
   const [weeklyReport, setWeeklyReport] = useState(null);
+  const [typeAsk, setTypeAsk] = useState(null);
   const [callError, setCallError] = useState("");
   const callRef = {
     get current() {
@@ -26983,6 +27141,10 @@ function NeoPage({
         ...w,
         stage: "drop"
       } : w),
+      askType: x => setTypeAsk({
+        prompt: x.prompt,
+        key: Date.now()
+      }),
       reportBuilding: () => setWeeklyReport(w => w ? {
         ...w,
         stage: "building"
@@ -27500,6 +27662,14 @@ function NeoPage({
   }, activeSubs.toLocaleString()))), session.role === "admin" && weeklyReport && React.createElement(WeeklyReportWindow, {
     report: weeklyReport,
     setReport: setWeeklyReport
+  }), typeAsk && React.createElement(NeoTypeWindow, {
+    key: typeAsk.key,
+    prompt: typeAsk.prompt,
+    onDone: text => {
+      setTypeAsk(null);
+      neoLiveMute(false);
+      neoLiveTell(text ? `[Zion] He typed it for you: "${text}". Use exactly this spelling, say a short thanks and continue.` : "[Zion] He closed the typing window without writing. Continue.");
+    }
   }), React.createElement(NeoChat, {
     compact: session.role === "admin",
     messages: messages,
@@ -35525,7 +35695,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">nhnzht</script>
+<script type="text/babel" id="zion-version">7crmx0</script>
 <script>
 (function () {
   var last = 0;
