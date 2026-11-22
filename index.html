@@ -4540,7 +4540,20 @@ function PlatformOverviewDashboard({
     }
   }, label, " Dashboard"), React.createElement("p", {
     className: "c-muted text-sm mt-0.5"
-  }, connectedModels.length, " account", connectedModels.length !== 1 ? "s" : "", " ", fromProfile ? "read from the public profile" : "connected via Publer"))), React.createElement("button", {
+  }, connectedModels.length, " account", connectedModels.length !== 1 ? "s" : "", " ", fromProfile ? "read from the public profile" : "connected via Publer"), fromProfile && (() => {
+    const last = (bufferTopPosts || []).filter(p => p.platform === platform && (account === "all" ? connectedNames.has(p.model) : p.model === account) && p.sentAt).sort((a, b) => b.sentAt - a.sentAt)[0];
+    const days = last ? Math.floor((Date.now() - last.sentAt) / 86400000) : null;
+    if (days == null || days < 2) return null;
+    return React.createElement("p", {
+      className: "fs-12 mt-1.5 font-semibold",
+      style: {
+        color: "#f5b942"
+      }
+    }, "No new post since ", new Date(last.sentAt).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short"
+    }), " (", days, " days). The numbers count posts made in the period, so 7D shows 0. Switch to 30D to see the older posts.");
+  })())), React.createElement("button", {
     onClick: onPlanPosts,
     className: "flex items-center gap-2 px-4 py-2.5 rounded-xl fs-12 font-mono uppercase tracking-wide font-semibold tap",
     style: {
@@ -14853,7 +14866,7 @@ function ModelDrawerStats({
   inflowwDailyStats
 }) {
   const g = (igGraphStats || []).find(x => x.model === model.name);
-  const now = new Date();
+  const now = zionToday();
   const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-`;
   const rowsM = (inflowwDailyStats || []).filter(r => r.model === model.name);
   const monthNet = rowsM.filter(r => r.statDate.startsWith(prefix)).reduce((t, r) => t + (r.earningsNet || 0), 0);
@@ -21548,7 +21561,7 @@ function Dashboard({
   const agencyModelNames = new Set(models.map(m => m.name));
   const myInflowwRows = (inflowwDailyStats || []).filter(r => agencyModelNames.has(r.model));
   const hasInflowwData = myInflowwRows.length > 0;
-  const objNow = new Date();
+  const objNow = zionToday();
   const objMonthStart = `${objNow.getFullYear()}-${String(objNow.getMonth() + 1).padStart(2, "0")}-01`;
   const monthRevenue = myInflowwRows.filter(r => r.statDate >= objMonthStart).reduce((sum, r) => sum + (r.earningsNet || 0), 0);
   const monthGoal = settings && settings.monthlyRevenueGoal || 20000;
@@ -21556,7 +21569,7 @@ function Dashboard({
   const dayOfMonth = objNow.getDate();
   const daysInMonth = new Date(objNow.getFullYear(), objNow.getMonth() + 1, 0).getDate();
   const getWeekDays = () => {
-    const now = new Date();
+    const now = zionToday();
     const dow = now.getDay();
     const daysSinceMonday = dow === 0 ? 6 : dow - 1;
     const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysSinceMonday);
@@ -21565,7 +21578,7 @@ function Dashboard({
     return out;
   };
   const getMonthDaysToDate = () => {
-    const now = new Date();
+    const now = zionToday();
     const first = new Date(now.getFullYear(), now.getMonth(), 1);
     const out = [];
     for (const d = new Date(first); d <= now; d.setDate(d.getDate() + 1)) out.push(toISO(d));
@@ -21619,7 +21632,7 @@ function Dashboard({
     return bucketIntoWeeks(allDays).reverse();
   };
   const weeksThisMonth = (() => {
-    const now = new Date();
+    const now = zionToday();
     return getAllWeeksHistory().filter(w => {
       const d = new Date(w.startISO + "T12:00:00");
       return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
@@ -21778,7 +21791,7 @@ function Dashboard({
     d.setDate(d.getDate() - 7);
     return toISO(d);
   }) : (() => {
-    const now = new Date();
+    const now = zionToday();
     const prevFirst = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const prevLast = new Date(now.getFullYear(), now.getMonth(), 0);
     const out = [];
@@ -22137,12 +22150,16 @@ function Dashboard({
   })());
 }
 Dashboard = React.memo(Dashboard);
-const toISO = d => new Intl.DateTimeFormat("en-CA", {
+const toISO = d => d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0 && d.getMilliseconds() === 0 ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` : new Intl.DateTimeFormat("en-CA", {
   timeZone: ZION_TZ,
   year: "numeric",
   month: "2-digit",
   day: "2-digit"
 }).format(d);
+function zionToday() {
+  const [y, m, d] = toISO(new Date()).split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
 const todayISO = () => toISO(new Date());
 const addDays = (iso, n) => {
   const d = new Date(iso + "T12:00:00");
@@ -26399,7 +26416,7 @@ function NeoPage({
   const heroModels = session.role === "creator" ? models.filter(m => m.name === session.name) : models;
   const openTasksCount = (session.role === "creator" ? tasks.filter(t => t.model === session.name) : tasks).filter(t => t.status !== "done").length;
   const relevantTrends = trends.filter(t => agency === "US" ? t.showUS : t.showCZ);
-  const now = new Date();
+  const now = zionToday();
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
   const agencyModelNames = new Set(heroModels.map(m => m.name));
   const inflowwThisMonth = (inflowwDailyStats || []).filter(r => agencyModelNames.has(r.model) && r.statDate >= monthStart);
@@ -28883,7 +28900,7 @@ function CreatorMoney({
     };
   }, [model]);
   const money = n => `$${Math.round(Number(n) || 0).toLocaleString("en-US")}`;
-  const now = new Date();
+  const now = zionToday();
   const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-`;
   const monthNet = (rows || []).filter(r => r.model === model && r.statDate.startsWith(prefix)).reduce((t, r) => t + (r.earningsNet || 0), 0);
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -34864,7 +34881,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">n9cl13</script>
+<script type="text/babel" id="zion-version">17x4wsq</script>
 <script>
 (function () {
   var last = 0;

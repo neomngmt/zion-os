@@ -3256,6 +3256,13 @@ function PlatformOverviewDashboard({
             <p className="c-muted text-sm mt-0.5">
               {connectedModels.length} account{connectedModels.length !== 1 ? "s" : ""} {fromProfile ? "read from the public profile" : "connected via Publer"}
             </p>
+            {fromProfile && (() => {
+              // the numbers count the posts made in the period, so a quiet account shows 0: say so plainly
+              const last = (bufferTopPosts || []).filter((p) => p.platform === platform && (account === "all" ? connectedNames.has(p.model) : p.model === account) && p.sentAt).sort((a, b) => b.sentAt - a.sentAt)[0];
+              const days = last ? Math.floor((Date.now() - last.sentAt) / 86400000) : null;
+              if (days == null || days < 2) return null;
+              return <p className="fs-12 mt-1.5 font-semibold" style={{ color: "#f5b942" }}>No new post since {new Date(last.sentAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} ({days} days). The numbers count posts made in the period, so 7D shows 0. Switch to 30D to see the older posts.</p>;
+            })()}
           </div>
         </div>
         <button onClick={onPlanPosts}
@@ -8590,7 +8597,7 @@ textarea.md-in{ resize:vertical; line-height:1.5; }
 `;
 function ModelDrawerStats({ model, igGraphStats, inflowwDailyStats }) {
   const g = (igGraphStats || []).find((x) => x.model === model.name);
-  const now = new Date();
+  const now = zionToday();
   const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-`;
   const rowsM = (inflowwDailyStats || []).filter((r) => r.model === model.name);
   const monthNet = rowsM.filter((r) => r.statDate.startsWith(prefix)).reduce((t, r) => t + (r.earningsNet || 0), 0);
@@ -11756,7 +11763,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
   // orb, mirrored here so it's visible without opening Neo. Same source (this
   // calendar month's real Infloww revenue, all models, Free + Paid combined)
   // and the same $20k fallback goal when no agency goal is set.
-  const objNow = new Date();
+  const objNow = zionToday();
   const objMonthStart = `${objNow.getFullYear()}-${String(objNow.getMonth() + 1).padStart(2, "0")}-01`;
   const monthRevenue = myInflowwRows.filter((r) => r.statDate >= objMonthStart).reduce((sum, r) => sum + (r.earningsNet || 0), 0);
   const monthGoal = (settings && settings.monthlyRevenueGoal) || 20000;
@@ -11775,7 +11782,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
   // 00:00 this collapses to just today (a single fresh candle) and fills back in
   // day by day through Sunday, same "to-date" shape as the Month view below.
   const getWeekDays = () => {
-    const now = new Date();
+    const now = zionToday();
     const dow = now.getDay(); // 0=Sun..6=Sat
     const daysSinceMonday = dow === 0 ? 6 : dow - 1;
     const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysSinceMonday);
@@ -11784,7 +11791,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
     return out;
   };
   const getMonthDaysToDate = () => {
-    const now = new Date();
+    const now = zionToday();
     const first = new Date(now.getFullYear(), now.getMonth(), 1);
     const out = [];
     for (const d = new Date(first); d <= now; d.setDate(d.getDate() + 1)) out.push(toISO(d));
@@ -11847,7 +11854,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
   // so this keeps the two views in agreement on both the week boundaries and
   // how many weeks the month actually has.
   const weeksThisMonth = (() => {
-    const now = new Date();
+    const now = zionToday();
     return getAllWeeksHistory()
       .filter((w) => {
         const d = new Date(w.startISO + "T12:00:00");
@@ -11975,7 +11982,7 @@ function Dashboard({ cards, models, stats, reels, onNavigate, inflowwDailyStats,
   const prevDays = revRange === 7
     ? days.map((day) => { const d = new Date(day + "T12:00:00"); d.setDate(d.getDate() - 7); return toISO(d); })
     : (() => {
-        const now = new Date();
+        const now = zionToday();
         const prevFirst = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const prevLast = new Date(now.getFullYear(), now.getMonth(), 0);
         const out = [];
@@ -12218,7 +12225,11 @@ Dashboard = React.memo(Dashboard);
 // ---------- date helpers ----------
 
 // the calendar day in the Zion time zone (Settings), so "today" is the Czech today for the CZ agency
-const toISO = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: ZION_TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+const toISO = (d) => (d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0 && d.getMilliseconds() === 0)
+  ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+  : new Intl.DateTimeFormat("en-CA", { timeZone: ZION_TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+// today in the Zion time zone, as a calendar day (phone midnight of that day) for day loops and month math
+function zionToday() { const [y, m, d] = toISO(new Date()).split("-").map(Number); return new Date(y, m - 1, d); }
 const todayISO = () => toISO(new Date());
 const addDays = (iso, n) => {
   const d = new Date(iso + "T12:00:00");
@@ -15439,7 +15450,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
 
   // ---- financial strip: this calendar month's real Infloww revenue (all
   // models, Free + Paid combined) vs a fixed $20k agency goal ----
-  const now = new Date();
+  const now = zionToday();
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
   const agencyModelNames = new Set(heroModels.map((m) => m.name));
   const inflowwThisMonth = (inflowwDailyStats || []).filter((r) => agencyModelNames.has(r.model) && r.statDate >= monthStart);
@@ -16958,7 +16969,7 @@ function CreatorMoney({ model, record, rows, children }) {
   }, [model]);
 
   const money = (n) => `$${Math.round(Number(n) || 0).toLocaleString("en-US")}`;
-  const now = new Date();
+  const now = zionToday();
   const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-`;
   const monthNet = (rows || []).filter((r) => r.model === model && r.statDate.startsWith(prefix)).reduce((t, r) => t + (r.earningsNet || 0), 0);
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
