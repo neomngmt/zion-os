@@ -238,6 +238,7 @@ async function neoLiveStart(agency) {
           let args = {}; try { args = JSON.parse(ev.arguments || "{}"); } catch (e) {}
           const job = (async () => {
             if (ev.name === "navigate") { neoLiveEmit("navigate", args.page); return "Opened."; }
+            if (ev.name === "weekly_report_upload") { neoLiveEmit("reportOpen"); return "The upload window is open on his screen now. Wait for the message that the screenshots are uploaded."; }
             if (ev.name === "weekly_report_build") neoLiveEmit("reportBuilding", args.report_id);
             try {
               const j = await neoLiveAgent({ run_tool: { name: ev.name, args } });
@@ -14976,10 +14977,12 @@ function WeeklyReportWindow({ report, setReport }) {
 @media (prefers-reduced-motion: reduce) { .wr-win, .wr-tile, .wr-scan::after, .wr-shim { animation: none !important; } }
 `;
   const close = () => setReport(null);
+  const isPhoneWR = typeof window !== "undefined" && window.innerWidth < 640;
+  if (report.stage === "ready") return null; // prepared, the window opens when the Boss says yes
   if (report.stage !== "drop") {
     const label = report.stage === "asking" ? "Neo is asking you the questions" : report.stage === "building" ? "Writing the report" : report.stage === "failed" ? "Something went wrong" : "Report ready";
-    return (
-      <div className="wr-win" style={{ position: "fixed", right: 20, bottom: 20, zIndex: 60, width: 320, maxWidth: "calc(100vw - 32px)", borderRadius: 16, background: "rgba(4,10,7,.94)", backdropFilter: "blur(10px)", padding: 16, overflow: "hidden" }}>
+    return ReactDOM.createPortal((
+      <div className="wr-win" style={{ position: "fixed", right: 16, bottom: "calc(16px + env(safe-area-inset-bottom))", zIndex: 300, fontFamily: "'Inter', system-ui, sans-serif", width: 320, maxWidth: "calc(100vw - 32px)", borderRadius: 16, background: "rgba(4,10,7,.94)", backdropFilter: "blur(10px)", padding: 16, overflow: "hidden" }}>
         <style>{css}</style>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ width: 9, height: 9, borderRadius: 9, background: report.stage === "failed" ? "#e07a5f" : G, boxShadow: `0 0 10px ${G}`, animation: report.stage === "done" ? "none" : "wrPulse 1.1s ease-in-out infinite" }} />
@@ -14998,10 +15001,10 @@ function WeeklyReportWindow({ report, setReport }) {
           </div>
         )}
       </div>
-    );
+    ), document.body);
   }
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, background: "rgba(0,0,0,.55)", backdropFilter: "blur(3px)" }}
+  return ReactDOM.createPortal((
+    <div style={{ position: "fixed", inset: 0, zIndex: 300, fontFamily: "'Inter', system-ui, sans-serif", display: "flex", alignItems: "center", justifyContent: "center", padding: "calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom))", background: "rgba(0,0,0,.72)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
       onDragOver={(e) => { e.preventDefault(); }} onDrop={(e) => { e.preventDefault(); setOver(""); addFiles(e.dataTransfer.files); }}>
       <style>{css}</style>
       <div className="wr-win wr-scan" style={{ position: "relative", width: 760, maxWidth: "100%", maxHeight: "calc(100vh - 32px)", overflowY: "auto", borderRadius: 20, background: "rgba(4,10,7,.96)", padding: "22px 22px 18px" }}>
@@ -15017,7 +15020,7 @@ function WeeklyReportWindow({ report, setReport }) {
           {[...WR_SLOTS, { slot: "other", label: "Anything else", hint: "chat, links, extra" }].map((t, i) => {
             const f = t.slot === "other" ? null : files[t.slot];
             return (
-              <button type="button" key={t.slot} className="wr-tile" style={{ animationDelay: `${0.12 + i * 0.07}s`, position: "relative", height: 150, borderRadius: 14, overflow: "hidden", textAlign: "left", padding: 0,
+              <button type="button" key={t.slot} className="wr-tile" style={{ animationDelay: `${0.12 + i * 0.07}s`, position: "relative", height: isPhoneWR ? 112 : 150, borderRadius: 14, overflow: "hidden", textAlign: "left", padding: 0,
                 border: `1px ${f ? "solid" : "dashed"} ${over === t.slot ? G : f ? "rgba(57,230,115,.45)" : "rgba(57,230,115,.22)"}`, background: over === t.slot ? "rgba(57,230,115,.1)" : "rgba(57,230,115,.03)" }}
                 onClick={() => { pickSlot.current = t.slot; pickRef.current && pickRef.current.click(); }}
                 onDragEnter={() => setOver(t.slot)} onDragLeave={() => setOver((o) => (o === t.slot ? "" : o))}
@@ -15045,7 +15048,7 @@ function WeeklyReportWindow({ report, setReport }) {
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 function NeoChat({ messages, setMessages, thinking, onSend, canAct, compact }) {
@@ -15581,7 +15584,8 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
       amp: (v) => { liveAmpRef.current = speakingRef.current ? v : 0; if (v > 0.05 && speakingRef.current) speakBumpRef.current = Date.now(); },
       navigate: (pg) => { if (onNavigate && pg) setTimeout(() => onNavigate(pg), 400); },
       pending: (x) => setMessages((all) => [...all, { role: "neo", text: "", pending: [{ id: `rt${Date.now()}${Math.random().toString(36).slice(2, 6)}`, ...x, state: "ask" }] }]),
-      report: (r) => setWeeklyReport({ id: r.report_id, model: r.model, week: r.week_number, period: r.period, stage: "drop" }),
+      report: (r) => setWeeklyReport({ id: r.report_id, model: r.model, week: r.week_number, period: r.period, stage: "ready" }),
+      reportOpen: () => setWeeklyReport((w) => (w ? { ...w, stage: "drop" } : w)),
       reportBuilding: () => setWeeklyReport((w) => (w ? { ...w, stage: "building" } : w)),
       reportDone: (r) => setWeeklyReport((w) => ({ ...(w || { model: "", week: "" }), stage: "done", url: r.url, file: r.file, telegram: r.telegram })),
       reportFailed: (m) => setWeeklyReport((w) => (w ? { ...w, stage: "failed", error: String(m || "").slice(0, 200) } : w)),

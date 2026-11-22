@@ -400,6 +400,10 @@ async function neoLiveStart(agency) {
                 neoLiveEmit("navigate", args.page);
                 return "Opened.";
               }
+              if (ev.name === "weekly_report_upload") {
+                neoLiveEmit("reportOpen");
+                return "The upload window is open on his screen now. Wait for the message that the screenshots are uploaded.";
+              }
               if (ev.name === "weekly_report_build") neoLiveEmit("reportBuilding", args.report_id);
               try {
                 const j = await neoLiveAgent({
@@ -25804,15 +25808,18 @@ function WeeklyReportWindow({
 @media (prefers-reduced-motion: reduce) { .wr-win, .wr-tile, .wr-scan::after, .wr-shim { animation: none !important; } }
 `;
   const close = () => setReport(null);
+  const isPhoneWR = typeof window !== "undefined" && window.innerWidth < 640;
+  if (report.stage === "ready") return null;
   if (report.stage !== "drop") {
     const label = report.stage === "asking" ? "Neo is asking you the questions" : report.stage === "building" ? "Writing the report" : report.stage === "failed" ? "Something went wrong" : "Report ready";
-    return React.createElement("div", {
+    return ReactDOM.createPortal(React.createElement("div", {
       className: "wr-win",
       style: {
         position: "fixed",
-        right: 20,
-        bottom: 20,
-        zIndex: 60,
+        right: 16,
+        bottom: "calc(16px + env(safe-area-inset-bottom))",
+        zIndex: 300,
+        fontFamily: "'Inter', system-ui, sans-serif",
         width: 320,
         maxWidth: "calc(100vw - 32px)",
         borderRadius: 16,
@@ -25903,19 +25910,21 @@ function WeeklyReportWindow({
         fontSize: 12,
         color: report.telegram ? G : "#6f8a7a"
       }
-    }, report.telegram ? "✓ Sent to your Telegram" : "Telegram did not go through, use the download.")));
+    }, report.telegram ? "✓ Sent to your Telegram" : "Telegram did not go through, use the download."))), document.body);
   }
-  return React.createElement("div", {
+  return ReactDOM.createPortal(React.createElement("div", {
     style: {
       position: "fixed",
       inset: 0,
-      zIndex: 60,
+      zIndex: 300,
+      fontFamily: "'Inter', system-ui, sans-serif",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      padding: 16,
-      background: "rgba(0,0,0,.55)",
-      backdropFilter: "blur(3px)"
+      padding: "calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom))",
+      background: "rgba(0,0,0,.72)",
+      backdropFilter: "blur(6px)",
+      WebkitBackdropFilter: "blur(6px)"
     },
     onDragOver: e => {
       e.preventDefault();
@@ -25998,7 +26007,7 @@ function WeeklyReportWindow({
       style: {
         animationDelay: `${0.12 + i * 0.07}s`,
         position: "relative",
-        height: 150,
+        height: isPhoneWR ? 112 : 150,
         borderRadius: 14,
         overflow: "hidden",
         textAlign: "left",
@@ -26128,7 +26137,7 @@ function WeeklyReportWindow({
       opacity: busy || sending || !done.length ? 0.45 : 1,
       transition: "opacity .2s"
     }
-  }, sending ? "Handing over" : "Hand them to Neo"))));
+  }, sending ? "Handing over" : "Hand them to Neo")))), document.body);
 }
 function NeoChat({
   messages,
@@ -26940,8 +26949,12 @@ function NeoPage({
         model: r.model,
         week: r.week_number,
         period: r.period,
-        stage: "drop"
+        stage: "ready"
       }),
+      reportOpen: () => setWeeklyReport(w => w ? {
+        ...w,
+        stage: "drop"
+      } : w),
       reportBuilding: () => setWeeklyReport(w => w ? {
         ...w,
         stage: "building"
@@ -35484,7 +35497,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">15mji1k</script>
+<script type="text/babel" id="zion-version">fancei</script>
 <script>
 (function () {
   var last = 0;
