@@ -64,6 +64,48 @@ const {
   useRef,
   useMemo
 } = React;
+let ZION_TZ = "Europe/Prague";
+function setZionTZ(tz) {
+  if (tz && tz !== ZION_TZ) {
+    try {
+      new Intl.DateTimeFormat("en", {
+        timeZone: tz
+      });
+      ZION_TZ = tz;
+    } catch (e) {}
+  }
+}
+function zionMidnight() {
+  const day = new Intl.DateTimeFormat("en-CA", {
+    timeZone: ZION_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date());
+  const guess = Date.parse(`${day}T00:00:00Z`);
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+    timeZone: ZION_TZ,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).formatToParts(new Date(guess)).map(x => [x.type, x.value]));
+  const asZone = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour) % 24, Number(p.minute));
+  return guess - (asZone - guess);
+}
+(() => {
+  for (const k of ["toLocaleString", "toLocaleDateString", "toLocaleTimeString"]) {
+    const orig = Date.prototype[k];
+    Date.prototype[k] = function (locales, opts) {
+      return orig.call(this, locales, opts && opts.timeZone ? opts : {
+        ...(opts || {}),
+        timeZone: ZION_TZ
+      });
+    };
+  }
+})();
 let sharedNeoAudioEl = null;
 function primeNeoAudioUnlock() {
   if (!sharedNeoAudioEl) {
@@ -1585,14 +1627,16 @@ function useSupaSettings(fallback) {
       const {
         data,
         error
-      } = await supabaseClient.from("settings").select("id, monthly_revenue_goal, neo_orb_layout").eq("id", 1).maybeSingle();
+      } = await supabaseClient.from("settings").select("id, monthly_revenue_goal, neo_orb_layout, timezone_cz, timezone_us").eq("id", 1).maybeSingle();
       if (error) throw error;
       setValue(data ? {
         adminPinCZ: "",
         adminPinUS: "",
         inflowwApiKey: "",
         monthlyRevenueGoal: data.monthly_revenue_goal != null ? Number(data.monthly_revenue_goal) : fallback.monthlyRevenueGoal || 20000,
-        neoOrbLayout: data.neo_orb_layout ? JSON.parse(data.neo_orb_layout) : fallback.neoOrbLayout || null
+        neoOrbLayout: data.neo_orb_layout ? JSON.parse(data.neo_orb_layout) : fallback.neoOrbLayout || null,
+        timezoneCZ: data.timezone_cz || "Europe/Prague",
+        timezoneUS: data.timezone_us || "America/New_York"
       } : fallback);
     } catch (e) {
       console.error("load failed for settings", e);
@@ -1612,6 +1656,8 @@ function useSupaSettings(fallback) {
         monthly_revenue_goal: next.monthlyRevenueGoal || 20000,
         neo_orb_layout: next.neoOrbLayout ? JSON.stringify(next.neoOrbLayout) : null
       };
+      if (next.timezoneCZ) patch.timezone_cz = next.timezoneCZ;
+      if (next.timezoneUS) patch.timezone_us = next.timezoneUS;
       if (next.adminPinCZ) patch.admin_pin_cz = next.adminPinCZ;
       if (next.adminPinUS) patch.admin_pin_us = next.adminPinUS;
       if (next.inflowwApiKey) patch.infloww_api_key = next.inflowwApiKey;
@@ -2652,7 +2698,7 @@ function DateRangePicker({
 }) {
   const [open, setOpen] = React.useState(false);
   const [cursor, setCursor] = React.useState(() => {
-    const d = new Date((start || toISO(new Date())) + "T00:00:00");
+    const d = new Date((start || toISO(new Date())) + "T12:00:00");
     return {
       year: d.getFullYear(),
       month: d.getMonth()
@@ -2697,7 +2743,7 @@ function DateRangePicker({
       setPickingEnd(false);
     }
   };
-  const fmt = iso => iso ? new Date(iso + "T00:00:00").toLocaleDateString(undefined, {
+  const fmt = iso => iso ? new Date(iso + "T12:00:00").toLocaleDateString(undefined, {
     day: "numeric",
     month: "short",
     year: "numeric"
@@ -2961,7 +3007,7 @@ function XMassPlanner({
         groups[n] = [];
       });
       photos.forEach((p, i) => groups[selected[i % selected.length]].push(p));
-      const startAt = new Date(rangeStart + "T00:00:00");
+      const startAt = new Date(rangeStart + "T12:00:00");
       if (rangeEnd) {
         const endAt = new Date(rangeEnd + "T23:59:59");
         const daysInRange = Math.max(1, Math.floor((endAt - startAt) / 86400000) + 1);
@@ -3204,7 +3250,7 @@ function XMassPlanner({
   const doneCount = plan ? plan.filter(it => itemStates[it.id]?.status === "done").length : 0;
   const localDateStr = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const weekDays = React.useMemo(() => {
-    const anchor = plan && plan.length ? new Date(rangeStart + "T00:00:00") : new Date();
+    const anchor = plan && plan.length ? new Date(rangeStart + "T12:00:00") : new Date();
     anchor.setHours(0, 0, 0, 0);
     return Array.from({
       length: 7
@@ -11653,7 +11699,7 @@ function IGModelPicker({
     const lastActiveDate = rows.filter(r => (r.postCount || 0) > 0).map(r => r.statDate).sort().pop();
     let lastActive = "—";
     if (lastActiveDate) {
-      const days = Math.round((Date.now() - new Date(lastActiveDate + "T00:00:00").getTime()) / 86400000);
+      const days = Math.round((Date.now() - new Date(lastActiveDate + "T12:00:00").getTime()) / 86400000);
       lastActive = days <= 0 ? "today" : days === 1 ? "1d ago" : `${days}d ago`;
     }
     return {
@@ -17245,11 +17291,7 @@ const acqHerAt = l => {
 };
 const acqSince = per => {
   if (per === "all") return 0;
-  if (per === "today") {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
-  }
+  if (per === "today") return zionMidnight();
   return Date.now() - Number(per) * 86400000;
 };
 const ACQ_PERIODS = [["today", "Today"], ["7", "Last 7 days"], ["30", "Last 30 days"], ["all", "All time"]];
@@ -21529,7 +21571,7 @@ function Dashboard({
     const weeks = [];
     let current = null;
     dayList.forEach(iso => {
-      const d = new Date(iso + "T00:00:00");
+      const d = new Date(iso + "T12:00:00");
       if (d.getDay() === 1 || !current) {
         current = {
           days: []
@@ -21561,19 +21603,19 @@ function Dashboard({
     const now = new Date();
     const todayISO = toISO(now);
     const allDays = [];
-    for (const d = new Date(earliest + "T00:00:00"); toISO(d) <= todayISO; d.setDate(d.getDate() + 1)) allDays.push(toISO(d));
+    for (const d = new Date(earliest + "T12:00:00"); toISO(d) <= todayISO; d.setDate(d.getDate() + 1)) allDays.push(toISO(d));
     return bucketIntoWeeks(allDays).reverse();
   };
   const weeksThisMonth = (() => {
     const now = new Date();
     return getAllWeeksHistory().filter(w => {
-      const d = new Date(w.startISO + "T00:00:00");
+      const d = new Date(w.startISO + "T12:00:00");
       return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
     }).sort((a, b) => a.startISO.localeCompare(b.startISO));
   })();
   const fmtWeekRange = (startISO, endISO) => {
-    const s = new Date(startISO + "T00:00:00"),
-      e = new Date(endISO + "T00:00:00");
+    const s = new Date(startISO + "T12:00:00"),
+      e = new Date(endISO + "T12:00:00");
     const fmt = (d, withYear) => d.toLocaleDateString(undefined, {
       month: "short",
       day: "numeric",
@@ -21596,7 +21638,7 @@ function Dashboard({
   const pureOf = (model, net, fee) => cutByModel[model] == null ? null : net * (cutByModel[model] / 100 - CHATTING_RATE) - fee;
   const weekBreakdown = (startISO, endISO) => {
     const daysPerMonth = {};
-    for (const d = new Date(startISO + "T00:00:00"); toISO(d) <= endISO; d.setDate(d.getDate() + 1)) {
+    for (const d = new Date(startISO + "T12:00:00"); toISO(d) <= endISO; d.setDate(d.getDate() + 1)) {
       const mk = toISO(d).slice(0, 7);
       daysPerMonth[mk] = (daysPerMonth[mk] || 0) + 1;
     }
@@ -21720,7 +21762,7 @@ function Dashboard({
     await refreshInfloww();
   };
   const prevDays = revRange === 7 ? days.map(day => {
-    const d = new Date(day + "T00:00:00");
+    const d = new Date(day + "T12:00:00");
     d.setDate(d.getDate() - 7);
     return toISO(d);
   }) : (() => {
@@ -21960,7 +22002,7 @@ function Dashboard({
     const allWeeks = getAllWeeksHistory();
     const groups = [];
     allWeeks.forEach(w => {
-      const monthKey = new Date(w.startISO + "T00:00:00").toLocaleDateString(undefined, {
+      const monthKey = new Date(w.startISO + "T12:00:00").toLocaleDateString(undefined, {
         month: "long",
         year: "numeric"
       });
@@ -22083,16 +22125,21 @@ function Dashboard({
   })());
 }
 Dashboard = React.memo(Dashboard);
-const toISO = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const toISO = d => new Intl.DateTimeFormat("en-CA", {
+  timeZone: ZION_TZ,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit"
+}).format(d);
 const todayISO = () => toISO(new Date());
 const addDays = (iso, n) => {
-  const d = new Date(iso + "T00:00:00");
+  const d = new Date(iso + "T12:00:00");
   d.setDate(d.getDate() + n);
   return toISO(d);
 };
 const fmtDay = iso => {
   if (!iso) return "";
-  const d = new Date(iso + "T00:00:00");
+  const d = new Date(iso + "T12:00:00");
   return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric"
@@ -24748,13 +24795,18 @@ function SettingsPanel({
   const [pinCZ, setPinCZ] = useState(settings.adminPinCZ || "");
   const [pinUS, setPinUS] = useState(settings.adminPinUS || "");
   const [monthlyGoal, setMonthlyGoal] = useState(settings.monthlyRevenueGoal || 20000);
+  const [tzCZ, setTzCZ] = useState(settings.timezoneCZ || "Europe/Prague");
+  const [tzUS, setTzUS] = useState(settings.timezoneUS || "America/New_York");
   const [saved, setSaved] = useState(false);
+  const ZONES = [["Europe/Prague", "Czech time (Prague)"], ["Europe/London", "London"], ["America/New_York", "US East (New York)"], ["America/Chicago", "US Central (Chicago)"], ["America/Los_Angeles", "US West (Los Angeles)"], ["America/Asuncion", "Paraguay (Asuncion)"], ["Asia/Bangkok", "Thailand (Bangkok)"], ["Asia/Dubai", "Dubai"], ["UTC", "UTC"]];
   const save = async () => {
     await persistSettings({
       ...settings,
       adminPinCZ: pinCZ.replace(/\D/g, "").slice(0, 4),
       adminPinUS: pinUS.replace(/\D/g, "").slice(0, 4),
-      monthlyRevenueGoal: Math.max(0, Number(monthlyGoal) || 0)
+      monthlyRevenueGoal: Math.max(0, Number(monthlyGoal) || 0),
+      timezoneCZ: tzCZ,
+      timezoneUS: tzUS
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -24784,6 +24836,28 @@ function SettingsPanel({
     placeholder: "leave blank to keep current",
     className: "w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text outline-none focus-border-accent"
   }))), React.createElement("div", {
+    className: "grid grid-cols-2 gap-3 max-w-sm mb-4"
+  }, React.createElement("div", null, React.createElement("label", {
+    className: "block fs-10 uppercase tracking-wide c-muted font-mono mb-1"
+  }, "🇨🇿 CZ time zone"), React.createElement("select", {
+    value: tzCZ,
+    onChange: e => setTzCZ(e.target.value),
+    className: "w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text outline-none focus-border-accent"
+  }, ZONES.map(([v, l]) => React.createElement("option", {
+    key: v,
+    value: v
+  }, l)))), React.createElement("div", null, React.createElement("label", {
+    className: "block fs-10 uppercase tracking-wide c-muted font-mono mb-1"
+  }, "🇺🇸 US time zone"), React.createElement("select", {
+    value: tzUS,
+    onChange: e => setTzUS(e.target.value),
+    className: "w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text outline-none focus-border-accent"
+  }, ZONES.map(([v, l]) => React.createElement("option", {
+    key: v,
+    value: v
+  }, l))))), React.createElement("p", {
+    className: "c-faint fs-11 mb-4 max-w-sm"
+  }, "All dates and times in Zion (today, weeks, charts, posting times) follow this zone, not the phone's own. Models use the zone of their agency."), React.createElement("div", {
     className: "max-w-sm mb-4"
   }, React.createElement("label", {
     className: "block fs-10 uppercase tracking-wide c-muted font-mono mb-1"
@@ -34303,6 +34377,7 @@ function App() {
   const NAV = session.role === "admin" ? NAV_ADMIN : NAV_CREATOR;
   const restrictModel = session.role === "creator" ? session.name : undefined;
   const currentView = view || "dashboard";
+  setZionTZ(session.agency === "US" ? settings.timezoneUS || "America/New_York" : settings.timezoneCZ || "Europe/Prague");
   try {
     document.documentElement.dataset.zpage = currentView;
     document.documentElement.dataset.zrole = session.role || "";
@@ -34788,7 +34863,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1u7xi9s</script>
+<script type="text/babel" id="zion-version">fdkkh5</script>
 <script>
 (function () {
   var last = 0;
