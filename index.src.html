@@ -15551,25 +15551,25 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
               ish backdrop so the circuit-board background's randomly-placed
               traces (regenerated fresh each mount) can never visibly cut
               through the text sitting on top of them. */}
-          <div className="hidden sm:flex sm:flex-col items-center sm:items-start text-center sm:text-left" style={{ width: 280, flexShrink: 0, overflow: "hidden", background: "rgba(3,7,5,0.55)", backdropFilter: "blur(4px)", borderRadius: "10px", padding: "10px 12px", margin: "-10px -12px" }}>
-            <div style={{ transform: isDesktopViewport ? `translate(12px, -12px)` : "none" }}>
-              <div className="flex items-baseline gap-2 neo-fade-in" style={{ animationDelay: "0.15s" }}>
+          <div className="hidden sm:flex sm:flex-col items-center sm:items-start text-center sm:text-left" style={{ width: 320, flexShrink: 0, overflow: "hidden", background: "rgba(3,7,5,0.55)", backdropFilter: "blur(4px)", borderRadius: "10px", padding: "10px 12px", margin: "22px -12px -10px" }}>
+            <div>
+              <div className="flex items-center gap-3 neo-fade-in" style={{ animationDelay: "0.15s" }}>
                 <span style={{
-                  width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+                  width: 11, height: 11, borderRadius: "50%", flexShrink: 0,
                   background: thinking ? amber : neoGreen,
                   boxShadow: `0 0 8px ${thinking ? amber : neoGreen}`,
                   animation: (thinking || speaking || listening) ? "neoDotBlink 0.8s ease-in-out infinite" : "neoDotBlink 1.6s ease-in-out infinite",
                 }} />
-                <span className="font-bold tracking-widest" style={{ color: neoGreen, textShadow: `0 0 12px ${neoGreen}aa`, fontSize: "18px" }}>
+                <span className="font-bold tracking-widest" style={{ color: neoGreen, textShadow: `0 0 12px ${neoGreen}aa`, fontSize: "30px", lineHeight: 1 }}>
                   NEO
                 </span>
-                <span className="fs-11 tracking-widest" style={{ color: thinking ? amber : (speaking || listening) ? neoGreen : textDim, letterSpacing: "2px" }}>
+                <span className="fs-13 tracking-widest" style={{ color: thinking ? amber : (speaking || listening) ? neoGreen : textDim, letterSpacing: "2px" }}>
                   · {thinking ? "THINKING" : speaking ? "SPEAKING" : listening ? "LISTENING" : "ONLINE"}
                 </span>
               </div>
               {/* fixed-height status area — content changes but the box never does, so it can't shove other elements around */}
-              <div className="mt-3 neo-fade-in overflow-hidden" style={{ height: 40, maxWidth: 280, animationDelay: "0.4s" }}>
-                <div className="fs-13 italic" style={{ color: neoGreen, opacity: 0.9 }}>
+              <div className="mt-3 neo-fade-in overflow-hidden" style={{ height: 52, maxWidth: 320, animationDelay: "0.4s" }}>
+                <div className="fs-16 italic" style={{ color: neoGreen, opacity: 0.9 }}>
                   {neoStatus}
                 </div>
               </div>
@@ -15646,7 +15646,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
 
       {/* empty spacer, same width as the left panel — keeps the orb visually
           centered now that the right panel has no content of its own */}
-      <div className="hidden sm:block" style={{ width: 280, flexShrink: 0 }} />
+      <div className="hidden sm:block" style={{ width: 320, flexShrink: 0 }} />
 
       </div>
 

@@ -26556,28 +26556,24 @@ function NeoPage({
   }, React.createElement("div", {
     className: "hidden sm:flex sm:flex-col items-center sm:items-start text-center sm:text-left",
     style: {
-      width: 280,
+      width: 320,
       flexShrink: 0,
       overflow: "hidden",
       background: "rgba(3,7,5,0.55)",
       backdropFilter: "blur(4px)",
       borderRadius: "10px",
       padding: "10px 12px",
-      margin: "-10px -12px"
+      margin: "22px -12px -10px"
     }
-  }, React.createElement("div", {
-    style: {
-      transform: isDesktopViewport ? `translate(12px, -12px)` : "none"
-    }
-  }, React.createElement("div", {
-    className: "flex items-baseline gap-2 neo-fade-in",
+  }, React.createElement("div", null, React.createElement("div", {
+    className: "flex items-center gap-3 neo-fade-in",
     style: {
       animationDelay: "0.15s"
     }
   }, React.createElement("span", {
     style: {
-      width: 8,
-      height: 8,
+      width: 11,
+      height: 11,
       borderRadius: "50%",
       flexShrink: 0,
       background: thinking ? amber : neoGreen,
@@ -26589,10 +26585,11 @@ function NeoPage({
     style: {
       color: neoGreen,
       textShadow: `0 0 12px ${neoGreen}aa`,
-      fontSize: "18px"
+      fontSize: "30px",
+      lineHeight: 1
     }
   }, "NEO"), React.createElement("span", {
-    className: "fs-11 tracking-widest",
+    className: "fs-13 tracking-widest",
     style: {
       color: thinking ? amber : speaking || listening ? neoGreen : textDim,
       letterSpacing: "2px"
@@ -26600,12 +26597,12 @@ function NeoPage({
   }, "· ", thinking ? "THINKING" : speaking ? "SPEAKING" : listening ? "LISTENING" : "ONLINE")), React.createElement("div", {
     className: "mt-3 neo-fade-in overflow-hidden",
     style: {
-      height: 40,
-      maxWidth: 280,
+      height: 52,
+      maxWidth: 320,
       animationDelay: "0.4s"
     }
   }, React.createElement("div", {
-    className: "fs-13 italic",
+    className: "fs-16 italic",
     style: {
       color: neoGreen,
       opacity: 0.9
@@ -26795,7 +26792,7 @@ function NeoPage({
   })))), React.createElement("div", {
     className: "hidden sm:block",
     style: {
-      width: 280,
+      width: 320,
       flexShrink: 0
     }
   })), false && React.createElement("div", {
@@ -34912,7 +34909,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1667poz</script>
+<script type="text/babel" id="zion-version">qee0bc</script>
 <script>
 (function () {
   var last = 0;
