@@ -26550,7 +26550,7 @@ function NeoPage({
   }, "/"), " ", cards.length))), React.createElement("div", {
     className: "flex flex-col sm:flex-row sm:items-center sm:justify-center items-center",
     style: {
-      gap: "3rem",
+      gap: isDesktopViewport ? Math.round(Math.min(winWidth * 0.32, 650) * 0.98 * 0.16) + 56 : "3rem",
       minHeight: "70vh"
     }
   }, React.createElement("div", {
@@ -26597,7 +26597,7 @@ function NeoPage({
       color: thinking ? amber : speaking || listening ? neoGreen : textDim,
       letterSpacing: "2px"
     }
-  }, "— ", thinking ? "THINKING" : speaking ? "SPEAKING" : listening ? "LISTENING" : "ONLINE")), React.createElement("div", {
+  }, "· ", thinking ? "THINKING" : speaking ? "SPEAKING" : listening ? "LISTENING" : "ONLINE")), React.createElement("div", {
     className: "mt-3 neo-fade-in overflow-hidden",
     style: {
       height: 40,
@@ -26632,7 +26632,7 @@ function NeoPage({
       letterSpacing: "3px",
       animationDelay: "0.5s"
     }
-  }, "N.E.O. — ", React.createElement("b", {
+  }, "N.E.O. · ", React.createElement("b", {
     style: {
       color: amber
     }
@@ -34912,7 +34912,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">8dezj4</script>
+<script type="text/babel" id="zion-version">1667poz</script>
 <script>
 (function () {
   var last = 0;
