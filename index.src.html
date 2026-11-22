@@ -2235,13 +2235,15 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
         }
         if (data?.error) throw new Error(`${modelName}: ${data.error}`);
         const captions = data.captions || [];
+        const options = data.options || [];
         if (data.sources) setSourcesByModel((prev) => ({ ...prev, [modelName]: data.sources }));
         const slots = nextMassPlannerSlots(modelPhotos.length, activeHours, startAt);
         // One caption per photo, in the same order they were sent — no more
         // modulo-cycling a small caption pool, since each caption is now
         // written to match that specific photo.
         modelPhotos.forEach((photo, i) => {
-          items.push({ id: uid(), model: modelName, photo, mediaKind: photo.kind, caption: captions[i] || "", scheduledAt: slots[i].toISOString() });
+          const alts = (options[i] || []).filter(Boolean);
+          items.push({ id: uid(), model: modelName, photo, mediaKind: photo.kind, caption: captions[i] || alts[0] || "", alts: alts.length ? alts : [captions[i] || ""], scheduledAt: slots[i].toISOString() });
         });
       }));
       items.sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
@@ -2605,9 +2607,6 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
                                 <div className="absolute top-1.5 right-1.5 fs-9 font-mono px-1 rounded" style={{ background: "rgba(0,0,0,0.55)", color: "#fff" }}>
                                   {new Date(it.scheduledAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}
                                 </div>
-                                <div className="absolute bottom-1 left-1.5 right-1.5 fs-9 leading-snug line-clamp-2" style={{ color: "rgba(255,255,255,0.92)" }}>
-                                  {it.caption}
-                                </div>
                                 {st && (
                                   <div className="absolute inset-0 flex items-center justify-center"
                                     style={{ background: st === "error" ? "rgba(120,20,20,0.45)" : "rgba(0,0,0,0.45)" }}>
@@ -2616,6 +2615,20 @@ function XMassPlanner({ models, lockedModel, defaultOpen = true, platform = "x",
                                     {st === "error" && <span className="fs-9 font-mono text-white text-center px-1">{itemStates[it.id].error}</span>}
                                   </div>
                                 )}
+                                {platform !== "snap" || snapKind !== "story" ? (
+                                  <div style={{ background: "#0b0f0d", borderTop: "1px solid rgba(57,230,115,0.12)" }}>
+                                    <textarea value={it.caption} disabled={st === "done" || st === "uploading" || st === "scheduling"} rows={3}
+                                      onChange={(e) => { const v = e.target.value; setPlan((prev) => prev.map((x) => (x.id === it.id ? { ...x, caption: v } : x))); }}
+                                      className="w-full fs-11 leading-snug c-text outline-none resize-none px-1.5 pt-1.5"
+                                      style={{ background: "transparent", border: 0, fontSize: 11 }} />
+                                    {(it.alts || []).length > 1 && st !== "done" && (
+                                      <button type="button" className="fs-9 font-mono uppercase tracking-wide c-accent px-1.5 pb-1.5 tap"
+                                        onClick={() => setPlan((prev) => prev.map((x) => { if (x.id !== it.id) return x; const k = x.alts.indexOf(x.caption); return { ...x, caption: x.alts[(k + 1) % x.alts.length] }; }))}>
+                                        ↻ other option {Math.max(1, (it.alts || []).indexOf(it.caption) + 1)}/{it.alts.length}
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : null}
                               </div>
                             );
                           })}
@@ -5178,8 +5191,8 @@ function SocialPostLogDashboard({ platform, label, Logo, models, handleKey, onPl
   const rows = log || [];
   const past7 = rows.filter((r) => { const t = Date.parse(r.scheduled_at); return t <= now && t > now - 7 * day; });
   const next7 = rows.filter((r) => { const t = Date.parse(r.scheduled_at); return t > now && t <= now + 7 * day; });
-  const days = Array.from({ length: 14 }, (_, i) => { const d = new Date(now + (i - 6) * day); return d.toISOString().slice(0, 10); }); // 6 days back, today, 7 days ahead
-  const perDay = days.map((d) => rows.filter((r) => String(r.scheduled_at).slice(0, 10) === d).length);
+  const days = Array.from({ length: 14 }, (_, i) => { const d = new Date(now + (i - 6) * day); return toISO(d); }); // 6 days back, today, 7 days ahead (Zion days)
+  const perDay = days.map((d) => rows.filter((r) => toISO(new Date(r.scheduled_at)) === d).length);
   const maxDay = Math.max(1, ...perDay);
   const fmtWhen = (iso) => new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   const linkedCount = models.filter((m) => linkedFn(m)).length;
@@ -5201,7 +5214,7 @@ function SocialPostLogDashboard({ platform, label, Logo, models, handleKey, onPl
       <div className="hb-card" style={{ marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 6 }}>
           <div style={{ fontWeight: 800, fontSize: 15 }}>Posts per day</div>
-          <span className="hb-note">last 7 days and the next 7, scheduled through Zion</span>
+          <span className="hb-note">last 7 days and the next 7, everything in OneUp</span>
         </div>
         <div className="nd-bars">
           {perDay.map((n, i) => (
@@ -5256,7 +5269,7 @@ function SnapOverviewDashboard({ models, onPlanPosts }) {
   const accs = useOneupAccounts();
   return <SocialPostLogDashboard platform="snap" label="Snapchat" Logo={SnapchatLogo} models={models} handleKey="snapHandle" onPlanPosts={onPlanPosts}
     linkedFn={(m) => Array.isArray(accs) ? oneupLinked(accs, "snap", m.name) : !!m.snapHandle}
-    note="Counts come from posts scheduled through Zion since 18 Nov 2026. Snapchat views need OneUp analytics, which is not on the current plan." />;
+    note="Posts come from OneUp (planned in Zion or straight in OneUp), synced every hour. Snapchat views need OneUp analytics, which is not on the current plan." />;
 }
 
 function FacebookPagesPanel({ models, restrictModel }) {

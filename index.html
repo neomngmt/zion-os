@@ -3050,18 +3050,21 @@ function XMassPlanner({
         }
         if (data?.error) throw new Error(`${modelName}: ${data.error}`);
         const captions = data.captions || [];
+        const options = data.options || [];
         if (data.sources) setSourcesByModel(prev => ({
           ...prev,
           [modelName]: data.sources
         }));
         const slots = nextMassPlannerSlots(modelPhotos.length, activeHours, startAt);
         modelPhotos.forEach((photo, i) => {
+          const alts = (options[i] || []).filter(Boolean);
           items.push({
             id: uid(),
             model: modelName,
             photo,
             mediaKind: photo.kind,
-            caption: captions[i] || "",
+            caption: captions[i] || alts[0] || "",
+            alts: alts.length ? alts : [captions[i] || ""],
             scheduledAt: slots[i].toISOString()
           });
         });
@@ -3619,12 +3622,7 @@ function XMassPlanner({
         hour: "2-digit",
         minute: "2-digit",
         hourCycle: "h23"
-      })), React.createElement("div", {
-        className: "absolute bottom-1 left-1.5 right-1.5 fs-9 leading-snug line-clamp-2",
-        style: {
-          color: "rgba(255,255,255,0.92)"
-        }
-      }, it.caption), st && React.createElement("div", {
+      })), st && React.createElement("div", {
         className: "absolute inset-0 flex items-center justify-center",
         style: {
           background: st === "error" ? "rgba(120,20,20,0.45)" : "rgba(0,0,0,0.45)"
@@ -3644,7 +3642,40 @@ function XMassPlanner({
         className: "animate-spin text-white"
       }), st === "error" && React.createElement("span", {
         className: "fs-9 font-mono text-white text-center px-1"
-      }, itemStates[it.id].error)));
+      }, itemStates[it.id].error)), platform !== "snap" || snapKind !== "story" ? React.createElement("div", {
+        style: {
+          background: "#0b0f0d",
+          borderTop: "1px solid rgba(57,230,115,0.12)"
+        }
+      }, React.createElement("textarea", {
+        value: it.caption,
+        disabled: st === "done" || st === "uploading" || st === "scheduling",
+        rows: 3,
+        onChange: e => {
+          const v = e.target.value;
+          setPlan(prev => prev.map(x => x.id === it.id ? {
+            ...x,
+            caption: v
+          } : x));
+        },
+        className: "w-full fs-11 leading-snug c-text outline-none resize-none px-1.5 pt-1.5",
+        style: {
+          background: "transparent",
+          border: 0,
+          fontSize: 11
+        }
+      }), (it.alts || []).length > 1 && st !== "done" && React.createElement("button", {
+        type: "button",
+        className: "fs-9 font-mono uppercase tracking-wide c-accent px-1.5 pb-1.5 tap",
+        onClick: () => setPlan(prev => prev.map(x => {
+          if (x.id !== it.id) return x;
+          const k = x.alts.indexOf(x.caption);
+          return {
+            ...x,
+            caption: x.alts[(k + 1) % x.alts.length]
+          };
+        }))
+      }, "↻ other option ", Math.max(1, (it.alts || []).indexOf(it.caption) + 1), "/", it.alts.length)) : null);
     })));
   })))));
 }
@@ -9239,9 +9270,9 @@ function SocialPostLogDashboard({
     length: 14
   }, (_, i) => {
     const d = new Date(now + (i - 6) * day);
-    return d.toISOString().slice(0, 10);
+    return toISO(d);
   });
-  const perDay = days.map(d => rows.filter(r => String(r.scheduled_at).slice(0, 10) === d).length);
+  const perDay = days.map(d => rows.filter(r => toISO(new Date(r.scheduled_at)) === d).length);
   const maxDay = Math.max(1, ...perDay);
   const fmtWhen = iso => new Date(iso).toLocaleString("en-GB", {
     weekday: "short",
@@ -9295,7 +9326,7 @@ function SocialPostLogDashboard({
     }
   }, "Posts per day"), React.createElement("span", {
     className: "hb-note"
-  }, "last 7 days and the next 7, scheduled through Zion")), React.createElement("div", {
+  }, "last 7 days and the next 7, everything in OneUp")), React.createElement("div", {
     className: "nd-bars"
   }, perDay.map((n, i) => React.createElement("div", {
     key: days[i],
@@ -9413,7 +9444,7 @@ function SnapOverviewDashboard({
     handleKey: "snapHandle",
     onPlanPosts: onPlanPosts,
     linkedFn: m => Array.isArray(accs) ? oneupLinked(accs, "snap", m.name) : !!m.snapHandle,
-    note: "Counts come from posts scheduled through Zion since 18 Nov 2026. Snapchat views need OneUp analytics, which is not on the current plan."
+    note: "Posts come from OneUp (planned in Zion or straight in OneUp), synced every hour. Snapchat views need OneUp analytics, which is not on the current plan."
   });
 }
 function FacebookPagesPanel({
@@ -34881,7 +34912,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">17x4wsq</script>
+<script type="text/babel" id="zion-version">8dezj4</script>
 <script>
 (function () {
   var last = 0;
