@@ -151,6 +151,11 @@ function neoLiveGreet() {
   try { c.dc.send(JSON.stringify({ type: "response.create" })); } catch (e) {}
   c.greetTimer = setTimeout(() => neoLiveGreetDone(c), 9000); // in case the greeting never plays
 }
+function neoLiveMute(on) {
+  const c = neoLive.c;
+  try { c && c.mic && c.mic.getTracks().forEach((t) => { t.enabled = !on; }); } catch (e) {}
+  try { on && c && c.dc && c.dc.readyState === "open" && c.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" })); } catch (e) {}
+}
 function neoLiveTell(text) {
   const c = neoLive.c;
   if (!c || !c.dc || c.dc.readyState !== "open") return false;
@@ -238,7 +243,7 @@ async function neoLiveStart(agency) {
           let args = {}; try { args = JSON.parse(ev.arguments || "{}"); } catch (e) {}
           const job = (async () => {
             if (ev.name === "navigate") { neoLiveEmit("navigate", args.page); return "Opened."; }
-            if (ev.name === "weekly_report_upload") { neoLiveEmit("reportOpen"); return "The upload window is open on his screen now. Wait for the message that the screenshots are uploaded."; }
+            if (ev.name === "weekly_report_upload") { c.quietNext = true; neoLiveMute(true); neoLiveEmit("reportOpen"); return "The upload window is open. Say nothing until the screenshots message."; }
             if (ev.name === "weekly_report_build") neoLiveEmit("reportBuilding", args.report_id);
             try {
               const j = await neoLiveAgent({ run_tool: { name: ev.name, args } });
@@ -256,7 +261,7 @@ async function neoLiveStart(agency) {
         }
         case "response.done": {
           const calls = c.calls; c.calls = [];
-          if (calls.length) { await Promise.all(calls); send({ type: "response.create" }); }
+          if (calls.length) { await Promise.all(calls); if (c.quietNext) c.quietNext = false; else send({ type: "response.create" }); }
           break;
         }
         default: break;
@@ -14954,8 +14959,12 @@ function WeeklyReportWindow({ report, setReport }) {
     setSending(true);
     try {
       await call({ action: "attach", report_id: report.id, screens: done.map((x) => ({ slot: x.slot, path: x.path })) });
-      const names = done.map((x) => (WR_SLOTS.find((s) => s.slot === x.slot) || { label: "extra screenshot" }).label.toLowerCase());
-      neoLiveTell(`[Zion] The screenshots are uploaded (${names.join(", ") || "none"}). Start the questions now, one at a time.`);
+      setReport((w) => ({ ...w, stage: "reading" }));
+      neoLiveMute(false);
+      neoLiveTell("[Zion] The Boss just handed you the screenshots. Say only: \"Thank you! Give me a second, I'm looking at the screens.\" Nothing else, then wait.");
+      let seen = "";
+      try { seen = (await call({ action: "read", report_id: report.id })).summary || ""; } catch (e) {}
+      neoLiveTell(`[Zion] What the screenshots show: ${seen || "(could not read them, ask the Boss for the key numbers)"}\nNow start the weekly report questions, one at a time, and use these numbers in them.`);
       setReport((w) => ({ ...w, stage: "asking" }));
     } catch (e) { setReport((w) => ({ ...w, error: e.message })); }
     setSending(false);
@@ -14976,11 +14985,11 @@ function WeeklyReportWindow({ report, setReport }) {
 .wr-shim { background: linear-gradient(90deg, rgba(57,230,115,.05) 0%, rgba(57,230,115,.28) 50%, rgba(57,230,115,.05) 100%); background-size: 200% 100%; animation: wrShimmer 1.2s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .wr-win, .wr-tile, .wr-scan::after, .wr-shim { animation: none !important; } }
 `;
-  const close = () => setReport(null);
+  const close = () => { if (report.stage === "drop") neoLiveMute(false); setReport(null); };
   const isPhoneWR = typeof window !== "undefined" && window.innerWidth < 640;
   if (report.stage === "ready") return null; // prepared, the window opens when the Boss says yes
   if (report.stage !== "drop") {
-    const label = report.stage === "asking" ? "Neo is asking you the questions" : report.stage === "building" ? "Writing the report" : report.stage === "failed" ? "Something went wrong" : "Report ready";
+    const label = report.stage === "reading" ? "Neo is looking at the screens" : report.stage === "asking" ? "Neo is asking you the questions" : report.stage === "building" ? "Writing the report" : report.stage === "failed" ? "Something went wrong" : "Report ready";
     return ReactDOM.createPortal((
       <div className="wr-win" style={{ position: "fixed", right: 16, bottom: "calc(16px + env(safe-area-inset-bottom))", zIndex: 300, fontFamily: "'Inter', system-ui, sans-serif", width: 320, maxWidth: "calc(100vw - 32px)", borderRadius: 16, background: "rgba(4,10,7,.94)", backdropFilter: "blur(10px)", padding: 16, overflow: "hidden" }}>
         <style>{css}</style>
