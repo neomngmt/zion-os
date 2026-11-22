@@ -160,6 +160,7 @@ function neoLiveTell(text) {
   const c = neoLive.c;
   if (!c || !c.dc || c.dc.readyState !== "open") return false;
   try {
+    c.autoRounds = 0;
     c.dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text }] } }));
     c.dc.send(JSON.stringify({ type: "response.create" }));
     return true;
@@ -234,7 +235,7 @@ async function neoLiveStart(agency) {
     dc.onmessage = async (m) => {
       let ev; try { ev = JSON.parse(m.data); } catch (e) { return; }
       switch (ev.type) {
-        case "input_audio_buffer.speech_started": neoLiveEmit("phase", "listening"); break;
+        case "input_audio_buffer.speech_started": c.autoRounds = 0; neoLiveEmit("phase", "listening"); break;
         case "input_audio_buffer.speech_stopped": neoLiveEmit("phase", "thinking"); break;
         case "output_audio_buffer.started": neoLiveEmit("phase", "speaking"); break;
         case "output_audio_buffer.stopped":
@@ -262,7 +263,12 @@ async function neoLiveStart(agency) {
         }
         case "response.done": {
           const calls = c.calls; c.calls = [];
-          if (calls.length) { await Promise.all(calls); if (c.quietNext) c.quietNext = false; else send({ type: "response.create" }); }
+          if (calls.length) {
+            await Promise.all(calls);
+            c.autoRounds = (c.autoRounds || 0) + 1;
+            if (c.quietNext) c.quietNext = false;
+            else if (c.autoRounds <= 2) send({ type: "response.create" });
+          }
           break;
         }
         default: break;
@@ -15005,9 +15011,9 @@ function WeeklyReportWindow({ report, setReport }) {
       setReport((w) => ({ ...w, stage: "reading" }));
       neoLiveMute(false);
       neoLiveTell("[Zion] The Boss just handed you the screenshots. Say only: \"Thank you! Give me a second, I'm looking at the screens.\" Nothing else, then wait.");
-      let seen = "";
-      try { seen = (await call({ action: "read", report_id: report.id })).summary || ""; } catch (e) {}
-      neoLiveTell(`[Zion] What the screenshots show: ${seen || "(could not read them, ask the Boss for the key numbers)"}\nNow start the weekly report questions, one at a time, and use these numbers in them.`);
+      let seen = {};
+      try { seen = await call({ action: "read", report_id: report.id }); } catch (e) {}
+      neoLiveTell(`[Zion] What the screenshots show: ${seen.summary || "(could not read them, ask the Boss for the key numbers)"}\n${seen.brief || ""}\nNow ask the first question only, then wait for his answer.`);
       setReport((w) => ({ ...w, stage: "asking" }));
     } catch (e) { setReport((w) => ({ ...w, error: e.message })); }
     setSending(false);

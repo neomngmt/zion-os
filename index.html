@@ -243,6 +243,7 @@ function neoLiveTell(text) {
   const c = neoLive.c;
   if (!c || !c.dc || c.dc.readyState !== "open") return false;
   try {
+    c.autoRounds = 0;
     c.dc.send(JSON.stringify({
       type: "conversation.item.create",
       item: {
@@ -389,6 +390,7 @@ async function neoLiveStart(agency) {
       }
       switch (ev.type) {
         case "input_audio_buffer.speech_started":
+          c.autoRounds = 0;
           neoLiveEmit("phase", "listening");
           break;
         case "input_audio_buffer.speech_stopped":
@@ -471,7 +473,8 @@ async function neoLiveStart(agency) {
             c.calls = [];
             if (calls.length) {
               await Promise.all(calls);
-              if (c.quietNext) c.quietNext = false;else send({
+              c.autoRounds = (c.autoRounds || 0) + 1;
+              if (c.quietNext) c.quietNext = false;else if (c.autoRounds <= 2) send({
                 type: "response.create"
               });
             }
@@ -25953,14 +25956,14 @@ function WeeklyReportWindow({
       }));
       neoLiveMute(false);
       neoLiveTell("[Zion] The Boss just handed you the screenshots. Say only: \"Thank you! Give me a second, I'm looking at the screens.\" Nothing else, then wait.");
-      let seen = "";
+      let seen = {};
       try {
-        seen = (await call({
+        seen = await call({
           action: "read",
           report_id: report.id
-        })).summary || "";
+        });
       } catch (e) {}
-      neoLiveTell(`[Zion] What the screenshots show: ${seen || "(could not read them, ask the Boss for the key numbers)"}\nNow start the weekly report questions, one at a time, and use these numbers in them.`);
+      neoLiveTell(`[Zion] What the screenshots show: ${seen.summary || "(could not read them, ask the Boss for the key numbers)"}\n${seen.brief || ""}\nNow ask the first question only, then wait for his answer.`);
       setReport(w => ({
         ...w,
         stage: "asking"
@@ -35695,7 +35698,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">7crmx0</script>
+<script type="text/babel" id="zion-version">1tbvkze</script>
 <script>
 (function () {
   var last = 0;
