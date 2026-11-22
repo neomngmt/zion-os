@@ -239,6 +239,28 @@ function neoLiveMute(on) {
     }));
   } catch (e) {}
 }
+function neoLivePatience(low) {
+  const c = neoLive.c;
+  if (!c || !c.dc || c.dc.readyState !== "open") return;
+  try {
+    c.dc.send(JSON.stringify({
+      type: "session.update",
+      session: {
+        type: "realtime",
+        audio: {
+          input: {
+            turn_detection: {
+              type: "semantic_vad",
+              eagerness: low ? "low" : "high",
+              create_response: true,
+              interrupt_response: true
+            }
+          }
+        }
+      }
+    }));
+  } catch (e) {}
+}
 function neoLiveTell(text) {
   const c = neoLive.c;
   if (!c || !c.dc || c.dc.readyState !== "open") return false;
@@ -25963,7 +25985,7 @@ function WeeklyReportWindow({
           report_id: report.id
         });
       } catch (e) {}
-      neoLiveTell(`[Zion] What the screenshots show: ${seen.summary || "(could not read them, ask the Boss for the key numbers)"}\n${seen.brief || ""}\nNow ask the first question only, then wait for his answer.`);
+      neoLiveTell(`[Zion] What the screenshots show: ${seen.summary || "(could not read them, ask the Boss for the key numbers)"}\n${seen.brief || ""}\nNow say the 2 or 3 key numbers in one sentence and ask: "Any more screens, or shall we start the questions?"`);
       setReport(w => ({
         ...w,
         stage: "asking"
@@ -27133,13 +27155,16 @@ function NeoPage({
           state: "ask"
         }]
       }]),
-      report: r => setWeeklyReport({
-        id: r.report_id,
-        model: r.model,
-        week: r.week_number,
-        period: r.period,
-        stage: "ready"
-      }),
+      report: r => {
+        neoLivePatience(true);
+        setWeeklyReport({
+          id: r.report_id,
+          model: r.model,
+          week: r.week_number,
+          period: r.period,
+          stage: "ready"
+        });
+      },
       reportOpen: () => setWeeklyReport(w => w ? {
         ...w,
         stage: "drop"
@@ -27152,7 +27177,7 @@ function NeoPage({
         ...w,
         stage: "building"
       } : w),
-      reportDone: r => setWeeklyReport(w => ({
+      reportDone: r => neoLivePatience(false) || setWeeklyReport(w => ({
         ...(w || {
           model: "",
           week: ""
@@ -35698,7 +35723,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1tbvkze</script>
+<script type="text/babel" id="zion-version">3wvg6z</script>
 <script>
 (function () {
   var last = 0;

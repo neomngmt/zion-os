@@ -156,6 +156,11 @@ function neoLiveMute(on) {
   try { c && c.mic && c.mic.getTracks().forEach((t) => { t.enabled = !on; }); } catch (e) {}
   try { on && c && c.dc && c.dc.readyState === "open" && c.dc.send(JSON.stringify({ type: "input_audio_buffer.clear" })); } catch (e) {}
 }
+function neoLivePatience(low) {
+  const c = neoLive.c;
+  if (!c || !c.dc || c.dc.readyState !== "open") return;
+  try { c.dc.send(JSON.stringify({ type: "session.update", session: { type: "realtime", audio: { input: { turn_detection: { type: "semantic_vad", eagerness: low ? "low" : "high", create_response: true, interrupt_response: true } } } } })); } catch (e) {}
+}
 function neoLiveTell(text) {
   const c = neoLive.c;
   if (!c || !c.dc || c.dc.readyState !== "open") return false;
@@ -15013,7 +15018,7 @@ function WeeklyReportWindow({ report, setReport }) {
       neoLiveTell("[Zion] The Boss just handed you the screenshots. Say only: \"Thank you! Give me a second, I'm looking at the screens.\" Nothing else, then wait.");
       let seen = {};
       try { seen = await call({ action: "read", report_id: report.id }); } catch (e) {}
-      neoLiveTell(`[Zion] What the screenshots show: ${seen.summary || "(could not read them, ask the Boss for the key numbers)"}\n${seen.brief || ""}\nNow ask the first question only, then wait for his answer.`);
+      neoLiveTell(`[Zion] What the screenshots show: ${seen.summary || "(could not read them, ask the Boss for the key numbers)"}\n${seen.brief || ""}\nNow say the 2 or 3 key numbers in one sentence and ask: "Any more screens, or shall we start the questions?"`);
       setReport((w) => ({ ...w, stage: "asking" }));
     } catch (e) { setReport((w) => ({ ...w, error: e.message })); }
     setSending(false);
@@ -15643,11 +15648,11 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
       amp: (v) => { liveAmpRef.current = speakingRef.current ? v : 0; if (v > 0.05 && speakingRef.current) speakBumpRef.current = Date.now(); },
       navigate: (pg) => { if (onNavigate && pg) setTimeout(() => onNavigate(pg), 400); },
       pending: (x) => setMessages((all) => [...all, { role: "neo", text: "", pending: [{ id: `rt${Date.now()}${Math.random().toString(36).slice(2, 6)}`, ...x, state: "ask" }] }]),
-      report: (r) => setWeeklyReport({ id: r.report_id, model: r.model, week: r.week_number, period: r.period, stage: "ready" }),
+      report: (r) => { neoLivePatience(true); setWeeklyReport({ id: r.report_id, model: r.model, week: r.week_number, period: r.period, stage: "ready" }); },
       reportOpen: () => setWeeklyReport((w) => (w ? { ...w, stage: "drop" } : w)),
       askType: (x) => setTypeAsk({ prompt: x.prompt, key: Date.now() }),
       reportBuilding: () => setWeeklyReport((w) => (w ? { ...w, stage: "building" } : w)),
-      reportDone: (r) => setWeeklyReport((w) => ({ ...(w || { model: "", week: "" }), stage: "done", url: r.url, file: r.file, telegram: r.telegram })),
+      reportDone: (r) => neoLivePatience(false) || setWeeklyReport((w) => ({ ...(w || { model: "", week: "" }), stage: "done", url: r.url, file: r.file, telegram: r.telegram })),
       reportFailed: (m) => setWeeklyReport((w) => (w ? { ...w, stage: "failed", error: String(m || "").slice(0, 200) } : w)),
     };
     setCallState(neoLive.state);
