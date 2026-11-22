@@ -1635,8 +1635,7 @@ function useSupaSettings(fallback) {
         inflowwApiKey: "",
         monthlyRevenueGoal: data.monthly_revenue_goal != null ? Number(data.monthly_revenue_goal) : fallback.monthlyRevenueGoal || 20000,
         neoOrbLayout: data.neo_orb_layout ? JSON.parse(data.neo_orb_layout) : fallback.neoOrbLayout || null,
-        timezoneCZ: data.timezone_cz || "Europe/Prague",
-        timezoneUS: data.timezone_us || "America/New_York"
+        timezone: data.timezone_cz || "Europe/Prague"
       } : fallback);
     } catch (e) {
       console.error("load failed for settings", e);
@@ -1656,8 +1655,7 @@ function useSupaSettings(fallback) {
         monthly_revenue_goal: next.monthlyRevenueGoal || 20000,
         neo_orb_layout: next.neoOrbLayout ? JSON.stringify(next.neoOrbLayout) : null
       };
-      if (next.timezoneCZ) patch.timezone_cz = next.timezoneCZ;
-      if (next.timezoneUS) patch.timezone_us = next.timezoneUS;
+      if (next.timezone) patch.timezone_cz = next.timezone;
       if (next.adminPinCZ) patch.admin_pin_cz = next.adminPinCZ;
       if (next.adminPinUS) patch.admin_pin_us = next.adminPinUS;
       if (next.inflowwApiKey) patch.infloww_api_key = next.inflowwApiKey;
@@ -24795,8 +24793,7 @@ function SettingsPanel({
   const [pinCZ, setPinCZ] = useState(settings.adminPinCZ || "");
   const [pinUS, setPinUS] = useState(settings.adminPinUS || "");
   const [monthlyGoal, setMonthlyGoal] = useState(settings.monthlyRevenueGoal || 20000);
-  const [tzCZ, setTzCZ] = useState(settings.timezoneCZ || "Europe/Prague");
-  const [tzUS, setTzUS] = useState(settings.timezoneUS || "America/New_York");
+  const [tz, setTz] = useState(settings.timezone || "Europe/Prague");
   const [saved, setSaved] = useState(false);
   const ZONES = [["Europe/Prague", "Czech time (Prague)"], ["Europe/London", "London"], ["America/New_York", "US East (New York)"], ["America/Chicago", "US Central (Chicago)"], ["America/Los_Angeles", "US West (Los Angeles)"], ["America/Asuncion", "Paraguay (Asuncion)"], ["Asia/Bangkok", "Thailand (Bangkok)"], ["Asia/Dubai", "Dubai"], ["UTC", "UTC"]];
   const save = async () => {
@@ -24805,8 +24802,7 @@ function SettingsPanel({
       adminPinCZ: pinCZ.replace(/\D/g, "").slice(0, 4),
       adminPinUS: pinUS.replace(/\D/g, "").slice(0, 4),
       monthlyRevenueGoal: Math.max(0, Number(monthlyGoal) || 0),
-      timezoneCZ: tzCZ,
-      timezoneUS: tzUS
+      timezone: tz
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -24836,28 +24832,19 @@ function SettingsPanel({
     placeholder: "leave blank to keep current",
     className: "w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text outline-none focus-border-accent"
   }))), React.createElement("div", {
-    className: "grid grid-cols-2 gap-3 max-w-sm mb-4"
-  }, React.createElement("div", null, React.createElement("label", {
+    className: "max-w-sm mb-2"
+  }, React.createElement("label", {
     className: "block fs-10 uppercase tracking-wide c-muted font-mono mb-1"
-  }, "🇨🇿 CZ time zone"), React.createElement("select", {
-    value: tzCZ,
-    onChange: e => setTzCZ(e.target.value),
+  }, "Zion time zone"), React.createElement("select", {
+    value: tz,
+    onChange: e => setTz(e.target.value),
     className: "w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text outline-none focus-border-accent"
   }, ZONES.map(([v, l]) => React.createElement("option", {
     key: v,
     value: v
-  }, l)))), React.createElement("div", null, React.createElement("label", {
-    className: "block fs-10 uppercase tracking-wide c-muted font-mono mb-1"
-  }, "🇺🇸 US time zone"), React.createElement("select", {
-    value: tzUS,
-    onChange: e => setTzUS(e.target.value),
-    className: "w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text outline-none focus-border-accent"
-  }, ZONES.map(([v, l]) => React.createElement("option", {
-    key: v,
-    value: v
-  }, l))))), React.createElement("p", {
+  }, l)))), React.createElement("p", {
     className: "c-faint fs-11 mb-4 max-w-sm"
-  }, "All dates and times in Zion (today, weeks, charts, posting times) follow this zone, not the phone's own. Models use the zone of their agency."), React.createElement("div", {
+  }, "The whole Zion (CZ and US agency, every model login) shows dates and times in this zone, not the phone's own: today, weeks, charts, posting times."), React.createElement("div", {
     className: "max-w-sm mb-4"
   }, React.createElement("label", {
     className: "block fs-10 uppercase tracking-wide c-muted font-mono mb-1"
@@ -34377,7 +34364,7 @@ function App() {
   const NAV = session.role === "admin" ? NAV_ADMIN : NAV_CREATOR;
   const restrictModel = session.role === "creator" ? session.name : undefined;
   const currentView = view || "dashboard";
-  setZionTZ(session.agency === "US" ? settings.timezoneUS || "America/New_York" : settings.timezoneCZ || "Europe/Prague");
+  setZionTZ(settings.timezone || "Europe/Prague");
   try {
     document.documentElement.dataset.zpage = currentView;
     document.documentElement.dataset.zrole = session.role || "";
@@ -34863,7 +34850,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">fdkkh5</script>
+<script type="text/babel" id="zion-version">16lqyb1</script>
 <script>
 (function () {
   var last = 0;

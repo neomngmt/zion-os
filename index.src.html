@@ -1079,7 +1079,7 @@ function useSupaSettings(fallback) {
     try {
       const { data, error } = await supabaseClient.from("settings").select("id, monthly_revenue_goal, neo_orb_layout, timezone_cz, timezone_us").eq("id", 1).maybeSingle();
       if (error) throw error;
-      setValue(data ? { adminPinCZ: "", adminPinUS: "", inflowwApiKey: "", monthlyRevenueGoal: data.monthly_revenue_goal != null ? Number(data.monthly_revenue_goal) : (fallback.monthlyRevenueGoal || 20000), neoOrbLayout: data.neo_orb_layout ? JSON.parse(data.neo_orb_layout) : (fallback.neoOrbLayout || null), timezoneCZ: data.timezone_cz || "Europe/Prague", timezoneUS: data.timezone_us || "America/New_York" } : fallback);
+      setValue(data ? { adminPinCZ: "", adminPinUS: "", inflowwApiKey: "", monthlyRevenueGoal: data.monthly_revenue_goal != null ? Number(data.monthly_revenue_goal) : (fallback.monthlyRevenueGoal || 20000), neoOrbLayout: data.neo_orb_layout ? JSON.parse(data.neo_orb_layout) : (fallback.neoOrbLayout || null), timezone: data.timezone_cz || "Europe/Prague" } : fallback);
     } catch (e) {
       console.error("load failed for settings", e);
       setValue(fallback);
@@ -1099,8 +1099,7 @@ function useSupaSettings(fallback) {
       // Since these are never fetched (see above), an unrelated save (e.g.
       // just the revenue goal) must not silently wipe the real PINs.
       const patch = { id: 1, monthly_revenue_goal: next.monthlyRevenueGoal || 20000, neo_orb_layout: next.neoOrbLayout ? JSON.stringify(next.neoOrbLayout) : null };
-      if (next.timezoneCZ) patch.timezone_cz = next.timezoneCZ;
-      if (next.timezoneUS) patch.timezone_us = next.timezoneUS;
+      if (next.timezone) patch.timezone_cz = next.timezone;
       if (next.adminPinCZ) patch.admin_pin_cz = next.adminPinCZ;
       if (next.adminPinUS) patch.admin_pin_us = next.adminPinUS;
       if (next.inflowwApiKey) patch.infloww_api_key = next.inflowwApiKey;
@@ -14229,8 +14228,7 @@ function SettingsPanel({ settings, persistSettings }) {
   const [pinCZ, setPinCZ] = useState(settings.adminPinCZ || "");
   const [pinUS, setPinUS] = useState(settings.adminPinUS || "");
   const [monthlyGoal, setMonthlyGoal] = useState(settings.monthlyRevenueGoal || 20000);
-  const [tzCZ, setTzCZ] = useState(settings.timezoneCZ || "Europe/Prague");
-  const [tzUS, setTzUS] = useState(settings.timezoneUS || "America/New_York");
+  const [tz, setTz] = useState(settings.timezone || "Europe/Prague");
   const [saved, setSaved] = useState(false);
   const ZONES = [["Europe/Prague", "Czech time (Prague)"], ["Europe/London", "London"], ["America/New_York", "US East (New York)"], ["America/Chicago", "US Central (Chicago)"], ["America/Los_Angeles", "US West (Los Angeles)"], ["America/Asuncion", "Paraguay (Asuncion)"], ["Asia/Bangkok", "Thailand (Bangkok)"], ["Asia/Dubai", "Dubai"], ["UTC", "UTC"]];
 
@@ -14240,8 +14238,7 @@ function SettingsPanel({ settings, persistSettings }) {
       adminPinCZ: pinCZ.replace(/\D/g, "").slice(0, 4),
       adminPinUS: pinUS.replace(/\D/g, "").slice(0, 4),
       monthlyRevenueGoal: Math.max(0, Number(monthlyGoal) || 0),
-      timezoneCZ: tzCZ,
-      timezoneUS: tzUS,
+      timezone: tz,
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -14263,21 +14260,13 @@ function SettingsPanel({ settings, persistSettings }) {
               className="w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text outline-none focus-border-accent" />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3 max-w-sm mb-4">
-          <div>
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">🇨🇿 CZ time zone</label>
-            <select value={tzCZ} onChange={(e) => setTzCZ(e.target.value)} className="w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text outline-none focus-border-accent">
-              {ZONES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">🇺🇸 US time zone</label>
-            <select value={tzUS} onChange={(e) => setTzUS(e.target.value)} className="w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text outline-none focus-border-accent">
-              {ZONES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
-          </div>
+        <div className="max-w-sm mb-2">
+          <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Zion time zone</label>
+          <select value={tz} onChange={(e) => setTz(e.target.value)} className="w-full c-bg-surface border c-border rounded-lg px-2.5 py-2.5 text-sm c-text outline-none focus-border-accent">
+            {ZONES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
         </div>
-        <p className="c-faint fs-11 mb-4 max-w-sm">All dates and times in Zion (today, weeks, charts, posting times) follow this zone, not the phone's own. Models use the zone of their agency.</p>
+        <p className="c-faint fs-11 mb-4 max-w-sm">The whole Zion (CZ and US agency, every model login) shows dates and times in this zone, not the phone's own: today, weeks, charts, posting times.</p>
         <div className="max-w-sm mb-4">
           <label className="block fs-10 uppercase tracking-wide c-muted font-mono mb-1">Monthly revenue goal (Neo page)</label>
           <div className="relative">
@@ -19884,7 +19873,7 @@ function App() {
   const restrictModel = session.role === "creator" ? session.name : undefined;
   const currentView = view || "dashboard";
   // the agency's time zone from Settings (CZ = Czech time), set before any page renders its dates
-  setZionTZ(session.agency === "US" ? (settings.timezoneUS || "America/New_York") : (settings.timezoneCZ || "Europe/Prague"));
+  setZionTZ(settings.timezone || "Europe/Prague");
   // after the early returns, so no hook here: just tell the stylesheet which section is open
   try { document.documentElement.dataset.zpage = currentView; document.documentElement.dataset.zrole = session.role || ""; } catch (e) {}
   // trends are shared/global — Team manages the same list from either login, choosing per-trend who sees it
