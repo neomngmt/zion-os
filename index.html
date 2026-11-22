@@ -4386,7 +4386,20 @@ function PlatformOverviewDashboard({
   }];
   const accountColor = name => MASS_PLANNER_COLORS[connectedModels.findIndex(m => m.name === name) % MASS_PLANNER_COLORS.length];
   const [livePosts, setLivePosts] = React.useState(null);
+  const fromProfile = platform === "x";
   React.useEffect(() => {
+    if (fromProfile) {
+      const since = Date.now() - range * 86400000;
+      setLivePosts((bufferTopPosts || []).filter(p => p.platform === "x" && connectedNames.has(p.model) && (account === "all" || p.model === account) && p.sentAt && p.sentAt >= since).map(p => ({
+        model: p.model,
+        text: p.text,
+        thumbnailUrl: p.thumbnailUrl,
+        postLink: p.externalLink,
+        reach: p.impressions,
+        scheduledAt: new Date(p.sentAt).toISOString()
+      })));
+      return;
+    }
     const targets = account === "all" ? connectedModels.map(m => m.name) : [account];
     if (!targets.length) {
       setLivePosts(null);
@@ -4415,7 +4428,7 @@ function PlatformOverviewDashboard({
     return () => {
       cancelled = true;
     };
-  }, [account, range, platform, connectedModels.map(m => m.name).join(",")]);
+  }, [account, range, platform, connectedModels.map(m => m.name).join(","), fromProfile ? bufferTopPosts : null]);
   const topPosts = livePosts?.length ? livePosts.map(p => ({
     model: p.model,
     text: p.text,
@@ -4425,8 +4438,8 @@ function PlatformOverviewDashboard({
   })).sort((a, b) => (b.impressions || 0) - (a.impressions || 0)) : (bufferTopPosts || []).filter(p => p.platform === platform && connectedNames.has(p.model) && (account === "all" || p.model === account)).sort((a, b) => (b.impressions || 0) - (a.impressions || 0));
   const [scheduledPosts, setScheduledPosts] = React.useState(null);
   React.useEffect(() => {
-    if (!connectedModels.length) {
-      setScheduledPosts(null);
+    if (!connectedModels.length || fromProfile) {
+      setScheduledPosts(fromProfile ? [] : null);
       return;
     }
     let cancelled = false;
@@ -4527,7 +4540,7 @@ function PlatformOverviewDashboard({
     }
   }, label, " Dashboard"), React.createElement("p", {
     className: "c-muted text-sm mt-0.5"
-  }, connectedModels.length, " account", connectedModels.length !== 1 ? "s" : "", " connected via Publer"))), React.createElement("button", {
+  }, connectedModels.length, " account", connectedModels.length !== 1 ? "s" : "", " ", fromProfile ? "read from the public profile" : "connected via Publer"))), React.createElement("button", {
     onClick: onPlanPosts,
     className: "flex items-center gap-2 px-4 py-2.5 rounded-xl fs-12 font-mono uppercase tracking-wide font-semibold tap",
     style: {
@@ -15686,7 +15699,7 @@ function XStatsSection({
   const reactionsSeries = byDay("reactions");
   const commentsSeries = byDay("comments");
   const maxImpr = Math.max(1, ...impressionsSeries);
-  const topPost = (bufferTopPosts || []).find(p => p.model === selected && p.platform === "x");
+  const topPost = (bufferTopPosts || []).filter(p => p.model === selected && p.platform === "x" && (!p.sentAt || p.sentAt >= Date.now() - 7 * 86400000)).sort((a, b) => (b.impressions || 0) - (a.impressions || 0))[0];
   const peakIdx = impressionsSeries.reduce((best, v, i) => v > impressionsSeries[best] ? i : best, 0);
   const BAR_BUDGET_PX = 116;
   const imprNiceStep = m => {
@@ -34851,7 +34864,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">w0dxx3</script>
+<script type="text/babel" id="zion-version">n9cl13</script>
 <script>
 (function () {
   var last = 0;

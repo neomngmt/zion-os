@@ -3129,7 +3129,14 @@ function PlatformOverviewDashboard({
   // selected account, or per every connected account (merged) when "all" is
   // selected, since one publer-posts call only covers a single account.
   const [livePosts, setLivePosts] = React.useState(null);
+  const fromProfile = platform === "x";
   React.useEffect(() => {
+    if (fromProfile) {
+      const since = Date.now() - range * 86400000;
+      setLivePosts((bufferTopPosts || []).filter((p) => p.platform === "x" && connectedNames.has(p.model) && (account === "all" || p.model === account) && p.sentAt && p.sentAt >= since)
+        .map((p) => ({ model: p.model, text: p.text, thumbnailUrl: p.thumbnailUrl, postLink: p.externalLink, reach: p.impressions, scheduledAt: new Date(p.sentAt).toISOString() })));
+      return;
+    }
     const targets = account === "all" ? connectedModels.map((m) => m.name) : [account];
     if (!targets.length) { setLivePosts(null); return; }
     let cancelled = false;
@@ -3148,7 +3155,7 @@ function PlatformOverviewDashboard({
       }
     })();
     return () => { cancelled = true; };
-  }, [account, range, platform, connectedModels.map((m) => m.name).join(",")]);
+  }, [account, range, platform, connectedModels.map((m) => m.name).join(","), fromProfile ? bufferTopPosts : null]);
 
   const topPosts = livePosts?.length
     ? livePosts
@@ -3162,7 +3169,7 @@ function PlatformOverviewDashboard({
   // from the analytics one topPosts uses, so it's its own fetch/section.
   const [scheduledPosts, setScheduledPosts] = React.useState(null);
   React.useEffect(() => {
-    if (!connectedModels.length) { setScheduledPosts(null); return; }
+    if (!connectedModels.length || fromProfile) { setScheduledPosts(fromProfile ? [] : null); return; }
     let cancelled = false;
     (async () => {
       try {
@@ -3247,7 +3254,7 @@ function PlatformOverviewDashboard({
           <div>
             <div className="text-2xl font-extrabold tracking-tight c-text" style={{ textShadow: `0 0 12px ${glowRgb}33` }}>{label} Dashboard</div>
             <p className="c-muted text-sm mt-0.5">
-              {connectedModels.length} account{connectedModels.length !== 1 ? "s" : ""} connected via Publer
+              {connectedModels.length} account{connectedModels.length !== 1 ? "s" : ""} {fromProfile ? "read from the public profile" : "connected via Publer"}
             </p>
           </div>
         </div>
@@ -9065,7 +9072,7 @@ function XStatsSection({ models, bufferDailyStats, bufferTopPosts, restrictModel
   const reactionsSeries = byDay("reactions");
   const commentsSeries = byDay("comments");
   const maxImpr = Math.max(1, ...impressionsSeries);
-  const topPost = (bufferTopPosts || []).find((p) => p.model === selected && p.platform === "x");
+  const topPost = (bufferTopPosts || []).filter((p) => p.model === selected && p.platform === "x" && (!p.sentAt || p.sentAt >= Date.now() - 7 * 86400000)).sort((a, b) => (b.impressions || 0) - (a.impressions || 0))[0];
 
   const peakIdx = impressionsSeries.reduce((best, v, i) => (v > impressionsSeries[best] ? i : best), 0);
   // Same "round, human step" idea as the Agency Revenue chart, in a smaller K-scale range
