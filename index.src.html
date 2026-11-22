@@ -161,6 +161,67 @@ function neoLivePatience(low) {
   if (!c || !c.dc || c.dc.readyState !== "open") return;
   try { c.dc.send(JSON.stringify({ type: "session.update", session: { type: "realtime", audio: { input: { turn_detection: { type: "semantic_vad", eagerness: low ? "low" : "high", create_response: true, interrupt_response: true } } } } })); } catch (e) {}
 }
+// Weekly report mode inside the live call. The realtime model stops answering on its own (create_response off,
+// patient turn taking, speech to text on); every finished thing the Boss says goes to weekly-report "turn",
+// where Claude decides the next line and action, and the voice reads that line out word for word.
+function neoWR(body) {
+  return fetch(`${SUPABASE_URL}/functions/v1/weekly-report`, { method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, "x-zion-token": neoLiveTok() }, body: JSON.stringify(body) })
+    .then((r) => r.json().then((j) => { if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`); return j; }));
+}
+function neoLiveSay(text) {
+  const c = neoLive.c;
+  if (!text || !c || !c.dc || c.dc.readyState !== "open") return;
+  try { c.dc.send(JSON.stringify({ type: "response.create", response: { instructions: `Read this out loud exactly as written, word for word, in your normal warm voice. Nothing before it, nothing after it:\n${text}`, tool_choice: "none" } })); } catch (e) {}
+}
+function neoReportMode(on, reportId) {
+  const c = neoLive.c;
+  if (!c || !c.dc || c.dc.readyState !== "open") return;
+  c.report = on ? { id: reportId, buf: [], timer: null, busy: false } : null;
+  try {
+    c.dc.send(JSON.stringify({ type: "session.update", session: { type: "realtime", audio: { input: {
+      turn_detection: { type: "semantic_vad", eagerness: on ? "low" : "high", create_response: !on, interrupt_response: true },
+      transcription: on ? { model: "gpt-4o-mini-transcribe" } : null,
+    } } } }));
+  } catch (e) {}
+}
+async function neoReportTurn(event, text) {
+  const c = neoLive.c;
+  if (!c || !c.report) return;
+  const id = c.report.id;
+  c.report.busy = true;
+  neoLiveEmit("phase", "thinking");
+  let r = null;
+  try { r = await neoWR({ action: "turn", report_id: id, event, text: text || "" }); }
+  catch (e) { r = { say: "Sorry, I lost that for a second. Can you say it again?", action: "none" }; }
+  if (!neoLive.c || neoLive.c !== c || !c.report) return;
+  c.report.busy = false;
+  if (r.say) neoLiveSay(r.say); else neoLiveEmit("phase", "listening");
+  if (r.action === "open_upload") { neoLiveMute(true); neoLiveEmit("reportOpen"); }
+  else if (r.action === "ask_type") { neoLiveMute(true); neoLiveEmit("askType", { prompt: r.ask_what || "" }); }
+  else if (r.action === "exit") { neoReportMode(false); neoLiveEmit("reportFailed", "Report stopped."); }
+  else if (r.action === "build") {
+    neoLiveEmit("reportBuilding", id);
+    try {
+      const b = await neoWR({ action: "build", report_id: id });
+      neoLiveEmit("reportDone", b);
+      if (neoLive.c === c) { neoReportMode(false); neoLiveSay(b.say || "Weekly report has been sent to your Telegram, boss."); }
+    } catch (e) {
+      neoLiveEmit("reportFailed", e.message);
+      if (neoLive.c === c) { neoReportMode(false); neoLiveSay("Something went wrong while writing the report. Want me to try again?"); }
+    }
+  }
+}
+function neoReportHeard(text) {
+  const c = neoLive.c;
+  if (!c || !c.report || !text) return;
+  c.report.buf.push(text);
+  clearTimeout(c.report.timer);
+  c.report.timer = setTimeout(() => {
+    if (!c.report) return;
+    const all = c.report.buf.join(" ").trim(); c.report.buf = [];
+    if (all) neoReportTurn("user", all);
+  }, 900);
+}
 function neoLiveTell(text) {
   const c = neoLive.c;
   if (!c || !c.dc || c.dc.readyState !== "open") return false;
@@ -240,7 +301,8 @@ async function neoLiveStart(agency) {
     dc.onmessage = async (m) => {
       let ev; try { ev = JSON.parse(m.data); } catch (e) { return; }
       switch (ev.type) {
-        case "input_audio_buffer.speech_started": c.autoRounds = 0; neoLiveEmit("phase", "listening"); break;
+        case "input_audio_buffer.speech_started": c.autoRounds = 0; if (c.report) clearTimeout(c.report.timer); neoLiveEmit("phase", "listening"); break;
+        case "conversation.item.input_audio_transcription.completed": if (c.report) neoReportHeard(String(ev.transcript || "").trim()); break;
         case "input_audio_buffer.speech_stopped": neoLiveEmit("phase", "thinking"); break;
         case "output_audio_buffer.started": neoLiveEmit("phase", "speaking"); break;
         case "output_audio_buffer.stopped":
@@ -256,7 +318,14 @@ async function neoLiveStart(agency) {
               const j = await neoLiveAgent({ run_tool: { name: ev.name, args } });
               if (ev.name === "weekly_report_start" || ev.name === "weekly_report_build") {
                 let r = null; try { r = JSON.parse(j.result || "null"); } catch (e) {}
-                if (r && r.report_id) neoLiveEmit(ev.name === "weekly_report_start" ? "report" : "reportDone", r);
+                if (r && r.report_id && ev.name === "weekly_report_start") {
+                  neoLiveEmit("report", r);
+                  c.quietNext = true;
+                  neoReportMode(true, r.report_id);
+                  setTimeout(() => neoLiveSay(r.say_now), 400); // after the tool output is in the conversation
+                  return "The app runs the weekly report now. Say nothing.";
+                }
+                if (r && r.report_id) neoLiveEmit("reportDone", r);
                 else if (ev.name === "weekly_report_build") neoLiveEmit("reportFailed", j.result || "");
               }
               if (j.pending) { neoLiveEmit("pending", { tool: ev.name, args, summary: j.summary }); return "Prepared. It is NOT done yet: the person sees a Confirm button on the screen and has to tap it."; }
@@ -15015,11 +15084,10 @@ function WeeklyReportWindow({ report, setReport }) {
       await call({ action: "attach", report_id: report.id, screens: done.map((x) => ({ slot: x.slot, path: x.path })) });
       setReport((w) => ({ ...w, stage: "reading" }));
       neoLiveMute(false);
-      neoLiveTell("[Zion] The Boss just handed you the screenshots. Say only: \"Thank you! Give me a second, I'm looking at the screens.\" Nothing else, then wait.");
-      let seen = {};
-      try { seen = await call({ action: "read", report_id: report.id }); } catch (e) {}
-      neoLiveTell(`[Zion] What the screenshots show: ${seen.summary || "(could not read them, ask the Boss for the key numbers)"}\n${seen.brief || ""}\nNow say the 2 or 3 key numbers in one sentence and ask: "Any more screens, or shall we start the questions?"`);
+      neoLiveSay("Thank you! Give me a second, I'm looking at the screens.");
+      try { await call({ action: "read", report_id: report.id }); } catch (e) {}
       setReport((w) => ({ ...w, stage: "asking" }));
+      await neoReportTurn("screens_ready", "");
     } catch (e) { setReport((w) => ({ ...w, error: e.message })); }
     setSending(false);
   };
@@ -15039,7 +15107,11 @@ function WeeklyReportWindow({ report, setReport }) {
 .wr-shim { background: linear-gradient(90deg, rgba(57,230,115,.05) 0%, rgba(57,230,115,.28) 50%, rgba(57,230,115,.05) 100%); background-size: 200% 100%; animation: wrShimmer 1.2s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .wr-win, .wr-tile, .wr-scan::after, .wr-shim { animation: none !important; } }
 `;
-  const close = () => { if (report.stage === "drop") neoLiveMute(false); setReport(null); };
+  const close = () => {
+    if (report.stage === "drop") { neoLiveMute(false); if (neoLive.c && neoLive.c.report) { setReport((w) => ({ ...w, stage: "asking" })); neoReportTurn("upload_closed", ""); return; } }
+    if (neoLive.c && neoLive.c.report && report.stage !== "done" && report.stage !== "failed") neoReportMode(false);
+    setReport(null);
+  };
   const isPhoneWR = typeof window !== "undefined" && window.innerWidth < 640;
   if (report.stage === "ready") return null; // prepared, the window opens when the Boss says yes
   if (report.stage !== "drop") {
@@ -15648,11 +15720,11 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
       amp: (v) => { liveAmpRef.current = speakingRef.current ? v : 0; if (v > 0.05 && speakingRef.current) speakBumpRef.current = Date.now(); },
       navigate: (pg) => { if (onNavigate && pg) setTimeout(() => onNavigate(pg), 400); },
       pending: (x) => setMessages((all) => [...all, { role: "neo", text: "", pending: [{ id: `rt${Date.now()}${Math.random().toString(36).slice(2, 6)}`, ...x, state: "ask" }] }]),
-      report: (r) => { neoLivePatience(true); setWeeklyReport({ id: r.report_id, model: r.model, week: r.week_number, period: r.period, stage: "ready" }); },
+      report: (r) => { setWeeklyReport({ id: r.report_id, model: r.model, week: r.week_number, period: r.period, stage: "ready" }); },
       reportOpen: () => setWeeklyReport((w) => (w ? { ...w, stage: "drop" } : w)),
       askType: (x) => setTypeAsk({ prompt: x.prompt, key: Date.now() }),
       reportBuilding: () => setWeeklyReport((w) => (w ? { ...w, stage: "building" } : w)),
-      reportDone: (r) => neoLivePatience(false) || setWeeklyReport((w) => ({ ...(w || { model: "", week: "" }), stage: "done", url: r.url, file: r.file, telegram: r.telegram })),
+      reportDone: (r) => setWeeklyReport((w) => ({ ...(w || { model: "", week: "" }), stage: "done", url: r.url, file: r.file, telegram: r.telegram })),
       reportFailed: (m) => setWeeklyReport((w) => (w ? { ...w, stage: "failed", error: String(m || "").slice(0, 200) } : w)),
     };
     setCallState(neoLive.state);
@@ -15931,6 +16003,7 @@ function NeoPage({ agency, session, onNavigate, onSignOut, cards, tasks, models,
       {session.role === "admin" && weeklyReport && <WeeklyReportWindow report={weeklyReport} setReport={setWeeklyReport} />}
       {typeAsk && <NeoTypeWindow key={typeAsk.key} prompt={typeAsk.prompt} onDone={(text) => {
         setTypeAsk(null); neoLiveMute(false);
+        if (neoLive.c && neoLive.c.report) { neoReportTurn("typed", text || "(closed without writing)"); return; }
         neoLiveTell(text ? `[Zion] He typed it for you: "${text}". Use exactly this spelling, say a short thanks and continue.` : "[Zion] He closed the typing window without writing. Continue.");
       }} />}
       <NeoChat compact={session.role === "admin"} messages={messages} setMessages={setMessages} thinking={thinking} onSend={(t) => send(t, "text")} canAct={session.role === "admin"} />
