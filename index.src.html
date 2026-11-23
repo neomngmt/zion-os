@@ -11288,9 +11288,28 @@ const acqReplyUrl = (lead) => {
   return u ? String(u).replace(/^https?:\/\/(old\.|np\.)?reddit\.com/, "https://www.reddit.com") : null;
 };
 // copy first (inside the tap), then open Reddit; nothing is sent by Zion
+// On the iPhone home screen app a link opens in a sheet inside Zion; after replying Reddit jumps to its app and
+// the sheet stays white. There it goes to real Safari (x-safari-https), which hands it to the Reddit app, and
+// switching back lands on Zion as it was.
+const zionStandaloneIOS = () => { try { return !!window.navigator.standalone && /iPhone|iPad|iPod/.test(navigator.userAgent); } catch (e) { return false; } };
+const openExternal = (url) => {
+  if (!url) return;
+  if (zionStandaloneIOS() && /^https:\/\//.test(url)) { window.location.href = "x-safari-" + url; return; }
+  window.open(url, "_blank", "noopener");
+};
+// every outside link in the home screen app (Reddit posts, IG profiles, OF links) goes the same way
+try {
+  document.addEventListener("click", (e) => {
+    if (!zionStandaloneIOS() || e.defaultPrevented) return;
+    const a = e.target && e.target.closest ? e.target.closest('a[href^="https://"]') : null;
+    if (!a || a.host === location.host || a.hasAttribute("download")) return;
+    e.preventDefault();
+    openExternal(a.href);
+  }, true);
+} catch (e) {}
 const acqCopyOpen = (text, url) => {
   try { navigator.clipboard.writeText(text).catch(() => {}); } catch (e) {}
-  if (url) window.open(url, "_blank", "noopener");
+  openExternal(url);
 };
 function AcqReplyQueue({ items, onClose, onPatch }) {
   const [i, setI] = useState(0);
@@ -11478,7 +11497,7 @@ function AcqLeadSheet({ lead, onClose, onPatch, onDeleted }) {
             {lead.bio && <div style={{ fontSize: 13, color: "#d9e2dd", lineHeight: 1.5, whiteSpace: "pre-wrap", maxHeight: 180, overflow: "auto" }}>{lead.bio}</div>}
             <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
               {lead.source_detail && <a className="hb-btn sm" href={lead.source_detail} target="_blank" rel="noopener noreferrer">Open the post</a>}
-              <a className="hb-btn ghost sm" href={`https://www.reddit.com/user/${lead.handle.replace(/^u\//, "")}/`} target="_blank" rel="noopener noreferrer">Her Reddit profile</a>
+              <a className="hb-btn ghost sm" href={`https://www.reddit.com/user/${lead.handle.replace(/^u\//, "")}/`} target="_blank" rel="noopener noreferrer" onClick={(e) => { if (zionStandaloneIOS()) { e.preventDefault(); openExternal(`https://www.reddit.com/user/${lead.handle.replace(/^u\//, "")}/`); } }}>Her Reddit profile</a>
             </div>
           </div>
         )}

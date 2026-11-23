@@ -20364,11 +20364,35 @@ const acqReplyUrl = lead => {
   const u = hers.length ? hers[hers.length - 1].url : lead.source_detail;
   return u ? String(u).replace(/^https?:\/\/(old\.|np\.)?reddit\.com/, "https://www.reddit.com") : null;
 };
+const zionStandaloneIOS = () => {
+  try {
+    return !!window.navigator.standalone && /iPhone|iPad|iPod/.test(navigator.userAgent);
+  } catch (e) {
+    return false;
+  }
+};
+const openExternal = url => {
+  if (!url) return;
+  if (zionStandaloneIOS() && /^https:\/\//.test(url)) {
+    window.location.href = "x-safari-" + url;
+    return;
+  }
+  window.open(url, "_blank", "noopener");
+};
+try {
+  document.addEventListener("click", e => {
+    if (!zionStandaloneIOS() || e.defaultPrevented) return;
+    const a = e.target && e.target.closest ? e.target.closest('a[href^="https://"]') : null;
+    if (!a || a.host === location.host || a.hasAttribute("download")) return;
+    e.preventDefault();
+    openExternal(a.href);
+  }, true);
+} catch (e) {}
 const acqCopyOpen = (text, url) => {
   try {
     navigator.clipboard.writeText(text).catch(() => {});
   } catch (e) {}
-  if (url) window.open(url, "_blank", "noopener");
+  openExternal(url);
 };
 function AcqReplyQueue({
   items,
@@ -20977,7 +21001,13 @@ function AcqLeadSheet({
     className: "hb-btn ghost sm",
     href: `https://www.reddit.com/user/${lead.handle.replace(/^u\//, "")}/`,
     target: "_blank",
-    rel: "noopener noreferrer"
+    rel: "noopener noreferrer",
+    onClick: e => {
+      if (zionStandaloneIOS()) {
+        e.preventDefault();
+        openExternal(`https://www.reddit.com/user/${lead.handle.replace(/^u\//, "")}/`);
+      }
+    }
   }, "Her Reddit profile"))), (lead.phone || lead.email) && React.createElement("div", {
     className: "hb-card",
     style: {
@@ -35873,7 +35903,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">fppax1</script>
+<script type="text/babel" id="zion-version">11zh5j8</script>
 <script>
 (function () {
   var last = 0;
