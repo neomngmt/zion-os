@@ -18737,22 +18737,24 @@ function AcquisitionPage() {
   const SECTIONS = [["overview", "Overview", "#39e673"], ["plan", "Plan", "#f0be3c"], ["ongoing", "Ongoing", "#38bdf8"], ["xout", "X outreach", "#e7e9ea"], ["meta", "Meta ads", "#1877f2"], ["referrals", "Contacts", "#f0be3c"], ["reddit", "Reddit", "#ff4500"], ["instagram", "Instagram outreach", "#e1306c"], ["newof", "New OF profiles", "#7c5cff"], ["other", "Other links", "#8fa39a"]];
   const ongoing = all.filter(l => ["messaged", "replied", "call"].includes(l.status)).sort((a, b) => (b.unread ? 1 : 0) - (a.unread ? 1 : 0) || Date.parse(b.last_contact_at || b.messaged_at || 0) - Date.parse(a.last_contact_at || a.messaged_at || 0));
   const inSection = section === "ongoing" ? ongoing : all.filter(l => sectionOf(l) === section);
+  const redditFresh = l => l.source !== "reddit" || !l.lead_at || Date.now() - Date.parse(l.lead_at) < 4 * 86400000;
+  const byNewest = (a, b) => (Date.parse(b.lead_at || 0) || 0) - (Date.parse(a.lead_at || 0) || 0) || (b.score || 0) - (a.score || 0);
   const stageLists = {
     active: inSection.filter(l => !["signed", "lost", "skip"].includes(l.status)).sort((a, b) => (b.score || 0) - (a.score || 0)),
-    new: inSection.filter(l => l.status === "new").sort((a, b) => (b.score || 0) - (a.score || 0)),
+    new: section === "reddit" ? inSection.filter(l => l.status === "new" && redditFresh(l)).sort(byNewest) : inSection.filter(l => l.status === "new").sort((a, b) => (b.score || 0) - (a.score || 0)),
     talks: inSection.filter(l => ["messaged", "replied", "call"].includes(l.status)),
     signed: inSection.filter(l => l.status === "signed"),
     archive: inSection.filter(l => ["lost", "skip"].includes(l.status))
   };
   const lists = {
-    todo: [...due, ...fresh.filter(l => !due.includes(l) && (l.source === "reddit" ? (l.score || 0) >= 60 : (l.score || 0) >= 50 || l.source === "ads" || l.source === "referral"))].slice(0, 80),
+    todo: [...due, ...fresh.filter(l => !due.includes(l) && (l.source === "reddit" ? (l.score || 0) >= 60 && redditFresh(l) : (l.score || 0) >= 50 || l.source === "ads" || l.source === "referral"))].slice(0, 80),
     new: fresh,
-    reddit: all.filter(l => l.source === "reddit" && l.status === "new").sort((a, b) => (b.score || 0) - (a.score || 0)),
+    reddit: all.filter(l => l.source === "reddit" && l.status === "new" && redditFresh(l)).sort(byNewest),
     pipeline: all.filter(l => ["messaged", "replied", "call"].includes(l.status)),
     signed: all.filter(l => l.status === "signed"),
     archive: all.filter(l => ["lost", "skip"].includes(l.status))
   };
-  const replyQueue = [...all.filter(l => l.source === "reddit" && l.unread && ["messaged", "replied", "call"].includes(l.status)), ...all.filter(l => l.source === "reddit" && l.status === "new" && (l.score || 0) >= 60).sort((a, b) => (b.score || 0) - (a.score || 0))].slice(0, 15);
+  const replyQueue = [...all.filter(l => l.source === "reddit" && l.unread && ["messaged", "replied", "call"].includes(l.status)), ...all.filter(l => l.source === "reddit" && l.status === "new" && (l.score || 0) >= 60 && redditFresh(l)).sort(byNewest)].slice(0, 15);
   const startQueue = () => setQueue(replyQueue.map(l => l.id));
   const since = acqSince(per);
   const perWord = {
@@ -18779,7 +18781,7 @@ function AcquisitionPage() {
     } : {
       title: "Good new leads",
       sub: "Reddit qualified + replied on X",
-      list: [...all.filter(l => l.source === "x" && !["call", "signed", "lost", "skip"].includes(l.status)).sort((a, b) => (acqHerAt(b) || 0) - (acqHerAt(a) || 0)), ...fresh.filter(l => l.source === "reddit" && (l.score || 0) >= 50).sort((a, b) => (b.score || 0) - (a.score || 0))]
+      list: [...all.filter(l => l.source === "x" && !["call", "signed", "lost", "skip"].includes(l.status)).sort((a, b) => (acqHerAt(b) || 0) - (acqHerAt(a) || 0)), ...fresh.filter(l => l.source === "reddit" && (l.score || 0) >= 50 && redditFresh(l)).sort(byNewest)]
     },
     messaged: agency === "CZ" ? {
       title: "New leads",
@@ -35903,7 +35905,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">11zh5j8</script>
+<script type="text/babel" id="zion-version">1urd79j</script>
 <script>
 (function () {
   var last = 0;
