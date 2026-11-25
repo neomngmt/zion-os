@@ -23639,7 +23639,8 @@ a:focus-visible, button:focus-visible{ outline:2px solid var(--lp-green); outlin
 .zf{ display:flex; flex-wrap:wrap; justify-content:center; gap:6px; margin:-18px auto 26px; padding:6px; border:1px solid var(--line); border-radius:99px; width:max-content; max-width:100%; background:rgba(255,255,255,.02); }
 .zf button{ border:0; background:transparent; color:var(--dim); font:600 11px 'JetBrains Mono',monospace; letter-spacing:2px; text-transform:uppercase; padding:9px 16px; border-radius:99px; cursor:pointer; transition:all .3s; }
 .zf button.on{ background:var(--g); color:#03110a; box-shadow:0 0 24px rgba(57,230,115,.4); }
-.z2-bento.filtered .z2-c{ grid-column:span 4 !important; }
+@media (min-width:981px){ .z2-bento.filtered .z2-c{ grid-column:span 4 !important; } }
+@media (max-width:980px){ .z2-bento.filtered .z2-c{ grid-column:span 12 !important; } }
 .z2-c.zf-off{ display:none; }
 .z2-c.zf-in{ animation:zfIn .55s cubic-bezier(.2,.8,.2,1) both; animation-delay:calc(var(--k,0) * 40ms); }
 @keyframes zfIn{ from{ opacity:0; transform:translateY(16px) scale(.97); } to{ opacity:1; transform:none; } }
@@ -37221,7 +37222,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">2ttosh</script>
+<script type="text/babel" id="zion-version">u7k5io</script>
 <script>
 (function () {
   var last = 0;
