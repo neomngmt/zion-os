@@ -2,9 +2,10 @@
 <html lang="cs">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Brand Bible | Zion Management</title>
-<meta name="theme-color" content="#07090a">
+<meta name="theme-color" content="#060908">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
@@ -227,19 +228,37 @@
   .popup-logo .zw-by { font-size: 15px; margin-top: 7px; }
   .popup-logo .pl-name { font-family: var(--mono); font-size: 10.5px; letter-spacing: 4px; color: var(--accent-soft); text-transform: uppercase; border: 1px solid var(--border); border-radius: 999px; padding: .25rem .8rem; }
   body.embed .app-header { padding-right: 58px; }
-  /* calmer intro: logo, title, one line, language, name, button */
-  .popup-logo, .popup-why { display: none !important; }
-  /* logo and the questionnaire name sit in the top left corner, like the header inside */
-  .popup-corner { position: fixed; top: calc(16px + env(safe-area-inset-top)); left: 20px; z-index: 3; display: flex; align-items: center; gap: 12px; animation: popIn .8s cubic-bezier(.2,.8,.2,1) .1s backwards; }
-  .popup-corner .zw { height: 32px; justify-content: center; }
-  .popup-corner .zw-svg { height: 18px; }
-  .popup-corner .zw-by { font-size: 10px; margin-top: 3px; }
-  .popup-corner .pl-tag { font-family: var(--mono); font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--accent-soft); border: 1px solid var(--border); border-radius: 999px; padding: .2rem .7rem; }
-  .popup-overlay { padding-top: 84px; }
-  .popup-title { font-size: 27px; }
-  .popup-note { max-width: 300px; margin-left: auto; margin-right: auto; margin-bottom: 1.4rem; }
-  .popup-langs .lang-btn { padding: .5rem .3rem; font-size: 13px; }
-  .popup-box { padding: 2.2rem 1.8rem 2rem; }
+  /* ---- intro: original layout and behaviour, solid panel, no auto tilt, compact on the phone ---- */
+  .popup-overlay { background: #060908; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  /* while the intro is open the page behind it does not move */
+  html.intro-open, html.intro-open body { overflow: hidden; }
+  .popup-box { background: linear-gradient(160deg, #13301f, #0d120f 58%); backdrop-filter: none; -webkit-backdrop-filter: none; border-color: rgba(57,230,115,0.24); box-shadow: 0 30px 70px rgba(0,0,0,0.6), 0 0 50px rgba(18,179,76,0.14); }
+  .popup-why { background: rgba(18,179,76,0.09); }
+  html, body { background: #060908; }
+  /* Safari paints the bar area in the page colour: the top edge of the intro fades into exactly that colour, so screen and bar read as one surface (only a picture, it never catches taps) */
+  .popup-overlay::after { content: ""; position: fixed; left: 0; right: 0; top: 0; height: 110px; z-index: 1; pointer-events: none; background: linear-gradient(180deg, #060908 0%, rgba(6,9,8,0.8) 40%, rgba(6,9,8,0) 100%); }
+  .popup-box { z-index: 2; }
+  /* the form never moves sideways, no zoom on a double tap or when a field is tapped (iPhone zooms on text under 16px) */
+  body { overflow-x: hidden; overflow-x: clip; max-width: 100%; }
+  html, body { touch-action: manipulation; }
+  @media (max-width: 520px) { input[type=text], textarea, select { font-size: 16px !important; } }
+  .popup-input-wrap input.need { border-color: #ff6b6b !important; box-shadow: 0 0 0 3px rgba(255,107,107,0.18) !important; animation: needShake .45s ease; }
+  @keyframes needShake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-7px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }
+  @media (max-width: 520px) {
+    .popup-overlay { padding: 14px; }
+    .popup-box { padding: 1.4rem 1.1rem 1.2rem; border-radius: 20px; }
+    .popup-logo { margin-bottom: .7rem; gap: 8px; }
+    .popup-logo .zw-svg { height: 32px; }
+    .popup-title { font-size: 24px; margin-bottom: .3rem; }
+    .popup-note { font-size: 12.5px; margin-bottom: .9rem; }
+    .popup-langs { margin-bottom: .75rem !important; gap: 6px !important; }
+    .popup-langs .lang-btn { padding: .48rem .2rem; font-size: 12.5px; }
+    .popup-input-wrap { margin-bottom: .6rem; }
+    .popup-input-wrap input { padding: .7rem; }
+    .popup-why { padding: .7rem .9rem; margin-bottom: .85rem; }
+    .popup-why p { font-size: 11.5px; line-height: 1.5; }
+    .popup-btn { padding: .8rem; font-size: 15px; }
+  }
 </style>
 </head>
 <body>
@@ -247,7 +266,6 @@
 <div class="popup-overlay" id="popup">
   <div class="fx-blob b1"></div><div class="fx-blob b2"></div><div class="fx-blob b3"></div>
   <canvas class="fx-canvas" id="popup-fx" aria-hidden="true"></canvas>
-  <div class="popup-corner"><span class="zw"><svg class="zw-svg" viewBox="-6 0 788 180" fill="none" stroke="#fff" stroke-width="12" role="img" aria-label="ZION"><path d="M0 6H160"/><path d="M160 6L92.8 76.6"/><path d="M76.8 93.4L0 174"/><path d="M0 174H160"/><path d="M252 6V174"/><path d="M344 90V128Q344 174 390 174H458Q504 174 504 128V52Q504 6 458 6H390Q344 6 344 52"/><path d="M596 6V174"/><path d="M596 6L660.8 66.5"/><path d="M678.8 83.3L776 174"/><path d="M776 6V174"/></svg><span class="zw-by">by neomngmt</span></span><span class="pl-tag">Brand Bible</span></div>
   <div class="popup-box">
     <div class="popup-logo"><span class="zw"><svg class="zw-svg" viewBox="-6 0 788 180" fill="none" stroke="#fff" stroke-width="12" role="img" aria-label="ZION"><path d="M0 6H160"/><path d="M160 6L92.8 76.6"/><path d="M76.8 93.4L0 174"/><path d="M0 174H160"/><path d="M252 6V174"/><path d="M344 90V128Q344 174 390 174H458Q504 174 504 128V52Q504 6 458 6H390Q344 6 344 52"/><path d="M596 6V174"/><path d="M596 6L660.8 66.5"/><path d="M678.8 83.3L776 174"/><path d="M776 6V174"/></svg><span class="zw-by">by neomngmt</span></span><span class="pl-name">Brand Bible</span></div>
     <div class="popup-title" id="popup-title"></div>
@@ -257,14 +275,14 @@
       <button class="lang-btn" id="lang-en" onclick="setLang('en')">🇬🇧 English</button>
     </div>
     <div class="popup-input-wrap">
-      <input type="text" id="popup-name" autocomplete="off">
+      <input type="text" id="popup-name" autocomplete="off" enterkeyhint="go">
     </div>
     <div class="popup-why">
       <div class="popup-why-title" id="popup-why-title"></div>
       <p id="popup-why-1"></p>
       <p id="popup-why-2"></p>
     </div>
-    <button class="popup-btn" id="popup-btn" onclick="startForm()"></button>
+    <button class="popup-btn" id="popup-btn" type="button"></button>
   </div>
 </div>
 
@@ -410,7 +428,7 @@ const SCREENS = [
 
 const T = {
   cz: {
-    popupTitle: 'Tvoje Brand Bible', popupNote: 'Zabere asi 15 minut. Čím víc detailů napíšeš, tím víc bude brand tvůj.',
+    popupTitle: 'Vítej 👋', popupNote: 'Vyber jazyk a napiš nám, jak se jmenuješ.',
     namePh: 'Tvoje jméno nebo alias...', whyTitle: 'PROČ JE TENTO DOTAZNÍK DŮLEŽITÝ',
     why1: 'Většina modelek na sítích vypadá a zní úplně stejně. Z tvých odpovědí postavíme brand, který bude jen tvůj: tvoje osobnost, zájmy, styl a příběh.',
     why2: 'Odpovídej celými větami a co nejpodrobněji. Čím víc detailů, tím lepší nápady na obsah pro tebe vymyslíme. Rozpracované se ti ukládá.',
@@ -423,7 +441,7 @@ const T = {
     emptyWarn: 'Zatím jsi nic nevyplnila. Opravdu chceš odeslat prázdný dotazník?',
   },
   en: {
-    popupTitle: 'Your Brand Bible', popupNote: 'About 15 minutes. The more detail you give, the more the brand is yours.',
+    popupTitle: 'Welcome 👋', popupNote: 'Pick your language and tell us your name.',
     namePh: 'Your name or alias...', whyTitle: 'WHY THIS QUESTIONNAIRE MATTERS',
     why1: 'Most creators online look and sound exactly the same. From your answers we build a brand that is only yours: your personality, interests, style and story.',
     why2: 'Please answer in full sentences and give as much detail as possible. The more detail, the better the content ideas we create for you. Your progress is saved.',
@@ -634,10 +652,13 @@ function loadDraft(){
 
 // ---------- start, send ----------
 let resumeAt = 0;
+document.documentElement.classList.add('intro-open');
 function startForm(){
   const name = document.getElementById('popup-name').value.trim();
-  if (!name) { document.getElementById('popup-name').focus(); return; }
+  if (!name) { const el = document.getElementById('popup-name'); el.classList.remove('need'); void el.offsetWidth; el.classList.add('need'); el.focus(); setTimeout(() => el.classList.remove('need'), 1600); return; }
   document.getElementById('popup').style.display = 'none';
+  document.documentElement.classList.remove('intro-open');
+  window.scrollTo(0, 0);
   buildDots();
   goTo(Math.min(resumeAt, TOTAL - 2), true);
   saveDraft();
@@ -721,7 +742,17 @@ document.addEventListener('DOMContentLoaded', () => {
   else if (draft && PRESET_NAME) { QUESTIONS.forEach((q) => writeAnswer(q, { text: '', rows: [], picked: [], other: '' })); }
   if (PRESET_NAME) { const inp = document.getElementById('popup-name'); inp.value = PRESET_NAME; inp.readOnly = true; inp.style.opacity = '.75'; }
   setLang(lang);
-  document.getElementById('popup-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') startForm(); });
+  document.getElementById('popup-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); startForm(); } });
+  // iPhone: start on the touch itself, a click after the keyboard closes can miss the button
+  const startBtn = document.getElementById('popup-btn');
+  let startedByTouch = 0;
+  startBtn.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+    e.preventDefault(); startedByTouch = Date.now();
+    startForm();
+    if (document.getElementById('popup').style.display === 'none' && document.activeElement) document.activeElement.blur();
+  });
+  startBtn.addEventListener('click', () => { if (Date.now() - startedByTouch < 800) return; startForm(); });
   document.getElementById('main').addEventListener('input', () => { clearTimeout(window.__sd); window.__sd = setTimeout(saveDraft, 400); });
 });
 
@@ -759,6 +790,7 @@ document.addEventListener('DOMContentLoaded', () => {
     seed();
   }
   function onMove(e){
+    if(e.pointerType === 'touch'){ px = e.clientX; py = e.clientY; return; } // a finger only moves the particles, never tilts
     px = e.clientX; py = e.clientY; lastMove = performance.now();
     const typing = document.activeElement && document.activeElement.tagName === 'INPUT';
     if(typing){ tx = 0; ty = 0; tSheen = .35; }
@@ -772,11 +804,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function frame(now){
     if(overlay.style.display === 'none'){ raf = 0; return; }
     const dt = Math.min(48, now - (last || now)); last = now;
-    // idle: slow breathing tilt so it feels alive without a pointer (phones)
-    if(now - lastMove > 2200){
-      tx = Math.sin(now / 2100) * 2.4; ty = Math.cos(now / 2700) * 3; tSheen = 0;
-      const t = now / 3000; overlay.style.setProperty('--mx', (50 + Math.cos(t) * 30).toFixed(1) + '%'); overlay.style.setProperty('--my', (35 + Math.sin(t) * 25).toFixed(1) + '%');
-    }
+    // idle: the panel goes back to flat (no tilting on its own)
+    if(now - lastMove > 2200){ tx = 0; ty = 0; tSheen = 0; }
     const k = 1 - Math.pow(.001, dt / 1000);
     rx += (tx - rx) * k; ry += (ty - ry) * k; sheen += (tSheen - sheen) * k;
     overlay.style.setProperty('--rx', rx.toFixed(2) + 'deg'); overlay.style.setProperty('--ry', ry.toFixed(2) + 'deg');
