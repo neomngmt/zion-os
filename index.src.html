@@ -829,6 +829,70 @@ const fontImport = `
 .anim-view { animation: fadeInUp 0.28s ease-out; }
 .anim-pulse-dot { animation: softPulse 2s ease-in-out infinite; }
 .anim-card-in { animation: cardIn 0.22s ease-out; }
+/* login: exactly one screen tall (dvh = the part of the screen Safari really shows), centred, no scrolling */
+.login-screen { position: fixed; inset: 0; height: 100vh; height: 100dvh; overflow: hidden; overscroll-behavior: none; touch-action: manipulation; }
+@media (max-height: 560px) { .login-screen { overflow-y: auto; } }
+/* ---------- Brand Bible prompt (creator) ---------- */
+.bb-veil { position: fixed; inset: 0; z-index: 260; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(4,7,5,0.72); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); animation: bbFade .35s ease both; font-family: Inter, -apple-system, sans-serif; }
+.bb-card { position: relative; overflow: hidden; width: 100%; max-width: 400px; text-align: center; padding: 30px 24px 20px; border-radius: 22px; border: 1px solid rgba(57,230,115,0.22); background: linear-gradient(160deg, rgba(18,179,76,0.14), rgba(14,19,16,0.97) 55%); box-shadow: 0 30px 70px rgba(0,0,0,0.55), 0 0 40px rgba(18,179,76,0.14); animation: bbIn .6s cubic-bezier(.2,.8,.2,1) both; }
+.bb-glow { position: absolute; inset: -40% -20% auto; height: 70%; background: radial-gradient(circle at 50% 50%, rgba(57,230,115,0.22), transparent 60%); pointer-events: none; animation: bbBreathe 5s ease-in-out infinite; }
+.bb-mark { position: relative; width: 34px; height: 34px; margin: 0 auto 12px; display: block; filter: drop-shadow(0 0 10px rgba(57,230,115,0.6)); animation: bbSpin 1s cubic-bezier(.2,1.4,.4,1) .15s both; }
+.bb-eyebrow { position: relative; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10.5px; letter-spacing: 2.5px; text-transform: uppercase; color: #39e673; margin-bottom: 8px; }
+.bb-title { position: relative; font-size: 26px; font-weight: 800; letter-spacing: -.6px; color: #f2f5f0; margin-bottom: 10px; }
+.bb-body { position: relative; font-size: 14px; line-height: 1.6; color: #b9c8bf; margin: 0 0 8px; }
+.bb-time { position: relative; font-size: 12px; color: #6f857a; margin: 0 0 20px; }
+.bb-go { position: relative; overflow: hidden; width: 100%; padding: 14px; border: none; border-radius: 999px; font-size: 15.5px; font-weight: 800; color: #04140c; background: linear-gradient(135deg, #39e673, #12b34c); box-shadow: 0 0 22px rgba(18,179,76,0.4); cursor: pointer; }
+.bb-go::after { content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%; transform: skewX(-20deg); background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent); animation: bbShine 2.8s ease-in-out 1s infinite; }
+.bb-later { position: relative; margin-top: 8px; width: 100%; padding: 10px; border: none; background: transparent; color: #7d9387; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.bb-later:hover { color: #f2f5f0; }
+.bb-frame { position: fixed; inset: 0; z-index: 270; background: #07090a; animation: bbFade .3s ease both; }
+.bb-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.bb-frame-x { position: absolute; top: calc(10px + env(safe-area-inset-top)); right: 10px; z-index: 2; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #b9c8bf; background: rgba(7,9,10,0.8); border: 1px solid rgba(57,230,115,0.25); cursor: pointer; }
+.bb-toast { position: fixed; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom)); z-index: 280; transform: translateX(-50%); padding: 12px 18px; border-radius: 999px; background: linear-gradient(135deg, #39e673, #12b34c); color: #04140c; font: 700 14px Inter, sans-serif; box-shadow: 0 10px 30px rgba(0,0,0,0.4), 0 0 24px rgba(18,179,76,0.4); animation: bbIn .5s cubic-bezier(.2,.8,.2,1) both; white-space: nowrap; }
+@keyframes bbFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes bbIn { from { opacity: 0; transform: translateY(18px) scale(.97); } to { opacity: 1; transform: none; } }
+.bb-toast { animation-name: bbToast; } @keyframes bbToast { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes bbBreathe { 0%, 100% { opacity: .7; transform: scale(1); } 50% { opacity: 1; transform: scale(1.08); } }
+@keyframes bbSpin { from { opacity: 0; transform: scale(.3) rotate(-45deg); } to { opacity: 1; transform: none; } }
+@keyframes bbShine { 0% { left: -60%; } 45%, 100% { left: 130%; } }
+@media (prefers-reduced-motion: reduce) { .bb-veil, .bb-card, .bb-glow, .bb-mark, .bb-go::after, .bb-toast, .bb-frame { animation: none !important; } }
+/* ---------- Bibles page (admin) ---------- */
+.bibles { max-width: 920px; }
+.bibles-top { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.bibles-tabs { display: flex; gap: 4px; padding: 4px; border-radius: 12px; border: 1px solid var(--line, rgba(57,230,115,0.16)); background: var(--surface, #0e1310); }
+.bibles-tabs button { display: flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 9px; border: none; background: transparent; color: var(--muted, #8fa39a); font-size: 13px; font-weight: 600; cursor: pointer; }
+.bibles-tabs button span { font-family: 'JetBrains Mono', monospace; font-size: 11px; opacity: .8; }
+.bibles-tabs button.on { background: linear-gradient(135deg, rgba(57,230,115,0.22), rgba(18,179,76,0.1)); color: #39e673; box-shadow: inset 0 0 0 1px rgba(57,230,115,0.35); }
+.bibles-link { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px; border: 1px solid rgba(57,230,115,0.3); background: transparent; color: #39e673; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.bibles-missing { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 14px; font-size: 12px; }
+.bibles-missing span { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted, #8fa39a); margin-right: 4px; }
+.bibles-missing em { font-style: normal; padding: 3px 10px; border-radius: 999px; border: 1px dashed rgba(255,190,80,0.4); color: #f2c76b; }
+.bibles-empty, .bibles-err { display: flex; gap: 8px; align-items: center; padding: 22px; border-radius: 14px; border: 1px dashed var(--line, rgba(57,230,115,0.16)); color: var(--muted, #8fa39a); font-size: 13px; }
+.bibles-err { color: #ff8a8a; } .bibles-err button { margin-left: auto; color: #39e673; background: none; border: none; cursor: pointer; }
+.bibles-list { display: flex; flex-direction: column; gap: 8px; }
+.bible-row { border-radius: 14px; border: 1px solid var(--line, rgba(57,230,115,0.14)); background: var(--surface, #0e1310); overflow: hidden; transition: border-color .2s, box-shadow .2s; animation: cardIn .3s ease-out both; }
+.bible-row.open { border-color: rgba(57,230,115,0.4); box-shadow: 0 0 24px rgba(18,179,76,0.12); }
+.bible-head { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: none; border: none; text-align: left; cursor: pointer; color: inherit; }
+.bible-avatar { width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #04140c; background: linear-gradient(135deg, #39e673, #12b34c); }
+.bible-who { flex: 1; min-width: 0; }
+.bible-name { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-weight: 700; font-size: 14.5px; color: var(--text, #f2f5f0); }
+.bible-meta { font-size: 11.5px; color: var(--muted, #8fa39a); margin-top: 2px; }
+.bible-tag { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 1px; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; border: 1px solid rgba(57,230,115,0.3); color: #39e673; font-weight: 500; }
+.bible-tag.warn { border-color: rgba(255,190,80,0.45); color: #f2c76b; }
+.bible-chev { color: var(--muted, #8fa39a); transition: transform .25s; }
+.bible-row.open .bible-chev { transform: rotate(180deg); }
+.bible-body { padding: 0 14px 14px; animation: cardIn .25s ease-out; }
+.bible-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.bible-actions button { display: flex; align-items: center; gap: 5px; padding: 6px 11px; border-radius: 999px; border: 1px solid var(--line, rgba(57,230,115,0.2)); background: transparent; color: var(--text, #f2f5f0); font-size: 12px; cursor: pointer; }
+.bible-qa { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 720px) { .bible-qa { grid-template-columns: 1fr; } }
+.qa { padding: 10px 12px; border-radius: 10px; background: rgba(57,230,115,0.035); border: 1px solid var(--line, rgba(57,230,115,0.1)); }
+.qa.empty { opacity: .5; }
+.qa-q { display: flex; gap: 7px; font-size: 11.5px; font-weight: 600; color: var(--muted, #8fa39a); margin-bottom: 4px; line-height: 1.4; }
+.qa-q span { font-family: 'JetBrains Mono', monospace; color: #39e673; }
+.qa-a { font-size: 13.5px; color: var(--text, #f2f5f0); white-space: pre-wrap; line-height: 1.5; }
+.bible-pre { white-space: pre-wrap; font-family: inherit; font-size: 13px; line-height: 1.55; color: var(--text, #f2f5f0); max-height: 560px; overflow: auto; padding: 12px; border-radius: 10px; background: rgba(57,230,115,0.035); margin: 0; }
+
 .anim-shake { animation: shakeX 0.4s ease-in-out; }
 .tap { transition: transform 0.12s ease; }
 .tap:active { transform: scale(0.96); }
@@ -867,7 +931,7 @@ button.c-bg-accent.rounded-xl,
   54%{ opacity:1; }
 }
 @keyframes writeOn{
-  to{ -webkit-clip-path:inset(0 0% 0 0); clip-path:inset(0 0% 0 0); }
+  to{ -webkit-clip-path:inset(-0.8em -0.8em -0.8em -0.8em); clip-path:inset(-0.8em -0.8em -0.8em -0.8em); }
 }
 @media (min-width: 641px) {
   .login-desktop-scale { transform: scale(1.1); }
@@ -13036,8 +13100,8 @@ a:focus-visible, button:focus-visible{ outline:2px solid var(--lp-green); outlin
   position:absolute; right:0; top:100%; margin-top:0;
   display:inline-block; line-height:1;
   font-family:'Dancing Script', cursive; font-weight:700; font-size:9px; white-space:nowrap;
-  color:var(--lp-green); text-shadow:0 0 3px var(--lp-green), 0 0 6px var(--lp-green);
-  -webkit-clip-path:inset(0 100% 0 0); clip-path:inset(0 100% 0 0);
+  color:var(--lp-green); text-shadow:0 0 2px var(--lp-green), 0 0 6px var(--lp-green), 0 0 14px rgba(57,230,115,0.55);
+  -webkit-clip-path:inset(-0.8em 100% -0.8em -0.8em); clip-path:inset(-0.8em 100% -0.8em -0.8em);
   animation:writeOn 1.2s steps(20,end) forwards, neoFlicker 3.5s ease-in-out infinite 1.2s;
   pointer-events:none;
 }
@@ -13048,7 +13112,7 @@ a:focus-visible, button:focus-visible{ outline:2px solid var(--lp-green); outlin
   54%{ opacity:1; }
 }
 @keyframes writeOn{
-  to{ -webkit-clip-path:inset(0 0% 0 0); clip-path:inset(0 0% 0 0); }
+  to{ -webkit-clip-path:inset(-0.8em -0.8em -0.8em -0.8em); clip-path:inset(-0.8em -0.8em -0.8em -0.8em); }
 }
 .footer-links{ display:flex; align-items:center; gap:26px; flex-wrap:wrap; }
 .footer-links a{ color:var(--lp-text-dim); text-decoration:none; transition:color .15s ease; }
@@ -13981,14 +14045,14 @@ function LoginScreen({ models, onLogin }) {
   };
 
   return (
-    <div className="min-h-screen c-bg-app flex items-center justify-center px-4" style={{ fontFamily: "Inter, sans-serif" }}>
+    <div className="c-bg-app flex items-center justify-center px-4 login-screen" style={{ fontFamily: "Inter, sans-serif" }}>
       <style>{fontImport}</style>
       <div className="w-full max-w-sm login-desktop-scale">
       <div className="anim-card-in">
         <div className="flex items-center justify-center mb-8">
           <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center" }}>
             <ZionWordmark height={38} />
-            <span style={{ fontFamily: "'Dancing Script', cursive", fontWeight: 700, color: "var(--accent, #39ffa0)", textShadow: "0 0 3px currentColor, 0 0 6px currentColor", lineHeight: 1, whiteSpace: "nowrap", fontSize: "14px", marginTop: "8px", alignSelf: "flex-end", WebkitClipPath: "inset(0 100% 0 0)", clipPath: "inset(0 100% 0 0)", animation: "writeOn 1.2s steps(20,end) forwards, neoFlicker 3.5s ease-in-out infinite 1.2s" }}>by neomngmt</span>
+            <span style={{ fontFamily: "'Dancing Script', cursive", fontWeight: 700, color: "var(--accent, #39ffa0)", textShadow: "0 0 2px currentColor, 0 0 6px currentColor, 0 0 14px rgba(57,230,115,0.55)", lineHeight: 1, whiteSpace: "nowrap", fontSize: "14px", marginTop: "8px", alignSelf: "flex-end", WebkitClipPath: "inset(-0.8em 100% -0.8em -0.8em)", clipPath: "inset(-0.8em 100% -0.8em -0.8em)", animation: "writeOn 1.2s steps(20,end) forwards, neoFlicker 3.5s ease-in-out infinite 1.2s" }}>by neomngmt</span>
           </div>
         </div>
 
@@ -17579,6 +17643,147 @@ CreatorDashboard = React.memo(CreatorDashboard);
 
 // ---------- creator onboarding (first login) ----------
 
+// ---------- Brand Bible (step 2 after the Creator Bible) and the admin "Bibles" page ----------
+const BRAND_BIBLE_URL = "https://neomngmt.github.io/brand-bible/";
+function brandBibleCall(body) {
+  return fetch(`${SUPABASE_URL}/functions/v1/brand-bible`, { method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, "x-zion-token": neoLiveTok() }, body: JSON.stringify(body) })
+    .then((r) => r.json().then((j) => { if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`); return j; }));
+}
+const BB_TEXT = {
+  cz: { eyebrow: "Krok 2 · Brand Bible", title: "Ještě jedna věc 💚", body: "Většina modelek na sítích vypadá a zní úplně stejně. Vyplň Brand Bible a postavíme ti brand, který bude jen tvůj: osobnost, zájmy, styl a nápady na obsah.", time: "Zabere asi 15 minut, rozpracované se ukládá.", go: "Vyplnit teď", later: "Později", close: "Zavřít", thanks: "Díky! Brand Bible máme ✓" },
+  en: { eyebrow: "Step 2 · Brand Bible", title: "One more thing 💚", body: "Most creators online look and sound exactly the same. Fill in your Brand Bible and we build a brand that is only yours: personality, interests, style and content ideas.", time: "Takes about 15 minutes, your progress is saved.", go: "Fill it in now", later: "Later", close: "Close", thanks: "Thank you! We have your Brand Bible ✓" },
+};
+function BrandBiblePrompt({ name, agency }) {
+  const [stage, setStage] = useState("checking"); // checking | ask | open | thanks | hidden
+  const L = BB_TEXT[agency === "US" ? "en" : "cz"];
+  const laterKey = `zion-bb-later:${name}`;
+  useEffect(() => {
+    let off = false;
+    let snoozed = false;
+    try { snoozed = Date.now() - (Number(localStorage.getItem(laterKey)) || 0) < 20 * 3600000; } catch (e) {}
+    brandBibleCall({ action: "status" })
+      .then((r) => { if (!off) setStage(r.filled || snoozed ? "hidden" : "ask"); })
+      .catch(() => { if (!off) setStage("hidden"); });
+    return () => { off = true; };
+  }, [name]);
+  useEffect(() => {
+    if (stage !== "open") return;
+    const onMsg = (e) => {
+      if (e.origin !== "https://neomngmt.github.io") return;
+      const d = e.data;
+      if (!d || d.source !== "brand-bible") return;
+      if (d.type === "submitted") { try { localStorage.removeItem(laterKey); } catch (x) {} }
+      if (d.type === "continue") { setStage("thanks"); setTimeout(() => setStage("hidden"), 3200); }
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, [stage]);
+  if (stage === "checking" || stage === "hidden") return null;
+  const later = () => { try { localStorage.setItem(laterKey, String(Date.now())); } catch (e) {} setStage("hidden"); };
+  if (stage === "thanks") return ReactDOM.createPortal(
+    <div className="bb-toast">{L.thanks}</div>, document.body);
+  if (stage === "open") {
+    const url = `${BRAND_BIBLE_URL}?embed=1&lang=${agency === "US" ? "en" : "cz"}&name=${encodeURIComponent(name)}`;
+    return ReactDOM.createPortal(
+      <div className="bb-frame">
+        <iframe src={url} title="Brand Bible" />
+        <button className="bb-frame-x tap" onClick={() => setStage("hidden")} aria-label={L.close}><X size={18} /></button>
+      </div>, document.body);
+  }
+  return ReactDOM.createPortal(
+    <div className="bb-veil" onClick={later}>
+      <div className="bb-card" onClick={(e) => e.stopPropagation()}>
+        <div className="bb-glow" />
+        <svg className="bb-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 1L23 12L12 23L1 12Z" stroke="#39e673" strokeWidth="1.2" /><path d="M12 7L17 12L12 17L7 12Z" fill="#39e673" /></svg>
+        <div className="bb-eyebrow">{L.eyebrow}</div>
+        <div className="bb-title">{L.title}</div>
+        <p className="bb-body">{L.body}</p>
+        <p className="bb-time">{L.time}</p>
+        <button className="bb-go tap" onClick={() => setStage("open")}>{L.go} →</button>
+        <button className="bb-later tap" onClick={later}>{L.later}</button>
+      </div>
+    </div>, document.body);
+}
+
+function BiblesPage({ models }) {
+  const [tab, setTab] = useState("brand");
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+  const [open, setOpen] = useState(null);
+  const [copied, setCopied] = useState("");
+  const load = () => { setErr(""); brandBibleCall({ action: "list" }).then(setData).catch((e) => setErr(e.message)); };
+  useEffect(load, []);
+  const rows = (data ? (tab === "brand" ? data.brand : data.creator) : []) || [];
+  const filledNames = new Set(rows.map((r) => r.model).filter(Boolean));
+  const missing = (models || []).filter((m) => !filledNames.has(m.name)).map((m) => m.name);
+  // newest Brand Bible per model on top, older ones folded under it
+  const fmt = (t) => t ? new Date(t).toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric", year: "numeric" }) : "";
+  const copy = (key, txt) => { try { navigator.clipboard.writeText(txt); setCopied(key); setTimeout(() => setCopied(""), 1500); } catch (e) {} };
+  const download = (r) => {
+    const blob = new Blob([r.content || ""], { type: "text/plain;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${tab === "brand" ? "Brand" : "Creator"}_Bible_${(r.model || r.name).replace(/[^A-Za-z0-9]+/g, "_")}.txt`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  };
+  const link = tab === "brand" ? BRAND_BIBLE_URL : CREATOR_BIBLE_URL;
+  return (
+    <div className="bibles anim-card-in">
+      <div className="bibles-top">
+        <div className="bibles-tabs">
+          <button className={`tap ${tab === "brand" ? "on" : ""}`} onClick={() => { setTab("brand"); setOpen(null); }}>Brand Bible {data ? <span>{data.brand.length}</span> : null}</button>
+          <button className={`tap ${tab === "creator" ? "on" : ""}`} onClick={() => { setTab("creator"); setOpen(null); }}>Creator Bible {data ? <span>{data.creator.length}</span> : null}</button>
+        </div>
+        <button className="bibles-link tap" onClick={() => copy("link", link)}><Link2 size={13} /> {copied === "link" ? "Link copied" : "Copy link for a model"}</button>
+      </div>
+      {err && <div className="bibles-err">{err} <button className="tap" onClick={load}>Try again</button></div>}
+      {!data && !err && <div className="bibles-empty"><Loader2 size={16} className="animate-spin" /> Loading…</div>}
+      {data && missing.length > 0 && (
+        <div className="bibles-missing"><span>Not filled yet</span>{missing.map((n) => <em key={n}>{n}</em>)}</div>
+      )}
+      {data && rows.length === 0 && <div className="bibles-empty">Nothing here yet. Send the link above to a model.</div>}
+      <div className="bibles-list">
+        {rows.map((r) => {
+          const isOpen = open === r.id;
+          const answered = Array.isArray(r.answers) ? r.answers.filter((a) => String(a.answer || "").trim()).length : null;
+          return (
+            <div key={r.id} className={`bible-row ${isOpen ? "open" : ""}`}>
+              <button className="bible-head tap" onClick={() => setOpen(isOpen ? null : r.id)}>
+                <div className="bible-avatar">{(r.model || r.name || "?").slice(0, 1).toUpperCase()}</div>
+                <div className="bible-who">
+                  <div className="bible-name">{r.model || r.name}{!r.model && <span className="bible-tag warn">Not matched</span>}{r.kind === "resubmit" && <span className="bible-tag">Resubmitted</span>}</div>
+                  <div className="bible-meta">{fmt(r.created_at)}{r.source ? ` · ${r.source === "zion" ? "in Zion" : "from link"}` : ""}{r.lang ? ` · ${r.lang === "cz" ? "Čeština" : "English"}` : ""}{answered !== null ? ` · ${answered}/${r.answers.length} answered` : ""}{!r.model && r.name ? ` · typed "${r.name}"` : ""}</div>
+                </div>
+                <ChevronDown size={16} className="bible-chev" />
+              </button>
+              {isOpen && (
+                <div className="bible-body">
+                  <div className="bible-actions">
+                    <button className="tap" onClick={() => copy(r.id, r.content || "")}><Copy size={12} /> {copied === r.id ? "Copied" : "Copy"}</button>
+                    {r.content_en && <button className="tap" onClick={() => copy(r.id + "en", r.content_en)}><Copy size={12} /> {copied === r.id + "en" ? "Copied" : "Copy in English"}</button>}
+                    <button className="tap" onClick={() => download(r)}><FileText size={12} /> Download</button>
+                  </div>
+                  {Array.isArray(r.answers) && r.answers.length ? (
+                    <div className="bible-qa">
+                      {r.answers.map((a) => (
+                        <div key={a.n} className={`qa ${String(a.answer || "").trim() ? "" : "empty"}`}>
+                          <div className="qa-q"><span>{a.n}</span>{a.q}</div>
+                          <div className="qa-a">{String(a.answer || "").trim() || "No answer"}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : <pre className="bible-pre">{r.content}</pre>}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function OnboardingScreen({ name, url, onContinue, onQuestionnaireReceived }) {
   const [received, setReceived] = useState(false);
 
@@ -18893,6 +19098,7 @@ const NAV_ADMIN = [
   { id: "neo", label: "Neo", icon: Sparkles },
   { id: "knowledge", label: "Neo Knowledge", icon: BookOpen },
   { id: "models", label: "Model Manager", icon: Users },
+  { id: "bibles", label: "Bibles", icon: FileText },
   { id: "whatsnew", label: "OF News", icon: Megaphone },
   { id: "settings", label: "Settings", icon: Settings },
 ];
@@ -20327,7 +20533,7 @@ function App() {
           <div className="flex items-center" style={{ position: "relative" }}>
             <span className="sm:hidden"><ZionMark size={18} gradId="zionMarkGradTopbar" /></span>
             <span className="hidden sm:block"><ZionWordmark height={25} /></span>
-            <span className="hidden sm:block" style={{ fontFamily: "'Dancing Script', cursive", fontWeight: 700, color: "var(--accent, #39ffa0)", textShadow: "0 0 3px currentColor, 0 0 6px currentColor", lineHeight: 1, whiteSpace: "nowrap", fontSize: "11px", position: "absolute", right: 0, top: "calc(50% + 16px)", pointerEvents: "none", WebkitClipPath: "inset(0 100% 0 0)", clipPath: "inset(0 100% 0 0)", animation: "writeOn 1.2s steps(20,end) forwards, neoFlicker 3.5s ease-in-out infinite 1.2s" }}>by neomngmt</span>
+            <span className="hidden sm:block" style={{ fontFamily: "'Dancing Script', cursive", fontWeight: 700, color: "var(--accent, #39ffa0)", textShadow: "0 0 2px currentColor, 0 0 6px currentColor, 0 0 14px rgba(57,230,115,0.55)", lineHeight: 1, whiteSpace: "nowrap", fontSize: "11px", position: "absolute", right: 0, top: "calc(50% + 16px)", pointerEvents: "none", WebkitClipPath: "inset(-0.8em 100% -0.8em -0.8em)", clipPath: "inset(-0.8em 100% -0.8em -0.8em)", animation: "writeOn 1.2s steps(20,end) forwards, neoFlicker 3.5s ease-in-out infinite 1.2s" }}>by neomngmt</span>
           </div>
         </button>
         <div className="flex items-center gap-1.5 px-4 py-3 flex-1 justify-end min-w-0">
@@ -20382,7 +20588,7 @@ function App() {
             <div className="sm:hidden flex items-center justify-center pt-5 pb-4" style={{ width: "100%" }}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                 <ZionWordmark height={21} />
-                <span style={{ fontFamily: "'Dancing Script', cursive", fontWeight: 700, color: "var(--accent, #39ffa0)", textShadow: "0 0 3px currentColor, 0 0 6px currentColor", lineHeight: 1, whiteSpace: "nowrap", fontSize: "10.5px", marginTop: "6px", alignSelf: "center", WebkitClipPath: "inset(0 100% 0 0)", clipPath: "inset(0 100% 0 0)", animation: "writeOn 1.2s steps(20,end) forwards, neoFlicker 3.5s ease-in-out infinite 1.2s" }}>by neomngmt</span>
+                <span style={{ fontFamily: "'Dancing Script', cursive", fontWeight: 700, color: "var(--accent, #39ffa0)", textShadow: "0 0 2px currentColor, 0 0 6px currentColor, 0 0 14px rgba(57,230,115,0.55)", lineHeight: 1, whiteSpace: "nowrap", fontSize: "10.5px", marginTop: "6px", alignSelf: "center", WebkitClipPath: "inset(-0.8em 100% -0.8em -0.8em)", clipPath: "inset(-0.8em 100% -0.8em -0.8em)", animation: "writeOn 1.2s steps(20,end) forwards, neoFlicker 3.5s ease-in-out infinite 1.2s" }}>by neomngmt</span>
               </div>
             </div>
           )}
@@ -20497,6 +20703,7 @@ function App() {
             {currentView === "titlegen" && isAdmin && <TitleGeneratorPage />}
             {currentView === "acquisition" && isAdmin && <AcquisitionPage />}
             {currentView === "knowledge" && isAdmin && <KnowledgePage />}
+            {currentView === "bibles" && isAdmin && <BiblesPage models={agencyModels} />}
             {currentView === "weeklytrends" && isAdmin && <TrendsHub models={agencyModels} />}
             {currentView === "weeklytrends" && !isAdmin && <TrendsHub creator={restrictModel} />}
             {currentView === "trending" && <CreatorTrending trends={trends} agency={session.agency} />}
@@ -20508,6 +20715,7 @@ function App() {
           </main>
         </div>
       </div>
+      {session.role === "creator" && restrictModel && <BrandBiblePrompt name={restrictModel} agency={session.agency} />}
       </>
       )}
 
