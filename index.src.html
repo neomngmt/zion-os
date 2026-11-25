@@ -857,41 +857,89 @@ const fontImport = `
 @keyframes bbShine { 0% { left: -60%; } 45%, 100% { left: 130%; } }
 @media (prefers-reduced-motion: reduce) { .bb-veil, .bb-card, .bb-glow, .bb-mark, .bb-go::after, .bb-toast, .bb-frame { animation: none !important; } }
 /* ---------- Bibles page (admin) ---------- */
-.bibles { max-width: 920px; }
-.bibles-top { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-.bibles-tabs { display: flex; gap: 4px; padding: 4px; border-radius: 12px; border: 1px solid var(--line, rgba(57,230,115,0.16)); background: var(--surface, #0e1310); }
-.bibles-tabs button { display: flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 9px; border: none; background: transparent; color: var(--muted, #8fa39a); font-size: 13px; font-weight: 600; cursor: pointer; }
-.bibles-tabs button span { font-family: 'JetBrains Mono', monospace; font-size: 11px; opacity: .8; }
-.bibles-tabs button.on { background: linear-gradient(135deg, rgba(57,230,115,0.22), rgba(18,179,76,0.1)); color: #39e673; box-shadow: inset 0 0 0 1px rgba(57,230,115,0.35); }
-.bibles-link { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px; border: 1px solid rgba(57,230,115,0.3); background: transparent; color: #39e673; font-size: 12.5px; font-weight: 600; cursor: pointer; }
-.bibles-missing { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 14px; font-size: 12px; }
-.bibles-missing span { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted, #8fa39a); margin-right: 4px; }
-.bibles-missing em { font-style: normal; padding: 3px 10px; border-radius: 999px; border: 1px dashed rgba(255,190,80,0.4); color: #f2c76b; }
+.bx { max-width: 1040px; }
 .bibles-empty, .bibles-err { display: flex; gap: 8px; align-items: center; padding: 22px; border-radius: 14px; border: 1px dashed var(--line, rgba(57,230,115,0.16)); color: var(--muted, #8fa39a); font-size: 13px; }
 .bibles-err { color: #ff8a8a; } .bibles-err button { margin-left: auto; color: #39e673; background: none; border: none; cursor: pointer; }
-.bibles-list { display: flex; flex-direction: column; gap: 8px; }
-.bible-row { border-radius: 14px; border: 1px solid var(--line, rgba(57,230,115,0.14)); background: var(--surface, #0e1310); overflow: hidden; transition: border-color .2s, box-shadow .2s; animation: cardIn .3s ease-out both; }
-.bible-row.open { border-color: rgba(57,230,115,0.4); box-shadow: 0 0 24px rgba(18,179,76,0.12); }
-.bible-head { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: none; border: none; text-align: left; cursor: pointer; color: inherit; }
-.bible-avatar { width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #04140c; background: linear-gradient(135deg, #39e673, #12b34c); }
-.bible-who { flex: 1; min-width: 0; }
-.bible-name { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-weight: 700; font-size: 14.5px; color: var(--text, #f2f5f0); }
-.bible-meta { font-size: 11.5px; color: var(--muted, #8fa39a); margin-top: 2px; }
-.bible-tag { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 1px; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; border: 1px solid rgba(57,230,115,0.3); color: #39e673; font-weight: 500; }
-.bible-tag.warn { border-color: rgba(255,190,80,0.45); color: #f2c76b; }
-.bible-chev { color: var(--muted, #8fa39a); transition: transform .25s; }
-.bible-row.open .bible-chev { transform: rotate(180deg); }
-.bible-body { padding: 0 14px 14px; animation: cardIn .25s ease-out; }
-.bible-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-.bible-actions button { display: flex; align-items: center; gap: 5px; padding: 6px 11px; border-radius: 999px; border: 1px solid var(--line, rgba(57,230,115,0.2)); background: transparent; color: var(--text, #f2f5f0); font-size: 12px; cursor: pointer; }
-.bible-qa { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-@media (max-width: 720px) { .bible-qa { grid-template-columns: 1fr; } }
-.qa { padding: 10px 12px; border-radius: 10px; background: rgba(57,230,115,0.035); border: 1px solid var(--line, rgba(57,230,115,0.1)); }
-.qa.empty { opacity: .5; }
-.qa-q { display: flex; gap: 7px; font-size: 11.5px; font-weight: 600; color: var(--muted, #8fa39a); margin-bottom: 4px; line-height: 1.4; }
-.qa-q span { font-family: 'JetBrains Mono', monospace; color: #39e673; }
-.qa-a { font-size: 13.5px; color: var(--text, #f2f5f0); white-space: pre-wrap; line-height: 1.5; }
-.bible-pre { white-space: pre-wrap; font-family: inherit; font-size: 13px; line-height: 1.55; color: var(--text, #f2f5f0); max-height: 560px; overflow: auto; padding: 12px; border-radius: 10px; background: rgba(57,230,115,0.035); margin: 0; }
+.bx-stats { display: grid; grid-template-columns: 1fr 1fr 0.8fr; gap: 12px; margin-bottom: 18px; }
+@media (max-width: 720px) { .bx-stats { grid-template-columns: 1fr 1fr; } .bx-stat.link { grid-column: 1 / -1; } }
+.bx-stat { position: relative; overflow: hidden; text-align: left; padding: 16px 18px; border-radius: 18px; cursor: pointer; color: inherit;
+  border: 1px solid var(--line, rgba(57,230,115,0.14)); background: linear-gradient(160deg, rgba(57,230,115,0.06), rgba(255,255,255,0.01) 60%), var(--surface, #0e1310);
+  transition: transform .25s cubic-bezier(.2,.8,.2,1), border-color .25s, box-shadow .25s; animation: bxUp .5s cubic-bezier(.2,.8,.2,1) both; }
+.bx-stat:nth-child(2) { animation-delay: .06s; } .bx-stat:nth-child(3) { animation-delay: .12s; }
+.bx-stat:hover { transform: translateY(-2px); border-color: rgba(57,230,115,0.35); }
+.bx-stat.on { border-color: rgba(57,230,115,0.55); box-shadow: 0 0 0 1px rgba(57,230,115,0.15) inset, 0 12px 40px rgba(18,179,76,0.16); background: linear-gradient(160deg, rgba(57,230,115,0.16), rgba(18,179,76,0.03) 65%), var(--surface, #0e1310); }
+.bx-stat.on::after { content: ""; position: absolute; right: -30px; top: -30px; width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle, rgba(57,230,115,0.25), transparent 70%); pointer-events: none; }
+.bx-stat-top { display: flex; flex-direction: column; gap: 2px; }
+.bx-stat-top span { font-size: 13px; font-weight: 700; color: var(--text, #f2f5f0); }
+.bx-stat-top em { font-style: normal; font-size: 11px; color: var(--muted, #8fa39a); }
+.bx-stat-num { margin-top: 14px; font-size: 34px; font-weight: 800; letter-spacing: -1px; line-height: 1; font-variant-numeric: tabular-nums; background: linear-gradient(135deg, #f2f5f0 30%, #39e673); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.bx-stat-num small { font-size: 14px; font-weight: 600; margin-left: 6px; letter-spacing: 0; -webkit-text-fill-color: var(--muted, #8fa39a); }
+.bx-bar { margin-top: 12px; height: 4px; border-radius: 99px; background: rgba(57,230,115,0.1); overflow: hidden; }
+.bx-bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #12b34c, #39e673); box-shadow: 0 0 10px rgba(57,230,115,0.6); transition: width 1s cubic-bezier(.2,.8,.2,1); }
+.bx-stat.link { display: flex; flex-direction: column; justify-content: space-between; border-style: dashed; }
+.bx-link-row { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 14px; font-weight: 700; color: #39e673; }
+.bx-missing { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin: 0 0 16px; }
+.bx-missing span { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted, #8fa39a); margin-right: 4px; }
+.bx-missing em { font-style: normal; display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px; font-size: 12px; color: #f2d48b; background: rgba(242,199,107,0.06); border: 1px solid rgba(242,199,107,0.22); }
+.bx-missing em i { width: 6px; height: 6px; border-radius: 50%; background: #f2c76b; box-shadow: 0 0 8px #f2c76b; animation: bxPulse 1.8s ease-in-out infinite; }
+.bx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.bx-card { position: relative; overflow: hidden; text-align: left; padding: 16px; border-radius: 18px; cursor: pointer; color: inherit;
+  border: 1px solid var(--line, rgba(57,230,115,0.14)); background: var(--surface, #0e1310);
+  transition: transform .3s cubic-bezier(.2,.8,.2,1), border-color .3s, box-shadow .3s; animation: bxUp .55s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i, 0) * 45ms + .1s); }
+.bx-card-glow { position: absolute; inset: auto -30% -60% -30%; height: 120%; background: radial-gradient(ellipse at 50% 100%, rgba(57,230,115,0.16), transparent 60%); opacity: 0; transition: opacity .35s; pointer-events: none; }
+.bx-card:hover { transform: translateY(-3px); border-color: rgba(57,230,115,0.45); box-shadow: 0 16px 44px rgba(0,0,0,0.35), 0 0 30px rgba(18,179,76,0.12); }
+.bx-card:hover .bx-card-glow { opacity: 1; }
+.bx-card-top { position: relative; display: flex; align-items: center; gap: 12px; }
+.bx-ring { --p: 100; width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0; padding: 3px; background: conic-gradient(#39e673 calc(var(--p) * 1%), rgba(57,230,115,0.12) 0); }
+.bx-ring > div { width: 100%; height: 100%; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 17px; color: #04140c; background: linear-gradient(135deg, #39e673, #12b34c); box-shadow: inset 0 0 0 2px var(--surface, #0e1310); }
+.bx-card-who { flex: 1; min-width: 0; }
+.bx-card-name { font-size: 15.5px; font-weight: 800; letter-spacing: -.2px; color: var(--text, #f2f5f0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bx-card-meta { font-size: 12px; color: var(--muted, #8fa39a); margin-top: 2px; }
+.bx-chev { color: var(--muted, #8fa39a); transition: transform .3s, color .3s; }
+.bx-card:hover .bx-chev { transform: translateX(3px); color: #39e673; }
+.bx-tags { position: relative; display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
+.bx-tags span { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 1px; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; color: var(--muted, #8fa39a); border: 1px solid var(--line, rgba(57,230,115,0.16)); }
+.bx-tags span.pct { color: #39e673; border-color: rgba(57,230,115,0.35); background: rgba(57,230,115,0.06); }
+.bx-tags span.warn { color: #f2c76b; border-color: rgba(242,199,107,0.35); }
+.bx-empty { text-align: center; padding: 46px 20px; border-radius: 20px; border: 1px dashed var(--line, rgba(57,230,115,0.18)); animation: bxUp .5s ease both; }
+.bx-empty-mark { width: 54px; height: 54px; margin: 0 auto 14px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #39e673; background: radial-gradient(circle, rgba(57,230,115,0.2), rgba(18,179,76,0.04) 70%); border: 1px solid rgba(57,230,115,0.35); box-shadow: 0 0 26px rgba(18,179,76,0.25); animation: bxFloat 4s ease-in-out infinite; }
+.bx-empty-title { font-size: 16px; font-weight: 800; color: var(--text, #f2f5f0); }
+.bx-empty-sub { font-size: 13px; color: var(--muted, #8fa39a); margin-top: 4px; }
+/* drawer with the answers */
+.bd-veil { position: fixed; inset: 0; z-index: 250; background: rgba(3,6,4,0.62); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: bbFade .25s ease both; display: flex; justify-content: flex-end; font-family: Inter, -apple-system, sans-serif; }
+.bd-panel { width: min(640px, 100%); height: 100%; display: flex; flex-direction: column; background: linear-gradient(180deg, rgba(18,179,76,0.08), transparent 220px), #0b100d; border-left: 1px solid rgba(57,230,115,0.2); box-shadow: -30px 0 80px rgba(0,0,0,0.5); animation: bdIn .45s cubic-bezier(.2,.8,.2,1) both; }
+@media (max-width: 720px) { .bd-veil { align-items: flex-end; } .bd-panel { height: 92%; border-left: none; border-top: 1px solid rgba(57,230,115,0.25); border-radius: 22px 22px 0 0; animation-name: bdUp; } }
+.bd-head { display: flex; align-items: center; gap: 14px; padding: 22px 22px 14px; padding-top: calc(22px + env(safe-area-inset-top)); }
+@media (max-width: 720px) { .bd-head { padding-top: 22px; } }
+.bd-avatar { width: 54px; height: 54px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 22px; color: #04140c; background: linear-gradient(135deg, #39e673, #12b34c); box-shadow: 0 0 0 4px rgba(57,230,115,0.12), 0 0 30px rgba(18,179,76,0.4); }
+.bd-who { flex: 1; min-width: 0; }
+.bd-kicker { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase; color: #39e673; }
+.bd-name { font-size: 24px; font-weight: 800; letter-spacing: -.6px; color: #f2f5f0; line-height: 1.15; margin-top: 2px; }
+.bd-meta { font-size: 12px; color: #8fa39a; margin-top: 3px; }
+.bd-x { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #b9c8bf; background: rgba(255,255,255,0.03); border: 1px solid rgba(57,230,115,0.2); cursor: pointer; flex-shrink: 0; }
+.bd-actions { display: flex; flex-wrap: wrap; gap: 7px; padding: 0 22px 14px; border-bottom: 1px solid rgba(57,230,115,0.1); }
+.bd-actions button { display: flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 999px; border: 1px solid rgba(57,230,115,0.25); background: rgba(57,230,115,0.05); color: #f2f5f0; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.bd-actions button:hover { border-color: rgba(57,230,115,0.55); }
+.bd-body { flex: 1; overflow-y: auto; padding: 6px 22px calc(28px + env(safe-area-inset-bottom)); overscroll-behavior: contain; }
+.bd-sec { margin-top: 18px; animation: bxUp .5s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i, 0) * 60ms + .15s); }
+.bd-sec h3 { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 600; letter-spacing: 2.5px; text-transform: uppercase; color: #39e673; }
+.bd-sec h3::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(57,230,115,0.35), transparent); }
+.bd-items { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 520px) { .bd-items { grid-template-columns: 1fr; } }
+.bd-item { padding: 11px 13px; border-radius: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(57,230,115,0.1); }
+.bd-item.wide { grid-column: 1 / -1; }
+.bd-item.empty { opacity: .42; }
+.bd-q { display: flex; gap: 7px; font-size: 11.5px; font-weight: 600; color: #8fa39a; line-height: 1.4; margin-bottom: 5px; }
+.bd-q span { font-family: 'JetBrains Mono', monospace; color: #39e673; }
+.bd-a { font-size: 14px; line-height: 1.55; color: #f2f5f0; white-space: pre-wrap; word-break: break-word; }
+.bd-item.empty .bd-a { font-style: italic; color: #6f857a; }
+.bible-pre { white-space: pre-wrap; font-family: inherit; font-size: 13px; line-height: 1.55; color: #f2f5f0; padding: 12px; border-radius: 10px; background: rgba(57,230,115,0.035); margin: 0; }
+@keyframes bxUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes bxPulse { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+@keyframes bxFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes bdIn { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes bdUp { from { transform: translateY(60px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .bx-stat, .bx-card, .bx-empty, .bx-empty-mark, .bd-panel, .bd-sec, .bx-missing em i { animation: none !important; } }
 
 .anim-shake { animation: shakeX 0.4s ease-in-out; }
 .tap { transition: transform 0.12s ease; }
@@ -17705,6 +17753,101 @@ function BrandBiblePrompt({ name, agency }) {
     </div>, document.body);
 }
 
+// Creator Bible text ("Label: value" lines, "--- 01 KDO JSI ---" headers) -> sections of question/answer pairs
+function parseBibleText(text) {
+  const sections = [];
+  let sec = { title: "", items: [] };
+  const push = () => { if (sec.items.length) sections.push(sec); };
+  for (const raw of String(text || "").split("\n")) {
+    const line = raw.trim();
+    if (!line || /^=+$/.test(line) || /^KOMPLETN[IÍ] FORMUL[AÁ]R$/i.test(line) || /^BRAND BIBLE:/i.test(line)) continue;
+    const h = line.match(/^(?:-{2,}|={2,})\s*(.+?)\s*(?:-{2,}|={2,})$/) || line.match(/^([A-ZÁ-Ž0-9 &/]{4,}):$/);
+    if (h) { push(); sec = { title: h[1].replace(/^\d+\s+/, ""), items: [] }; continue; }
+    const kv = line.match(/^([^:]{2,70}):\s*(.*)$/);
+    if (kv && !/^https?$/i.test(kv[1])) sec.items.push({ q: kv[1], a: kv[2] });
+    else if (sec.items.length) sec.items[sec.items.length - 1].a += (sec.items[sec.items.length - 1].a ? "\n" : "") + line;
+    else sec.items.push({ q: "", a: line });
+  }
+  push();
+  return sections;
+}
+const BRAND_PARTS = [[1, 10, "Personality & identity"], [11, 18, "Skills, jobs & hobbies"], [19, 26, "Style, vibes & aesthetic"], [27, 32, "Locations & props"], [33, 38, "Current activity"]];
+function bibleSections(r) {
+  if (Array.isArray(r.answers) && r.answers.length) {
+    return BRAND_PARTS.map(([from, to, title]) => ({ title, items: r.answers.filter((x) => x.n >= from && x.n <= to).map((x) => ({ n: x.n, q: x.q, a: x.answer || "" })) })).filter((x) => x.items.length);
+  }
+  return parseBibleText(r.content);
+}
+function bibleFill(r) {
+  const items = bibleSections(r).flatMap((x) => x.items).filter((x) => x.q);
+  if (!items.length) return null;
+  return { done: items.filter((x) => String(x.a).trim()).length, total: items.length };
+}
+function agoText(t) {
+  if (!t) return "";
+  const d = Math.floor((Date.now() - Date.parse(t)) / 86400000);
+  if (d <= 0) return "today";
+  if (d === 1) return "yesterday";
+  if (d < 30) return `${d} days ago`;
+  return new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function BibleDrawer({ row, kind, onClose }) {
+  const [copied, setCopied] = useState("");
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+  const sections = bibleSections(row);
+  const fill = bibleFill(row);
+  const who = row.model || row.name;
+  const copy = (key, txt) => { try { navigator.clipboard.writeText(txt); setCopied(key); setTimeout(() => setCopied(""), 1500); } catch (e) {} };
+  const download = () => {
+    const blob = new Blob([row.content || ""], { type: "text/plain;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${kind === "brand" ? "Brand" : "Creator"}_Bible_${who.replace(/[^A-Za-z0-9]+/g, "_")}.txt`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  };
+  return ReactDOM.createPortal(
+    <div className="bd-veil" onClick={onClose}>
+      <aside className="bd-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="bd-head">
+          <div className="bd-avatar">{who.slice(0, 1).toUpperCase()}</div>
+          <div className="bd-who">
+            <div className="bd-kicker">{kind === "brand" ? "Brand Bible" : "Creator Bible"}</div>
+            <div className="bd-name">{who}</div>
+            <div className="bd-meta">{agoText(row.created_at)}{fill ? ` · ${fill.done} of ${fill.total} answered` : ""}{row.source ? ` · ${row.source === "zion" ? "filled in Zion" : "from the link"}` : ""}</div>
+          </div>
+          <button className="bd-x tap" onClick={onClose} aria-label="Close"><X size={18} /></button>
+        </div>
+        <div className="bd-actions">
+          <button className="tap" onClick={() => copy("all", row.content || "")}><Copy size={13} /> {copied === "all" ? "Copied" : "Copy all"}</button>
+          {row.content_en && <button className="tap" onClick={() => copy("en", row.content_en)}><Copy size={13} /> {copied === "en" ? "Copied" : "Copy in English"}</button>}
+          <button className="tap" onClick={download}><FileText size={13} /> Download</button>
+        </div>
+        <div className="bd-body">
+          {sections.map((sec, i) => (
+            <section key={i} className="bd-sec" style={{ "--i": i }}>
+              {sec.title && <h3>{sec.title}</h3>}
+              <div className="bd-items">
+                {sec.items.map((it, k) => (
+                  <div key={k} className={`bd-item ${String(it.a).trim() ? "" : "empty"} ${String(it.a).length > 90 ? "wide" : ""}`}>
+                    {it.q && <div className="bd-q">{it.n ? <span>{it.n}</span> : null}{it.q}</div>}
+                    <div className="bd-a">{String(it.a).trim() || "No answer"}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+          {!sections.length && <pre className="bible-pre">{row.content}</pre>}
+        </div>
+      </aside>
+    </div>, document.body);
+}
+
 function BiblesPage({ models }) {
   const [tab, setTab] = useState("brand");
   const [data, setData] = useState(null);
@@ -17713,73 +17856,76 @@ function BiblesPage({ models }) {
   const [copied, setCopied] = useState("");
   const load = () => { setErr(""); brandBibleCall({ action: "list" }).then(setData).catch((e) => setErr(e.message)); };
   useEffect(load, []);
-  const rows = (data ? (tab === "brand" ? data.brand : data.creator) : []) || [];
-  const filledNames = new Set(rows.map((r) => r.model).filter(Boolean));
-  const missing = (models || []).filter((m) => !filledNames.has(m.name)).map((m) => m.name);
-  // newest Brand Bible per model on top, older ones folded under it
-  const fmt = (t) => t ? new Date(t).toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric", year: "numeric" }) : "";
+  const list = (k) => ((data && data[k]) || []);
+  const rows = list(tab);
+  const filledFor = (k) => new Set(list(k).map((r) => r.model).filter(Boolean));
+  const missing = (models || []).filter((m) => !filledFor(tab).has(m.name)).map((m) => m.name);
   const copy = (key, txt) => { try { navigator.clipboard.writeText(txt); setCopied(key); setTimeout(() => setCopied(""), 1500); } catch (e) {} };
-  const download = (r) => {
-    const blob = new Blob([r.content || ""], { type: "text/plain;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${tab === "brand" ? "Brand" : "Creator"}_Bible_${(r.model || r.name).replace(/[^A-Za-z0-9]+/g, "_")}.txt`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-  };
   const link = tab === "brand" ? BRAND_BIBLE_URL : CREATOR_BIBLE_URL;
+  const total = (models || []).length;
+  const stat = (k) => filledFor(k).size;
   return (
-    <div className="bibles anim-card-in">
-      <div className="bibles-top">
-        <div className="bibles-tabs">
-          <button className={`tap ${tab === "brand" ? "on" : ""}`} onClick={() => { setTab("brand"); setOpen(null); }}>Brand Bible {data ? <span>{data.brand.length}</span> : null}</button>
-          <button className={`tap ${tab === "creator" ? "on" : ""}`} onClick={() => { setTab("creator"); setOpen(null); }}>Creator Bible {data ? <span>{data.creator.length}</span> : null}</button>
-        </div>
-        <button className="bibles-link tap" onClick={() => copy("link", link)}><Link2 size={13} /> {copied === "link" ? "Link copied" : "Copy link for a model"}</button>
+    <div className="bx anim-card-in">
+      <div className="bx-stats">
+        {[["brand", "Brand Bibles", "Branding questionnaire"], ["creator", "Creator Bibles", "Persona for chatting"]].map(([k, label, sub]) => (
+          <button key={k} className={`bx-stat tap ${tab === k ? "on" : ""}`} onClick={() => { setTab(k); setOpen(null); }}>
+            <div className="bx-stat-top"><span>{label}</span><em>{sub}</em></div>
+            <div className="bx-stat-num">{data ? stat(k) : "·"}<small>/ {total}</small></div>
+            <div className="bx-bar"><i style={{ width: `${total ? Math.round((data ? stat(k) : 0) / total * 100) : 0}%` }} /></div>
+          </button>
+        ))}
+        <button className="bx-stat link tap" onClick={() => copy("link", link)}>
+          <div className="bx-stat-top"><span>Send to a model</span><em>{tab === "brand" ? "Brand Bible" : "Creator Bible"} link</em></div>
+          <div className="bx-link-row"><Link2 size={16} /> {copied === "link" ? "Copied ✓" : "Copy link"}</div>
+        </button>
       </div>
+
       {err && <div className="bibles-err">{err} <button className="tap" onClick={load}>Try again</button></div>}
       {!data && !err && <div className="bibles-empty"><Loader2 size={16} className="animate-spin" /> Loading…</div>}
+
       {data && missing.length > 0 && (
-        <div className="bibles-missing"><span>Not filled yet</span>{missing.map((n) => <em key={n}>{n}</em>)}</div>
+        <div className="bx-missing">
+          <span>Waiting for</span>
+          {missing.map((n) => <em key={n}><i />{n}</em>)}
+        </div>
       )}
-      {data && rows.length === 0 && <div className="bibles-empty">Nothing here yet. Send the link above to a model.</div>}
-      <div className="bibles-list">
-        {rows.map((r) => {
-          const isOpen = open === r.id;
-          const answered = Array.isArray(r.answers) ? r.answers.filter((a) => String(a.answer || "").trim()).length : null;
+
+      {data && rows.length === 0 && (
+        <div className="bx-empty">
+          <div className="bx-empty-mark"><FileText size={22} /></div>
+          <div className="bx-empty-title">No {tab === "brand" ? "Brand" : "Creator"} Bibles yet</div>
+          <div className="bx-empty-sub">Models get it in Zion right after the Creator Bible, or send them the link.</div>
+        </div>
+      )}
+
+      <div className="bx-grid">
+        {rows.map((r, i) => {
+          const who = r.model || r.name;
+          const fill = bibleFill(r);
+          const pct = fill ? Math.round(fill.done / fill.total * 100) : null;
           return (
-            <div key={r.id} className={`bible-row ${isOpen ? "open" : ""}`}>
-              <button className="bible-head tap" onClick={() => setOpen(isOpen ? null : r.id)}>
-                <div className="bible-avatar">{(r.model || r.name || "?").slice(0, 1).toUpperCase()}</div>
-                <div className="bible-who">
-                  <div className="bible-name">{r.model || r.name}{!r.model && <span className="bible-tag warn">Not matched</span>}{r.kind === "resubmit" && <span className="bible-tag">Resubmitted</span>}</div>
-                  <div className="bible-meta">{fmt(r.created_at)}{r.source ? ` · ${r.source === "zion" ? "in Zion" : "from link"}` : ""}{r.lang ? ` · ${r.lang === "cz" ? "Čeština" : "English"}` : ""}{answered !== null ? ` · ${answered}/${r.answers.length} answered` : ""}{!r.model && r.name ? ` · typed "${r.name}"` : ""}</div>
+            <button key={r.id} className="bx-card tap" style={{ "--i": i }} onClick={() => setOpen(r)}>
+              <div className="bx-card-glow" />
+              <div className="bx-card-top">
+                <div className="bx-ring" style={{ "--p": pct === null ? 100 : pct }}><div>{who.slice(0, 1).toUpperCase()}</div></div>
+                <div className="bx-card-who">
+                  <div className="bx-card-name">{who}</div>
+                  <div className="bx-card-meta">{agoText(r.created_at)}</div>
                 </div>
-                <ChevronDown size={16} className="bible-chev" />
-              </button>
-              {isOpen && (
-                <div className="bible-body">
-                  <div className="bible-actions">
-                    <button className="tap" onClick={() => copy(r.id, r.content || "")}><Copy size={12} /> {copied === r.id ? "Copied" : "Copy"}</button>
-                    {r.content_en && <button className="tap" onClick={() => copy(r.id + "en", r.content_en)}><Copy size={12} /> {copied === r.id + "en" ? "Copied" : "Copy in English"}</button>}
-                    <button className="tap" onClick={() => download(r)}><FileText size={12} /> Download</button>
-                  </div>
-                  {Array.isArray(r.answers) && r.answers.length ? (
-                    <div className="bible-qa">
-                      {r.answers.map((a) => (
-                        <div key={a.n} className={`qa ${String(a.answer || "").trim() ? "" : "empty"}`}>
-                          <div className="qa-q"><span>{a.n}</span>{a.q}</div>
-                          <div className="qa-a">{String(a.answer || "").trim() || "No answer"}</div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : <pre className="bible-pre">{r.content}</pre>}
-                </div>
-              )}
-            </div>
+                <ChevronRight size={16} className="bx-chev" />
+              </div>
+              <div className="bx-tags">
+                {!r.model && <span className="warn">Not matched{r.name ? ` · "${r.name}"` : ""}</span>}
+                {r.kind === "resubmit" && <span>Resubmitted</span>}
+                {r.source && <span>{r.source === "zion" ? "In Zion" : "From link"}</span>}
+                {r.lang && <span>{r.lang === "cz" ? "CZ" : "EN"}</span>}
+                {pct !== null && <span className="pct">{pct}% answered</span>}
+              </div>
+            </button>
           );
         })}
       </div>
+      {open && <BibleDrawer row={open} kind={tab} onClose={() => setOpen(null)} />}
     </div>
   );
 }
