@@ -296,17 +296,17 @@
     </div>
 
     <div class="popup-input-wrap">
-      <input type="text" id="popup-name" placeholder="Tvoje jméno nebo alias..." autocomplete="off">
+      <input type="text" id="popup-name" placeholder="Tvoje jméno nebo alias..." autocomplete="off" enterkeyhint="next">
     </div>
     <div class="popup-input-wrap">
-      <input type="text" id="popup-of" placeholder="Tvůj OnlyFans username (např. @tvojejmeno)" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <input type="text" id="popup-of" placeholder="Tvůj OnlyFans username (např. @tvojejmeno)" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go">
     </div>
     <div class="popup-why">
       <div class="popup-why-title" id="popup-why-title">PROČ JE TENTO DOTAZNÍK DŮLEŽITÝ</div>
       <p id="popup-why-1">Pomáhá nám zachytit tvoji osobnost, hlas a zájmy, aby každá konverzace s tvými fanoušky působila autenticky. Cílem je zajistit, aby chatting tým psal tak, jak bys psala ty přirozeně.</p>
       <p id="popup-why-2">Vyplněním získáš nástroje pro silnější vztahy s fans, vyšší loajalitu a maximální sales při zachování tvé osobnosti.</p>
     </div>
-    <button class="popup-btn" id="popup-btn" onclick="startForm()">Začít dotazník →</button>
+    <button class="popup-btn" id="popup-btn" type="button">Začít dotazník →</button>
   </div>
 </div>
 
@@ -1116,9 +1116,19 @@ function startForm(){
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  ['popup-name','popup-of'].forEach(id => document.getElementById(id).addEventListener('keydown', e => {
-    if(e.key === 'Enter') startForm();
-  }));
+  // keyboard: Enter in the name goes to the username, Enter there starts
+  document.getElementById('popup-name').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); document.getElementById('popup-of').focus(); } });
+  document.getElementById('popup-of').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); startForm(); } });
+  // iPhone: start on the touch itself. A normal click comes after the keyboard closes, the page jumps and the tap can miss the button.
+  const startBtn = document.getElementById('popup-btn');
+  let startedByTouch = 0;
+  startBtn.addEventListener('pointerdown', e => {
+    if(e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+    e.preventDefault(); startedByTouch = Date.now();
+    startForm();
+    if(document.getElementById('popup').style.display === 'none' && document.activeElement) document.activeElement.blur();
+  });
+  startBtn.addEventListener('click', () => { if(Date.now() - startedByTouch < 800) return; startForm(); });
 });
 
 // Intro screen: panel tilts toward the pointer, particles drift and react to it.
