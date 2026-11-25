@@ -1304,7 +1304,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
     });
   };
 })();
-const CREATOR_BIBLE_URL = "https://neomngmt.github.io/creator-bible/";
+const CREATOR_BIBLE_URL = "https://zionbyneo.com/creatorbible/";
 const STAGES = [{
   id: "idea",
   label: "Idea",
@@ -31196,7 +31196,7 @@ function CreatorDashboard({
   }, "Entered manually by your manager each week."));
 }
 CreatorDashboard = React.memo(CreatorDashboard);
-const BRAND_BIBLE_URL = "https://neomngmt.github.io/brand-bible/";
+const BRAND_BIBLE_URL = "https://zionbyneo.com/brandbible/";
 function brandBibleCall(body) {
   return fetch(`${SUPABASE_URL}/functions/v1/brand-bible`, {
     method: "POST",
@@ -31261,7 +31261,7 @@ function BrandBiblePrompt({
   useEffect(() => {
     if (stage !== "open") return;
     const onMsg = e => {
-      if (e.origin !== "https://neomngmt.github.io") return;
+      if (e.origin !== window.location.origin && e.origin !== "https://zionbyneo.com") return;
       const d = e.data;
       if (!d || d.source !== "brand-bible") return;
       if (d.type === "submitted") {
@@ -31636,7 +31636,7 @@ function OnboardingScreen({
   const [received, setReceived] = useState(false);
   useEffect(() => {
     function handleMessage(event) {
-      if (event.origin !== "https://neomngmt.github.io") return;
+      if (event.origin !== window.location.origin && event.origin !== "https://zionbyneo.com") return;
       const data = event.data;
       if (!data || data.source !== "creator-bible") return;
       if (data.type === "submitted") {
@@ -37236,7 +37236,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">iip0l</script>
+<script type="text/babel" id="zion-version">1v6zh2m</script>
 <script>
 (function () {
   var last = 0;

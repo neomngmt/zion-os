@@ -677,7 +677,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 // ---------------------------------------------------------------------------
 
 
-const CREATOR_BIBLE_URL = "https://neomngmt.github.io/creator-bible/";
+const CREATOR_BIBLE_URL = "https://zionbyneo.com/creatorbible/";
 
 const STAGES = [
   { id: "idea", label: "Idea", code: "01", color: "#8B93A1" },
@@ -18185,7 +18185,7 @@ CreatorDashboard = React.memo(CreatorDashboard);
 // ---------- creator onboarding (first login) ----------
 
 // ---------- Brand Bible (step 2 after the Creator Bible) and the admin "Bibles" page ----------
-const BRAND_BIBLE_URL = "https://neomngmt.github.io/brand-bible/";
+const BRAND_BIBLE_URL = "https://zionbyneo.com/brandbible/";
 function brandBibleCall(body) {
   return fetch(`${SUPABASE_URL}/functions/v1/brand-bible`, { method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, "x-zion-token": neoLiveTok() }, body: JSON.stringify(body) })
     .then((r) => r.json().then((j) => { if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`); return j; }));
@@ -18210,7 +18210,7 @@ function BrandBiblePrompt({ name, agency }) {
   useEffect(() => {
     if (stage !== "open") return;
     const onMsg = (e) => {
-      if (e.origin !== "https://neomngmt.github.io") return;
+      if (e.origin !== window.location.origin && e.origin !== "https://zionbyneo.com") return;
       const d = e.data;
       if (!d || d.source !== "brand-bible") return;
       if (d.type === "submitted") { try { localStorage.removeItem(laterKey); } catch (x) {} }
@@ -18431,7 +18431,7 @@ function OnboardingScreen({ name, url, onContinue, onQuestionnaireReceived }) {
       // Without an origin check, any window (an ad iframe, a malicious tab)
       // could post a fake { source: "creator-bible" } message and either
       // skip onboarding or write arbitrary text into this model's bio.
-      if (event.origin !== "https://neomngmt.github.io") return;
+      if (event.origin !== window.location.origin && event.origin !== "https://zionbyneo.com") return;
       const data = event.data;
       if (!data || data.source !== "creator-bible") return;
       if (data.type === "submitted") {

@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brand Bible | Zion Management</title>
+<meta name="theme-color" content="#07090a">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  /* Zion brand: same palette and fonts as zion-management.eu */
+  :root {
+    --bg: #07090a; --surface: #0e1310; --surface2: #121a15; --panel: #0e1310;
+    --accent: #12b34c; --accent2: #0a5c2c; --accent-soft: #39e673;
+    --glow: rgba(18,179,76,0.35);
+    --text: #f2f5f0; --text-muted: #8fa39a; --text-hint: #4b5a52;
+    --border: rgba(18,179,76,0.16); --border-hover: rgba(57,230,115,0.5);
+    --radius: 14px; --radius-sm: 10px;
+    --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 15px; line-height: 1.6; min-height: 100vh; position: relative; overflow-x: hidden; }
+  /* ambient green glow behind everything, like the website */
+  body::before { content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: radial-gradient(640px circle at 14% 6%, rgba(18,179,76,0.13), transparent 62%),
+                radial-gradient(560px circle at 88% 96%, rgba(18,179,76,0.09), transparent 62%); }
+  body::after { content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .5;
+    background-image: radial-gradient(rgba(57,230,115,0.35) 1px, transparent 1.4px); background-size: 46px 46px; background-position: 7px 11px;
+    -webkit-mask-image: radial-gradient(ellipse at 50% 20%, black 0%, transparent 70%); mask-image: radial-gradient(ellipse at 50% 20%, black 0%, transparent 70%); }
+  .app-header, .progress-wrap, .main, .nav-bar { position: relative; z-index: 2; }
+  .app-header { position: sticky; top: 0; z-index: 100; background: rgba(7,9,10,0.78); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); padding: .8rem 1.25rem; display: flex; align-items: center; justify-content: space-between; }
+  .header-logo { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 800; letter-spacing: 3px; color: var(--text); text-transform: uppercase; }
+  .header-logo .star { width: 20px; height: 20px; flex-shrink: 0; }
+  .header-logo .tag { font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: 2px; color: var(--accent-soft); border: 1px solid var(--border); border-radius: 999px; padding: .15rem .6rem; }
+  .header-step { font-family: var(--mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); }
+  .progress-wrap { height: 2px; background: rgba(18,179,76,0.10); position: sticky; top: 53px; z-index: 99; }
+  .progress-bar { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-soft)); box-shadow: 0 0 12px var(--glow); transition: width .4s cubic-bezier(.4,0,.2,1); }
+  .main { max-width: 580px; margin: 0 auto; padding: 2.25rem 1.25rem 6rem; }
+  .cover { text-align: center; padding: 3rem 0 2.5rem; }
+  .section { display: none; }
+  .section.active { display: block; animation: slideUp .3s ease; }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  .sec-eyebrow { font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: 3px; color: var(--accent-soft); text-transform: uppercase; margin-bottom: .5rem; }
+  .sec-title { font-size: 30px; font-weight: 800; color: var(--text); margin-bottom: .65rem; letter-spacing: -.8px; line-height: 1.15; }
+  .sec-note { font-size: 13px; color: var(--text-muted); border-left: 2px solid var(--accent); padding: .1rem 0 .1rem .8rem; margin-bottom: 2rem; line-height: 1.55; }
+  .field { margin-bottom: 1.3rem; }
+  .field-label { display: block; font-size: 12.5px; font-weight: 600; color: #c9d6cd; margin-bottom: .5rem; }
+  input[type=text], textarea { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: inherit; font-size: 15px; padding: .75rem .95rem; outline: none; transition: border-color .15s, box-shadow .15s, background .15s; -webkit-appearance: none; }
+  input[type=text]:focus, textarea:focus { border-color: var(--accent-soft); background: var(--surface2); box-shadow: 0 0 0 3px rgba(18,179,76,0.16); }
+  input::placeholder, textarea::placeholder { color: var(--text-hint); }
+  textarea { resize: vertical; min-height: 96px; line-height: 1.6; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .bullet-list { display: flex; flex-direction: column; gap: 8px; }
+  .bullet-row { display: flex; align-items: center; gap: 10px; }
+  .bullet-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-soft); box-shadow: 0 0 8px var(--glow); flex-shrink: 0; }
+  .bullet-row input { flex: 1; }
+  .add-field-btn { background: none; border: none; color: var(--accent-soft); font-family: var(--mono); font-size: 12px; letter-spacing: .5px; cursor: pointer; padding: .35rem 0; margin-top: 4px; }
+  .add-field-btn:hover { text-decoration: underline; }
+  .arch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 1.25rem; }
+  .arch-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .arch-btn { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-muted); font-family: inherit; font-size: 13px; padding: .72rem .9rem; cursor: pointer; text-align: left; transition: all .15s; line-height: 1.3; }
+  .arch-btn:hover { border-color: var(--border-hover); color: var(--text); transform: translateY(-1px); }
+  .arch-btn.selected { border-color: var(--accent-soft); background: linear-gradient(135deg, rgba(57,230,115,0.16), rgba(18,179,76,0.07)); color: var(--accent-soft); font-weight: 600; box-shadow: 0 0 16px rgba(18,179,76,0.18); }
+  .kw-wrap { display: flex; flex-wrap: wrap; gap: 6px; min-height: 36px; margin-bottom: .75rem; }
+  .kw-tag { display: flex; align-items: center; gap: 5px; background: rgba(18,179,76,0.12); border: 1px solid rgba(57,230,115,0.3); border-radius: 99px; padding: .25rem .7rem; font-size: 13px; color: var(--accent-soft); }
+  .kw-tag button { background: none; border: none; color: rgba(57,230,115,0.6); cursor: pointer; font-size: 15px; line-height: 1; padding: 0; font-family: inherit; }
+  .kw-input-row { display: flex; gap: 8px; }
+  .kw-input-row input { flex: 1; }
+  .btn-add-kw { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-muted); font-family: inherit; font-size: 14px; padding: .7rem 1rem; cursor: pointer; white-space: nowrap; transition: all .15s; }
+  .btn-add-kw:hover { border-color: var(--accent-soft); color: var(--accent-soft); }
+  .divider { height: 1px; background: var(--border); margin: 1.5rem 0; }
+  .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(7,9,10,0.82); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--border); padding: .85rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 12px; z-index: 100; }
+  .nav-dots { display: flex; gap: 5px; }
+  .nav-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(18,179,76,0.10); border: 1px solid var(--border); cursor: pointer; transition: all .2s; }
+  .nav-dot.active { background: linear-gradient(90deg, var(--accent-soft), var(--accent)); border-color: var(--accent-soft); width: 20px; border-radius: 99px; box-shadow: 0 0 10px var(--glow); }
+  .nav-dot.done { border-color: var(--accent); background: rgba(18,179,76,0.35); }
+  .btn-nav { background: transparent; border: 1px solid var(--border); border-radius: 999px; color: var(--text-muted); font-family: inherit; font-size: 14px; font-weight: 600; padding: .6rem 1.2rem; cursor: pointer; transition: all .18s; }
+  .btn-nav:hover { border-color: var(--border-hover); color: var(--text); }
+  .btn-nav.primary { background: linear-gradient(135deg, var(--accent-soft), var(--accent)); border-color: transparent; color: #04140c; font-weight: 700; box-shadow: 0 0 18px var(--glow); }
+  .btn-nav.primary:hover { transform: translateY(-2px); box-shadow: 0 0 26px var(--glow); }
+  .btn-nav:disabled { opacity: .3; pointer-events: none; }
+  .export-screen { padding: 2rem 0; text-align: center; }
+  .export-icon { width: 68px; height: 68px; border-radius: 50%; background: radial-gradient(circle, rgba(57,230,115,0.28), rgba(18,179,76,0.06) 70%); border: 1px solid var(--accent-soft); box-shadow: 0 0 30px var(--glow); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; font-size: 28px; color: var(--accent-soft); }
+  .export-title { font-size: 26px; font-weight: 800; margin-bottom: .4rem; letter-spacing: -.6px; }
+  .export-sub { font-size: 14px; color: var(--text-muted); margin-bottom: 2rem; }
+  .export-btns { display: flex; flex-direction: column; gap: 10px; }
+  .btn-export { width: 100%; padding: .9rem; border-radius: 999px; font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer; border: none; transition: transform .18s, box-shadow .18s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn-export:hover { transform: translateY(-2px); }
+  .btn-export.primary { background: linear-gradient(135deg, var(--accent-soft), var(--accent)); color: #04140c; box-shadow: 0 0 20px var(--glow); }
+  .btn-export.primary:hover { box-shadow: 0 0 28px var(--glow); }
+  .btn-export.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn-export.secondary:hover { border-color: var(--border-hover); }
+  .summary-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; text-align: left; margin-top: 1.5rem; }
+  .summary-row { display: flex; justify-content: space-between; padding: .45rem 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .summary-row:last-child { border-bottom: none; }
+  .summary-key { font-family: var(--mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); }
+  .summary-val { color: var(--text); text-align: right; max-width: 60%; }
+  /* POPUP */
+  .popup-overlay { position: fixed; inset: 0; background: rgba(4,7,5,0.88); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index: 999; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+  .popup-overlay::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(520px circle at 50% 30%, rgba(18,179,76,0.22), transparent 65%); }
+  .popup-box { position: relative; background: linear-gradient(160deg, rgba(18,179,76,0.10), rgba(14,19,16,0.96) 55%); border: 1px solid var(--border); box-shadow: 0 30px 70px rgba(0,0,0,0.55), 0 0 40px rgba(18,179,76,0.12); border-radius: 22px; padding: 2.4rem 2rem; max-width: 430px; width: 100%; text-align: center; }
+  .popup-logo { display: flex; align-items: center; justify-content: center; gap: 10px; font-family: var(--mono); font-size: 11px; letter-spacing: 4px; color: var(--accent-soft); text-transform: uppercase; margin-bottom: 1.25rem; }
+  .popup-logo .star { width: 22px; height: 22px; }
+  .popup-title { font-size: 30px; font-weight: 800; color: #fff; margin-bottom: .5rem; letter-spacing: -.8px; }
+  .popup-note { font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 1.5rem; }
+  .popup-why { background: rgba(18,179,76,0.07); border: 1px solid var(--border); border-radius: 14px; padding: 1rem 1.25rem; text-align: left; margin-bottom: 1.5rem; }
+  .popup-why-title { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 2px; color: var(--accent-soft); margin-bottom: .5rem; }
+  .popup-why p { font-size: 12px; color: var(--text-muted); line-height: 1.65; }
+  .popup-why p + p { margin-top: .5rem; }
+  .popup-input-wrap { margin-bottom: 1.25rem; }
+  .popup-input-wrap input { text-align: center; font-size: 16px; padding: .9rem; border-radius: 12px; }
+  .popup-btn { width: 100%; padding: .95rem; background: linear-gradient(135deg, var(--accent-soft), var(--accent)); border: none; border-radius: 999px; color: #04140c; font-family: inherit; font-size: 16px; font-weight: 800; cursor: pointer; box-shadow: 0 0 22px var(--glow); transition: transform .18s, box-shadow .18s; }
+  .popup-btn:hover { transform: translateY(-2px); box-shadow: 0 0 30px var(--glow); }
+  .lang-btn { flex: 1; padding: .65rem; border-radius: 999px; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); transition: all .15s; }
+  .lang-btn.active { border-color: var(--accent-soft); background: rgba(57,230,115,0.12); color: var(--accent-soft); box-shadow: 0 0 14px rgba(18,179,76,0.2); }
+  .lang-btn:hover { border-color: var(--border-hover); }
+  /* INTRO: tilting 3D panel, drifting aurora, interactive particles */
+  .popup-overlay { overflow-y: auto; overflow-x: hidden; align-items: flex-start; --rx: 0deg; --ry: 0deg; --mx: 50%; --my: 30%; --sheen: 0; --dx: 0; --dy: 0; }
+  .popup-overlay::before { z-index: 0; background: radial-gradient(520px circle at 50% 40%, rgba(18,179,76,0.16), transparent 70%); }
+  .popup-box { margin: auto; z-index: 2; transform: perspective(1100px) rotateX(var(--rx)) rotateY(var(--ry)); will-change: transform; animation: boxIn .9s cubic-bezier(.2,.8,.2,1) backwards; }
+  .popup-box::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: var(--sheen);
+    background: radial-gradient(420px circle at var(--mx) var(--my), rgba(120,255,170,0.16), transparent 55%); transition: opacity .25s; }
+  .popup-box > * { animation: popIn .75s cubic-bezier(.2,.8,.2,1) backwards; }
+  .popup-box > *:nth-child(1) { animation-delay: .20s; } .popup-box > *:nth-child(2) { animation-delay: .28s; }
+  .popup-box > *:nth-child(3) { animation-delay: .36s; } .popup-box > *:nth-child(4) { animation-delay: .44s; }
+  .popup-box > *:nth-child(5) { animation-delay: .52s; } .popup-box > *:nth-child(6) { animation-delay: .60s; }
+  .popup-box > *:nth-child(7) { animation-delay: .68s; }
+  /* depth is faked with a small shift per layer (no 3D context, so no flickering edges) */
+  .popup-logo { translate: calc(var(--dx) * .6px) calc(var(--dy) * -.6px); } .popup-title { translate: calc(var(--dx) * .8px) calc(var(--dy) * -.8px); } .popup-note { translate: calc(var(--dx) * .4px) calc(var(--dy) * -.4px); }
+  .popup-langs { translate: calc(var(--dx) * .45px) calc(var(--dy) * -.45px); } .popup-input-wrap { translate: calc(var(--dx) * .3px) calc(var(--dy) * -.3px); } .popup-btn { translate: calc(var(--dx) * .7px) calc(var(--dy) * -.7px); }
+  .popup-btn { position: relative; overflow: hidden; }
+  .popup-btn::after { content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%; transform: skewX(-20deg); pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent); transition: left .7s ease; }
+  .popup-btn:hover::after { left: 130%; }
+  .popup-langs .lang-btn { padding: .65rem .3rem; font-size: 13.5px; white-space: nowrap; }
+  .popup-title.swap, .popup-note.swap, .popup-why p.swap, .popup-why-title.swap, .popup-btn.swap { animation: swapIn .35s ease; }
+  .fx-canvas, .fx-blob { position: fixed; pointer-events: none; }
+  .fx-canvas { inset: 0; width: 100%; height: 100%; z-index: 1; }
+  .fx-blob { z-index: 0; border-radius: 50%; filter: blur(80px); opacity: .34; will-change: transform; }
+  .fx-blob.b1 { width: 30vmax; height: 30vmax; left: 6vmax; top: -8vmax; background: rgba(18,179,76,0.5); animation: drift1 22s ease-in-out infinite alternate; }
+  .fx-blob.b2 { width: 26vmax; height: 26vmax; right: 2vmax; bottom: -10vmax; background: rgba(10,120,56,0.5); animation: drift2 26s ease-in-out infinite alternate; }
+  .fx-blob.b3 { display: none; }
+  @keyframes boxIn { from { opacity: 0; translate: 0 26px; scale: .965; } to { opacity: 1; translate: 0 0; scale: 1; } }
+  @keyframes popIn { from { opacity: 0; translate: 0 16px; } to { opacity: 1; translate: 0 0; } }
+  @keyframes swapIn { from { opacity: .15; translate: 0 6px; } to { opacity: 1; translate: 0 0; } }
+  @keyframes drift1 { from { transform: translate(0,0) scale(1); } to { transform: translate(8vw,6vh) scale(1.1); } }
+  @keyframes drift2 { from { transform: translate(0,0) scale(1.1); } to { transform: translate(-7vw,-7vh) scale(.95); } }
+  @keyframes drift3 { from { transform: translate(0,0) scale(.9); } to { transform: translate(-18vw,16vh) scale(1.15); } }
+  .popup-logo { letter-spacing: 3px; white-space: nowrap; }
+  .popup-logo .pl-dot { margin: 0 -2px; }
+  @media (max-width: 520px) { .header-logo .mgmt { display: none; } .popup-logo { flex-direction: column; gap: 6px; letter-spacing: 3px; } .popup-logo .pl-dot { display: none; } }
+  /* FORM SCREENS: ambient particles, directional section transitions, staggered rows, control feedback, finish screen */
+  .pg-canvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+  .pg-shift { position: fixed; z-index: 0; pointer-events: none; transition: transform 1.4s cubic-bezier(.2,.8,.2,1); }
+  .pg-shift.s1 { left: -8vmax; top: -10vmax; transform: translate(calc(var(--sec, 0) * 2.2vw), calc(var(--sec, 0) * 1.6vh)); }
+  .pg-shift.s2 { right: -10vmax; bottom: -12vmax; transform: translate(calc(var(--sec, 0) * -2vw), calc(var(--sec, 0) * -1.4vh)); }
+  .pg-blob { width: 38vmax; height: 38vmax; border-radius: 50%; background: radial-gradient(circle, rgba(18,179,76,0.20), transparent 66%); will-change: transform; }
+  .pg-shift.s1 .pg-blob { animation: drift1 26s ease-in-out infinite alternate; }
+  .pg-shift.s2 .pg-blob { background: radial-gradient(circle, rgba(10,120,56,0.24), transparent 66%); animation: drift2 30s ease-in-out infinite alternate; }
+  .section.active { animation: secInR .55s cubic-bezier(.2,.8,.2,1); }
+  .section.active.from-l { animation-name: secInL; }
+  .section.active > * { animation: rowIn .65s cubic-bezier(.2,.8,.2,1) backwards; }
+  .section.active > *:nth-child(1) { animation-delay: .03s; } .section.active > *:nth-child(2) { animation-delay: .08s; }
+  .section.active > *:nth-child(3) { animation-delay: .13s; } .section.active > *:nth-child(4) { animation-delay: .18s; }
+  .section.active > *:nth-child(5) { animation-delay: .23s; } .section.active > *:nth-child(6) { animation-delay: .28s; }
+  .section.active > *:nth-child(7) { animation-delay: .33s; } .section.active > *:nth-child(8) { animation-delay: .38s; }
+  .section.active > *:nth-child(n+9) { animation-delay: .43s; }
+  @keyframes secInR { from { opacity: 0; translate: 38px 0; } to { opacity: 1; translate: 0 0; } }
+  @keyframes secInL { from { opacity: 0; translate: -38px 0; } to { opacity: 1; translate: 0 0; } }
+  @keyframes rowIn { from { opacity: 0; translate: 0 16px; } to { opacity: 1; translate: 0 0; } }
+  .arch-btn.selected { animation: chipPop .45s cubic-bezier(.3,1.7,.5,1); }
+  @keyframes chipPop { 0% { transform: scale(.93); box-shadow: 0 0 0 0 rgba(57,230,115,0.6); } 55% { transform: scale(1.04); } 100% { transform: scale(1); box-shadow: 0 0 16px rgba(18,179,76,0.18); } }
+  input[type=text]:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(18,179,76,0.16), 0 0 28px rgba(18,179,76,0.16); }
+  .bullet-dot { transition: transform .2s, box-shadow .2s; }
+  .bullet-row:focus-within .bullet-dot { transform: scale(1.5); box-shadow: 0 0 14px var(--glow); }
+  .bullet-row.new { animation: bulletIn .45s cubic-bezier(.2,.8,.2,1); }
+  @keyframes bulletIn { from { opacity: 0; translate: -14px 0; } to { opacity: 1; translate: 0 0; } }
+  .kw-tag { animation: chipPop .4s cubic-bezier(.3,1.7,.5,1); }
+  .btn-nav.primary { position: relative; overflow: hidden; }
+  .btn-nav.primary::after { content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%; transform: skewX(-20deg); pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent); transition: left .7s ease; }
+  .btn-nav.primary:hover::after { left: 130%; }
+  .progress-bar { position: relative; }
+  .progress-bar::after { content: ""; position: absolute; right: -3px; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; background: #c9ffdc; box-shadow: 0 0 10px 3px var(--accent-soft); animation: headPulse 1.7s ease-in-out infinite; }
+  .progress-bar[style*="width:0%"]::after, .progress-bar[style*="width: 0%"]::after { display: none; }
+  @keyframes headPulse { 0%, 100% { opacity: .75; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.25); } }
+  .nav-dot { animation: dotIn .5s cubic-bezier(.3,1.6,.5,1) backwards; animation-delay: calc(var(--i, 0) * 30ms); }
+  @keyframes dotIn { from { opacity: 0; transform: scale(.2); } to { opacity: 1; transform: scale(1); } }
+  #sec-export .export-screen { transform: perspective(1100px) rotateX(var(--erx, 0deg)) rotateY(var(--ery, 0deg)); will-change: transform; }
+  #sec-export .export-icon { translate: calc(var(--edx, 0) * .85px) calc(var(--edy, 0) * -.85px); animation: iconIn 1s cubic-bezier(.2,1.4,.4,1) .15s backwards; }
+  #sec-export .export-title { translate: calc(var(--edx, 0) * .6px) calc(var(--edy, 0) * -.6px); background: linear-gradient(90deg, var(--text) 40%, var(--accent-soft) 50%, var(--text) 60%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: titleShine 3.4s ease .5s 1 both; }
+  #sec-export .export-sub, #sec-export .export-btns { translate: calc(var(--edx, 0) * .4px) calc(var(--edy, 0) * -.4px); }
+  #sec-export .summary-card { translate: calc(var(--edx, 0) * .2px) calc(var(--edy, 0) * -.2px); box-shadow: 0 24px 50px rgba(0,0,0,0.45), 0 0 30px rgba(18,179,76,0.08); }
+  @keyframes iconIn { from { opacity: 0; scale: .3; rotate: -45deg; } to { opacity: 1; scale: 1; rotate: 0deg; } }
+  @keyframes titleShine { from { background-position: 100% 0; } to { background-position: 0 0; } }
+  /* progress bar lives inside the header, so it always sits exactly on its bottom edge */
+  .app-header { border-bottom: none; }
+  .app-header .progress-wrap { position: absolute; top: auto; left: 0; right: 0; bottom: 0; z-index: 1; }
+  @media (max-width: 480px) { .grid2 { grid-template-columns: 1fr; } .sec-title { font-size: 26px; } }
+
+  /* Brand Bible additions */
+  .q { padding-bottom: .2rem; }
+  .q .field-label { display: flex; gap: .6rem; align-items: baseline; font-size: 14px; line-height: 1.45; color: #dfe9e2; }
+  .q .qn { font-family: var(--mono); font-size: 11px; color: var(--accent-soft); border: 1px solid var(--border); border-radius: 999px; padding: .05rem .5rem; flex-shrink: 0; }
+  .row-num { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 11px; color: var(--accent-soft); border: 1px solid var(--border); background: rgba(18,179,76,0.06); transition: all .2s; }
+  .bullet-row:focus-within .row-num { border-color: var(--accent-soft); box-shadow: 0 0 12px var(--glow); }
+  .opts { margin-bottom: .6rem; }
+  .ans-other { margin-top: 0; }
+  .send-state { margin-top: 1.25rem; font-family: var(--mono); font-size: 12px; letter-spacing: .5px; color: var(--accent-soft); }
+  .btn-nav:disabled { opacity: .3; }
+
+  /* Zion wordmark with the neon "by neomngmt", same as the Zion app */
+  .zw { display: inline-flex; flex-direction: column; align-items: flex-end; line-height: 1; }
+  .zw-svg { display: block; height: 100%; width: auto; }
+  .zw-by { font-family: 'Dancing Script', cursive; font-weight: 700; color: #39e673; white-space: nowrap; letter-spacing: 0; text-transform: none;
+    text-shadow: 0 0 2px #39e673, 0 0 6px #39e673, 0 0 14px rgba(57,230,115,0.55); animation: zwFlicker 3.5s ease-in-out infinite; }
+  @keyframes zwFlicker { 0%, 100% { opacity: .85; } 50% { opacity: 1; } 52% { opacity: .6; } 54% { opacity: 1; } }
+  .header-logo .zw { height: 30px; justify-content: center; }
+  .header-logo .zw-svg { height: 17px; }
+  .header-logo .zw-by { font-size: 9.5px; margin-top: 3px; }
+  .popup-logo { flex-direction: column !important; gap: 12px !important; letter-spacing: 3px; }
+  .popup-logo .zw-svg { height: 38px; }
+  .popup-logo .zw-by { font-size: 15px; margin-top: 7px; }
+  .popup-logo .pl-name { font-family: var(--mono); font-size: 10.5px; letter-spacing: 4px; color: var(--accent-soft); text-transform: uppercase; border: 1px solid var(--border); border-radius: 999px; padding: .25rem .8rem; }
+  body.embed .app-header { padding-right: 58px; }
+  /* calmer intro: logo, title, one line, language, name, button */
+  .popup-logo, .popup-why { display: none !important; }
+  /* logo and the questionnaire name sit in the top left corner, like the header inside */
+  .popup-corner { position: fixed; top: calc(16px + env(safe-area-inset-top)); left: 20px; z-index: 3; display: flex; align-items: center; gap: 12px; animation: popIn .8s cubic-bezier(.2,.8,.2,1) .1s backwards; }
+  .popup-corner .zw { height: 32px; justify-content: center; }
+  .popup-corner .zw-svg { height: 18px; }
+  .popup-corner .zw-by { font-size: 10px; margin-top: 3px; }
+  .popup-corner .pl-tag { font-family: var(--mono); font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--accent-soft); border: 1px solid var(--border); border-radius: 999px; padding: .2rem .7rem; }
+  .popup-overlay { padding-top: 84px; }
+  .popup-title { font-size: 27px; }
+  .popup-note { max-width: 300px; margin-left: auto; margin-right: auto; margin-bottom: 1.4rem; }
+  .popup-langs .lang-btn { padding: .5rem .3rem; font-size: 13px; }
+  .popup-box { padding: 2.2rem 1.8rem 2rem; }
+</style>
+</head>
+<body>
+
+<div class="popup-overlay" id="popup">
+  <div class="fx-blob b1"></div><div class="fx-blob b2"></div><div class="fx-blob b3"></div>
+  <canvas class="fx-canvas" id="popup-fx" aria-hidden="true"></canvas>
+  <div class="popup-corner"><span class="zw"><svg class="zw-svg" viewBox="-6 0 788 180" fill="none" stroke="#fff" stroke-width="12" role="img" aria-label="ZION"><path d="M0 6H160"/><path d="M160 6L92.8 76.6"/><path d="M76.8 93.4L0 174"/><path d="M0 174H160"/><path d="M252 6V174"/><path d="M344 90V128Q344 174 390 174H458Q504 174 504 128V52Q504 6 458 6H390Q344 6 344 52"/><path d="M596 6V174"/><path d="M596 6L660.8 66.5"/><path d="M678.8 83.3L776 174"/><path d="M776 6V174"/></svg><span class="zw-by">by neomngmt</span></span><span class="pl-tag">Brand Bible</span></div>
+  <div class="popup-box">
+    <div class="popup-logo"><span class="zw"><svg class="zw-svg" viewBox="-6 0 788 180" fill="none" stroke="#fff" stroke-width="12" role="img" aria-label="ZION"><path d="M0 6H160"/><path d="M160 6L92.8 76.6"/><path d="M76.8 93.4L0 174"/><path d="M0 174H160"/><path d="M252 6V174"/><path d="M344 90V128Q344 174 390 174H458Q504 174 504 128V52Q504 6 458 6H390Q344 6 344 52"/><path d="M596 6V174"/><path d="M596 6L660.8 66.5"/><path d="M678.8 83.3L776 174"/><path d="M776 6V174"/></svg><span class="zw-by">by neomngmt</span></span><span class="pl-name">Brand Bible</span></div>
+    <div class="popup-title" id="popup-title"></div>
+    <p class="popup-note" id="popup-note"></p>
+    <div class="popup-langs" style="display:flex;gap:8px;margin-bottom:1.25rem">
+      <button class="lang-btn active" id="lang-cz" onclick="setLang('cz')">🇨🇿 Čeština</button>
+      <button class="lang-btn" id="lang-en" onclick="setLang('en')">🇬🇧 English</button>
+    </div>
+    <div class="popup-input-wrap">
+      <input type="text" id="popup-name" autocomplete="off">
+    </div>
+    <div class="popup-why">
+      <div class="popup-why-title" id="popup-why-title"></div>
+      <p id="popup-why-1"></p>
+      <p id="popup-why-2"></p>
+    </div>
+    <button class="popup-btn" id="popup-btn" onclick="startForm()"></button>
+  </div>
+</div>
+
+<div class="pg-shift s1"><div class="pg-blob"></div></div><div class="pg-shift s2"><div class="pg-blob"></div></div>
+<canvas class="pg-canvas" id="pg-fx" aria-hidden="true"></canvas>
+
+<header class="app-header">
+  <div class="header-logo"><span class="zw"><svg class="zw-svg" viewBox="-6 0 788 180" fill="none" stroke="#fff" stroke-width="12" role="img" aria-label="ZION"><path d="M0 6H160"/><path d="M160 6L92.8 76.6"/><path d="M76.8 93.4L0 174"/><path d="M0 174H160"/><path d="M252 6V174"/><path d="M344 90V128Q344 174 390 174H458Q504 174 504 128V52Q504 6 458 6H390Q344 6 344 52"/><path d="M596 6V174"/><path d="M596 6L660.8 66.5"/><path d="M678.8 83.3L776 174"/><path d="M776 6V174"/></svg><span class="zw-by">by neomngmt</span></span><span class="tag">Brand Bible</span></div>
+  <div class="header-step" id="hdr-step"></div>
+  <div class="progress-wrap"><div class="progress-bar" id="prog" style="width:0%"></div></div>
+</header>
+
+<main class="main" id="main">
+  <!-- question screens are built from QUESTIONS below -->
+  <div id="sec-export" class="section">
+    <div class="export-screen">
+      <div class="export-icon">&#10003;</div>
+      <div class="export-title" id="ex-title"></div>
+      <div class="export-sub" id="ex-sub"></div>
+      <div class="export-btns">
+        <button class="btn-export primary" id="btn-continue" onclick="continueToDashboard()" style="display:none;"></button>
+        <button class="btn-export secondary" id="btn-pdf" onclick="exportPDF()"></button>
+      </div>
+      <div class="send-state" id="send-state"></div>
+    </div>
+  </div>
+</main>
+
+<nav class="nav-bar">
+  <button class="btn-nav" id="btn-prev" onclick="navigate(-1)" disabled></button>
+  <div class="nav-dots" id="nav-dots"></div>
+  <button class="btn-nav primary" id="btn-next" onclick="navigate(1)"></button>
+</nav>
+
+<script>
+// ---------- the questionnaire, 1:1 with the Branding Questionnaire PDF ----------
+// type: text = free answer, list = numbered rows (n), multi / one = tap options (+ optional own text)
+const QUESTIONS = [
+  { sec: 0, n: 1, type: 'text', short: true,
+    cz: 'Jak se jmenuješ a jaké máš přezdívky?', en: 'What’s your name and nickname(s)?' },
+  { sec: 0, n: 2, type: 'text',
+    cz: 'Jak by tvou osobnost popsali tvoji nejbližší přátelé?', en: 'How would your close friends describe your personality?' },
+  { sec: 0, n: 3, type: 'text',
+    cz: 'Čím jsi posedlá nebo o čem často mluvíš?', en: 'What’s something you’re obsessed with or talk about often?' },
+  { sec: 0, n: 4, type: 'text',
+    cz: 'Jaký máš jeden zvláštní nebo vtipný zvyk?', en: 'What’s one quirky or funny habit you have?' },
+  { sec: 0, n: 5, type: 'list', rows: 3,
+    cz: 'Jaké 3 věci nesnášíš dělat nebo o nich mluvit?', en: 'What are 3 things you hate doing or talking about?' },
+  { sec: 0, n: 6, type: 'text',
+    cz: 'Jaké je tvoje tajné „guilty pleasure“, které by od tebe lidi nečekali?', en: 'What’s a secret guilty pleasure that people wouldn’t expect from you?' },
+
+  { sec: 1, n: 7, type: 'text',
+    cz: 'Jaký máš tajný talent?', en: 'What’s a secret talent that you have?' },
+  { sec: 1, n: 8, type: 'list', rows: 5,
+    cz: 'Napiš 5 svých povahových vlastností:', en: 'Mention 5 character traits that you have:' },
+  { sec: 1, n: 9, type: 'list', rows: 5,
+    cz: 'Jakých je tvých 5 nejoblíbenějších značek jídla nebo pití? (např. Starbucks, McDonald’s atd.)', en: 'What are your top 5 favourite food/drinks brands? (Eg. Starbucks, McDonalds etc.)' },
+  { sec: 1, n: 10, type: 'list', rows: 5,
+    cz: 'Jakých je tvých 5 nejoblíbenějších značek všech dob? (auta, hodinky, oblečení, hry atd.)', en: 'What are your top 5 all time favourite brands? (cars, watches, clothes, games etc.)' },
+
+  { sec: 2, n: 11, type: 'text',
+    cz: 'Jaké práce jsi v minulosti dělala?', en: 'What jobs have you had in the past?' },
+  { sec: 2, n: 12, type: 'text',
+    cz: 'Studovala jsi někdy něco nebo jsi absolvovala kurz v nějakém oboru?', en: 'Did you ever study something or take a course in a specific field?' },
+  { sec: 2, n: 13, type: 'text',
+    cz: 'Jaké koníčky nebo aktivity tě opravdu baví?', en: 'What hobbies or activities do you genuinely enjoy?' },
+  { sec: 2, n: 14, type: 'text',
+    cz: 'Umíš vařit? Pokud ano, jaké je tvoje typické jídlo?', en: 'Can you cook? If yes, what’s your signature dish?' },
+  { sec: 2, n: 15, type: 'text',
+    cz: 'Jaké máš koníčky?', en: 'What hobbies do you have?' },
+  { sec: 2, n: 16, type: 'text',
+    cz: 'Jaké sporty děláš?', en: 'What sports do you play?' },
+  { sec: 2, n: 17, type: 'multi', other: true,
+    opts: [['Lásku', 'Love'], ['Život', 'Life'], ['Módu', 'Fashion'], ['Psychologii', 'Psychology'], ['Ne, nebaví mě to', 'No, not really']],
+    cz: 'Ráda dáváš rady o lásce, životě, módě nebo psychologii?', en: 'Do you like giving advice about love, life, fashion, or psychology?' },
+  { sec: 2, n: 18, type: 'text',
+    cz: 'Kdybys mohla dělat nějakou práci jen pro zábavu (peníze stranou), jaká by to byla?', en: 'If you could do a job just for fun (money aside), what would it be?' },
+
+  { sec: 3, n: 19, type: 'text',
+    cz: 'V jakém oblečení se cítíš nejvíc sebevědomě?', en: 'What kind of outfits do you feel most confident in?' },
+  { sec: 3, n: 20, type: 'text',
+    cz: 'Máš tetování nebo výjimečné rysy těla, které bys chtěla zdůraznit?', en: 'Any tattoos or unique body features you’d like to highlight?' },
+  { sec: 3, n: 21, type: 'multi', other: true,
+    opts: [['Instagram', 'Instagram'], ['TikTok', 'TikTok'], ['X (Twitter)', 'X (Twitter)'], ['Snapchat', 'Snapchat'], ['Threads', 'Threads'], ['Reddit', 'Reddit']],
+    cz: 'Na jakých platformách ti nevadí postovat? (IG, TikTok, X atd.)', en: 'Which platforms are you comfortable posting on? (IG, TikTok, X, etc.)' },
+  { sec: 3, n: 22, type: 'multi', other: true,
+    opts: [['Na veřejnosti', 'In public'], ['Na polo-veřejných místech', 'Semi-public'], ['Jen doma', 'Only at home']],
+    cz: 'Bavilo by tě natáčet na veřejnosti, na polo-veřejných místech, nebo jen doma?', en: 'Would you enjoy filming in public, semi-public, or only at home?' },
+
+  { sec: 4, n: 23, type: 'list', rows: 5,
+    cz: 'Kdo je tvých 5 nejoblíbenějších hereček?', en: 'Who are your top 5 favourite female actors?' },
+  { sec: 4, n: 24, type: 'list', rows: 5,
+    cz: 'Jakých je tvých 5 nejoblíbenějších filmů všech dob?', en: 'What are your top 5 all time favourite movies?' },
+  { sec: 4, n: 25, type: 'list', rows: 5,
+    cz: 'Jakých je tvých 5 nejoblíbenějších seriálů všech dob?', en: 'What are your top 5 all time favourite series?' },
+  { sec: 4, n: 26, type: 'list', rows: 5,
+    cz: 'Jakých je tvých 5 nejoblíbenějších filmových postav všech dob? (Ideálně ty, které bys sama chtěla hrát.)', en: 'What are your top 5 all time favourite movie characters? (Ideally if you were to play these characters who would they be?)' },
+
+  { sec: 5, n: 27, type: 'text', short: true,
+    cz: 'Kde bydlíš? (Město a typ bydlení: byt, dům, studio?)', en: 'Where do you live? (City + type of space: apartment, house, studio?)' },
+  { sec: 5, n: 28, type: 'multi', other: true,
+    opts: [['Kadeřnictví / holičství', 'Hair salon / Barber station'], ['Kancelář / pracovní kóje', 'Office space / Cubicle'], ['Kuchyň s dobrým světlem', 'Kitchen with good light'], ['Garáž / dílna', 'Car garage / Workshop'], ['Střecha / balkon', 'Rooftop / Balcony'], ['Zahrada / les / příroda', 'Garden / Forest / Nature'], ['Ordinace lékaře', 'Doctor’s office']],
+    cz: 'Máš přístup k některému z těchto míst?', en: 'Do you have access to any of the following locations?' },
+  { sec: 5, n: 29, type: 'text',
+    cz: 'Jaké rekvizity už máš? (např. stavební nářadí, kuchyňské náčiní, doktorské nebo učitelské pomůcky atd.)', en: 'What props do you already own? (e.g., construction tools, cooking tools, doctor tools, teacher tools etc.)' },
+  { sec: 5, n: 30, type: 'one', other: true,
+    opts: [['Ano', 'Yes'], ['Záleží na tom', 'It depends'], ['Ne', 'No']],
+    cz: 'Jsi otevřená tomu kupovat každý měsíc drobné rekvizity nebo outfity, pokud je navrhneme?', en: 'Are you open to buying small props or outfits monthly if suggested?' },
+  { sec: 5, n: 31, type: 'text',
+    cz: 'Bydlíš sama, nebo s někým? Je pro tebe natáčení doma snadné, nebo těžké?', en: 'Do you live alone or with someone? Is filming content at home easy or hard?' },
+  { sec: 5, n: 32, type: 'one', other: true,
+    opts: [['Do 5 hodin', 'Up to 5 hours'], ['5 až 10 hodin', '5 to 10 hours'], ['10 až 20 hodin', '10 to 20 hours'], ['20+ hodin', '20+ hours']],
+    cz: 'Kolik hodin týdně můžeš reálně věnovat tvorbě obsahu?', en: 'How many hours per week can you realistically dedicate to content creation?' },
+
+  { sec: 6, n: 33, type: 'multi', other: true,
+    opts: [['OnlyFans', 'OnlyFans'], ['Fansly', 'Fansly'], ['Fanvue', 'Fanvue'], ['Zatím žádné', 'None yet']],
+    cz: 'Jaké platformy teď používáš k prodeji obsahu?', en: 'What platforms do you currently use for selling content?' },
+  { sec: 6, n: 34, type: 'one', other: true,
+    opts: [['Ano', 'Yes'], ['Ne', 'No']],
+    cz: 'Máš aktivní OnlyFans účet?', en: 'Do you have an active OnlyFans Account?' },
+  { sec: 6, n: 35, type: 'text',
+    cz: 'Pokud máš aktivní OF účet, kolik máš teď předplatitelů? Kolik nových předplatitelů průměrně získáš za den?', en: 'If you have an active OF account, how many subscribers do you currently have? How many new subscribers do you get per day on average?' },
+  { sec: 6, n: 36, type: 'text',
+    cz: 'Jaký je tvůj průměrný měsíční příjem z OnlyFans? Pokud používáš i jiné platformy, která je pro tebe nejvýdělečnější a jaký je na ní průměrný příjem?', en: 'What’s your average monthly income from OnlyFans at the moment? If there are other platforms that you’re using, what’s the most profitable for you and what’s the average income on that?' },
+  { sec: 6, n: 37, type: 'multi', other: true,
+    opts: [['Instagram', 'Instagram'], ['TikTok', 'TikTok'], ['X (Twitter)', 'X (Twitter)'], ['Snapchat', 'Snapchat'], ['Threads', 'Threads'], ['Reddit', 'Reddit']],
+    cz: 'Jaké sociální sítě teď používáš k získávání nových předplatitelů?', en: 'What social media platforms are you currently using to generate new subscribers?' },
+  { sec: 6, n: 38, type: 'multi', other: true,
+    opts: [['Instagram', 'Instagram'], ['TikTok', 'TikTok'], ['X (Twitter)', 'X (Twitter)'], ['Snapchat', 'Snapchat'], ['Threads', 'Threads'], ['Reddit', 'Reddit']],
+    cz: 'Jaké sociální sítě jsi ochotná v budoucnu používat k získávání nových předplatitelů? (X, Snapchat, TikTok, IG, Threads, Reddit atd.)', en: 'What social media platforms are you open to use in the future to generate new subscribers? (X, Snapchat, TikTok, IG, Threads, Reddit etc.)' },
+];
+
+// screens: sections of the PDF, the long ones split in two
+const SCREENS = [
+  { part: 1, cz: ['Osobnost a identita', 'Jaká jsi doopravdy. Piš celými větami a klidně víc, každý detail nám pomáhá.'], en: ['Personality & Identity', 'Who you really are. Answer in full sentences and give as much detail as you can, it helps us.'] },
+  { part: 1, cz: ['Osobnost a identita', 'Talent, vlastnosti a značky, které miluješ.'], en: ['Personality & Identity', 'Talents, traits and the brands you love.'] },
+  { part: 2, cz: ['Dovednosti, práce a koníčky', 'Co umíš, co jsi dělala a co tě baví.'], en: ['Skills, Past Jobs & Hobbies', 'What you can do, what you did and what you enjoy.'] },
+  { part: 3, cz: ['Styl, vibe a estetika', 'V čem se cítíš nejlíp a kde ráda natáčíš.'], en: ['Style, Vibes & Aesthetic', 'What you feel best in and where you like to film.'] },
+  { part: 3, cz: ['Styl, vibe a estetika', 'Tvoje oblíbené herečky, filmy, seriály a postavy.'], en: ['Style, Vibes & Aesthetic', 'Your favourite actresses, movies, series and characters.'] },
+  { part: 4, cz: ['Místa, rekvizity a zdroje pro obsah', 'Kde a s čím můžeš natáčet.'], en: ['Locations, Props & Content Resources', 'Where and with what you can film.'] },
+  { part: 5, cz: ['Současná aktivita', 'Kde teď jsi, ať víme, odkud startujeme.'], en: ['Current Activity', 'Where you are now, so we know where we start from.'] },
+];
+
+const T = {
+  cz: {
+    popupTitle: 'Tvoje Brand Bible', popupNote: 'Zabere asi 15 minut. Čím víc detailů napíšeš, tím víc bude brand tvůj.',
+    namePh: 'Tvoje jméno nebo alias...', whyTitle: 'PROČ JE TENTO DOTAZNÍK DŮLEŽITÝ',
+    why1: 'Většina modelek na sítích vypadá a zní úplně stejně. Z tvých odpovědí postavíme brand, který bude jen tvůj: tvoje osobnost, zájmy, styl a příběh.',
+    why2: 'Odpovídej celými větami a co nejpodrobněji. Čím víc detailů, tím lepší nápady na obsah pro tebe vymyslíme. Rozpracované se ti ukládá.',
+    startBtn: 'Začít dotazník →', next: 'Další →', prev: '← Zpět', finish: 'Odeslat ✓', sending: 'Odesílám...',
+    part: 'Část', of: 'z', intro: 'Úvod', done: 'Hotovo',
+    answerPh: 'Tvoje odpověď...', otherPh: 'Něco dalšího? Napiš vlastní...',
+    exTitle: 'Hotovo, děkujeme!', exSub: 'Tvoje Brand Bible je odeslaná. Z odpovědí teď postavíme tvůj brand a nápady na obsah.',
+    pdf: '↓ Stáhnout moje odpovědi (PDF)', cont: 'Pokračovat do Zionu →',
+    sent: 'Odpovědi jsme dostali ✓', sendFail: 'Odeslání se nepovedlo. Zkontroluj internet a zkus to znovu.', retry: 'Zkusit znovu',
+    emptyWarn: 'Zatím jsi nic nevyplnila. Opravdu chceš odeslat prázdný dotazník?',
+  },
+  en: {
+    popupTitle: 'Your Brand Bible', popupNote: 'About 15 minutes. The more detail you give, the more the brand is yours.',
+    namePh: 'Your name or alias...', whyTitle: 'WHY THIS QUESTIONNAIRE MATTERS',
+    why1: 'Most creators online look and sound exactly the same. From your answers we build a brand that is only yours: your personality, interests, style and story.',
+    why2: 'Please answer in full sentences and give as much detail as possible. The more detail, the better the content ideas we create for you. Your progress is saved.',
+    startBtn: 'Start the questionnaire →', next: 'Next →', prev: '← Back', finish: 'Send ✓', sending: 'Sending...',
+    part: 'Part', of: 'of', intro: 'Intro', done: 'Done',
+    answerPh: 'Your answer...', otherPh: 'Anything else? Write your own...',
+    exTitle: 'Done, thank you!', exSub: 'Your Brand Bible has been sent. We now build your brand and content ideas from your answers.',
+    pdf: '↓ Download my answers (PDF)', cont: 'Continue to Dashboard →',
+    sent: 'We received your answers ✓', sendFail: 'Sending failed. Check your internet and try again.', retry: 'Try again',
+    emptyWarn: 'You have not filled anything in yet. Do you really want to send an empty questionnaire?',
+  },
+};
+
+const SECTIONS = SCREENS.map((_, i) => 'sec' + (i + 1)).concat('sec-export');
+const TOTAL = SECTIONS.length;
+let cur = 0;
+let lang = 'cz';
+let sentOk = false;
+const DRAFT_KEY = 'zion-brand-bible-draft';
+// opened from Zion: ?name=<her model name>&lang=cz|en&embed=1 (name is filled in and locked)
+const URLP = new URLSearchParams(location.search);
+const EMBED = URLP.get('embed') === '1';
+const PRESET_NAME = (URLP.get('name') || '').trim().slice(0, 60);
+if (URLP.get('lang') === 'en') lang = 'en';
+if (EMBED) document.addEventListener('DOMContentLoaded', () => document.body.classList.add('embed'));
+const norm = (s) => String(s || '').trim().toLowerCase();
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+// ---------- building the screens ----------
+function buildScreens(){
+  const main = document.getElementById('main');
+  const exp = document.getElementById('sec-export');
+  SCREENS.forEach((s, i) => {
+    const el = document.createElement('div');
+    el.id = 'sec' + (i + 1);
+    el.className = 'section' + (i === 0 ? ' active' : '');
+    let html = '<div class="sec-eyebrow" data-eyebrow="' + i + '"></div><div class="sec-title" data-stitle="' + i + '"></div><div class="sec-note" data-snote="' + i + '"></div>';
+    QUESTIONS.filter((q) => q.sec === i).forEach((q) => {
+      html += '<div class="field q" data-q="' + q.n + '"><label class="field-label"><span class="qn">' + q.n + '</span><span class="qt"></span></label>';
+      if (q.type === 'text') html += q.short ? '<input type="text" class="ans" data-ph="answerPh">' : '<textarea class="ans" data-ph="answerPh"></textarea>';
+      if (q.type === 'list') {
+        html += '<div class="bullet-list">';
+        for (let r = 1; r <= q.rows; r++) html += '<div class="bullet-row"><div class="row-num">' + r + '</div><input type="text" class="ans-row"></div>';
+        html += '</div>';
+      }
+      if (q.type === 'multi' || q.type === 'one') {
+        html += '<div class="arch-grid opts">';
+        q.opts.forEach((o, k) => { html += '<button type="button" class="arch-btn" data-k="' + k + '" onclick="' + (q.type === 'one' ? 'pickOne' : 'toggleArch') + '(this)"></button>'; });
+        html += '</div>';
+        if (q.other) html += '<input type="text" class="ans-other" data-ph="otherPh">';
+      }
+      html += '</div>';
+    });
+    el.innerHTML = html;
+    main.insertBefore(el, exp);
+  });
+}
+
+function applyLang(){
+  const t = T[lang];
+  document.documentElement.lang = lang === 'cz' ? 'cs' : 'en';
+  QUESTIONS.forEach((q) => {
+    const f = document.querySelector('[data-q="' + q.n + '"]');
+    if (!f) return;
+    f.querySelector('.qt').textContent = q[lang];
+    if (q.opts) f.querySelectorAll('.arch-btn').forEach((b) => { b.textContent = q.opts[+b.dataset.k][lang === 'cz' ? 0 : 1]; });
+  });
+  document.querySelectorAll('[data-ph]').forEach((el) => { el.placeholder = t[el.dataset.ph]; });
+  document.querySelectorAll('[data-eyebrow]').forEach((el) => { const s = SCREENS[+el.dataset.eyebrow]; el.textContent = t.part + ' ' + s.part + ' / 5'; });
+  document.querySelectorAll('[data-stitle]').forEach((el) => { el.textContent = SCREENS[+el.dataset.stitle][lang][0]; });
+  document.querySelectorAll('[data-snote]').forEach((el) => { el.textContent = SCREENS[+el.dataset.snote][lang][1]; });
+  document.getElementById('btn-prev').textContent = t.prev;
+  document.getElementById('ex-title').textContent = t.exTitle;
+  document.getElementById('ex-sub').textContent = t.exSub;
+  document.getElementById('btn-pdf').textContent = t.pdf;
+  document.getElementById('btn-continue').textContent = t.cont;
+  goTo(cur, true);
+}
+
+function setLang(l){
+  lang = l;
+  document.getElementById('lang-cz').classList.toggle('active', l === 'cz');
+  document.getElementById('lang-en').classList.toggle('active', l === 'en');
+  const t = T[l];
+  document.getElementById('popup-title').textContent = t.popupTitle;
+  document.getElementById('popup-note').textContent = t.popupNote;
+  document.getElementById('popup-why-title').textContent = t.whyTitle;
+  document.getElementById('popup-why-1').textContent = t.why1;
+  document.getElementById('popup-why-2').textContent = t.why2;
+  document.getElementById('popup-name').placeholder = t.namePh;
+  document.getElementById('popup-btn').textContent = t.startBtn;
+  ['popup-title', 'popup-note', 'popup-why-title', 'popup-why-1', 'popup-why-2', 'popup-btn'].forEach((id) => { const el = document.getElementById(id); el.classList.remove('swap'); void el.offsetWidth; el.classList.add('swap'); });
+  applyLang();
+  saveDraft();
+}
+
+// ---------- navigation ----------
+function buildDots(){
+  const c = document.getElementById('nav-dots');
+  c.innerHTML = '';
+  for (let i = 0; i < TOTAL; i++) {
+    const d = document.createElement('div');
+    d.className = 'nav-dot' + (i === cur ? ' active' : i < cur ? ' done' : '');
+    d.style.setProperty('--i', i);
+    if (i < TOTAL - 1) d.onclick = () => goTo(i);
+    c.appendChild(d);
+  }
+}
+
+function goTo(idx, quiet){
+  if (idx === TOTAL - 1 && !sentOk && !quiet) return;
+  const dir = idx < cur ? 'from-l' : 'from-r';
+  document.getElementById(SECTIONS[cur]).classList.remove('active');
+  cur = idx;
+  const nxt = document.getElementById(SECTIONS[cur]);
+  nxt.classList.remove('from-l', 'from-r');
+  if (!quiet) nxt.classList.add(dir);
+  nxt.classList.add('active');
+  document.body.style.setProperty('--sec', cur);
+  document.getElementById('prog').style.width = Math.round((cur / (TOTAL - 1)) * 100) + '%';
+  const t = T[lang];
+  document.getElementById('hdr-step').textContent = cur === TOTAL - 1 ? t.done : (cur + 1) + ' ' + t.of + ' ' + (TOTAL - 1);
+  document.getElementById('btn-prev').disabled = cur === 0 || cur === TOTAL - 1;
+  const nextBtn = document.getElementById('btn-next');
+  if (cur === TOTAL - 1) nextBtn.style.display = 'none';
+  else {
+    nextBtn.style.display = '';
+    nextBtn.disabled = false;
+    if (cur === TOTAL - 2) { nextBtn.textContent = t.finish; nextBtn.onclick = submitForm; }
+    else { nextBtn.textContent = t.next; nextBtn.onclick = () => navigate(1); }
+  }
+  buildDots();
+  if (!quiet) { window.scrollTo({ top: 0, behavior: 'smooth' }); saveDraft(); }
+}
+function navigate(d){ goTo(Math.max(0, Math.min(TOTAL - 2, cur + d))); }
+
+function toggleArch(btn){ btn.classList.toggle('selected'); saveDraft(); }
+function pickOne(btn){
+  const was = btn.classList.contains('selected');
+  btn.parentElement.querySelectorAll('.arch-btn').forEach((b) => b.classList.remove('selected'));
+  if (!was) btn.classList.add('selected');
+  saveDraft();
+}
+
+// ---------- answers ----------
+function readAnswer(q){
+  const f = document.querySelector('[data-q="' + q.n + '"]');
+  if (q.type === 'text') return { text: f.querySelector('.ans').value.trim() };
+  if (q.type === 'list') return { rows: Array.from(f.querySelectorAll('.ans-row')).map((i) => i.value.trim()) };
+  const picked = Array.from(f.querySelectorAll('.arch-btn.selected')).map((b) => +b.dataset.k);
+  const other = f.querySelector('.ans-other');
+  return { picked, other: other ? other.value.trim() : '' };
+}
+function writeAnswer(q, a){
+  const f = document.querySelector('[data-q="' + q.n + '"]');
+  if (!f || !a) return;
+  if (q.type === 'text') f.querySelector('.ans').value = a.text || '';
+  if (q.type === 'list') f.querySelectorAll('.ans-row').forEach((i, k) => { i.value = (a.rows || [])[k] || ''; });
+  if (q.opts) {
+    f.querySelectorAll('.arch-btn').forEach((b) => b.classList.toggle('selected', (a.picked || []).includes(+b.dataset.k)));
+    const o = f.querySelector('.ans-other'); if (o) o.value = a.other || '';
+  }
+}
+// one answer as plain text, in the given language ('cz' or 'en')
+function answerText(q, a, l){
+  if (q.type === 'text') return a.text;
+  if (q.type === 'list') return a.rows.map((r, k) => r ? (k + 1) + '. ' + r : '').filter(Boolean).join('\n');
+  const names = a.picked.map((k) => q.opts[k][l === 'cz' ? 0 : 1]);
+  if (a.other) names.push(a.other);
+  return names.join(', ');
+}
+function collect(){
+  const name = document.getElementById('popup-name').value.trim();
+  const items = QUESTIONS.map((q) => {
+    const a = readAnswer(q);
+    return { n: q.n, q: q[lang], q_en: q.en, answer: answerText(q, a, lang), answer_en: answerText(q, a, 'en'), raw: a };
+  });
+  return { name, lang, items };
+}
+function fullText(d, l){
+  let out = 'BRAND BIBLE: ' + d.name + '\n';
+  let sec = -1;
+  QUESTIONS.forEach((q, i) => {
+    if (SCREENS[q.sec].part !== sec) { sec = SCREENS[q.sec].part; out += '\n=== ' + SCREENS[q.sec][l][0].toUpperCase() + ' ===\n'; }
+    const it = d.items[i];
+    out += '\n' + q.n + '. ' + (l === 'en' ? it.q_en : it.q) + '\n' + ((l === 'en' ? it.answer_en : it.answer) || '-') + '\n';
+  });
+  return out;
+}
+
+// progress is kept on her phone, so she can stop and continue later
+function saveDraft(){
+  try {
+    const d = { name: document.getElementById('popup-name').value, lang, cur, answers: {} };
+    QUESTIONS.forEach((q) => { d.answers[q.n] = readAnswer(q); });
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+  } catch (e) {}
+}
+function loadDraft(){
+  try {
+    const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+    if (!d) return null;
+    QUESTIONS.forEach((q) => writeAnswer(q, d.answers && d.answers[q.n]));
+    if (d.name) document.getElementById('popup-name').value = d.name;
+    return d;
+  } catch (e) { return null; }
+}
+
+// ---------- start, send ----------
+let resumeAt = 0;
+function startForm(){
+  const name = document.getElementById('popup-name').value.trim();
+  if (!name) { document.getElementById('popup-name').focus(); return; }
+  document.getElementById('popup').style.display = 'none';
+  buildDots();
+  goTo(Math.min(resumeAt, TOTAL - 2), true);
+  saveDraft();
+  if (window.startPageFx) window.startPageFx();
+}
+
+async function submitForm(){
+  const d = collect();
+  if (!d.items.some((it) => it.answer) && !confirm(T[lang].emptyWarn)) return;
+  const btn = document.getElementById('btn-next');
+  btn.textContent = T[lang].sending;
+  btn.disabled = true;
+  const body = {
+    _subject: 'Brand Bible: ' + d.name,
+    Formular: 'Brand Bible',
+    Jmeno: d.name,
+    Jazyk: lang === 'cz' ? 'Čeština' : 'English',
+    Odpovedi: fullText(d, lang),
+    Answers_EN: lang === 'en' ? '' : fullText(d, 'en'),
+  };
+  // the email copy (Formspree) and Zion get it at the same time; one of them is enough to count as sent
+  const toEmail = fetch('https://formspree.io/f/mkoadwrq', { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.ok).catch(() => false);
+  const toZion = fetch('https://kvwwjyvkoiqsvpyzbcmn.supabase.co/functions/v1/brand-bible', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'submit', name: d.name, lang, source: EMBED ? 'zion' : 'link', items: d.items.map(({ raw, ...it }) => it), content: fullText(d, lang), content_en: lang === 'en' ? '' : fullText(d, 'en') }) }).then((r) => r.ok).catch(() => false);
+  const [okEmail, okZion] = await Promise.all([toEmail, toZion]);
+  const ok = okEmail || okZion;
+  if (!ok) {
+    btn.textContent = T[lang].finish;
+    btn.disabled = false;
+    alert(T[lang].sendFail);
+    return;
+  }
+  sentOk = true;
+  try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+  // inside Zion later: tell the parent page the answers are in
+  try { if (window.parent !== window) window.parent.postMessage({ source: 'brand-bible', type: 'submitted', data: d }, '*'); } catch (e) {}
+  window.__lastSubmission = d;
+  goTo(TOTAL - 1);
+  document.getElementById('send-state').textContent = T[lang].sent;
+  celebrate();
+}
+
+function continueToDashboard(){ try { window.parent.postMessage({ source: 'brand-bible', type: 'continue' }, '*'); } catch (e) {} }
+if (window.parent !== window) document.addEventListener('DOMContentLoaded', () => { document.getElementById('btn-continue').style.display = 'flex'; });
+
+// ---------- PDF of her answers (Helvetica has no Czech letters, so they are simplified) ----------
+function exportPDF(){
+  const d = window.__lastSubmission || collect();
+  const plain = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’‘]/g, "'").replace(/[„“”]/g, '"').replace(/[^\x00-\xff\n]/g, '');
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+  const W = 210, H = 297, M = 18, CW = W - 2 * M;
+  let y = M;
+  const chk = (n) => { if (y + n > H - M) { pdf.addPage(); y = M; } };
+  pdf.setFont('helvetica', 'bold'); pdf.setFontSize(20); pdf.setTextColor(18, 179, 76);
+  pdf.text('BRAND BIBLE', M, y + 4); y += 11;
+  pdf.setFontSize(12); pdf.setTextColor(30, 30, 30); pdf.text(plain(d.name), M, y); y += 4;
+  pdf.setDrawColor(18, 179, 76); pdf.setLineWidth(0.6); pdf.line(M, y, W - M, y); y += 8;
+  let sec = -1;
+  QUESTIONS.forEach((q, i) => {
+    if (SCREENS[q.sec].part !== sec) {
+      sec = SCREENS[q.sec].part; chk(16); y += 2;
+      pdf.setFont('helvetica', 'bold'); pdf.setFontSize(13); pdf.setTextColor(18, 179, 76);
+      pdf.text(plain(SCREENS[q.sec][lang][0]).toUpperCase(), M, y); y += 7;
+    }
+    const it = d.items[i];
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9); pdf.setTextColor(110, 110, 110);
+    pdf.splitTextToSize(plain(q.n + '. ' + it.q), CW).forEach((l) => { chk(5); pdf.text(l, M, y); y += 4.4; });
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(10.5); pdf.setTextColor(25, 25, 25);
+    plain(it.answer || '-').split('\n').forEach((para) => pdf.splitTextToSize(para, CW).forEach((l) => { chk(6); pdf.text(l, M, y + 1); y += 5.2; }));
+    y += 3.5;
+  });
+  pdf.save('Brand_Bible_' + plain(d.name).replace(/[^A-Za-z0-9]+/g, '_') + '.pdf');
+}
+
+// ---------- boot ----------
+document.addEventListener('DOMContentLoaded', () => {
+  buildScreens();
+  const draft = loadDraft();
+  if (draft && (!PRESET_NAME || norm(draft.name) === norm(PRESET_NAME))) { resumeAt = draft.cur || 0; if (draft.lang === 'en' && !URLP.get('lang')) lang = 'en'; }
+  else if (draft && PRESET_NAME) { QUESTIONS.forEach((q) => writeAnswer(q, { text: '', rows: [], picked: [], other: '' })); }
+  if (PRESET_NAME) { const inp = document.getElementById('popup-name'); inp.value = PRESET_NAME; inp.readOnly = true; inp.style.opacity = '.75'; }
+  setLang(lang);
+  document.getElementById('popup-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') startForm(); });
+  document.getElementById('main').addEventListener('input', () => { clearTimeout(window.__sd); window.__sd = setTimeout(saveDraft, 400); });
+});
+
+// Intro screen: panel tilts toward the pointer, particles drift and react to it.
+// Everything is skipped for "reduce motion" and stops once the questionnaire starts.
+document.addEventListener('DOMContentLoaded', () => {
+  const overlay = document.getElementById('popup');
+  const box = overlay && overlay.querySelector('.popup-box');
+  const cvs = document.getElementById('popup-fx');
+  if(!overlay || !box || !cvs || !cvs.getContext) return;
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){ cvs.style.display = 'none'; return; }
+  const ctx = cvs.getContext('2d');
+  const MAX_TILT = 7;
+  let W = 0, H = 0, dpr = 1, parts = [];
+  let rx = 0, ry = 0, tx = 0, ty = 0, sheen = 0, tSheen = 0;
+  let px = -999, py = -999, lastMove = 0, raf = 0, last = 0;
+
+  function seed(){
+    const n = Math.round(Math.min(70, Math.max(24, W * H / 20000)));
+    while(parts.length < n) parts.push(spawn());
+    parts.length = n;
+  }
+  function spawn(){
+    const diamond = Math.random() < 0.22;
+    return { x: Math.random() * W, y: Math.random() * H,
+      vx: (Math.random() - .5) * .22, vy: (Math.random() - .5) * .22 - .04,
+      r: diamond ? 5 + Math.random() * 6 : 1.1 + Math.random() * 2, a: .45 + Math.random() * .5,
+      d: diamond, rot: Math.random() * 6.28, vr: (Math.random() - .5) * .004 };
+  }
+  function resize(){
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    cvs.width = W * dpr; cvs.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    seed();
+  }
+  function onMove(e){
+    px = e.clientX; py = e.clientY; lastMove = performance.now();
+    const typing = document.activeElement && document.activeElement.tagName === 'INPUT';
+    if(typing){ tx = 0; ty = 0; tSheen = .35; }
+    else { tx = -((py / H) - .5) * 2 * MAX_TILT; ty = ((px / W) - .5) * 2 * MAX_TILT; tSheen = 1; }
+    const r = box.getBoundingClientRect();
+    overlay.style.setProperty('--mx', ((px - r.left) / r.width * 100).toFixed(1) + '%');
+    overlay.style.setProperty('--my', ((py - r.top) / r.height * 100).toFixed(1) + '%');
+  }
+  function onLeave(){ lastMove = 0; px = py = -999; }
+
+  function frame(now){
+    if(overlay.style.display === 'none'){ raf = 0; return; }
+    const dt = Math.min(48, now - (last || now)); last = now;
+    // idle: slow breathing tilt so it feels alive without a pointer (phones)
+    if(now - lastMove > 2200){
+      tx = Math.sin(now / 2100) * 2.4; ty = Math.cos(now / 2700) * 3; tSheen = 0;
+      const t = now / 3000; overlay.style.setProperty('--mx', (50 + Math.cos(t) * 30).toFixed(1) + '%'); overlay.style.setProperty('--my', (35 + Math.sin(t) * 25).toFixed(1) + '%');
+    }
+    const k = 1 - Math.pow(.001, dt / 1000);
+    rx += (tx - rx) * k; ry += (ty - ry) * k; sheen += (tSheen - sheen) * k;
+    overlay.style.setProperty('--rx', rx.toFixed(2) + 'deg'); overlay.style.setProperty('--ry', ry.toFixed(2) + 'deg');
+    overlay.style.setProperty('--dx', ry.toFixed(2)); overlay.style.setProperty('--dy', rx.toFixed(2));
+    overlay.style.setProperty('--sheen', sheen.toFixed(2));
+
+    ctx.clearRect(0, 0, W, H);
+    const step = dt / 16.7;
+    for(const p of parts){
+      const dx = p.x - px, dy = p.y - py, dist = Math.hypot(dx, dy);
+      if(dist < 150 && dist > 0){ const f = (1 - dist / 150) * .35 * step; p.vx += dx / dist * f; p.vy += dy / dist * f; }
+      p.vx *= .985; p.vy *= .985;
+      if(Math.abs(p.vx) < .06) p.vx += (Math.random() - .5) * .01;
+      if(Math.abs(p.vy) < .06) p.vy += (Math.random() - .5) * .01;
+      p.x += p.vx * step; p.y += p.vy * step; p.rot += p.vr * dt;
+      if(p.x < -20) p.x = W + 20; else if(p.x > W + 20) p.x = -20;
+      if(p.y < -20) p.y = H + 20; else if(p.y > H + 20) p.y = -20;
+    }
+    // faint links between neighbours and to the pointer
+    ctx.lineWidth = 1;
+    for(let i = 0; i < parts.length; i++){
+      const a = parts[i];
+      for(let j = i + 1; j < parts.length; j++){
+        const b = parts[j], d = Math.hypot(a.x - b.x, a.y - b.y);
+        if(d < 120){ ctx.strokeStyle = 'rgba(57,230,115,' + ((1 - d / 120) * .26).toFixed(3) + ')'; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+      }
+      const dm = Math.hypot(a.x - px, a.y - py);
+      if(dm < 170){ ctx.strokeStyle = 'rgba(120,255,170,' + ((1 - dm / 170) * .35).toFixed(3) + ')'; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(px, py); ctx.stroke(); }
+    }
+    for(const p of parts){
+      if(p.d){
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        ctx.strokeStyle = 'rgba(57,230,115,' + (p.a * .7).toFixed(3) + ')'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(0, -p.r); ctx.lineTo(p.r, 0); ctx.lineTo(0, p.r); ctx.lineTo(-p.r, 0); ctx.closePath(); ctx.stroke();
+        ctx.restore();
+      } else {
+        ctx.fillStyle = 'rgba(57,230,115,' + p.a.toFixed(3) + ')';
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.2832); ctx.fill();
+      }
+    }
+    raf = requestAnimationFrame(frame);
+  }
+  function run(){ if(!raf && !document.hidden){ last = 0; raf = requestAnimationFrame(frame); } }
+
+  resize();
+  window.addEventListener('resize', resize);
+  overlay.addEventListener('pointermove', onMove);
+  overlay.addEventListener('pointerleave', onLeave);
+  overlay.addEventListener('pointerup', e => { if(e.pointerType === 'touch') onLeave(); });
+  document.addEventListener('visibilitychange', () => { if(document.hidden){ cancelAnimationFrame(raf); raf = 0; } else run(); });
+  run();
+});
+
+// Form screens: faint particle field behind the questions (reacts to the pointer), and the finish screen tilts.
+document.addEventListener('DOMContentLoaded', () => {
+  const cvs = document.getElementById('pg-fx');
+  if(!cvs || !cvs.getContext) return;
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){ cvs.style.display = 'none'; return; }
+  const ctx = cvs.getContext('2d');
+  let W = 0, H = 0, dpr = 1, parts = [], px = -999, py = -999, lastMove = 0, raf = 0, last = 0;
+  let erx = 0, ery = 0;
+
+  function spawn(){
+    const d = Math.random() < 0.2;
+    return { x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .18, vy: (Math.random() - .5) * .18 - .03,
+      r: d ? 4 + Math.random() * 5 : 1 + Math.random() * 1.8, a: .25 + Math.random() * .4, d, rot: Math.random() * 6.28, vr: (Math.random() - .5) * .003 };
+  }
+  function resize(){
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    cvs.width = W * dpr; cvs.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const n = Math.round(Math.min(34, Math.max(14, W * H / 42000)));
+    while(parts.length < n) parts.push(spawn());
+    parts.length = n;
+  }
+  function frame(now){
+    if(document.hidden || document.getElementById('popup').style.display !== 'none'){ raf = 0; return; }
+    const dt = Math.min(48, now - (last || now)); last = now;
+    const step = dt / 16.7;
+    ctx.clearRect(0, 0, W, H);
+    for(const p of parts){
+      const dx = p.x - px, dy = p.y - py, dist = Math.hypot(dx, dy);
+      if(dist < 140 && dist > 0){ const f = (1 - dist / 140) * .3 * step; p.vx += dx / dist * f; p.vy += dy / dist * f; }
+      p.vx *= .985; p.vy *= .985;
+      if(Math.abs(p.vx) < .05) p.vx += (Math.random() - .5) * .008;
+      if(Math.abs(p.vy) < .05) p.vy += (Math.random() - .5) * .008;
+      p.x += p.vx * step; p.y += p.vy * step; p.rot += p.vr * dt;
+      if(p.x < -20) p.x = W + 20; else if(p.x > W + 20) p.x = -20;
+      if(p.y < -20) p.y = H + 20; else if(p.y > H + 20) p.y = -20;
+    }
+    ctx.lineWidth = 1;
+    for(let i = 0; i < parts.length; i++){
+      const a = parts[i];
+      for(let j = i + 1; j < parts.length; j++){
+        const b = parts[j], d = Math.hypot(a.x - b.x, a.y - b.y);
+        if(d < 120){ ctx.strokeStyle = 'rgba(57,230,115,' + ((1 - d / 120) * .2).toFixed(3) + ')'; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+      }
+      const dm = Math.hypot(a.x - px, a.y - py);
+      if(dm < 160){ ctx.strokeStyle = 'rgba(120,255,170,' + ((1 - dm / 160) * .34).toFixed(3) + ')'; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(px, py); ctx.stroke(); }
+    }
+    for(const p of parts){
+      if(p.d){
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.strokeStyle = 'rgba(57,230,115,' + (p.a * .8).toFixed(3) + ')';
+        ctx.beginPath(); ctx.moveTo(0, -p.r); ctx.lineTo(p.r, 0); ctx.lineTo(0, p.r); ctx.lineTo(-p.r, 0); ctx.closePath(); ctx.stroke(); ctx.restore();
+      } else { ctx.fillStyle = 'rgba(57,230,115,' + p.a.toFixed(3) + ')'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.2832); ctx.fill(); }
+    }
+    // finish screen: tilt like the intro panel (pointer, or a slow breathing when idle)
+    if(cur === TOTAL - 1){
+      const idle = now - lastMove > 2200;
+      const tx = idle ? Math.sin(now / 2300) * 2.2 : -((py / H) - .5) * 2 * 5;
+      const ty = idle ? Math.cos(now / 2900) * 3 : ((px / W) - .5) * 2 * 6;
+      const k = 1 - Math.pow(.001, dt / 1000);
+      erx += (tx - erx) * k; ery += (ty - ery) * k;
+      const ex = document.getElementById('sec-export');
+      ex.style.setProperty('--erx', erx.toFixed(2) + 'deg'); ex.style.setProperty('--ery', ery.toFixed(2) + 'deg');
+      ex.style.setProperty('--edx', ery.toFixed(2)); ex.style.setProperty('--edy', erx.toFixed(2));
+    }
+    raf = requestAnimationFrame(frame);
+  }
+  window.startPageFx = function(){ if(!raf && !document.hidden){ last = 0; raf = requestAnimationFrame(frame); } };
+  resize();
+  window.addEventListener('resize', resize);
+  window.addEventListener('pointermove', e => { px = e.clientX; py = e.clientY; lastMove = performance.now(); });
+  document.addEventListener('pointerleave', () => { px = py = -999; lastMove = 0; });
+  document.addEventListener('visibilitychange', () => { if(document.hidden){ cancelAnimationFrame(raf); raf = 0; } else if(document.getElementById('popup').style.display === 'none') window.startPageFx(); });
+});
+
+// Confetti of green diamonds when the questionnaire is finished.
+function celebrate(){
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const c = document.createElement('canvas');
+  c.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:400;pointer-events:none';
+  document.body.appendChild(c);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2), W = window.innerWidth, H = window.innerHeight;
+  c.width = W * dpr; c.height = H * dpr;
+  const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const colors = ['#39e673', '#12b34c', '#c9ffdc', '#0a8c3e', '#f2f5f0'];
+  const bursts = [[W * .5, H * .34], [W * .2, H * .5], [W * .8, H * .5]];
+  const ps = [];
+  bursts.forEach(([ox, oy], bi) => { for(let i = 0; i < (bi ? 38 : 60); i++){
+    const ang = (bi === 0 ? -Math.PI / 2 : bi === 1 ? -Math.PI / 3 : -2 * Math.PI / 3) + (Math.random() - .5) * 1.8, sp = 5 + Math.random() * 9;
+    ps.push({ x: ox, y: oy, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, r: 3 + Math.random() * 5, rot: Math.random() * 6.28, vr: (Math.random() - .5) * .3,
+      col: colors[(Math.random() * colors.length) | 0], dia: Math.random() < .65, delay: bi * 180 });
+  } });
+  const t0 = performance.now(); let prev = t0;
+  (function tick(now){
+    const t = now - t0, dt = Math.min(48, now - prev) / 16.7; prev = now;
+    ctx.clearRect(0, 0, W, H);
+    let alive = 0;
+    for(const p of ps){
+      if(t < p.delay){ alive++; continue; }
+      p.vy += .22 * dt; p.vx *= Math.pow(.992, dt); p.vy *= Math.pow(.992, dt); p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt;
+      const life = (t - p.delay) / 3400; if(life >= 1 || p.y > H + 30) continue; alive++;
+      ctx.globalAlpha = life > .65 ? 1 - (life - .65) / .35 : 1; ctx.fillStyle = p.col;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      if(p.dia){ ctx.beginPath(); ctx.moveTo(0, -p.r); ctx.lineTo(p.r * .7, 0); ctx.lineTo(0, p.r); ctx.lineTo(-p.r * .7, 0); ctx.closePath(); ctx.fill(); }
+      else { ctx.beginPath(); ctx.arc(0, 0, p.r * .45, 0, 6.2832); ctx.fill(); }
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+    if(alive && t < 4200) requestAnimationFrame(tick); else c.remove();
+  })(t0);
+}
+
+
+</script>
+</body>
+</html>

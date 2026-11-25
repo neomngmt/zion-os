@@ -1,0 +1,1944 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>Creator Bible | Zion Management</title>
+<meta name="theme-color" content="#060908">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  /* Zion brand: same palette and fonts as zion-management.eu */
+  :root {
+    --bg: #07090a; --surface: #0e1310; --surface2: #121a15; --panel: #0e1310;
+    --accent: #12b34c; --accent2: #0a5c2c; --accent-soft: #39e673;
+    --glow: rgba(18,179,76,0.35);
+    --text: #f2f5f0; --text-muted: #8fa39a; --text-hint: #4b5a52;
+    --border: rgba(18,179,76,0.16); --border-hover: rgba(57,230,115,0.5);
+    --radius: 14px; --radius-sm: 10px;
+    --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 15px; line-height: 1.6; min-height: 100vh; position: relative; overflow-x: hidden; }
+  /* ambient green glow behind everything, like the website */
+  body::before { content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: radial-gradient(640px circle at 14% 6%, rgba(18,179,76,0.13), transparent 62%),
+                radial-gradient(560px circle at 88% 96%, rgba(18,179,76,0.09), transparent 62%); }
+  body::after { content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .5;
+    background-image: radial-gradient(rgba(57,230,115,0.35) 1px, transparent 1.4px); background-size: 46px 46px; background-position: 7px 11px;
+    -webkit-mask-image: radial-gradient(ellipse at 50% 20%, black 0%, transparent 70%); mask-image: radial-gradient(ellipse at 50% 20%, black 0%, transparent 70%); }
+  .app-header, .progress-wrap, .main, .nav-bar { position: relative; z-index: 2; }
+  .app-header { position: sticky; top: 0; z-index: 100; background: rgba(7,9,10,0.78); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); padding: .8rem 1.25rem; display: flex; align-items: center; justify-content: space-between; }
+  .header-logo { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 800; letter-spacing: 3px; color: var(--text); text-transform: uppercase; }
+  .header-logo .star { width: 20px; height: 20px; flex-shrink: 0; }
+  .header-logo .tag { font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: 2px; color: var(--accent-soft); border: 1px solid var(--border); border-radius: 999px; padding: .15rem .6rem; }
+  .header-step { font-family: var(--mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); }
+  .progress-wrap { height: 2px; background: rgba(18,179,76,0.10); position: sticky; top: 53px; z-index: 99; }
+  .progress-bar { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-soft)); box-shadow: 0 0 12px var(--glow); transition: width .4s cubic-bezier(.4,0,.2,1); }
+  .main { max-width: 580px; margin: 0 auto; padding: 2.25rem 1.25rem 6rem; }
+  .cover { text-align: center; padding: 3rem 0 2.5rem; }
+  .section { display: none; }
+  .section.active { display: block; animation: slideUp .3s ease; }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  .sec-eyebrow { font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: 3px; color: var(--accent-soft); text-transform: uppercase; margin-bottom: .5rem; }
+  .sec-title { font-size: 30px; font-weight: 800; color: var(--text); margin-bottom: .65rem; letter-spacing: -.8px; line-height: 1.15; }
+  .sec-note { font-size: 13px; color: var(--text-muted); border-left: 2px solid var(--accent); padding: .1rem 0 .1rem .8rem; margin-bottom: 2rem; line-height: 1.55; }
+  .field { margin-bottom: 1.3rem; }
+  .field-label { display: block; font-size: 12.5px; font-weight: 600; color: #c9d6cd; margin-bottom: .5rem; }
+  input[type=text], textarea { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: inherit; font-size: 15px; padding: .75rem .95rem; outline: none; transition: border-color .15s, box-shadow .15s, background .15s; -webkit-appearance: none; }
+  input[type=text]:focus, textarea:focus { border-color: var(--accent-soft); background: var(--surface2); box-shadow: 0 0 0 3px rgba(18,179,76,0.16); }
+  input::placeholder, textarea::placeholder { color: var(--text-hint); }
+  textarea { resize: vertical; min-height: 96px; line-height: 1.6; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .bullet-list { display: flex; flex-direction: column; gap: 8px; }
+  .bullet-row { display: flex; align-items: center; gap: 10px; }
+  .bullet-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-soft); box-shadow: 0 0 8px var(--glow); flex-shrink: 0; }
+  .bullet-row input { flex: 1; }
+  .add-field-btn { background: none; border: none; color: var(--accent-soft); font-family: var(--mono); font-size: 12px; letter-spacing: .5px; cursor: pointer; padding: .35rem 0; margin-top: 4px; }
+  .add-field-btn:hover { text-decoration: underline; }
+  .arch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 1.25rem; }
+  .arch-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .arch-btn { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-muted); font-family: inherit; font-size: 13px; padding: .72rem .9rem; cursor: pointer; text-align: left; transition: all .15s; line-height: 1.3; }
+  .arch-btn:hover { border-color: var(--border-hover); color: var(--text); transform: translateY(-1px); }
+  .arch-btn.selected { border-color: var(--accent-soft); background: linear-gradient(135deg, rgba(57,230,115,0.16), rgba(18,179,76,0.07)); color: var(--accent-soft); font-weight: 600; box-shadow: 0 0 16px rgba(18,179,76,0.18); }
+  .kw-wrap { display: flex; flex-wrap: wrap; gap: 6px; min-height: 36px; margin-bottom: .75rem; }
+  .kw-tag { display: flex; align-items: center; gap: 5px; background: rgba(18,179,76,0.12); border: 1px solid rgba(57,230,115,0.3); border-radius: 99px; padding: .25rem .7rem; font-size: 13px; color: var(--accent-soft); }
+  .kw-tag button { background: none; border: none; color: rgba(57,230,115,0.6); cursor: pointer; font-size: 15px; line-height: 1; padding: 0; font-family: inherit; }
+  .kw-input-row { display: flex; gap: 8px; }
+  .kw-input-row input { flex: 1; }
+  .btn-add-kw { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-muted); font-family: inherit; font-size: 14px; padding: .7rem 1rem; cursor: pointer; white-space: nowrap; transition: all .15s; }
+  .btn-add-kw:hover { border-color: var(--accent-soft); color: var(--accent-soft); }
+  .divider { height: 1px; background: var(--border); margin: 1.5rem 0; }
+  .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(7,9,10,0.82); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--border); padding: .85rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 12px; z-index: 100; }
+  .nav-dots { display: flex; gap: 5px; }
+  .nav-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(18,179,76,0.10); border: 1px solid var(--border); cursor: pointer; transition: all .2s; }
+  .nav-dot.active { background: linear-gradient(90deg, var(--accent-soft), var(--accent)); border-color: var(--accent-soft); width: 20px; border-radius: 99px; box-shadow: 0 0 10px var(--glow); }
+  .nav-dot.done { border-color: var(--accent); background: rgba(18,179,76,0.35); }
+  .btn-nav { background: transparent; border: 1px solid var(--border); border-radius: 999px; color: var(--text-muted); font-family: inherit; font-size: 14px; font-weight: 600; padding: .6rem 1.2rem; cursor: pointer; transition: all .18s; }
+  .btn-nav:hover { border-color: var(--border-hover); color: var(--text); }
+  .btn-nav.primary { background: linear-gradient(135deg, var(--accent-soft), var(--accent)); border-color: transparent; color: #04140c; font-weight: 700; box-shadow: 0 0 18px var(--glow); }
+  .btn-nav.primary:hover { transform: translateY(-2px); box-shadow: 0 0 26px var(--glow); }
+  .btn-nav:disabled { opacity: .3; pointer-events: none; }
+  .export-screen { padding: 2rem 0; text-align: center; }
+  .export-icon { width: 68px; height: 68px; border-radius: 50%; background: radial-gradient(circle, rgba(57,230,115,0.28), rgba(18,179,76,0.06) 70%); border: 1px solid var(--accent-soft); box-shadow: 0 0 30px var(--glow); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; font-size: 28px; color: var(--accent-soft); }
+  .export-title { font-size: 26px; font-weight: 800; margin-bottom: .4rem; letter-spacing: -.6px; }
+  .export-sub { font-size: 14px; color: var(--text-muted); margin-bottom: 2rem; }
+  .export-btns { display: flex; flex-direction: column; gap: 10px; }
+  .btn-export { width: 100%; padding: .9rem; border-radius: 999px; font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer; border: none; transition: transform .18s, box-shadow .18s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn-export:hover { transform: translateY(-2px); }
+  .btn-export.primary { background: linear-gradient(135deg, var(--accent-soft), var(--accent)); color: #04140c; box-shadow: 0 0 20px var(--glow); }
+  .btn-export.primary:hover { box-shadow: 0 0 28px var(--glow); }
+  .btn-export.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn-export.secondary:hover { border-color: var(--border-hover); }
+  .summary-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; text-align: left; margin-top: 1.5rem; }
+  .summary-row { display: flex; justify-content: space-between; padding: .45rem 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .summary-row:last-child { border-bottom: none; }
+  .summary-key { font-family: var(--mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); }
+  .summary-val { color: var(--text); text-align: right; max-width: 60%; }
+  /* POPUP */
+  .popup-overlay { position: fixed; inset: 0; background: rgba(4,7,5,0.88); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index: 999; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+  .popup-overlay::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(520px circle at 50% 30%, rgba(18,179,76,0.22), transparent 65%); }
+  .popup-box { position: relative; background: linear-gradient(160deg, rgba(18,179,76,0.10), rgba(14,19,16,0.96) 55%); border: 1px solid var(--border); box-shadow: 0 30px 70px rgba(0,0,0,0.55), 0 0 40px rgba(18,179,76,0.12); border-radius: 22px; padding: 2.4rem 2rem; max-width: 430px; width: 100%; text-align: center; }
+  .popup-logo { display: flex; align-items: center; justify-content: center; gap: 10px; font-family: var(--mono); font-size: 11px; letter-spacing: 4px; color: var(--accent-soft); text-transform: uppercase; margin-bottom: 1.25rem; }
+  .popup-logo .star { width: 22px; height: 22px; }
+  .popup-title { font-size: 30px; font-weight: 800; color: #fff; margin-bottom: .5rem; letter-spacing: -.8px; }
+  .popup-note { font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 1.5rem; }
+  .popup-why { background: rgba(18,179,76,0.07); border: 1px solid var(--border); border-radius: 14px; padding: 1rem 1.25rem; text-align: left; margin-bottom: 1.5rem; }
+  .popup-why-title { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 2px; color: var(--accent-soft); margin-bottom: .5rem; }
+  .popup-why p { font-size: 12px; color: var(--text-muted); line-height: 1.65; }
+  .popup-why p + p { margin-top: .5rem; }
+  .popup-input-wrap { margin-bottom: 1.25rem; }
+  .popup-input-wrap input { text-align: center; font-size: 16px; padding: .9rem; border-radius: 12px; }
+  .popup-btn { width: 100%; padding: .95rem; background: linear-gradient(135deg, var(--accent-soft), var(--accent)); border: none; border-radius: 999px; color: #04140c; font-family: inherit; font-size: 16px; font-weight: 800; cursor: pointer; box-shadow: 0 0 22px var(--glow); transition: transform .18s, box-shadow .18s; }
+  .popup-btn:hover { transform: translateY(-2px); box-shadow: 0 0 30px var(--glow); }
+  .lang-btn { flex: 1; padding: .65rem; border-radius: 999px; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); transition: all .15s; }
+  .lang-btn.active { border-color: var(--accent-soft); background: rgba(57,230,115,0.12); color: var(--accent-soft); box-shadow: 0 0 14px rgba(18,179,76,0.2); }
+  .lang-btn:hover { border-color: var(--border-hover); }
+  /* INTRO: tilting 3D panel, drifting aurora, interactive particles */
+  .popup-overlay { overflow-y: auto; overflow-x: hidden; align-items: flex-start; --rx: 0deg; --ry: 0deg; --mx: 50%; --my: 30%; --sheen: 0; --dx: 0; --dy: 0; }
+  .popup-overlay::before { z-index: 0; background: radial-gradient(520px circle at 50% 40%, rgba(18,179,76,0.16), transparent 70%); }
+  .popup-box { margin: auto; z-index: 2; transform: perspective(1100px) rotateX(var(--rx)) rotateY(var(--ry)); will-change: transform; animation: boxIn .9s cubic-bezier(.2,.8,.2,1) backwards; }
+  .popup-box::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: var(--sheen);
+    background: radial-gradient(420px circle at var(--mx) var(--my), rgba(120,255,170,0.16), transparent 55%); transition: opacity .25s; }
+  .popup-box > * { animation: popIn .75s cubic-bezier(.2,.8,.2,1) backwards; }
+  .popup-box > *:nth-child(1) { animation-delay: .20s; } .popup-box > *:nth-child(2) { animation-delay: .28s; }
+  .popup-box > *:nth-child(3) { animation-delay: .36s; } .popup-box > *:nth-child(4) { animation-delay: .44s; }
+  .popup-box > *:nth-child(5) { animation-delay: .52s; } .popup-box > *:nth-child(6) { animation-delay: .60s; }
+  .popup-box > *:nth-child(7) { animation-delay: .68s; }
+  /* depth is faked with a small shift per layer (no 3D context, so no flickering edges) */
+  .popup-logo { translate: calc(var(--dx) * .6px) calc(var(--dy) * -.6px); } .popup-title { translate: calc(var(--dx) * .8px) calc(var(--dy) * -.8px); } .popup-note { translate: calc(var(--dx) * .4px) calc(var(--dy) * -.4px); }
+  .popup-langs { translate: calc(var(--dx) * .45px) calc(var(--dy) * -.45px); } .popup-input-wrap { translate: calc(var(--dx) * .3px) calc(var(--dy) * -.3px); } .popup-btn { translate: calc(var(--dx) * .7px) calc(var(--dy) * -.7px); }
+  .popup-btn { position: relative; overflow: hidden; }
+  .popup-btn::after { content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%; transform: skewX(-20deg); pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent); transition: left .7s ease; }
+  .popup-btn:hover::after { left: 130%; }
+  .popup-langs .lang-btn { padding: .65rem .3rem; font-size: 13.5px; white-space: nowrap; }
+  .popup-title.swap, .popup-note.swap, .popup-why p.swap, .popup-why-title.swap, .popup-btn.swap { animation: swapIn .35s ease; }
+  .fx-canvas, .fx-blob { position: fixed; pointer-events: none; }
+  .fx-canvas { inset: 0; width: 100%; height: 100%; z-index: 1; }
+  .fx-blob { z-index: 0; border-radius: 50%; filter: blur(80px); opacity: .34; will-change: transform; }
+  .fx-blob.b1 { width: 30vmax; height: 30vmax; left: 6vmax; top: -8vmax; background: rgba(18,179,76,0.5); animation: drift1 22s ease-in-out infinite alternate; }
+  .fx-blob.b2 { width: 26vmax; height: 26vmax; right: 2vmax; bottom: -10vmax; background: rgba(10,120,56,0.5); animation: drift2 26s ease-in-out infinite alternate; }
+  .fx-blob.b3 { display: none; }
+  @keyframes boxIn { from { opacity: 0; translate: 0 26px; scale: .965; } to { opacity: 1; translate: 0 0; scale: 1; } }
+  @keyframes popIn { from { opacity: 0; translate: 0 16px; } to { opacity: 1; translate: 0 0; } }
+  @keyframes swapIn { from { opacity: .15; translate: 0 6px; } to { opacity: 1; translate: 0 0; } }
+  @keyframes drift1 { from { transform: translate(0,0) scale(1); } to { transform: translate(8vw,6vh) scale(1.1); } }
+  @keyframes drift2 { from { transform: translate(0,0) scale(1.1); } to { transform: translate(-7vw,-7vh) scale(.95); } }
+  @keyframes drift3 { from { transform: translate(0,0) scale(.9); } to { transform: translate(-18vw,16vh) scale(1.15); } }
+  .popup-logo { letter-spacing: 3px; white-space: nowrap; }
+  .popup-logo .pl-dot { margin: 0 -2px; }
+  @media (max-width: 520px) { .header-logo .mgmt { display: none; } .popup-logo { flex-direction: column; gap: 6px; letter-spacing: 3px; } .popup-logo .pl-dot { display: none; } }
+  /* FORM SCREENS: ambient particles, directional section transitions, staggered rows, control feedback, finish screen */
+  .pg-canvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+  .pg-shift { position: fixed; z-index: 0; pointer-events: none; transition: transform 1.4s cubic-bezier(.2,.8,.2,1); }
+  .pg-shift.s1 { left: -8vmax; top: -10vmax; transform: translate(calc(var(--sec, 0) * 2.2vw), calc(var(--sec, 0) * 1.6vh)); }
+  .pg-shift.s2 { right: -10vmax; bottom: -12vmax; transform: translate(calc(var(--sec, 0) * -2vw), calc(var(--sec, 0) * -1.4vh)); }
+  .pg-blob { width: 38vmax; height: 38vmax; border-radius: 50%; background: radial-gradient(circle, rgba(18,179,76,0.20), transparent 66%); will-change: transform; }
+  .pg-shift.s1 .pg-blob { animation: drift1 26s ease-in-out infinite alternate; }
+  .pg-shift.s2 .pg-blob { background: radial-gradient(circle, rgba(10,120,56,0.24), transparent 66%); animation: drift2 30s ease-in-out infinite alternate; }
+  .section.active { animation: secInR .55s cubic-bezier(.2,.8,.2,1); }
+  .section.active.from-l { animation-name: secInL; }
+  .section.active > * { animation: rowIn .65s cubic-bezier(.2,.8,.2,1) backwards; }
+  .section.active > *:nth-child(1) { animation-delay: .03s; } .section.active > *:nth-child(2) { animation-delay: .08s; }
+  .section.active > *:nth-child(3) { animation-delay: .13s; } .section.active > *:nth-child(4) { animation-delay: .18s; }
+  .section.active > *:nth-child(5) { animation-delay: .23s; } .section.active > *:nth-child(6) { animation-delay: .28s; }
+  .section.active > *:nth-child(7) { animation-delay: .33s; } .section.active > *:nth-child(8) { animation-delay: .38s; }
+  .section.active > *:nth-child(n+9) { animation-delay: .43s; }
+  @keyframes secInR { from { opacity: 0; translate: 38px 0; } to { opacity: 1; translate: 0 0; } }
+  @keyframes secInL { from { opacity: 0; translate: -38px 0; } to { opacity: 1; translate: 0 0; } }
+  @keyframes rowIn { from { opacity: 0; translate: 0 16px; } to { opacity: 1; translate: 0 0; } }
+  .arch-btn.selected { animation: chipPop .45s cubic-bezier(.3,1.7,.5,1); }
+  @keyframes chipPop { 0% { transform: scale(.93); box-shadow: 0 0 0 0 rgba(57,230,115,0.6); } 55% { transform: scale(1.04); } 100% { transform: scale(1); box-shadow: 0 0 16px rgba(18,179,76,0.18); } }
+  input[type=text]:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(18,179,76,0.16), 0 0 28px rgba(18,179,76,0.16); }
+  .bullet-dot { transition: transform .2s, box-shadow .2s; }
+  .bullet-row:focus-within .bullet-dot { transform: scale(1.5); box-shadow: 0 0 14px var(--glow); }
+  .bullet-row.new { animation: bulletIn .45s cubic-bezier(.2,.8,.2,1); }
+  @keyframes bulletIn { from { opacity: 0; translate: -14px 0; } to { opacity: 1; translate: 0 0; } }
+  .kw-tag { animation: chipPop .4s cubic-bezier(.3,1.7,.5,1); }
+  .btn-nav.primary { position: relative; overflow: hidden; }
+  .btn-nav.primary::after { content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%; transform: skewX(-20deg); pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent); transition: left .7s ease; }
+  .btn-nav.primary:hover::after { left: 130%; }
+  .progress-bar { position: relative; }
+  .progress-bar::after { content: ""; position: absolute; right: -3px; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; background: #c9ffdc; box-shadow: 0 0 10px 3px var(--accent-soft); animation: headPulse 1.7s ease-in-out infinite; }
+  .progress-bar[style*="width:0%"]::after, .progress-bar[style*="width: 0%"]::after { display: none; }
+  @keyframes headPulse { 0%, 100% { opacity: .75; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.25); } }
+  .nav-dot { animation: dotIn .5s cubic-bezier(.3,1.6,.5,1) backwards; animation-delay: calc(var(--i, 0) * 30ms); }
+  @keyframes dotIn { from { opacity: 0; transform: scale(.2); } to { opacity: 1; transform: scale(1); } }
+  #sec-export .export-screen { transform: perspective(1100px) rotateX(var(--erx, 0deg)) rotateY(var(--ery, 0deg)); will-change: transform; }
+  #sec-export .export-icon { translate: calc(var(--edx, 0) * .85px) calc(var(--edy, 0) * -.85px); animation: iconIn 1s cubic-bezier(.2,1.4,.4,1) .15s backwards; }
+  #sec-export .export-title { translate: calc(var(--edx, 0) * .6px) calc(var(--edy, 0) * -.6px); background: linear-gradient(90deg, var(--text) 40%, var(--accent-soft) 50%, var(--text) 60%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: titleShine 3.4s ease .5s 1 both; }
+  #sec-export .export-sub, #sec-export .export-btns { translate: calc(var(--edx, 0) * .4px) calc(var(--edy, 0) * -.4px); }
+  #sec-export .summary-card { translate: calc(var(--edx, 0) * .2px) calc(var(--edy, 0) * -.2px); box-shadow: 0 24px 50px rgba(0,0,0,0.45), 0 0 30px rgba(18,179,76,0.08); }
+  @keyframes iconIn { from { opacity: 0; scale: .3; rotate: -45deg; } to { opacity: 1; scale: 1; rotate: 0deg; } }
+  @keyframes titleShine { from { background-position: 100% 0; } to { background-position: 0 0; } }
+  /* progress bar lives inside the header, so it always sits exactly on its bottom edge */
+  .app-header { border-bottom: none; }
+  .app-header .progress-wrap { position: absolute; top: auto; left: 0; right: 0; bottom: 0; z-index: 1; }
+  @media (max-width: 480px) { .grid2 { grid-template-columns: 1fr; } .sec-title { font-size: 26px; } }
+
+  /* Zion wordmark with the neon "by neomngmt", same as the Zion app */
+  .zw { display: inline-flex; flex-direction: column; align-items: flex-end; line-height: 1; }
+  .zw-svg { display: block; height: 100%; width: auto; }
+  .zw-by { font-family: 'Dancing Script', cursive; font-weight: 700; color: #39e673; white-space: nowrap; letter-spacing: 0; text-transform: none;
+    text-shadow: 0 0 2px #39e673, 0 0 6px #39e673, 0 0 14px rgba(57,230,115,0.55); animation: zwFlicker 3.5s ease-in-out infinite; }
+  @keyframes zwFlicker { 0%, 100% { opacity: .85; } 50% { opacity: 1; } 52% { opacity: .6; } 54% { opacity: 1; } }
+  .header-logo .zw { height: 30px; justify-content: center; }
+  .header-logo .zw-svg { height: 17px; }
+  .header-logo .zw-by { font-size: 9.5px; margin-top: 3px; }
+  .popup-logo { flex-direction: column !important; gap: 12px !important; letter-spacing: 3px; }
+  .popup-logo .zw-svg { height: 38px; }
+  .popup-logo .zw-by { font-size: 15px; margin-top: 7px; }
+  .popup-logo .pl-name { font-family: var(--mono); font-size: 10.5px; letter-spacing: 4px; color: var(--accent-soft); text-transform: uppercase; border: 1px solid var(--border); border-radius: 999px; padding: .25rem .8rem; }
+  body.embed .app-header { padding-right: 58px; }
+
+  /* ---- intro: solid panel, no auto tilt, scrolls and fits on the phone (layout as before) ---- */
+  .popup-overlay { background: #060908; display: block; padding: 6vh 1.25rem 2.5rem; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior: contain; }
+  .popup-box { margin: 0 auto; background: linear-gradient(160deg, #13301f, #0d120f 58%); backdrop-filter: none; -webkit-backdrop-filter: none; border-color: rgba(57,230,115,0.24); box-shadow: 0 30px 70px rgba(0,0,0,0.6), 0 0 50px rgba(18,179,76,0.14); }
+  .popup-why { background: rgba(18,179,76,0.09); }
+  /* the form never moves sideways: no horizontal overflow, no zoom when a field is tapped (iPhone zooms on text under 16px) */
+  html, body { overflow-x: hidden; overflow-x: clip; overscroll-behavior-x: none; max-width: 100%; }
+  .main { touch-action: pan-y; }
+  @media (max-width: 520px) { input[type=text], textarea, select { font-size: 16px !important; } }
+  /* phone: the intro is exactly one screen, no scrolling, everything visible */
+  body:has(#popup:not([style*="none"])) { overflow: hidden; height: 100dvh; }
+  html { background: #060908; }
+  @media (max-width: 520px) { body:has(#popup:not([style*="none"])) { position: fixed; inset: 0; width: 100%; height: 100lvh; } }
+  @media (max-width: 520px) {
+    /* full screen: the background runs under the Safari bars, the panel stays in the visible part */
+    .popup-overlay { padding: calc(10px + env(safe-area-inset-top)) 14px calc(10px + env(safe-area-inset-bottom)); height: 100vh; height: 100lvh; overflow: hidden; overflow: clip; display: flex; align-items: center; touch-action: none; overscroll-behavior: none; }
+    .popup-overlay .popup-box { max-height: calc(100dvh - 20px); }
+    .popup-overlay input, .popup-overlay button { touch-action: manipulation; }
+    .popup-overlay .popup-box { max-height: calc(100dvh - 20px); }
+  }
+  @media (max-width: 520px) and (max-height: 760px) {
+    .popup-box { padding: 1.1rem 1rem 1rem !important; }
+    .popup-logo { margin-bottom: .5rem !important; gap: 6px !important; }
+    .popup-logo .zw-svg { height: 30px !important; }
+    .popup-logo .zw-by { font-size: 12px !important; margin-top: 4px !important; }
+    .popup-logo .pl-name { font-size: 9.5px !important; padding: .15rem .65rem !important; }
+    .popup-title { font-size: 22px !important; margin-bottom: .2rem !important; }
+    .popup-note { font-size: 12px !important; margin-bottom: .7rem !important; line-height: 1.45 !important; }
+    .popup-langs { margin-bottom: .6rem !important; }
+    .popup-langs .lang-btn { padding: .42rem .2rem !important; }
+    .popup-input-wrap { margin-bottom: .5rem !important; }
+    .popup-input-wrap input { padding: .62rem !important; }
+    .popup-why { padding: .65rem .85rem !important; margin-bottom: .7rem !important; }
+    .popup-why-title { margin-bottom: .3rem !important; }
+    .popup-why p { font-size: 11px !important; line-height: 1.45 !important; }
+    .popup-btn { padding: .75rem !important; }
+  }
+  @media (max-width: 520px) and (max-height: 640px) { .popup-why p + p { display: none; } }
+  @media (max-width: 520px) {
+    .popup-overlay { padding: 10px 14px; }
+    .popup-box { padding: 1.6rem 1.15rem 1.35rem; border-radius: 20px; }
+    .popup-logo { margin-bottom: .9rem; }
+    .popup-title { font-size: 26px; margin-bottom: .35rem; }
+    .popup-note { font-size: 12.5px; margin-bottom: 1rem; }
+    .popup-langs { margin-bottom: .85rem !important; gap: 6px !important; }
+    .popup-langs .lang-btn { padding: .5rem .2rem; font-size: 12.5px; }
+    .popup-input-wrap { margin-bottom: .7rem; }
+    .popup-input-wrap input { padding: .75rem; font-size: 16px; }
+    .popup-why { padding: .8rem 1rem; margin-bottom: 1rem; }
+    .popup-why p { font-size: 11.5px; line-height: 1.55; }
+    .popup-btn { padding: .85rem; font-size: 15px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- POPUP -->
+<div class="popup-overlay" id="popup">
+  <div class="fx-blob b1"></div><div class="fx-blob b2"></div><div class="fx-blob b3"></div>
+  <canvas class="fx-canvas" id="popup-fx" aria-hidden="true"></canvas>
+  <div class="popup-box">
+    <div class="popup-logo"><span class="zw"><svg class="zw-svg" viewBox="-6 0 788 180" fill="none" stroke="#fff" stroke-width="12" role="img" aria-label="ZION"><path d="M0 6H160"/><path d="M160 6L92.8 76.6"/><path d="M76.8 93.4L0 174"/><path d="M0 174H160"/><path d="M252 6V174"/><path d="M344 90V128Q344 174 390 174H458Q504 174 504 128V52Q504 6 458 6H390Q344 6 344 52"/><path d="M596 6V174"/><path d="M596 6L660.8 66.5"/><path d="M678.8 83.3L776 174"/><path d="M776 6V174"/></svg><span class="zw-by">by neomngmt</span></span><span class="pl-name">Creator Bible</span></div>
+    <div class="popup-title" id="popup-title">Vítej 👋</div>
+    <p class="popup-note" id="popup-note">Než začneš, vyber jazyk a řekni nám jak se jmenuješ.</p>
+    
+    <div class="popup-langs" style="display:flex;gap:8px;margin-bottom:1.25rem">
+      <button class="lang-btn active" id="lang-cz" onclick="setLang('cz')">🇨🇿 Čeština</button>
+      <button class="lang-btn" id="lang-en" onclick="setLang('en')">🇬🇧 English</button>
+      <button class="lang-btn" id="lang-es" onclick="setLang('es')">🇦🇷 Español</button>
+    </div>
+
+    <div class="popup-input-wrap">
+      <input type="text" id="popup-name" placeholder="Tvoje jméno nebo alias..." autocomplete="off">
+    </div>
+    <div class="popup-input-wrap">
+      <input type="text" id="popup-of" placeholder="Tvůj OnlyFans username (např. @tvojejmeno)" autocomplete="off" autocapitalize="off" spellcheck="false">
+    </div>
+    <div class="popup-why">
+      <div class="popup-why-title" id="popup-why-title">PROČ JE TENTO DOTAZNÍK DŮLEŽITÝ</div>
+      <p id="popup-why-1">Pomáhá nám zachytit tvoji osobnost, hlas a zájmy, aby každá konverzace s tvými fanoušky působila autenticky. Cílem je zajistit, aby chatting tým psal tak, jak bys psala ty přirozeně.</p>
+      <p id="popup-why-2">Vyplněním získáš nástroje pro silnější vztahy s fans, vyšší loajalitu a maximální sales při zachování tvé osobnosti.</p>
+    </div>
+    <button class="popup-btn" id="popup-btn" onclick="startForm()">Začít dotazník →</button>
+  </div>
+</div>
+
+<div class="pg-shift s1"><div class="pg-blob"></div></div><div class="pg-shift s2"><div class="pg-blob"></div></div>
+<canvas class="pg-canvas" id="pg-fx" aria-hidden="true"></canvas>
+
+<header class="app-header">
+  <div class="header-logo"><span class="zw"><svg class="zw-svg" viewBox="-6 0 788 180" fill="none" stroke="#fff" stroke-width="12" role="img" aria-label="ZION"><path d="M0 6H160"/><path d="M160 6L92.8 76.6"/><path d="M76.8 93.4L0 174"/><path d="M0 174H160"/><path d="M252 6V174"/><path d="M344 90V128Q344 174 390 174H458Q504 174 504 128V52Q504 6 458 6H390Q344 6 344 52"/><path d="M596 6V174"/><path d="M596 6L660.8 66.5"/><path d="M678.8 83.3L776 174"/><path d="M776 6V174"/></svg><span class="zw-by">by neomngmt</span></span><span class="tag">Creator Bible</span></div>
+  <div class="header-step" id="hdr-step">Úvod</div>
+  <div class="progress-wrap"><div class="progress-bar" id="prog" style="width:0%"></div></div>
+</header>
+
+<main class="main">
+
+<!-- COVER removed, start from sec1 -->
+
+<input type="hidden" id="cv-name">
+
+<!-- 1. KDO JSI -->
+<div id="sec1" class="section active">
+  <div class="sec-eyebrow">01 / 09</div>
+  <div class="sec-title" id="lbl-sec1-title">Kdo jsi?</div>
+  <div class="sec-note" id="lbl-sec1-note">Pár věcí o tobě. Nemusíš znít dokonale, chceme znát tebe skutečnou.</div>
+  <div class="grid2">
+    <div class="field"><label class="field-label" id="lbl-date">Datum narození</label><input type="text" id="cv-date" placeholder="Např. 24.11.2005"></div>
+    <div class="field"><label class="field-label" id="lbl-height">Výška</label><input type="text" id="s1-height" placeholder="Např. 168 cm"></div>
+  </div>
+  <div class="grid2">
+    <div class="field"><label class="field-label" id="lbl-stagebd">Veřejné datum narození (stage)</label><input type="text" id="s1-stagebd" placeholder="Datum které používáme pro fanoušky"></div>
+    <div class="field"><label class="field-label" id="lbl-stageage">Veřejný věk (stage age)</label><input type="text" id="s1-stageage" placeholder="Např. 20"></div>
+  </div>
+  <div class="grid2">
+    <div class="field"><label class="field-label" id="lbl-nat">Národnost</label><input type="text" id="s1-nat" placeholder="Např. česká, slovenská..."></div>
+    <div class="field"><label class="field-label" id="lbl-stagenick">Přezdívky (stage)</label><input type="text" id="s1-stagenick" placeholder="Např. Lili, Lilka..."></div>
+  </div>
+  <div class="field"><label class="field-label" id="lbl-english">Úroveň angličtiny</label>
+    <div class="arch-grid" id="s1-english" style="grid-template-columns:1fr 1fr 1fr">
+      <button class="arch-btn" onclick="pickOne(this)">Neumím anglicky</button>
+      <button class="arch-btn" onclick="pickOne(this)">Základní</button>
+      <button class="arch-btn" onclick="pickOne(this)">Konverzační</button>
+      <button class="arch-btn" onclick="pickOne(this)">Plynulá</button>
+      <button class="arch-btn" onclick="pickOne(this)">Rodilá</button>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="field"><label class="field-label" id="lbl-eyes">Barva očí</label><input type="text" id="s1-eyes" placeholder="Např. modré, hnědé..."></div>
+    <div class="field"><label class="field-label" id="lbl-loc">Odkud jsi</label><input type="text" id="s1-loc" placeholder="Město, země"></div>
+  </div>
+  <div class="grid2">
+    <div class="field"><label class="field-label" id="lbl-tattoos">Tetování (počet)</label><input type="text" id="s1-tattoos" placeholder="Např. 3, žádné..."></div>
+    <div class="field"><label class="field-label" id="lbl-pet">Domácí zvíře?</label><input type="text" id="s1-pet" placeholder="Např. pes, kočka, ne..."></div>
+  </div>
+  <div class="field"><label class="field-label" id="lbl-rel">Jsi svobodná / relationship status?</label>
+    <div class="arch-grid" id="s1-rel" style="grid-template-columns:1fr 1fr 1fr">
+      <button class="arch-btn" id="btn-single" onclick="toggleArch(this)">Svobodná</button>
+      <button class="arch-btn" id="btn-taken" onclick="toggleArch(this)">Ve vztahu</button>
+      <button class="arch-btn" id="btn-comp" onclick="toggleArch(this)">Complicated</button>
+    </div>
+  </div>
+  <div class="field"><label class="field-label" id="lbl-hobbies">Koníčky a záliby</label><textarea id="s1-hobbies" placeholder="Např. fitness, plavání, wellness, cestování..."></textarea></div>
+  <div class="field"><label class="field-label" id="lbl-story">Tvůj příběh (2-3 věty)</label><textarea id="s1-story" placeholder="Proč jsi začala, co tě k tomu dovedlo, co tě dělá autentickou..."></textarea></div>
+  <div class="field">
+    <label class="field-label" id="lbl-personality">Jak bys popsala svou osobnost? (2-4 věci)</label>
+    <div class="bullet-list" id="s1-traits">
+      <div class="bullet-row"><div class="bullet-dot"></div><input type="text" placeholder="Např. odvážná, přímá, nedělám si starosti..."></div>
+      <div class="bullet-row"><div class="bullet-dot"></div><input type="text" placeholder="Další vlastnost..."></div>
+    </div>
+    <button class="add-field-btn" onclick="addBullet('s1-traits')">+ přidat</button>
+  </div>
+  <div class="field"><label class="field-label" id="lbl-diff">Čím se odlišuješ od ostatních holek na OF?</label><textarea id="s1-diff" placeholder="Co ti ostatní nemají nebo co děláš jinak..."></textarea></div>
+</div>
+
+<!-- 2. VIBE & ARCHETYP -->
+<div id="sec2" class="section">
+  <div class="sec-eyebrow">02 / 09</div>
+  <div class="sec-title" id="lbl-sec2-title">Tvůj vibe</div>
+  <div class="sec-note" id="lbl-sec2-note">Vyber typy které tě vystihují a popiš svou energii.</div>
+  <div class="arch-grid" id="arch-grid">
+    <button class="arch-btn" onclick="toggleArch(this)">Alternativní / tattoo vibe</button>
+    <button class="arch-btn" onclick="toggleArch(this)">Holka ze sousedství</button>
+    <button class="arch-btn" onclick="toggleArch(this)">Rozmazlená princezna</button>
+    <button class="arch-btn" onclick="toggleArch(this)">Gymrat / fitness holka</button>
+    <button class="arch-btn" onclick="toggleArch(this)">Gamerka / nerd</button>
+    <button class="arch-btn" onclick="toggleArch(this)">Jemná a nevinná</button>
+    <button class="arch-btn" onclick="toggleArch(this)">Latina / temperamentní</button>
+    <button class="arch-btn" onclick="toggleArch(this)">Tichá introvertka</button>
+    <button class="arch-btn" onclick="toggleArch(this)">Máma / MILF vibe</button>
+    <button class="arch-btn" onclick="toggleArch(this)">Dark / gothic</button>
+    <button class="arch-btn" onclick="toggleArch(this)">Party holka</button>
+    <button class="arch-btn" onclick="toggleArch(this)">Jiná...</button>
+  </div>
+  <div class="field"><label class="field-label" id="lbl-arch-custom">Upřesnění nebo vlastní popis</label><input type="text" id="s2-custom" placeholder="Vlastní kombinace nebo popis..."></div>
+  <div class="field"><label class="field-label" id="lbl-vibe">Jak bys popsala svoji energii a vibe? (vlastními slovy)</label><textarea id="s2-vibe" placeholder="Např. jsem ta co říká co si myslí, baví mě být sexy ale bez přetvářky, mám ráda chaos..."></textarea></div>
+</div>
+
+<!-- 3. TOV & OBSAH -->
+<div id="sec3" class="section">
+  <div class="sec-eyebrow">03 / 09</div>
+  <div class="sec-title" id="lbl-sec3-title">Jak komunikuješ?</div>
+  <div class="sec-note" id="lbl-sec3-note">Chceme mluvit tvým hlasem, ne kopií někoho jiného.</div>
+  <div class="field"><label class="field-label" id="lbl-tov">Jak bys popsala svůj styl komunikace?</label><input type="text" id="s3-tov" placeholder="Např. sarkastická, hravá, flirtující, přímá, vtipná..."></div>
+  <div class="field">
+    <label class="field-label" id="lbl-fans">Jak oslovuješ své fanoušky?</label>
+    <div class="kw-wrap" id="kw-fans"></div>
+    <div class="kw-input-row">
+      <input type="text" id="kw-fans-inp" placeholder="Např. cukroušku, dorečku, miláčku... (Enter)">
+      <button class="btn-add-kw" id="btn-add-fans" onclick="addKw('kw-fans','kw-fans-inp')">Přidat</button>
+    </div>
+  </div>
+  <div class="field">
+    <label class="field-label" id="lbl-words">Tvoje vlastní slova a výrazy které ráda používáš</label>
+    <div class="kw-wrap" id="kw-words"></div>
+    <div class="kw-input-row">
+      <input type="text" id="kw-words-inp" placeholder="Slang, vtipná slovíčka, typické výrazy... (Enter)">
+      <button class="btn-add-kw" id="btn-add-words" onclick="addKw('kw-words','kw-words-inp')">Přidat</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- 3b. OSOBNI INFO -->
+<div id="sec3b" class="section">
+  <div class="sec-eyebrow" id="lbl-sec3b-eyebrow">04 / 09</div>
+  <div class="sec-title" id="lbl-sec3b-title">Osobní info</div>
+  <div class="sec-note" id="lbl-sec3b-note">Víme, že je to osobní, ale pro udržení whale fanoušků (lidí, kteří hodně utrácejí) jsou tyto detaily klíčové. Pomáhají nám vytvořit opravdu autentické a osobní spojení s fanoušky.</div>
+
+  <div class="field"><label class="field-label" id="lbl-fav-color">Oblíbená barva</label><input type="text" id="s3b-color" placeholder="Např. černá, modrá..."></div>
+  <div class="field"><label class="field-label" id="lbl-fav-food">Oblíbené jídlo</label><input type="text" id="s3b-food" placeholder="Např. sushi, pizza, svíčková..."></div>
+  <div class="field"><label class="field-label" id="lbl-fav-movie">Oblíbený film / seriál</label><input type="text" id="s3b-movie" placeholder="Např. Squid Game, Interstellar..."></div>
+  <div class="field"><label class="field-label" id="lbl-fav-music">Hudba kterou posloucháš</label><input type="text" id="s3b-music" placeholder="Např. pop, hip-hop, R&B, konkrétní umělci..."></div>
+
+  <div class="field">
+    <label class="field-label" id="lbl-fav-nickname">Tvoje oblíbená přezdívka od fanoušků</label>
+    <div class="arch-row" id="sec3b-nick">
+      <button class="arch-btn" id="btn-nick-baby" onclick="toggleArch(this,'sec3b-nick')">baby</button>
+      <button class="arch-btn" id="btn-nick-princess" onclick="toggleArch(this,'sec3b-nick')">princess</button>
+      <button class="arch-btn" id="btn-nick-mommy" onclick="toggleArch(this,'sec3b-nick')">mommy</button>
+      <button class="arch-btn" id="btn-nick-brat" onclick="toggleArch(this,'sec3b-nick')">brat</button>
+      <button class="arch-btn" id="btn-nick-angel" onclick="toggleArch(this,'sec3b-nick')">angel</button>
+    </div>
+    <input type="text" id="s3b-nick-other" placeholder="Nebo napiš vlastní..." style="margin-top:8px">
+  </div>
+
+  <div class="field"><label class="field-label" id="lbl-fav-emoji">Oblíbený emoji styl</label><input type="text" id="s3b-emoji" placeholder="Např. 🖤✨, 🔥💋, 🌸🍑..."></div>
+  <div class="field"><label class="field-label" id="lbl-pets">Mazlíčci (jméno a druh)</label><input type="text" id="s3b-pets" placeholder="Např. Max - pes, Luna - kočka..."></div>
+  <div class="field"><label class="field-label" id="lbl-typical-day">Tvůj typický den</label><textarea id="s3b-day" rows="3" placeholder="Jak vypadá tvůj běžný den? Ráno, odpoledne, večer..."></textarea></div>
+
+  <div class="field" style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid #222">
+    <label class="field-label" id="lbl-measurements-title" style="font-size:0.95rem;opacity:0.7">Míry (nepovinné)</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:0.75rem">
+      <div><label class="field-label" id="lbl-weight" style="font-size:0.8rem">Váha</label><input type="text" id="s3b-weight" placeholder="Např. 60 kg"></div>
+      <div><label class="field-label" id="lbl-bra" style="font-size:0.8rem">Podprsenka</label><input type="text" id="s3b-bra" placeholder="Např. 75C"></div>
+      <div><label class="field-label" id="lbl-waist" style="font-size:0.8rem">Pas</label><input type="text" id="s3b-waist" placeholder="Např. 68 cm"></div>
+      <div><label class="field-label" id="lbl-hips" style="font-size:0.8rem">Boky</label><input type="text" id="s3b-hips" placeholder="Např. 95 cm"></div>
+      <div><label class="field-label" id="lbl-shoe" style="font-size:0.8rem">Velikost bot</label><input type="text" id="s3b-shoe" placeholder="Např. 38, EU 38"></div>
+      <div><label class="field-label" id="lbl-dress" style="font-size:0.8rem">Velikost oblečení</label><input type="text" id="s3b-dress" placeholder="Např. S/M, 36"></div>
+    </div>
+    <div style="margin-top:10px"><label class="field-label" id="lbl-hair" style="font-size:0.8rem">Barva vlasů</label><input type="text" id="s3b-hair" placeholder="Např. tmavě hnědá s blond melírem...">
+      <div class="arch-grid" id="s3b-hairtype" style="grid-template-columns:1fr 1fr;margin-top:8px;margin-bottom:0">
+        <button class="arch-btn" onclick="pickOne(this)">Přírodní</button>
+        <button class="arch-btn" onclick="pickOne(this)">Barvené</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 5. OBSAH -->
+<div id="sec4" class="section">
+  <div class="sec-eyebrow">05 / 09</div>
+  <div class="sec-title" id="lbl-sec4-title">Tvůj obsah</div>
+  <div class="sec-note" id="lbl-sec4-note">Co točíš, co tě baví, co nechceš.</div>
+  <div class="field">
+    <label class="field-label" id="lbl-fav">Jaká videa bys chtěla dělat nejraději?</label>
+    <div class="bullet-list" id="s4-fav">
+      <div class="bullet-row"><div class="bullet-dot"></div><input type="text" placeholder="Např. talking selfie reels..."></div>
+      <div class="bullet-row"><div class="bullet-dot"></div><input type="text" placeholder="Např. outfit check, dance, POV..."></div>
+    </div>
+    <button class="add-field-btn" onclick="addBullet('s4-fav')">+ přidat</button>
+  </div>
+  <div class="field">
+    <label class="field-label" id="lbl-profiles">Profily holek které sleduješ a líbí se ti jejich obsah</label>
+    <div class="bullet-list" id="s4-refs">
+      <div class="bullet-row"><div class="bullet-dot"></div><input type="text" placeholder="@profil - co se ti na ní líbí..."></div>
+      <div class="bullet-row"><div class="bullet-dot"></div><input type="text" placeholder="@profil..."></div>
+    </div>
+    <button class="add-field-btn" onclick="addBullet('s4-refs')">+ přidat profil</button>
+  </div>
+  <div class="field"><label class="field-label" id="lbl-never">Co bys nikdy nechtěla točit?</label><textarea id="s4-never" placeholder="Např. fake lifestyle, přehnané filtry, cringe lipsync..."></textarea></div>
+</div>
+
+<!-- 5. CO NECHCES -->
+<div id="sec5" class="section">
+  <div class="sec-eyebrow">06 / 09</div>
+  <div class="sec-title" id="lbl-sec5-title">Tvoje hranice</div>
+  <div class="sec-note" id="lbl-sec5-note">Co nechceš aby se o tobě říkalo nebo s čím nechceš být spojována.</div>
+  <div class="field">
+    <label class="field-label" id="lbl-tabu">Témata o kterých nechceš mluvit veřejně</label>
+    <div class="bullet-list" id="s5-top">
+      <div class="bullet-row"><div class="bullet-dot"></div><input type="text" placeholder="Např. politika, rodina, ex..."></div>
+      <div class="bullet-row"><div class="bullet-dot"></div><input type="text" placeholder="Další téma..."></div>
+    </div>
+    <button class="add-field-btn" onclick="addBullet('s5-top')">+ přidat</button>
+  </div>
+  <div class="field">
+    <label class="field-label" id="lbl-collab">Typy kolaborací a SFS které nechceš</label>
+    <div class="bullet-list" id="s5-col">
+      <div class="bullet-row"><div class="bullet-dot"></div><input type="text" placeholder="Např. profily se špatnou reputací..."></div>
+    </div>
+    <button class="add-field-btn" onclick="addBullet('s5-col')">+ přidat</button>
+  </div>
+</div>
+
+<!-- 6. DOSTUPNOST -->
+<div id="sec6" class="section">
+  <div class="sec-eyebrow">07 / 09</div>
+  <div class="sec-title" id="lbl-sec6-title">Tvůj čas</div>
+  <div class="sec-note" id="lbl-sec6-note">Pomáhá nám plánovat kolik obsahu reálně zvládneš.</div>
+  <div class="field">
+    <label class="field-label" id="lbl-fulltime">Děláš OF na fulltime nebo máš i jinou práci / školu?</label>
+    <div class="arch-grid" style="grid-template-columns:1fr 1fr 1fr">
+      <button class="arch-btn" id="btn-ft-full" onclick="toggleArch(this)">OF fulltime</button>
+      <button class="arch-btn" id="btn-ft-work" onclick="toggleArch(this)">OF + práce / škola</button>
+      <button class="arch-btn" id="btn-ft-side" onclick="toggleArch(this)">OF je vedlejší</button>
+    </div>
+  </div>
+  <div class="field">
+    <label class="field-label" id="lbl-hours">Kolik hodin denně můžeš věnovat tvorbě obsahu?</label>
+    <div class="arch-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
+      <button class="arch-btn" onclick="toggleArch(this)">1-2h</button>
+      <button class="arch-btn" onclick="toggleArch(this)">2-4h</button>
+      <button class="arch-btn" onclick="toggleArch(this)">4-6h</button>
+      <button class="arch-btn" onclick="toggleArch(this)">6h+</button>
+    </div>
+  </div>
+  <div class="field"><label class="field-label" id="lbl-love">Co tě na tvé práci baví nejvíc?</label><textarea id="s6-love" placeholder="Co ti dělá radost, co tě nabíjí energií..."></textarea></div>
+</div>
+
+<!-- 8. CHATTING -->
+<div id="sec6b" class="section">
+  <div class="sec-eyebrow">08 / 09</div>
+  <div class="sec-title" id="lbl-sec8-title">Obsah a limity pro chat</div>
+  <div class="sec-note" id="lbl-sec8-note">Díky tomu chatteři vědí, co smí nabízet a co nikdy. Vyber vše, co sedí.</div>
+  <div class="field"><label class="field-label" id="lbl-content">Obsah, který jsi ochotná dělat (vyber vše, co sedí)</label>
+    <div class="arch-grid" id="s8-content">
+      <button class="arch-btn" onclick="toggleArch(this)">Obsah s obličejem</button>
+      <button class="arch-btn" onclick="toggleArch(this)">Obsah bez obličeje</button>
+      <button class="arch-btn" onclick="toggleArch(this)">Solo obsah</button>
+      <button class="arch-btn" onclick="toggleArch(this)">Obsah s hračkami</button>
+      <button class="arch-btn" onclick="toggleArch(this)">GG obsah</button>
+      <button class="arch-btn" onclick="toggleArch(this)">BG obsah</button>
+      <button class="arch-btn" onclick="toggleArch(this)">Blow job obsah</button>
+      <button class="arch-btn" onclick="toggleArch(this)">Anal obsah</button>
+      <button class="arch-btn" onclick="toggleArch(this)">Threesome obsah</button>
+      <button class="arch-btn" onclick="toggleArch(this)">Roleplay obsah</button>
+      <button class="arch-btn" onclick="toggleArch(this)">Hlasové zprávy / audio</button>
+      <button class="arch-btn" onclick="toggleArch(this)">Videohovory</button>
+      <button class="arch-btn" onclick="toggleArch(this)">Live streamy</button>
+      <button class="arch-btn" onclick="toggleArch(this)">Custom obsah na přání</button>
+      <button class="arch-btn" onclick="toggleArch(this)">JOI (obsah s vedením)</button>
+      <button class="arch-btn" onclick="toggleArch(this)">Dick rating</button>
+      <button class="arch-btn" onclick="toggleArch(this)">Verifikační fotky / videa</button>
+      <button class="arch-btn" onclick="toggleArch(this)">Prodej nošených věcí (např. kalhotky)</button>
+    </div>
+  </div>
+  <div class="field"><label class="field-label" id="lbl-delivery">Průměrná doba dodání customu</label>
+    <div class="arch-grid" id="s8-delivery" style="grid-template-columns:1fr 1fr">
+      <button class="arch-btn" onclick="pickOne(this)">Ten samý den</button>
+      <button class="arch-btn" onclick="pickOne(this)">1-3 dny</button>
+      <button class="arch-btn" onclick="pickOne(this)">1 týden</button>
+      <button class="arch-btn" onclick="pickOne(this)">Podle zakázky</button>
+    </div>
+  </div>
+  <div class="field"><label class="field-label" id="lbl-live">Děláš live na OnlyFans?</label>
+    <div class="arch-grid" id="s8-live" style="grid-template-columns:1fr 1fr;margin-bottom:.6rem">
+      <button class="arch-btn" onclick="pickOne(this)">Ano</button>
+      <button class="arch-btn" onclick="pickOne(this)">Ne</button>
+    </div>
+    <input type="text" id="s8-live-schedule" placeholder="Pokud ano, kdy obvykle (dny a časy)">
+  </div>
+  <div class="field"><label class="field-label" id="lbl-limits">Tvrdé limity (cokoliv, co nikdy nechceš, aby chatter nabízel)</label>
+    <div class="arch-grid" id="s8-limits" style="margin-bottom:.6rem">
+      <button class="arch-btn" onclick="toggleArch(this)">Žádný explicitní fetiš obsah</button>
+      <button class="arch-btn" onclick="toggleArch(this)">Žádné BG</button>
+      <button class="arch-btn" onclick="toggleArch(this)">Žádné videohovory</button>
+      <button class="arch-btn" onclick="toggleArch(this)">Žádný prodej nošených věcí</button>
+    </div>
+    <input type="text" id="s8-limits-other" placeholder="Další limity (napiš vlastní)">
+  </div>
+  <div class="field"><label class="field-label" id="lbl-fansdesc">Jak mají fanoušci popsat tebe?</label><textarea id="s8-fansdesc" placeholder="Např. sladká, drzá, přirozená, někdo kdo je u nich pořád..."></textarea></div>
+</div>
+
+<!-- 7. CIL -->
+<div id="sec7" class="section">
+  <div class="sec-eyebrow">09 / 09</div>
+  <div class="sec-title" id="lbl-sec7-title">Poslední otázka</div>
+  <div class="sec-note" id="lbl-sec7-note">Pak jsi hotová!</div>
+  <div class="field"><label class="field-label" id="lbl-goal">Kde se vidíš za rok? Co chceš vybudovat?</label><textarea id="s7-goal" placeholder="Tvůj cíl, co chceš dosáhnout..."></textarea></div>
+  <div class="field"><label class="field-label" id="lbl-custom">Minimální cena za custom obsah</label><input type="text" id="s7-customs" placeholder="Např. 150$, 200$, domluva..."></div>
+  <div class="field"><label class="field-label" id="lbl-video">Chceš dělat videohovory?</label>
+    <div class="arch-grid" style="grid-template-columns:1fr 1fr">
+      <button class="arch-btn" id="btn-vid-yes" onclick="toggleArch(this)">Ano</button>
+      <button class="arch-btn" id="btn-vid-no" onclick="toggleArch(this)">Ne</button>
+    </div>
+  </div>
+  <div class="field"><label class="field-label" id="lbl-vlimits">Co při videohovorech nechceš?</label><input type="text" id="s7-calls-limits" placeholder="Např. bez tváře, bez porna, max 10 min..."></div>
+  <div class="field"><label class="field-label" id="lbl-notes">Důležité informace pro chat</label><textarea id="s7-notes" placeholder="Např. má ráda dominanci, určité téma hlídá pečlivě, speciální přání..."></textarea></div>
+</div>
+
+<!-- EXPORT -->
+<div id="sec-export" class="section">
+  <div class="export-screen">
+    <div class="export-icon">&#10003;</div>
+    <div class="export-title" id="ex-title">Hotovo!</div>
+    <div class="export-sub" id="ex-sub">Tvoje Creator Bible je vyplněná a připravená ke stažení.</div>
+    <div class="export-btns">
+      <button class="btn-export primary" id="btn-continue" onclick="continueToDashboard()" style="display:none;">Continue to Dashboard &rarr;</button>
+      <button class="btn-export primary" id="btn-brand-card" onclick="exportBrandCard()">★ Stáhnout Brand Card</button>
+      <button class="btn-export secondary" id="btn-full-pdf" onclick="exportFullPDF()">↓ Stáhnout kompletní PDF</button>
+    </div>
+    <div class="summary-card" id="summary-card"></div>
+  </div>
+</div>
+
+</main>
+
+<nav class="nav-bar">
+  <button class="btn-nav" id="btn-prev" onclick="navigate(-1)" disabled>← Zpět</button>
+  <div class="nav-dots" id="nav-dots"></div>
+  <button class="btn-nav primary" id="btn-next" onclick="navigate(1)">Další →</button>
+</nav>
+
+<script>
+const SECTIONS = ['sec1','sec2','sec3','sec3b','sec4','sec5','sec6','sec6b','sec7','sec-export'];
+const LABELS = ['01 Kdo jsi','02 Tvůj vibe','03 Komunikace','04 Osobní info','05 Obsah','06 Hranice','07 Čas','08 Chatting','09 Cíl','Hotovo'];
+const LABELS_EN = ['01 Who you are','02 Your vibe','03 Communication','04 Personal info','05 Content','06 Boundaries','07 Time','08 Chatting','09 Goal','Done'];
+const LABELS_ES = ['01 Quién sos','02 Tu vibra','03 Comunicación','04 Info personal','05 Contenido','06 Límites','07 Tiempo','08 Chatting','09 Meta','Listo'];
+let cur = 0;
+const TOTAL = SECTIONS.length;
+
+function buildDots(){
+  const c = document.getElementById('nav-dots');
+  c.innerHTML = '';
+  for(let i=0;i<TOTAL;i++){
+    const d = document.createElement('div');
+    d.className = 'nav-dot' + (i===cur?' active':i<cur?' done':'');
+    d.style.setProperty('--i', i);
+    const idx = i;
+    d.onclick = () => goTo(idx);
+    c.appendChild(d);
+  }
+}
+
+function goTo(idx){
+  const dir = idx < cur ? 'from-l' : 'from-r';
+  document.getElementById(SECTIONS[cur]).classList.remove('active');
+  cur = idx;
+  const nxt = document.getElementById(SECTIONS[cur]);
+  nxt.classList.remove('from-l', 'from-r');
+  nxt.classList.add(dir, 'active');
+  document.body.style.setProperty('--sec', cur);
+  const pct = cur === 0 ? 0 : Math.round((cur / (TOTAL-1)) * 100);
+  document.getElementById('prog').style.width = pct + '%';
+  document.getElementById('hdr-step').textContent = ({cz: LABELS, en: LABELS_EN, es: LABELS_ES})[lang][cur];
+  document.getElementById('btn-prev').disabled = cur === 0;
+  const nextBtn = document.getElementById('btn-next');
+  if(cur === TOTAL-1){ nextBtn.style.display = 'none'; } else {
+    nextBtn.style.display = '';
+    const t = translations[lang].labels;
+    if(cur === TOTAL-2){
+      nextBtn.textContent = t.finishBtn;
+      nextBtn.onclick = submitToAgency;
+    } else {
+      nextBtn.textContent = t.nextBtn;
+      nextBtn.onclick = () => navigate(1);
+    }
+  }
+  if(cur === TOTAL-1){ buildSummary(); celebrate(); }
+  buildDots();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+let lang = 'cz';
+
+const translations = {
+  cz: {
+    popupTitle: 'Vítej 👋',
+    popupNote: 'Než začneš, vyber jazyk a řekni nám jak se jmenuješ.',
+    popupWhyTitle: 'PROČ JE TENTO DOTAZNÍK DŮLEŽITÝ',
+    popupWhy1: 'Pomáhá nám zachytit tvoji osobnost, hlas a zájmy, aby každá konverzace s tvými fanoušky působila autenticky. Cílem je zajistit, aby chatting tým psal tak, jak bys psala ty přirozeně.',
+    popupWhy2: 'Vyplněním získáš nástroje pro silnější vztahy s fans, vyšší loajalitu a maximální sales při zachování tvé osobnosti.',
+    popupNamePlaceholder: 'Tvoje jméno nebo alias...',
+    popupOfPlaceholder: 'Tvůj OnlyFans username (např. @tvojejmeno)',
+    popupBtn: 'Začít dotazník →',
+    labels: {
+      sec1Title: 'Kdo jsi?', sec1Note: 'Pár věcí o tobě. Nemusíš znít dokonale, chceme znát tebe skutečnou.',
+      dateOfBirth: 'Datum narození', datePlaceholder: 'Např. 24.11.2005',
+      height: 'Výška', heightPlaceholder: 'Např. 168 cm',
+      eyeColor: 'Barva očí', eyePlaceholder: 'Např. modré, hnědé...',
+      from: 'Odkud jsi', fromPlaceholder: 'Město, země',
+      tattoos: 'Tetování (počet)', tattoosPlaceholder: 'Např. 3, žádné...',
+      pet: 'Domácí zvíře?', petPlaceholder: 'Např. pes, kočka, ne...',
+      relationship: 'Jsi svobodná / relationship status?',
+      relSingle: 'Svobodná', relTaken: 'Ve vztahu', relComplicated: 'Complicated',
+      hobbies: 'Koníčky a záliby', hobbiesPlaceholder: 'Např. fitness, plavání, wellness, cestování...',
+      story: 'Tvůj příběh (2-3 věty)', storyPlaceholder: 'Proč jsi začala, co tě k tomu dovedlo, co tě dělá autentickou...',
+      personality: 'Jak bys popsala svou osobnost? (2-4 věci)', personalityPlaceholder: 'Např. odvážná, přímá...',
+      addMore: '+ přidat', diff: 'Čím se odlišuješ od ostatních holek na OF?', diffPlaceholder: 'Co ti ostatní nemají nebo co děláš jinak...',
+      sec2Title: 'Tvůj vibe', sec2Note: 'Vyber typy které tě vystihují a popiš svou energii.',
+      archetypeCustom: 'Upřesnění nebo vlastní popis', archetypeCustomPlaceholder: 'Vlastní kombinace nebo popis...',
+      vibeLabel: 'Jak bys popsala svoji energii a vibe? (vlastními slovy)', vibePlaceholder: 'Např. jsem ta co říká co si myslí...',
+      sec3Title: 'Jak komunikuješ?', sec3Note: 'Chceme mluvit tvým hlasem, ne kopií někoho jiného.',
+      tovLabel: 'Jak bys popsala svůj styl komunikace?', tovPlaceholder: 'Např. sarkastická, hravá, flirtující...',
+      fansLabel: 'Jak oslovuješ své fanoušky?', fansPlaceholder: 'Např. cukroušku, dorečku, miláčku... (Enter)',
+      wordsLabel: 'Tvoje vlastní slova a výrazy které ráda používáš', wordsPlaceholder: 'Slang, vtipná slovíčka, typické výrazy... (Enter)',
+      addBtn: 'Přidat',
+      sec3bTitle: 'Osobní info', sec3bNote: 'Víme, že je to osobní, ale pro udržení whale fanoušků (lidí, kteří hodně utrácejí) jsou tyto detaily klíčové. Pomáhají nám vytvořit opravdu autentické a osobní spojení s fanoušky.',
+      favColor: 'Oblíbená barva', favColorPh: 'Např. černá, modrá...',
+      favFood: 'Oblíbené jídlo', favFoodPh: 'Např. sushi, pizza, svíčková...',
+      favMovie: 'Oblíbený film / seriál', favMoviePh: 'Např. Squid Game, Interstellar...',
+      favMusic: 'Hudba kterou posloucháš', favMusicPh: 'Např. pop, hip-hop, R&B, konkrétní umělci...',
+      favNickLabel: 'Tvoje oblíbená přezdívka od fanoušků',
+      favNickOther: 'Nebo napiš vlastní...',
+      favEmoji: 'Oblíbený emoji styl', favEmojiPh: 'Např. 🖤✨, 🔥💋, 🌸🍑...',
+      petsLabel: 'Mazlíčci (jméno a druh)', petsPh: 'Např. Max - pes, Luna - kočka...',
+      typicalDay: 'Tvůj typický den', typicalDayPh: 'Jak vypadá tvůj běžný den? Ráno, odpoledne, večer...',
+      measureTitle: 'Míry (nepovinné)',
+      weightLabel: 'Váha', weightPh: 'Např. 60 kg',
+      braLabel: 'Podprsenka', braPh: 'Např. 75C',
+      waistLabel: 'Pas', waistPh: 'Např. 68 cm',
+      hipsLabel: 'Boky', hipsPh: 'Např. 95 cm',
+      shoeLabel: 'Velikost bot', shoePh: 'Např. 38, EU 38',
+      dressLabel: 'Velikost oblečení', dressPh: 'Např. S/M, 36',
+      hairLabel: 'Barva vlasů', hairPh: 'Např. tmavě hnědá s blond melírem...',
+      sec4Title: 'Tvůj obsah', sec4Note: 'Co točíš, co tě baví, co nechceš.',
+      favVideos: 'Jaká videa bys chtěla dělat nejraději?', favPlaceholder: 'Např. talking selfie reels...',
+      addProfile: '+ přidat profil', profiles: 'Profily holek které sleduješ a líbí se ti jejich obsah', profilePlaceholder: '@profil - co se ti na ní líbí...',
+      neverShoot: 'Co bys nikdy nechtěla točit?', neverPlaceholder: 'Např. fake lifestyle, přehnané filtry...',
+      sec5Title: 'Tvoje hranice', sec5Note: 'Co nechceš aby se o tobě říkalo nebo s čím nechceš být spojována.',
+      tabuLabel: 'Témata o kterých nechceš mluvit veřejně', tabuPlaceholder: 'Např. politika, rodina, ex...',
+      collabLabel: 'Typy kolaborací a SFS které nechceš', collabPlaceholder: 'Např. profily se špatnou reputací...',
+      sec6Title: 'Tvůj čas', sec6Note: 'Pomáhá nám plánovat kolik obsahu reálně zvládneš.',
+      fulltimeLabel: 'Děláš OF na fulltime nebo máš i jinou práci / školu?',
+      ftFulltime: 'OF fulltime', ftWork: 'OF + práce / škola', ftSide: 'OF je vedlejší',
+      hoursLabel: 'Kolik hodin denně můžeš věnovat tvorbě obsahu?',
+      loveLabel: 'Co tě na tvé práci baví nejvíc?', lovePlaceholder: 'Co ti dělá radost, co tě nabíjí energií...',
+      sec7Title: 'Poslední otázka', sec7Note: 'Pak jsi hotová!',
+      goalLabel: 'Kde se vidíš za rok? Co chceš vybudovat?', goalPlaceholder: 'Tvůj cíl, co chceš dosáhnout...',
+      customLabel: 'Minimální cena za custom obsah', customPlaceholder: 'Např. 150$, 200$, domluva...',
+      videoLabel: 'Chceš dělat videohovory?', videoYes: 'Ano', videoNo: 'Ne',
+      videoLimitsLabel: 'Co při videohovorech nechceš?', videoLimitsPlaceholder: 'Např. bez tváře, bez porna...',
+      notesLabel: 'Důležité informace pro chat', notesPlaceholder: 'Např. má ráda dominanci, určité téma hlídá pečlivě...',
+      stageBd: 'Veřejné datum narození (stage)', stageBdPh: 'Datum které používáme pro fanoušky',
+      stageAge: 'Veřejný věk (stage age)', stageAgePh: 'Např. 20',
+      nationality: 'Národnost', nationalityPh: 'Např. česká, slovenská...',
+      stageNick: 'Přezdívky (stage)', stageNickPh: 'Např. Lili, Lilka...',
+      englishLabel: 'Úroveň angličtiny',
+      englishOptions: ['Neumím anglicky', 'Základní', 'Konverzační', 'Plynulá', 'Rodilá'],
+      hairTypeOptions: ['Přírodní', 'Barvené'],
+      sec8Title: 'Obsah a limity pro chat', sec8Note: 'Díky tomu chatteři vědí, co smí nabízet a co nikdy. Vyber vše, co sedí.',
+      contentLabel: 'Obsah, který jsi ochotná dělat (vyber vše, co sedí)',
+      contentOptions: ['Obsah s obličejem', 'Obsah bez obličeje', 'Solo obsah', 'Obsah s hračkami', 'GG obsah', 'BG obsah', 'Blow job obsah', 'Anal obsah', 'Threesome obsah', 'Roleplay obsah', 'Hlasové zprávy / audio', 'Videohovory', 'Live streamy', 'Custom obsah na přání', 'JOI (obsah s vedením)', 'Dick rating', 'Verifikační fotky / videa', 'Prodej nošených věcí (např. kalhotky)'],
+      deliveryLabel: 'Průměrná doba dodání customu',
+      deliveryOptions: ['Ten samý den', '1-3 dny', '1 týden', 'Podle zakázky'],
+      liveLabel: 'Děláš live na OnlyFans?', liveOptions: ['Ano', 'Ne'], liveSchedulePh: 'Pokud ano, kdy obvykle (dny a časy)',
+      limitsLabel: 'Tvrdé limity (cokoliv, co nikdy nechceš, aby chatter nabízel)',
+      limitsOptions: ['Žádný explicitní fetiš obsah', 'Žádné BG', 'Žádné videohovory', 'Žádný prodej nošených věcí'],
+      limitsOtherPh: 'Další limity (napiš vlastní)',
+      fansDescLabel: 'Jak mají fanoušci popsat tebe?', fansDescPh: 'Např. sladká, drzá, přirozená, někdo kdo je u nich pořád...',
+      archetypeOptions: ['Alternativní / tattoo vibe','Holka ze sousedství','Rozmazlená princezna','Gymrat / fitness holka','Gamerka / nerd','Jemná a nevinná','Latina / temperamentní','Tichá introvertka','Máma / MILF vibe','Dark / gothic','Party holka','Jiná...'],
+      traitPh: ['Např. odvážná, přímá, nedělám si starosti...','Další vlastnost...'], favPh: ['Např. talking selfie reels...','Např. outfit check, dance, POV...'],
+      refsPh: ['@profil - co se ti na ní líbí...','@profil...'], topPh: ['Např. politika, rodina, ex...','Další téma...'], colPh: ['Např. profily se špatnou reputací...'],
+      removeLabel: 'Odstranit', sending: 'Odesílám...',
+      sumName: 'Jméno', sumBirth: 'Datum narození', sumArch: 'Archetyp', sumStyle: 'Styl', sumAddr: 'Oslovení', sumAvail: 'Dostupnost', defName: 'Modelka',
+      finishBtn: 'Dokončit ✓', nextBtn: 'Další →', backBtn: '← Zpět',
+      exportTitle: 'hotovo!', exportSub: 'Tvoje Creator Bible je vyplněná a připravená ke stažení.',
+      brandCardBtn: '★ Stáhnout Brand Card', fullPdfBtn: '↓ Stáhnout kompletní PDF',
+    }
+  },
+  en: {
+    popupTitle: 'Welcome 👋',
+    popupNote: 'Before you start, choose your language and tell us your name.',
+    popupWhyTitle: 'WHY IS THIS QUESTIONNAIRE IMPORTANT',
+    popupWhy1: 'It helps us capture your personality, voice and interests so every conversation with your fans feels authentic. The goal is to make sure your chatting team writes just like you would naturally.',
+    popupWhy2: 'By completing this, you\'ll get tools to build stronger fan relationships, increase loyalty and maximize sales, while staying true to your personality.',
+    popupNamePlaceholder: 'Your name or alias...',
+    popupOfPlaceholder: 'Your OnlyFans username (e.g. @yourname)',
+    popupBtn: 'Start questionnaire →',
+    labels: {
+      sec1Title: 'Who are you?', sec1Note: 'A few things about you. You don\'t have to sound perfect, we want to know the real you.',
+      dateOfBirth: 'Date of birth', datePlaceholder: 'E.g. 24.11.2005',
+      height: 'Height', heightPlaceholder: 'E.g. 5\'6" or 168 cm',
+      eyeColor: 'Eye color', eyePlaceholder: 'E.g. blue, brown...',
+      from: 'Where are you from?', fromPlaceholder: 'City, country',
+      tattoos: 'Tattoos (how many)', tattoosPlaceholder: 'E.g. 3, none...',
+      pet: 'Do you have a pet?', petPlaceholder: 'E.g. dog, cat, no...',
+      relationship: 'Are you single / relationship status?',
+      relSingle: 'Single', relTaken: 'In a relationship', relComplicated: 'Complicated',
+      hobbies: 'Hobbies & interests', hobbiesPlaceholder: 'E.g. fitness, swimming, wellness, travel...',
+      story: 'Your story (2-3 sentences)', storyPlaceholder: 'Why did you start, what led you here, what makes you authentic...',
+      personality: 'How would you describe your personality? (2-4 things)', personalityPlaceholder: 'E.g. bold, direct, carefree...',
+      addMore: '+ add', diff: 'What makes you different from other girls on OF?', diffPlaceholder: 'What others don\'t have, or what you do differently...',
+      sec2Title: 'Your vibe', sec2Note: 'Pick the types that fit you and describe your energy.',
+      archetypeCustom: 'Custom description or clarification', archetypeCustomPlaceholder: 'Your own combination or description...',
+      vibeLabel: 'How would you describe your energy and vibe? (in your own words)', vibePlaceholder: 'E.g. I\'m the one who says what she thinks...',
+      sec3Title: 'How do you communicate?', sec3Note: 'We want to speak in your voice, not a copy of someone else.',
+      tovLabel: 'How would you describe your communication style?', tovPlaceholder: 'E.g. sarcastic, playful, flirty, direct...',
+      fansLabel: 'How do you address your fans?', fansPlaceholder: 'E.g. baby, sweetheart, love... (Enter)',
+      wordsLabel: 'Your own words and expressions you love using', wordsPlaceholder: 'Slang, funny phrases, signature sayings... (Enter)',
+      addBtn: 'Add',
+      sec3bTitle: 'Personal info', sec3bNote: 'We know this is personal, but to keep whale fans (big spenders) engaged, these details are key. They help us create a truly authentic and personal connection with your fans.',
+      favColor: 'Favorite color', favColorPh: 'E.g. black, blue...',
+      favFood: 'Favorite food', favFoodPh: 'E.g. sushi, pizza, tacos...',
+      favMovie: 'Favorite movie / show', favMoviePh: 'E.g. Squid Game, Interstellar...',
+      favMusic: 'Music you listen to', favMusicPh: 'E.g. pop, hip-hop, R&B, specific artists...',
+      favNickLabel: 'Your favorite nickname from fans',
+      favNickOther: 'Or type your own...',
+      favEmoji: 'Favorite emoji style', favEmojiPh: 'E.g. 🖤✨, 🔥💋, 🌸🍑...',
+      petsLabel: 'Pets (name and type)', petsPh: 'E.g. Max - dog, Luna - cat...',
+      typicalDay: 'Your typical day', typicalDayPh: 'What does your average day look like? Morning, afternoon, evening...',
+      measureTitle: 'Measurements (optional)',
+      weightLabel: 'Weight', weightPh: 'E.g. 130 lbs / 60 kg',
+      braLabel: 'Bra size', braPh: 'E.g. 36D',
+      waistLabel: 'Waist', waistPh: 'E.g. 27 in / 68 cm',
+      hipsLabel: 'Hips', hipsPh: 'E.g. 36 in / 95 cm',
+      shoeLabel: 'Shoe size', shoePh: 'E.g. US 7 / EU 38',
+      dressLabel: 'Dress size', dressPh: 'E.g. S/M, US 8',
+      hairLabel: 'Hair color', hairPh: 'E.g. dark brown with blonde highlights...',
+      sec4Title: 'Your content', sec4Note: 'What you shoot, what you enjoy, what you don\'t want.',
+      favVideos: 'What kind of videos would you love to make?', favPlaceholder: 'E.g. talking selfie reels...',
+      addProfile: '+ add profile', profiles: 'Profiles of girls you follow and like their content', profilePlaceholder: '@profile - what you like about them...',
+      neverShoot: 'What would you never want to film?', neverPlaceholder: 'E.g. fake lifestyle, heavy filters...',
+      sec5Title: 'Your boundaries', sec5Note: 'What you don\'t want said about you or associated with you.',
+      tabuLabel: 'Topics you don\'t want to talk about publicly', tabuPlaceholder: 'E.g. politics, family, ex...',
+      collabLabel: 'Types of collabs and SFS you don\'t want', collabPlaceholder: 'E.g. profiles with bad reputation...',
+      sec6Title: 'Your time', sec6Note: 'Helps us plan how much content you can realistically handle.',
+      fulltimeLabel: 'Is OF your full-time job or do you have other work / school?',
+      ftFulltime: 'OF fulltime', ftWork: 'OF + work / school', ftSide: 'OF is a side thing',
+      hoursLabel: 'How many hours a day can you dedicate to content creation?',
+      loveLabel: 'What do you enjoy most about your work?', lovePlaceholder: 'What makes you happy, what energizes you...',
+      sec7Title: 'Last question', sec7Note: 'Then you\'re done!',
+      goalLabel: 'Where do you see yourself in a year? What do you want to build?', goalPlaceholder: 'Your goal, what you want to achieve...',
+      customLabel: 'Minimum price for custom content', customPlaceholder: 'E.g. $150, $200, negotiable...',
+      videoLabel: 'Would you like to do video calls?', videoYes: 'Yes', videoNo: 'No',
+      videoLimitsLabel: 'What don\'t you want during video calls?', videoLimitsPlaceholder: 'E.g. no face, no explicit content...',
+      notesLabel: 'Important information for chat', notesPlaceholder: 'E.g. likes dominance, very careful about certain topics...',
+      stageBd: 'Public birthday (stage)', stageBdPh: 'The date we use for fans',
+      stageAge: 'Public age (stage age)', stageAgePh: 'E.g. 20',
+      nationality: 'Nationality', nationalityPh: 'E.g. Czech, Slovak...',
+      stageNick: 'Nicknames (stage)', stageNickPh: 'E.g. Lili, Lilka...',
+      englishLabel: 'English level',
+      englishOptions: ['Cannot speak English', 'Basic', 'Conversational', 'Fluent', 'Native'],
+      hairTypeOptions: ['Natural', 'Dyed'],
+      sec8Title: 'Content and limits for chat', sec8Note: 'This tells the chatters what they may offer and what never to touch. Select everything that applies.',
+      contentLabel: 'Content you are comfortable creating (select everything that applies)',
+      contentOptions: ['Face content (showing your face)', 'Non-face content (no face shown)', 'Solo content', 'Toy content', 'GG content', 'BG content', 'Blow job content', 'Anal content', 'Threesome content', 'Roleplay content', 'Voice notes / audio messages', 'Video calls', 'Live streaming', 'Custom content requests', 'JOI (guided instruction content)', 'Dick rating', 'Verification pics / videos', 'Selling worn items (e.g. panties)'],
+      deliveryLabel: 'Average custom delivery time',
+      deliveryOptions: ['Same day', '1-3 days', '1 week', 'Depends'],
+      liveLabel: 'Do you go live on OnlyFans?', liveOptions: ['Yes', 'No'], liveSchedulePh: 'If yes, when you usually go live (days and times)',
+      limitsLabel: 'Hard limits (anything you never want a chatter to offer or discuss)',
+      limitsOptions: ['No explicit fetish content', 'No BG', 'No video calls', 'No selling of worn items'],
+      limitsOtherPh: 'Other limits (write your own)',
+      fansDescLabel: 'How should fans describe you?', fansDescPh: 'E.g. sweet, sassy, natural, someone who is always there for them...',
+      archetypeOptions: ['Alternative / tattoo vibe','Girl next door','Spoiled princess','Gym rat / fitness girl','Gamer / nerd','Soft and innocent','Latina / fiery','Quiet introvert','Mom / MILF vibe','Dark / gothic','Party girl','Other...'],
+      traitPh: ['E.g. bold, direct, carefree...','Another trait...'], favPh: ['E.g. talking selfie reels...','E.g. outfit check, dance, POV...'],
+      refsPh: ['@profile - what you like about her...','@profile...'], topPh: ['E.g. politics, family, ex...','Another topic...'], colPh: ['E.g. profiles with a bad reputation...'],
+      removeLabel: 'Remove', sending: 'Sending...',
+      sumName: 'Name', sumBirth: 'Date of birth', sumArch: 'Archetype', sumStyle: 'Style', sumAddr: 'Addresses fans as', sumAvail: 'Availability', defName: 'Creator',
+      finishBtn: 'Submit ✓', nextBtn: 'Next →', backBtn: '← Back',
+      exportTitle: 'done!', exportSub: 'Your Creator Bible is complete and ready to download.',
+      brandCardBtn: '★ Download Brand Card', fullPdfBtn: '↓ Download full PDF',
+    }
+  }
+  ,
+  es: {
+    popupTitle: '¡Bienvenida! 👋',
+    popupNote: 'Antes de empezar, elegí tu idioma y contanos cómo te llamás.',
+    popupWhyTitle: 'POR QUÉ ES IMPORTANTE ESTE CUESTIONARIO',
+    popupWhy1: 'Nos ayuda a captar tu personalidad, tu voz y tus intereses para que cada conversación con tus fans se sienta auténtica. El objetivo es que tu equipo de chatting escriba tal como lo harías vos, de forma natural.',
+    popupWhy2: 'Al completarlo, vas a tener herramientas para construir relaciones más fuertes con tus fans, más lealtad y más ventas, siendo siempre vos misma.',
+    popupNamePlaceholder: 'Tu nombre o alias...',
+    popupOfPlaceholder: 'Tu usuario de OnlyFans (ej. @tunombre)',
+    popupBtn: 'Empezar cuestionario →',
+    labels: {
+      sec1Title: '¿Quién sos?', sec1Note: 'Algunas cosas sobre vos. No hace falta que suene perfecto, queremos conocerte tal cual sos.',
+      dateOfBirth: 'Fecha de nacimiento', datePlaceholder: 'Ej. 24/11/2005',
+      height: 'Altura', heightPlaceholder: 'Ej. 1,68 m o 168 cm',
+      eyeColor: 'Color de ojos', eyePlaceholder: 'Ej. celestes, marrones...',
+      from: '¿De dónde sos?', fromPlaceholder: 'Ciudad, país',
+      tattoos: 'Tatuajes (cuántos)', tattoosPlaceholder: 'Ej. 3, ninguno...',
+      pet: '¿Tenés mascota?', petPlaceholder: 'Ej. perro, gato, no...',
+      relationship: '¿Estás soltera? / Estado de relación',
+      relSingle: 'Soltera', relTaken: 'En pareja', relComplicated: 'Complicado',
+      hobbies: 'Hobbies e intereses', hobbiesPlaceholder: 'Ej. fitness, natación, spa, viajar...',
+      story: 'Tu historia (2 o 3 oraciones)', storyPlaceholder: 'Por qué empezaste, qué te trajo hasta acá, qué te hace auténtica...',
+      personality: '¿Cómo describirías tu personalidad? (2 a 4 cosas)', personalityPlaceholder: 'Ej. atrevida, directa, relajada...',
+      addMore: '+ agregar', diff: '¿Qué te hace diferente de otras chicas en OF?', diffPlaceholder: 'Lo que otras no tienen, o lo que hacés distinto...',
+      sec2Title: 'Tu vibra', sec2Note: 'Elegí los tipos que van con vos y describí tu energía.',
+      archetypeCustom: 'Aclaración o descripción propia', archetypeCustomPlaceholder: 'Tu propia combinación o descripción...',
+      vibeLabel: '¿Cómo describirías tu energía y tu vibra? (con tus propias palabras)', vibePlaceholder: 'Ej. soy la que dice lo que piensa...',
+      sec3Title: '¿Cómo te comunicás?', sec3Note: 'Queremos hablar con tu voz, no con una copia de otra persona.',
+      tovLabel: '¿Cómo describirías tu estilo de comunicación?', tovPlaceholder: 'Ej. sarcástica, juguetona, coqueta, directa...',
+      fansLabel: '¿Cómo les decís a tus fans?', fansPlaceholder: 'Ej. baby, sweetheart, love... (Enter)',
+      wordsLabel: 'Tus propias palabras y expresiones que te encanta usar', wordsPlaceholder: 'Jerga, frases graciosas, muletillas... (Enter)',
+      addBtn: 'Agregar',
+      sec3bTitle: 'Info personal', sec3bNote: 'Sabemos que es algo personal, pero para mantener enganchados a los fans whale (los que más gastan), estos detalles son clave. Nos ayudan a crear una conexión realmente auténtica y personal con tus fans.',
+      favColor: 'Color favorito', favColorPh: 'Ej. negro, azul...',
+      favFood: 'Comida favorita', favFoodPh: 'Ej. sushi, pizza, milanesa...',
+      favMovie: 'Película / serie favorita', favMoviePh: 'Ej. Squid Game, Interstellar...',
+      favMusic: 'Música que escuchás', favMusicPh: 'Ej. pop, cumbia, trap, reggaetón, artistas puntuales...',
+      favNickLabel: 'Tu apodo favorito de parte de los fans',
+      favNickOther: 'O escribí el tuyo...',
+      favEmoji: 'Estilo de emojis favorito', favEmojiPh: 'Ej. 🖤✨, 🔥💋, 🌸🍑...',
+      petsLabel: 'Mascotas (nombre y tipo)', petsPh: 'Ej. Max, perro. Luna, gata...',
+      typicalDay: 'Tu día típico', typicalDayPh: '¿Cómo es tu día normal? Mañana, tarde, noche...',
+      measureTitle: 'Medidas (opcional)',
+      weightLabel: 'Peso', weightPh: 'Ej. 60 kg',
+      braLabel: 'Talle de corpiño', braPh: 'Ej. 90C',
+      waistLabel: 'Cintura', waistPh: 'Ej. 68 cm',
+      hipsLabel: 'Cadera', hipsPh: 'Ej. 95 cm',
+      shoeLabel: 'Talle de calzado', shoePh: 'Ej. 38',
+      dressLabel: 'Talle de ropa', dressPh: 'Ej. S/M, 38',
+      hairLabel: 'Color de pelo', hairPh: 'Ej. castaño oscuro con reflejos rubios...',
+      sec4Title: 'Tu contenido', sec4Note: 'Qué filmás, qué disfrutás, qué no querés.',
+      favVideos: '¿Qué tipo de videos te gustaría hacer más?', favPlaceholder: 'Ej. talking selfie reels...',
+      addProfile: '+ agregar perfil', profiles: 'Perfiles de chicas que seguís y cuyo contenido te gusta', profilePlaceholder: '@perfil, qué te gusta de ella...',
+      neverShoot: '¿Qué nunca querrías filmar?', neverPlaceholder: 'Ej. un estilo de vida falso, filtros exagerados...',
+      sec5Title: 'Tus límites', sec5Note: 'Lo que no querés que se diga de vos o con lo que no querés que te asocien.',
+      tabuLabel: 'Temas de los que no querés hablar en público', tabuPlaceholder: 'Ej. política, familia, ex...',
+      collabLabel: 'Tipos de colaboraciones y SFS que no querés', collabPlaceholder: 'Ej. perfiles con mala reputación...',
+      sec6Title: 'Tu tiempo', sec6Note: 'Nos ayuda a planificar cuánto contenido podés hacer de verdad.',
+      fulltimeLabel: '¿OF es tu trabajo de tiempo completo o tenés otro trabajo / estudios?',
+      ftFulltime: 'OF tiempo completo', ftWork: 'OF + trabajo / estudios', ftSide: 'OF es algo secundario',
+      hoursLabel: '¿Cuántas horas por día podés dedicar a crear contenido?',
+      loveLabel: '¿Qué es lo que más disfrutás de tu trabajo?', lovePlaceholder: 'Lo que te hace feliz, lo que te da energía...',
+      sec7Title: 'Última pregunta', sec7Note: '¡Y listo, terminaste!',
+      goalLabel: '¿Dónde te ves en un año? ¿Qué querés construir?', goalPlaceholder: 'Tu meta, lo que querés lograr...',
+      customLabel: 'Precio mínimo por contenido custom', customPlaceholder: 'Ej. $150, $200, a convenir...',
+      videoLabel: '¿Querés hacer videollamadas?', videoYes: 'Sí', videoNo: 'No',
+      videoLimitsLabel: '¿Qué no querés en las videollamadas?', videoLimitsPlaceholder: 'Ej. sin cara, nada explícito...',
+      notesLabel: 'Información importante para el chat', notesPlaceholder: 'Ej. le gusta la dominación, cuida mucho ciertos temas...',
+      stageBd: 'Cumpleaños público (stage)', stageBdPh: 'La fecha que usamos con los fans',
+      stageAge: 'Edad pública (stage age)', stageAgePh: 'Ej. 20',
+      nationality: 'Nacionalidad', nationalityPh: 'Ej. argentina, uruguaya...',
+      stageNick: 'Apodos (stage)', stageNickPh: 'Ej. Lili, Lu...',
+      englishLabel: 'Nivel de inglés',
+      englishOptions: ['No hablo inglés', 'Básico', 'Conversacional', 'Fluido', 'Nativo'],
+      hairTypeOptions: ['Natural', 'Teñido'],
+      sec8Title: 'Contenido y límites para el chat', sec8Note: 'Esto les dice a los chatters qué pueden ofrecer y qué nunca tocar. Marcá todo lo que corresponda.',
+      contentLabel: 'Contenido que te sentís cómoda creando (marcá todo lo que corresponda)',
+      contentOptions: ['Contenido con cara', 'Contenido sin cara', 'Contenido solo', 'Contenido con juguetes', 'Contenido GG', 'Contenido BG', 'Contenido de sexo oral', 'Contenido anal', 'Contenido de trío', 'Contenido de roleplay', 'Notas de voz / audios', 'Videollamadas', 'Lives / transmisiones en vivo', 'Pedidos de contenido custom', 'JOI (contenido con instrucciones guiadas)', 'Dick rating', 'Fotos / videos de verificación', 'Venta de prendas usadas (ej. bombachas)'],
+      deliveryLabel: 'Tiempo promedio de entrega de un custom',
+      deliveryOptions: ['El mismo día', '1 a 3 días', '1 semana', 'Depende'],
+      liveLabel: '¿Hacés lives en OnlyFans?', liveOptions: ['Sí', 'No'], liveSchedulePh: 'Si hacés, cuándo los hacés normalmente (días y horarios)',
+      limitsLabel: 'Límites firmes (todo lo que nunca querés que un chatter ofrezca o hable)',
+      limitsOptions: ['Nada de contenido fetish explícito', 'Nada de BG', 'Nada de videollamadas', 'Nada de venta de prendas usadas'],
+      limitsOtherPh: 'Otros límites (escribí los tuyos)',
+      fansDescLabel: '¿Cómo querés que te describan los fans?', fansDescPh: 'Ej. dulce, atrevida, natural, alguien que siempre está para ellos...',
+      archetypeOptions: ['Alternativa / estilo tattoo', 'La chica de al lado', 'Princesa mimada', 'Gymrat / chica fitness', 'Gamer / nerd', 'Dulce e inocente', 'Latina / de temperamento', 'Introvertida tranquila', 'Mamá / estilo MILF', 'Dark / gótica', 'Chica de fiesta', 'Otra...'],
+      traitPh: ['Ej. atrevida, directa, relajada...', 'Otra característica...'], favPh: ['Ej. talking selfie reels...', 'Ej. outfit check, baile, POV...'],
+      refsPh: ['@perfil, qué te gusta de ella...', '@perfil...'], topPh: ['Ej. política, familia, ex...', 'Otro tema...'], colPh: ['Ej. perfiles con mala reputación...'],
+      removeLabel: 'Quitar', sending: 'Enviando...',
+      sumName: 'Nombre', sumBirth: 'Fecha de nacimiento', sumArch: 'Arquetipo', sumStyle: 'Estilo', sumAddr: 'Cómo les dice a los fans', sumAvail: 'Disponibilidad', defName: 'Creadora',
+      finishBtn: 'Enviar ✓', nextBtn: 'Siguiente →', backBtn: '← Atrás',
+      exportTitle: '¡listo!', exportSub: 'Tu Creator Bible está completa y lista para descargar.',
+      brandCardBtn: '★ Descargar Brand Card', fullPdfBtn: '↓ Descargar PDF completo',
+    }
+  }
+};
+
+function setLang(l) {
+  lang = l;
+  document.getElementById('lang-cz').classList.toggle('active', l === 'cz');
+  document.getElementById('lang-en').classList.toggle('active', l === 'en');
+  document.getElementById('lang-es').classList.toggle('active', l === 'es');
+  document.documentElement.lang = ({cz: 'cs', en: 'en', es: 'es-AR'})[l];
+  const t = translations[l];
+  document.getElementById('popup-title').textContent = t.popupTitle;
+  document.getElementById('popup-note').textContent = t.popupNote;
+  document.getElementById('popup-why-title').textContent = t.popupWhyTitle;
+  document.getElementById('popup-why-1').textContent = t.popupWhy1;
+  document.getElementById('popup-why-2').textContent = t.popupWhy2;
+  document.getElementById('popup-name').placeholder = t.popupNamePlaceholder;
+  document.getElementById('popup-of').placeholder = t.popupOfPlaceholder;
+  document.getElementById('popup-btn').textContent = t.popupBtn;
+  ['popup-title','popup-note','popup-why-title','popup-why-1','popup-why-2','popup-btn'].forEach(id => { const el = document.getElementById(id); el.classList.remove('swap'); void el.offsetWidth; el.classList.add('swap'); });
+}
+
+function applyTranslations() {
+  const t = translations[lang].labels;
+  const setT = (id, text) => { const el = document.getElementById(id); if(el) el.textContent = text; };
+  const setP = (id, text) => { const el = document.getElementById(id); if(el) el.placeholder = text; };
+  // Option buttons of one group, in order (keeps the selection, only swaps the text)
+  const setAdd = (id, text) => { const b = document.querySelector(`.add-field-btn[onclick="addBullet('${id}')"]`); if(b) b.textContent = text; };
+  const setBul = (id, arr) => { const l = document.getElementById(id); if(!l) return; l.querySelectorAll('input[type=text]').forEach((inp, i) => { if(arr[i] !== undefined) inp.placeholder = arr[i]; }); };
+  const setGroup = (id, texts) => { const g = document.getElementById(id); if(!g) return; g.querySelectorAll('.arch-btn').forEach((b, i) => { if(texts[i] !== undefined) b.textContent = texts[i]; }); };
+
+  // Sec 1
+  setT('lbl-sec1-title', t.sec1Title); setT('lbl-sec1-note', t.sec1Note);
+  setT('lbl-date', t.dateOfBirth); setP('cv-date', t.datePlaceholder);
+  setT('lbl-height', t.height); setP('s1-height', t.heightPlaceholder);
+  setT('lbl-eyes', t.eyeColor); setP('s1-eyes', t.eyePlaceholder);
+  setT('lbl-loc', t.from); setP('s1-loc', t.fromPlaceholder);
+  setT('lbl-tattoos', t.tattoos); setP('s1-tattoos', t.tattoosPlaceholder);
+  setT('lbl-pet', t.pet); setP('s1-pet', t.petPlaceholder);
+  setT('lbl-rel', t.relationship);
+  setT('btn-single', t.relSingle); setT('btn-taken', t.relTaken); setT('btn-comp', t.relComplicated);
+  setT('lbl-hobbies', t.hobbies); setP('s1-hobbies', t.hobbiesPlaceholder);
+  setT('lbl-story', t.story); setP('s1-story', t.storyPlaceholder);
+  setT('lbl-personality', t.personality);
+  setT('lbl-diff', t.diff); setP('s1-diff', t.diffPlaceholder);
+  // Sec 2
+  setT('lbl-sec2-title', t.sec2Title); setT('lbl-sec2-note', t.sec2Note);
+  setT('lbl-arch-custom', t.archetypeCustom); setP('s2-custom', t.archetypeCustomPlaceholder);
+  setT('lbl-vibe', t.vibeLabel); setP('s2-vibe', t.vibePlaceholder);
+  // Sec 3
+  setT('lbl-sec3-title', t.sec3Title); setT('lbl-sec3-note', t.sec3Note);
+  setT('lbl-tov', t.tovLabel); setP('s3-tov', t.tovPlaceholder);
+  setT('lbl-fans', t.fansLabel); setP('kw-fans-inp', t.fansPlaceholder);
+  setT('lbl-words', t.wordsLabel); setP('kw-words-inp', t.wordsPlaceholder);
+  setT('btn-add-fans', t.addBtn); setT('btn-add-words', t.addBtn);
+  // Sec 3b
+  setT('lbl-sec3b-title', t.sec3bTitle); setT('lbl-sec3b-note', t.sec3bNote);
+  setT('lbl-fav-color', t.favColor); setP('s3b-color', t.favColorPh);
+  setT('lbl-fav-food', t.favFood); setP('s3b-food', t.favFoodPh);
+  setT('lbl-fav-movie', t.favMovie); setP('s3b-movie', t.favMoviePh);
+  setT('lbl-fav-music', t.favMusic); setP('s3b-music', t.favMusicPh);
+  setT('lbl-fav-nickname', t.favNickLabel); setP('s3b-nick-other', t.favNickOther);
+  setT('lbl-fav-emoji', t.favEmoji); setP('s3b-emoji', t.favEmojiPh);
+  setT('lbl-pets', t.petsLabel); setP('s3b-pets', t.petsPh);
+  setT('lbl-typical-day', t.typicalDay); setP('s3b-day', t.typicalDayPh);
+  setT('lbl-measurements-title', t.measureTitle);
+  setT('lbl-weight', t.weightLabel); setP('s3b-weight', t.weightPh);
+  setT('lbl-bra', t.braLabel); setP('s3b-bra', t.braPh);
+  setT('lbl-waist', t.waistLabel); setP('s3b-waist', t.waistPh);
+  setT('lbl-hips', t.hipsLabel); setP('s3b-hips', t.hipsPh);
+  setT('lbl-shoe', t.shoeLabel); setP('s3b-shoe', t.shoePh);
+  setT('lbl-dress', t.dressLabel); setP('s3b-dress', t.dressPh);
+  setT('lbl-hair', t.hairLabel); setP('s3b-hair', t.hairPh);
+  // Sec 4
+  setT('lbl-sec4-title', t.sec4Title); setT('lbl-sec4-note', t.sec4Note);
+  setT('lbl-fav', t.favVideos);
+  setT('lbl-profiles', t.profiles);
+  setT('lbl-never', t.neverShoot); setP('s4-never', t.neverPlaceholder);
+  // Sec 5
+  setT('lbl-sec5-title', t.sec5Title); setT('lbl-sec5-note', t.sec5Note);
+  setT('lbl-tabu', t.tabuLabel);
+  setT('lbl-collab', t.collabLabel);
+  // Sec 6
+  setT('lbl-sec6-title', t.sec6Title); setT('lbl-sec6-note', t.sec6Note);
+  setT('lbl-fulltime', t.fulltimeLabel);
+  setT('btn-ft-full', t.ftFulltime); setT('btn-ft-work', t.ftWork); setT('btn-ft-side', t.ftSide);
+  setT('lbl-hours', t.hoursLabel);
+  setT('lbl-love', t.loveLabel); setP('s6-love', t.lovePlaceholder);
+  // Sec 7
+  setT('lbl-sec7-title', t.sec7Title); setT('lbl-sec7-note', t.sec7Note);
+  setT('lbl-goal', t.goalLabel); setP('s7-goal', t.goalPlaceholder);
+  setT('lbl-custom', t.customLabel); setP('s7-customs', t.customPlaceholder);
+  setT('lbl-video', t.videoLabel);
+  setT('btn-vid-yes', t.videoYes); setT('btn-vid-no', t.videoNo);
+  setT('lbl-vlimits', t.videoLimitsLabel); setP('s7-calls-limits', t.videoLimitsPlaceholder);
+  setT('lbl-notes', t.notesLabel); setP('s7-notes', t.notesPlaceholder);
+  // Profile additions (sec 1) and hair type (sec 3b)
+  setT('lbl-stagebd', t.stageBd); setP('s1-stagebd', t.stageBdPh);
+  setT('lbl-stageage', t.stageAge); setP('s1-stageage', t.stageAgePh);
+  setT('lbl-nat', t.nationality); setP('s1-nat', t.nationalityPh);
+  setT('lbl-stagenick', t.stageNick); setP('s1-stagenick', t.stageNickPh);
+  setT('lbl-english', t.englishLabel);
+  setGroup('s1-english', t.englishOptions);
+  setGroup('s3b-hairtype', t.hairTypeOptions);
+  // Sec 8 (chatting)
+  setT('lbl-sec8-title', t.sec8Title); setT('lbl-sec8-note', t.sec8Note);
+  setT('lbl-content', t.contentLabel); setGroup('s8-content', t.contentOptions);
+  setT('lbl-delivery', t.deliveryLabel); setGroup('s8-delivery', t.deliveryOptions);
+  setT('lbl-live', t.liveLabel); setGroup('s8-live', t.liveOptions); setP('s8-live-schedule', t.liveSchedulePh);
+  setT('lbl-limits', t.limitsLabel); setGroup('s8-limits', t.limitsOptions); setP('s8-limits-other', t.limitsOtherPh);
+  setT('lbl-fansdesc', t.fansDescLabel); setP('s8-fansdesc', t.fansDescPh);
+  // Vibe types, example rows and "add" buttons
+  setGroup('arch-grid', t.archetypeOptions);
+  setBul('s1-traits', t.traitPh); setBul('s4-fav', t.favPh); setBul('s4-refs', t.refsPh); setBul('s5-top', t.topPh); setBul('s5-col', t.colPh);
+  setAdd('s1-traits', t.addMore); setAdd('s4-fav', t.addMore); setAdd('s5-top', t.addMore); setAdd('s5-col', t.addMore); setAdd('s4-refs', t.addProfile);
+  // Nav
+  setT('btn-next', t.nextBtn); setT('btn-prev', t.backBtn);
+  // Export
+  const exportSub = document.getElementById('ex-sub');
+  if(exportSub) exportSub.textContent = t.exportSub;
+  const brandBtn = document.getElementById('btn-brand-card');
+  if(brandBtn) brandBtn.textContent = t.brandCardBtn;
+  const fullBtn = document.getElementById('btn-full-pdf');
+  if(fullBtn) fullBtn.textContent = t.fullPdfBtn;
+}
+
+function startForm(){
+  const name = document.getElementById('popup-name').value.trim();
+  if(!name){ document.getElementById('popup-name').focus(); return; }
+  if(!document.getElementById('popup-of').value.trim()){ document.getElementById('popup-of').focus(); return; }
+  document.getElementById('cv-name').value = name;
+  document.getElementById('popup').style.display = 'none';
+  applyTranslations();
+  document.getElementById('hdr-step').textContent = ({cz: LABELS, en: LABELS_EN, es: LABELS_ES})[lang][cur];
+  buildDots();
+  if(window.startPageFx) window.startPageFx();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  ['popup-name','popup-of'].forEach(id => document.getElementById(id).addEventListener('keydown', e => {
+    if(e.key === 'Enter') startForm();
+  }));
+});
+
+// Intro screen: panel tilts toward the pointer, particles drift and react to it.
+// Everything is skipped for "reduce motion" and stops once the questionnaire starts.
+document.addEventListener('DOMContentLoaded', () => {
+  const overlay = document.getElementById('popup');
+  const box = overlay && overlay.querySelector('.popup-box');
+  const cvs = document.getElementById('popup-fx');
+  if(!overlay || !box || !cvs || !cvs.getContext) return;
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){ cvs.style.display = 'none'; return; }
+  const ctx = cvs.getContext('2d');
+  const MAX_TILT = 7;
+  let W = 0, H = 0, dpr = 1, parts = [];
+  let rx = 0, ry = 0, tx = 0, ty = 0, sheen = 0, tSheen = 0;
+  let px = -999, py = -999, lastMove = 0, raf = 0, last = 0;
+
+  function seed(){
+    const n = Math.round(Math.min(70, Math.max(24, W * H / 20000)));
+    while(parts.length < n) parts.push(spawn());
+    parts.length = n;
+  }
+  function spawn(){
+    const diamond = Math.random() < 0.22;
+    return { x: Math.random() * W, y: Math.random() * H,
+      vx: (Math.random() - .5) * .22, vy: (Math.random() - .5) * .22 - .04,
+      r: diamond ? 5 + Math.random() * 6 : 1.1 + Math.random() * 2, a: .45 + Math.random() * .5,
+      d: diamond, rot: Math.random() * 6.28, vr: (Math.random() - .5) * .004 };
+  }
+  function resize(){
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    cvs.width = W * dpr; cvs.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    seed();
+  }
+
+  function onMove(e){
+    if(e.pointerType === 'touch'){ px = e.clientX; py = e.clientY; return; } // a finger only moves the particles, never tilts
+    px = e.clientX; py = e.clientY; lastMove = performance.now();
+    const typing = document.activeElement && document.activeElement.tagName === 'INPUT';
+    if(typing){ tx = 0; ty = 0; tSheen = .35; }
+    else { tx = -((py / H) - .5) * 2 * MAX_TILT; ty = ((px / W) - .5) * 2 * MAX_TILT; tSheen = 1; }
+    const r = box.getBoundingClientRect();
+    overlay.style.setProperty('--mx', ((px - r.left) / r.width * 100).toFixed(1) + '%');
+    overlay.style.setProperty('--my', ((py - r.top) / r.height * 100).toFixed(1) + '%');
+  }
+  function onLeave(){ lastMove = 0; px = py = -999; }
+
+  function frame(now){
+    if(overlay.style.display === 'none'){ raf = 0; return; }
+    const dt = Math.min(48, now - (last || now)); last = now;
+    // idle: the panel goes back to flat (no tilting on its own)
+    if(now - lastMove > 2200){ tx = 0; ty = 0; tSheen = 0; }
+    const k = 1 - Math.pow(.001, dt / 1000);
+    rx += (tx - rx) * k; ry += (ty - ry) * k; sheen += (tSheen - sheen) * k;
+    overlay.style.setProperty('--rx', rx.toFixed(2) + 'deg'); overlay.style.setProperty('--ry', ry.toFixed(2) + 'deg');
+    overlay.style.setProperty('--dx', ry.toFixed(2)); overlay.style.setProperty('--dy', rx.toFixed(2));
+    overlay.style.setProperty('--sheen', sheen.toFixed(2));
+
+    ctx.clearRect(0, 0, W, H);
+    const step = dt / 16.7;
+    for(const p of parts){
+      const dx = p.x - px, dy = p.y - py, dist = Math.hypot(dx, dy);
+      if(dist < 150 && dist > 0){ const f = (1 - dist / 150) * .35 * step; p.vx += dx / dist * f; p.vy += dy / dist * f; }
+      p.vx *= .985; p.vy *= .985;
+      if(Math.abs(p.vx) < .06) p.vx += (Math.random() - .5) * .01;
+      if(Math.abs(p.vy) < .06) p.vy += (Math.random() - .5) * .01;
+      p.x += p.vx * step; p.y += p.vy * step; p.rot += p.vr * dt;
+      if(p.x < -20) p.x = W + 20; else if(p.x > W + 20) p.x = -20;
+      if(p.y < -20) p.y = H + 20; else if(p.y > H + 20) p.y = -20;
+    }
+    // faint links between neighbours and to the pointer
+    ctx.lineWidth = 1;
+    for(let i = 0; i < parts.length; i++){
+      const a = parts[i];
+      for(let j = i + 1; j < parts.length; j++){
+        const b = parts[j], d = Math.hypot(a.x - b.x, a.y - b.y);
+        if(d < 120){ ctx.strokeStyle = 'rgba(57,230,115,' + ((1 - d / 120) * .26).toFixed(3) + ')'; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+      }
+      const dm = Math.hypot(a.x - px, a.y - py);
+      if(dm < 170){ ctx.strokeStyle = 'rgba(120,255,170,' + ((1 - dm / 170) * .35).toFixed(3) + ')'; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(px, py); ctx.stroke(); }
+    }
+    for(const p of parts){
+      if(p.d){
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        ctx.strokeStyle = 'rgba(57,230,115,' + (p.a * .7).toFixed(3) + ')'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(0, -p.r); ctx.lineTo(p.r, 0); ctx.lineTo(0, p.r); ctx.lineTo(-p.r, 0); ctx.closePath(); ctx.stroke();
+        ctx.restore();
+      } else {
+        ctx.fillStyle = 'rgba(57,230,115,' + p.a.toFixed(3) + ')';
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.2832); ctx.fill();
+      }
+    }
+    raf = requestAnimationFrame(frame);
+  }
+  function run(){ if(!raf && !document.hidden){ last = 0; raf = requestAnimationFrame(frame); } }
+
+  resize();
+  window.addEventListener('resize', resize);
+  overlay.addEventListener('pointermove', onMove);
+  overlay.addEventListener('pointerleave', onLeave);
+  overlay.addEventListener('pointerup', e => { if(e.pointerType === 'touch') onLeave(); });
+  document.addEventListener('visibilitychange', () => { if(document.hidden){ cancelAnimationFrame(raf); raf = 0; } else run(); });
+  run();
+});
+
+// Form screens: faint particle field behind the questions (reacts to the pointer), and the finish screen tilts.
+document.addEventListener('DOMContentLoaded', () => {
+  const cvs = document.getElementById('pg-fx');
+  if(!cvs || !cvs.getContext) return;
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){ cvs.style.display = 'none'; return; }
+  const ctx = cvs.getContext('2d');
+  let W = 0, H = 0, dpr = 1, parts = [], px = -999, py = -999, lastMove = 0, raf = 0, last = 0;
+  let erx = 0, ery = 0;
+
+  function spawn(){
+    const d = Math.random() < 0.2;
+    return { x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .18, vy: (Math.random() - .5) * .18 - .03,
+      r: d ? 4 + Math.random() * 5 : 1 + Math.random() * 1.8, a: .25 + Math.random() * .4, d, rot: Math.random() * 6.28, vr: (Math.random() - .5) * .003 };
+  }
+  function resize(){
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    cvs.width = W * dpr; cvs.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const n = Math.round(Math.min(34, Math.max(14, W * H / 42000)));
+    while(parts.length < n) parts.push(spawn());
+    parts.length = n;
+  }
+  function frame(now){
+    if(document.hidden || document.getElementById('popup').style.display !== 'none'){ raf = 0; return; }
+    const dt = Math.min(48, now - (last || now)); last = now;
+    const step = dt / 16.7;
+    ctx.clearRect(0, 0, W, H);
+    for(const p of parts){
+      const dx = p.x - px, dy = p.y - py, dist = Math.hypot(dx, dy);
+      if(dist < 140 && dist > 0){ const f = (1 - dist / 140) * .3 * step; p.vx += dx / dist * f; p.vy += dy / dist * f; }
+      p.vx *= .985; p.vy *= .985;
+      if(Math.abs(p.vx) < .05) p.vx += (Math.random() - .5) * .008;
+      if(Math.abs(p.vy) < .05) p.vy += (Math.random() - .5) * .008;
+      p.x += p.vx * step; p.y += p.vy * step; p.rot += p.vr * dt;
+      if(p.x < -20) p.x = W + 20; else if(p.x > W + 20) p.x = -20;
+      if(p.y < -20) p.y = H + 20; else if(p.y > H + 20) p.y = -20;
+    }
+    ctx.lineWidth = 1;
+    for(let i = 0; i < parts.length; i++){
+      const a = parts[i];
+      for(let j = i + 1; j < parts.length; j++){
+        const b = parts[j], d = Math.hypot(a.x - b.x, a.y - b.y);
+        if(d < 120){ ctx.strokeStyle = 'rgba(57,230,115,' + ((1 - d / 120) * .2).toFixed(3) + ')'; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+      }
+      const dm = Math.hypot(a.x - px, a.y - py);
+      if(dm < 160){ ctx.strokeStyle = 'rgba(120,255,170,' + ((1 - dm / 160) * .34).toFixed(3) + ')'; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(px, py); ctx.stroke(); }
+    }
+    for(const p of parts){
+      if(p.d){
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.strokeStyle = 'rgba(57,230,115,' + (p.a * .8).toFixed(3) + ')';
+        ctx.beginPath(); ctx.moveTo(0, -p.r); ctx.lineTo(p.r, 0); ctx.lineTo(0, p.r); ctx.lineTo(-p.r, 0); ctx.closePath(); ctx.stroke(); ctx.restore();
+      } else { ctx.fillStyle = 'rgba(57,230,115,' + p.a.toFixed(3) + ')'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.2832); ctx.fill(); }
+    }
+    // finish screen: tilt like the intro panel (pointer, or a slow breathing when idle)
+    if(cur === TOTAL - 1){
+      const idle = now - lastMove > 2200;
+      const tx = idle ? Math.sin(now / 2300) * 2.2 : -((py / H) - .5) * 2 * 5;
+      const ty = idle ? Math.cos(now / 2900) * 3 : ((px / W) - .5) * 2 * 6;
+      const k = 1 - Math.pow(.001, dt / 1000);
+      erx += (tx - erx) * k; ery += (ty - ery) * k;
+      const ex = document.getElementById('sec-export');
+      ex.style.setProperty('--erx', erx.toFixed(2) + 'deg'); ex.style.setProperty('--ery', ery.toFixed(2) + 'deg');
+      ex.style.setProperty('--edx', ery.toFixed(2)); ex.style.setProperty('--edy', erx.toFixed(2));
+    }
+    raf = requestAnimationFrame(frame);
+  }
+  window.startPageFx = function(){ if(!raf && !document.hidden){ last = 0; raf = requestAnimationFrame(frame); } };
+  resize();
+  window.addEventListener('resize', resize);
+  window.addEventListener('pointermove', e => { px = e.clientX; py = e.clientY; lastMove = performance.now(); });
+  document.addEventListener('pointerleave', () => { px = py = -999; lastMove = 0; });
+  document.addEventListener('visibilitychange', () => { if(document.hidden){ cancelAnimationFrame(raf); raf = 0; } else if(document.getElementById('popup').style.display === 'none') window.startPageFx(); });
+});
+
+// Confetti of green diamonds when the questionnaire is finished.
+function celebrate(){
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const c = document.createElement('canvas');
+  c.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:400;pointer-events:none';
+  document.body.appendChild(c);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2), W = window.innerWidth, H = window.innerHeight;
+  c.width = W * dpr; c.height = H * dpr;
+  const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const colors = ['#39e673', '#12b34c', '#c9ffdc', '#0a8c3e', '#f2f5f0'];
+  const bursts = [[W * .5, H * .34], [W * .2, H * .5], [W * .8, H * .5]];
+  const ps = [];
+  bursts.forEach(([ox, oy], bi) => { for(let i = 0; i < (bi ? 38 : 60); i++){
+    const ang = (bi === 0 ? -Math.PI / 2 : bi === 1 ? -Math.PI / 3 : -2 * Math.PI / 3) + (Math.random() - .5) * 1.8, sp = 5 + Math.random() * 9;
+    ps.push({ x: ox, y: oy, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, r: 3 + Math.random() * 5, rot: Math.random() * 6.28, vr: (Math.random() - .5) * .3,
+      col: colors[(Math.random() * colors.length) | 0], dia: Math.random() < .65, delay: bi * 180 });
+  } });
+  const t0 = performance.now(); let prev = t0;
+  (function tick(now){
+    const t = now - t0, dt = Math.min(48, now - prev) / 16.7; prev = now;
+    ctx.clearRect(0, 0, W, H);
+    let alive = 0;
+    for(const p of ps){
+      if(t < p.delay){ alive++; continue; }
+      p.vy += .22 * dt; p.vx *= Math.pow(.992, dt); p.vy *= Math.pow(.992, dt); p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt;
+      const life = (t - p.delay) / 3400; if(life >= 1 || p.y > H + 30) continue; alive++;
+      ctx.globalAlpha = life > .65 ? 1 - (life - .65) / .35 : 1; ctx.fillStyle = p.col;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      if(p.dia){ ctx.beginPath(); ctx.moveTo(0, -p.r); ctx.lineTo(p.r * .7, 0); ctx.lineTo(0, p.r); ctx.lineTo(-p.r * .7, 0); ctx.closePath(); ctx.fill(); }
+      else { ctx.beginPath(); ctx.arc(0, 0, p.r * .45, 0, 6.2832); ctx.fill(); }
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+    if(alive && t < 4200) requestAnimationFrame(tick); else c.remove();
+  })(t0);
+}
+
+function navigate(d){ goTo(Math.max(0, Math.min(TOTAL-1, cur+d))); }
+
+async function submitToAgency(){
+  teamValues = true;
+  const d = collectAll();
+  teamValues = false;
+  const isCZ = lang === 'cz';
+  const chatterSheet = isCZ ? `**CHATTER SHEET**
+====================
+**Jméno:** ${d.model}
+**Datum narození:** ${d.date}
+**Výška:** ${d.s1.vyska}
+**Barva očí:** ${d.s1.oci}
+**Odkud:** ${d.s1.lokace}
+**Tetování:** ${d.s1.tetovani}
+**Domácí zvíře:** ${d.s1.mazlicek}
+**Vztah:** ${d.s1.vztah}
+**Veřejné datum narození:** ${d.s1.stageBd}
+**Veřejný věk:** ${d.s1.stageAge}
+**Národnost:** ${d.s1.nationality}
+**Přezdívky:** ${d.s1.stageNick}
+**Angličtina:** ${d.s1.english}
+---
+**KONÍČKY & ZÁLIBY**
+${d.s1.hobby}
+---
+**KOMUNIKACE**
+**Styl:** ${[d.s3.tov, d.s1.osobnost.filter(Boolean).join(', ')].filter(Boolean).join(', ')}
+**Slova, která často používá:** ${d.s3.slova.join(', ')}
+**Oslovení fanoušků:** ${d.s3.osloveni.join(', ')}
+**Přezdívka:** ${d.s3b.nickname}
+**Oblíbený emoji:** ${d.s3b.emoji}
+**Tabu témata:** ${d.s5.temata.join(', ')}
+---
+**OSOBNÍ INFO**
+**Oblíbená barva:** ${d.s3b.color}
+**Oblíbené jídlo:** ${d.s3b.food}
+**Oblíbený film/seriál:** ${d.s3b.movie}
+**Hudba:** ${d.s3b.music}
+**Mazlíčci:** ${d.s3b.pets}
+**Míry:** ${[d.s3b.weight, d.s3b.bra, d.s3b.waist && 'pas '+d.s3b.waist, d.s3b.hips && 'boky '+d.s3b.hips, d.s3b.shoe && 'boty '+d.s3b.shoe, d.s3b.dress && 'vel. '+d.s3b.dress].filter(Boolean).join(' | ')}
+**Barva vlasů:** ${[d.s3b.hair, d.s3b.hairType].filter(Boolean).join(', ')}
+---
+**OBSAH & CENY**
+**Videohovory:** ${d.s7.videohovory}
+**Co při videohovorech nechce:** ${d.s7.video_limity}
+**Custom obsah:** ${d.s7.customs}
+**Co nechce točit:** ${d.s4.never}
+**Nechce kolaborovat s:** ${d.s5.kolaborace.join(', ')}
+---
+**CHATTING: CO SMÍ A NESMÍ**
+**Obsah, který dělá:** ${d.s8.content.join(', ')}
+**Doba dodání customu:** ${d.s8.delivery}
+**Live na OF:** ${[d.s8.live, d.s8.liveSchedule].filter(Boolean).join(' | ')}
+**Tvrdé limity:** ${d.s8.limits.join(', ')}
+**Jak ji mají fanoušci popsat:** ${d.s8.fansDesc}
+---
+${d.s7.poznamky ? '⚠️ **POZNÁMKA**\n' + d.s7.poznamky : ''}` : `**CHATTER SHEET**
+====================
+**Name:** ${d.model}
+**Date of birth:** ${d.date}
+**Height:** ${d.s1.vyska}
+**Eye color:** ${d.s1.oci}
+**From:** ${d.s1.lokace}
+**Tattoos:** ${d.s1.tetovani}
+**Pet:** ${d.s1.mazlicek}
+**Relationship:** ${d.s1.vztah}
+**Public birthday:** ${d.s1.stageBd}
+**Public age:** ${d.s1.stageAge}
+**Nationality:** ${d.s1.nationality}
+**Nicknames:** ${d.s1.stageNick}
+**English level:** ${d.s1.english}
+---
+**HOBBIES & INTERESTS**
+${d.s1.hobby}
+---
+**COMMUNICATION**
+**Style:** ${[d.s3.tov, d.s1.osobnost.filter(Boolean).join(', ')].filter(Boolean).join(', ')}
+**Words she often uses:** ${d.s3.slova.join(', ')}
+**How she addresses fans:** ${d.s3.osloveni.join(', ')}
+**Nickname:** ${d.s3b.nickname}
+**Favorite emoji:** ${d.s3b.emoji}
+**Taboo topics:** ${d.s5.temata.join(', ')}
+---
+**PERSONAL INFO**
+**Favorite color:** ${d.s3b.color}
+**Favorite food:** ${d.s3b.food}
+**Favorite movie/show:** ${d.s3b.movie}
+**Music:** ${d.s3b.music}
+**Pets:** ${d.s3b.pets}
+**Measurements:** ${[d.s3b.weight, d.s3b.bra, d.s3b.waist && 'waist '+d.s3b.waist, d.s3b.hips && 'hips '+d.s3b.hips, d.s3b.shoe && 'shoe '+d.s3b.shoe, d.s3b.dress && 'dress '+d.s3b.dress].filter(Boolean).join(' | ')}
+**Hair color:** ${[d.s3b.hair, d.s3b.hairType].filter(Boolean).join(', ')}
+---
+**CONTENT & PRICING**
+**Video calls:** ${d.s7.videohovory}
+**What she doesn't want during video calls:** ${d.s7.video_limity}
+**Custom content:** ${d.s7.customs}
+**Won't film:** ${d.s4.never}
+**Won't collab with:** ${d.s5.kolaborace.join(', ')}
+---
+**CHATTING: WHAT SHE DOES AND DOESN'T**
+**Content she does:** ${d.s8.content.join(', ')}
+**Custom delivery time:** ${d.s8.delivery}
+**Live on OF:** ${[d.s8.live, d.s8.liveSchedule].filter(Boolean).join(' | ')}
+**Hard limits:** ${d.s8.limits.join(', ')}
+**How fans should describe her:** ${d.s8.fansDesc}
+---
+${d.s7.poznamky ? '⚠️ **NOTE**\n' + d.s7.poznamky : ''}`;
+
+  const celyFormular = isCZ ? `KOMPLETNI FORMULAR
+====================
+
+--- 01 KDO JSI ---
+Jméno: ${d.model}
+Datum narození: ${d.date}
+Výška: ${d.s1.vyska}
+Barva očí: ${d.s1.oci}
+Odkud: ${d.s1.lokace}
+Tetování: ${d.s1.tetovani}
+Domácí zvíře: ${d.s1.mazlicek}
+Vztah: ${d.s1.vztah}
+Koníčky a záliby: ${d.s1.hobby}
+Příběh: ${d.s1.pribeh}
+Osobnost: ${d.s1.osobnost.join(', ')}
+Čím se odlišuje: ${d.s1.odliseni}
+Veřejné datum narození: ${d.s1.stageBd}
+Veřejný věk: ${d.s1.stageAge}
+Národnost: ${d.s1.nationality}
+Přezdívky: ${d.s1.stageNick}
+Angličtina: ${d.s1.english}
+
+--- 02 TVUJ VIBE ---
+Archetyp: ${d.s2.archetypy.join(', ')}
+Vlastní popis archetypu: ${d.s2.vlastni}
+Vibe vlastními slovy: ${d.s2.vibe}
+
+--- 03 KOMUNIKACE ---
+Styl komunikace: ${d.s3.tov}
+Oslovení fanoušků: ${d.s3.osloveni.join(', ')}
+Vlastní výrazy: ${d.s3.slova.join(', ')}
+
+--- 04 OSOBNI INFO ---
+Oblíbená barva: ${d.s3b.color}
+Oblíbené jídlo: ${d.s3b.food}
+Oblíbený film/seriál: ${d.s3b.movie}
+Hudba: ${d.s3b.music}
+Oblíbená přezdívka: ${d.s3b.nickname}
+Oblíbený emoji: ${d.s3b.emoji}
+Mazlíčci: ${d.s3b.pets}
+Typický den: ${d.s3b.day}
+Váha: ${d.s3b.weight}
+Podprsenka: ${d.s3b.bra}
+Pas: ${d.s3b.waist}
+Boky: ${d.s3b.hips}
+Velikost bot: ${d.s3b.shoe}
+Velikost oblečení: ${d.s3b.dress}
+Barva vlasů: ${[d.s3b.hair, d.s3b.hairType].filter(Boolean).join(', ')}
+
+--- 05 OBSAH ---
+Oblíbené formáty videí: ${d.s4.oblibena.join(', ')}
+Inspirační profily: ${d.s4.reference.join(', ')}
+Co nechce točit: ${d.s4.never}
+
+--- 06 HRANICE ---
+Tabu témata: ${d.s5.temata.join(', ')}
+Nechce kolaborovat s: ${d.s5.kolaborace.join(', ')}
+
+--- 07 CAS & DOSTUPNOST ---
+Dostupnost: ${d.s6.dostupnost}
+Co ji baví: ${d.s6.love}
+
+--- 08 CHATTING ---
+Obsah, který dělá: ${d.s8.content.join(', ')}
+Doba dodání customu: ${d.s8.delivery}
+Live na OF: ${[d.s8.live, d.s8.liveSchedule].filter(Boolean).join(' | ')}
+Tvrdé limity: ${d.s8.limits.join(', ')}
+Jak ji mají fanoušci popsat: ${d.s8.fansDesc}
+
+--- 09 OSTATNI ---
+Videohovory: ${d.s7.videohovory}
+Co při videohovorech nechce: ${d.s7.video_limity}
+Custom obsah cena: ${d.s7.customs}
+Důležité info pro chat: ${d.s7.poznamky}
+Cíl: ${d.s7.goal}` : `COMPLETE FORM
+====================
+
+--- 01 WHO ARE YOU ---
+Name: ${d.model}
+Date of birth: ${d.date}
+Height: ${d.s1.vyska}
+Eye color: ${d.s1.oci}
+From: ${d.s1.lokace}
+Tattoos: ${d.s1.tetovani}
+Pet: ${d.s1.mazlicek}
+Relationship status: ${d.s1.vztah}
+Hobbies & interests: ${d.s1.hobby}
+Story: ${d.s1.pribeh}
+Personality: ${d.s1.osobnost.join(', ')}
+What makes her different: ${d.s1.odliseni}
+Public birthday: ${d.s1.stageBd}
+Public age: ${d.s1.stageAge}
+Nationality: ${d.s1.nationality}
+Nicknames: ${d.s1.stageNick}
+English level: ${d.s1.english}
+
+--- 02 VIBE ---
+Archetype: ${d.s2.archetypy.join(', ')}
+Custom description: ${d.s2.vlastni}
+Vibe in her own words: ${d.s2.vibe}
+
+--- 03 COMMUNICATION ---
+Communication style: ${d.s3.tov}
+How she addresses fans: ${d.s3.osloveni.join(', ')}
+Own expressions: ${d.s3.slova.join(', ')}
+
+--- 04 PERSONAL INFO ---
+Favorite color: ${d.s3b.color}
+Favorite food: ${d.s3b.food}
+Favorite movie/show: ${d.s3b.movie}
+Music: ${d.s3b.music}
+Favorite nickname: ${d.s3b.nickname}
+Favorite emoji: ${d.s3b.emoji}
+Pets: ${d.s3b.pets}
+Typical day: ${d.s3b.day}
+Weight: ${d.s3b.weight}
+Bra size: ${d.s3b.bra}
+Waist: ${d.s3b.waist}
+Hips: ${d.s3b.hips}
+Shoe size: ${d.s3b.shoe}
+Dress size: ${d.s3b.dress}
+Hair color: ${[d.s3b.hair, d.s3b.hairType].filter(Boolean).join(', ')}
+
+--- 05 CONTENT ---
+Favorite video formats: ${d.s4.oblibena.join(', ')}
+Inspirational profiles: ${d.s4.reference.join(', ')}
+Won't film: ${d.s4.never}
+
+--- 06 BOUNDARIES ---
+Taboo topics: ${d.s5.temata.join(', ')}
+Won't collab with: ${d.s5.kolaborace.join(', ')}
+
+--- 07 TIME & AVAILABILITY ---
+Availability: ${d.s6.dostupnost}
+What she enjoys: ${d.s6.love}
+
+--- 08 CHATTING ---
+Content she does: ${d.s8.content.join(', ')}
+Custom delivery time: ${d.s8.delivery}
+Live on OF: ${[d.s8.live, d.s8.liveSchedule].filter(Boolean).join(' | ')}
+Hard limits: ${d.s8.limits.join(', ')}
+How fans should describe her: ${d.s8.fansDesc}
+
+--- 09 OTHER ---
+Video calls: ${d.s7.videohovory}
+What she doesn't want during video calls: ${d.s7.video_limity}
+Custom content price: ${d.s7.customs}
+Important info for chat: ${d.s7.poznamky}
+Goal: ${d.s7.goal}`;
+
+  const body = {
+    _subject: 'Creator Bible - ' + d.model,
+    Chatter_Sheet: chatterSheet,
+    Cely_formular: celyFormular
+  };
+  const btn = document.getElementById('btn-next');
+  btn.textContent = translations[lang].labels.sending;
+  btn.disabled = true;
+  // Always go to export - send in background
+  goTo(TOTAL-1);
+  fetch('https://formspree.io/f/mkoadwrq', {
+    method: 'POST',
+    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    mode: 'cors'
+  }).catch(() => {});
+  // Put her answers straight into Agency OS as her persona. The language she
+  // picked at the start decides the agency (cz = CZ, en = US). Formspree above
+  // is the backup copy, so a failure here is silent for her.
+  fetch('https://kvwwjyvkoiqsvpyzbcmn.supabase.co/functions/v1/creator-bible-submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: d.model, ofUsername: document.getElementById('popup-of').value.trim(), lang: lang, celyFormular: celyFormular, chatterSheet: chatterSheet }),
+    mode: 'cors'
+  }).catch(() => {});
+  // When this page is framed inside Agency OS (Zion), tell the parent window
+  // the form was submitted so it can save the answers to her profile.
+  // A plain no-op when the form is opened on its own from a link.
+  try {
+    if (window.parent !== window) window.parent.postMessage({ source: 'creator-bible', type: 'submitted', celyFormular: celyFormular, chatterSheet: chatterSheet }, '*');
+  } catch (e) {}
+}
+
+function addBullet(id){
+  const list = document.getElementById(id);
+  const row = document.createElement('div');
+  row.className = 'bullet-row new';
+  row.innerHTML = '<div class="bullet-dot"></div><input type="text" placeholder="...">';
+  list.appendChild(row);
+}
+
+function toggleArch(btn){ btn.classList.toggle('selected'); }
+// Single choice: selecting one button clears the others in the same group (click again to clear).
+function pickOne(btn){ const was = btn.classList.contains('selected'); btn.parentElement.querySelectorAll('.arch-btn').forEach(b => b.classList.remove('selected')); if(!was) btn.classList.add('selected'); }
+
+function addKw(wrapId, inputId){
+  const inp = document.getElementById(inputId);
+  const val = inp.value.trim();
+  if(!val) return;
+  const wrap = document.getElementById(wrapId);
+  const tag = document.createElement('div');
+  tag.className = 'kw-tag';
+  tag.innerHTML = val + '<button onclick="this.parentElement.remove()" aria-label="' + translations[lang].labels.removeLabel + '">×</button>';
+  wrap.appendChild(tag);
+  inp.value = '';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('kw-fans-inp').addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); addKw('kw-fans','kw-fans-inp'); }});
+  document.getElementById('kw-words-inp').addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); addKw('kw-words','kw-words-inp'); }});
+});
+
+document.addEventListener('keydown', e => {
+  if(e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.id !== 'kw-fans-inp' && e.target.id !== 'kw-words-inp' && e.target.id !== 'popup-name' && e.target.id !== 'popup-of' && cur < TOTAL-1){
+    e.preventDefault(); navigate(1);
+  }
+});
+
+function gv(id){ const el=document.getElementById(id); return el?el.value.trim():''; }
+function gi(cid){ const el=document.getElementById(cid); if(!el)return[]; return Array.from(el.querySelectorAll('input[type=text]')).map(i=>i.value.trim()).filter(Boolean); }
+function gk(wid){ const w=document.getElementById(wid); if(!w)return[]; return Array.from(w.querySelectorAll('.kw-tag')).map(t=>t.textContent.replace('×','').trim()); }
+// Spanish answers are sent to the team with the English option text (so the US team reads one language); on screen and in her PDF they stay Spanish.
+let teamValues = false;
+function bv(b){ return (teamValues && lang === 'es' && b.dataset.en) ? b.dataset.en : b.textContent; }
+function initEn(){
+  const e = translations.en.labels;
+  const grp = {'arch-grid': e.archetypeOptions, 's1-english': e.englishOptions, 's3b-hairtype': e.hairTypeOptions, 's8-content': e.contentOptions, 's8-delivery': e.deliveryOptions, 's8-live': e.liveOptions, 's8-limits': e.limitsOptions};
+  Object.keys(grp).forEach(id => { const g = document.getElementById(id); if(!g) return; g.querySelectorAll('.arch-btn').forEach((b, i) => { if(grp[id][i] !== undefined) b.dataset.en = grp[id][i]; }); });
+  const one = {'btn-single': e.relSingle, 'btn-taken': e.relTaken, 'btn-comp': e.relComplicated, 'btn-ft-full': e.ftFulltime, 'btn-ft-work': e.ftWork, 'btn-ft-side': e.ftSide, 'btn-vid-yes': e.videoYes, 'btn-vid-no': e.videoNo};
+  Object.keys(one).forEach(id => { const b = document.getElementById(id); if(b) b.dataset.en = one[id]; });
+}
+function gGroup(id){ const g=document.getElementById(id); if(!g)return[]; return Array.from(g.querySelectorAll('.arch-btn.selected')).map(bv); }
+function gArch(secId){ const sec=document.getElementById(secId); if(!sec)return[]; return Array.from(sec.querySelectorAll('.arch-btn.selected')).map(bv); }
+
+function collectAll(){
+  return {
+    model: gv('cv-name'), date: gv('cv-date'),
+    s1: { vek:'', vyska:gv('s1-height'), oci:gv('s1-eyes'), lokace:gv('s1-loc'), tetovani:gv('s1-tattoos'), mazlicek:gv('s1-pet'), vztah:gGroup('s1-rel').join(', '), stageBd:gv('s1-stagebd'), stageAge:gv('s1-stageage'), nationality:gv('s1-nat'), stageNick:gv('s1-stagenick'), english:gGroup('s1-english').join(', '), hobby:gv('s1-hobbies'), zaliby:gv('s1-zaliby'), pribeh:gv('s1-story'), osobnost:gi('s1-traits'), odliseni:gv('s1-diff') },
+    s2: { archetypy:gArch('sec2'), vlastni:gv('s2-custom'), vibe:gv('s2-vibe') },
+    s3: { tov:gv('s3-tov'), osloveni:gk('kw-fans'), slova:gk('kw-words') },
+    s3b: { color:gv('s3b-color'), food:gv('s3b-food'), movie:gv('s3b-movie'), music:gv('s3b-music'), nickname:[...gArch('sec3b-nick'), gv('s3b-nick-other')].filter(Boolean).join(', '), emoji:gv('s3b-emoji'), pets:gv('s3b-pets'), day:gv('s3b-day'), weight:gv('s3b-weight'), bra:gv('s3b-bra'), waist:gv('s3b-waist'), hips:gv('s3b-hips'), shoe:gv('s3b-shoe'), dress:gv('s3b-dress'), hair:gv('s3b-hair'), hairType:gGroup('s3b-hairtype').join(', ') },
+    s4: { oblibena:gi('s4-fav'), reference:gi('s4-refs'), never:gv('s4-never') },
+    s5: { temata:gi('s5-top'), kolaborace:gi('s5-col') },
+    s6: { dostupnost:gArch('sec6').join(', '), love:gv('s6-love') },
+    s8: { content:gGroup('s8-content'), delivery:gGroup('s8-delivery').join(', '), live:gGroup('s8-live').join(', '), liveSchedule:gv('s8-live-schedule'), limits:[...gGroup('s8-limits'), gv('s8-limits-other')].filter(Boolean), fansDesc:gv('s8-fansdesc') },
+    s7: { goal:gv('s7-goal'), customs:gv('s7-customs'), videohovory:gArch('sec7').join(', '), video_limity:gv('s7-calls-limits'), poznamky:gv('s7-notes') }
+  };
+}
+
+function buildSummary(){
+  const d = collectAll();
+  const L = translations[lang].labels;
+  const name = d.model || L.defName;
+  document.getElementById('ex-title').textContent = name + ': ' + translations[lang].labels.exportTitle;
+  document.getElementById('ex-sub').textContent = translations[lang].labels.exportSub;
+  const card = document.getElementById('summary-card');
+  const rows = [
+    [L.sumName, name],
+    [L.sumBirth, d.date||'-'],
+    [L.sumArch, d.s2.archetypy.join(', ')||d.s2.vlastni||'-'],
+    [L.sumStyle, d.s3.tov||'-'],
+    [L.sumAddr, d.s3.osloveni.join(', ')||'-'],
+    [L.sumAvail, d.s6.dostupnost||'-'],
+  ];
+  card.innerHTML = rows.map(([k,v]) => `<div class="summary-row"><span class="summary-key">${k}</span><span class="summary-val">${v}</span></div>`).join('');
+}
+
+// ---- PDF helpers ----
+function makePDF(){
+  const {jsPDF} = window.jspdf;
+  const pdf = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const W=210,H=297,M=16,CW=W-M*2;
+  let y=M;
+  const chk = n => { if(y+n>H-14){pdf.addPage();y=M;} };
+  const rule = (c,w=0.3) => { pdf.setDrawColor(...c);pdf.setLineWidth(w);pdf.line(M,y,W-M,y);y+=3; };
+  const lbl = (t,accent) => { chk(8);pdf.setFontSize(7);pdf.setFont('helvetica','bold');pdf.setTextColor(accent?18:130,accent?179:130,accent?76:130);pdf.text(t,M,y);y+=4; };
+  const val = t => { if(!t||!t.trim())t='-';chk(6);pdf.setFontSize(9.5);pdf.setFont('helvetica','normal');pdf.setTextColor(30,30,30);const ls=pdf.splitTextToSize(t,CW);ls.forEach(l=>{chk(6);pdf.text(l,M,y);y+=5;});y+=1; };
+  const buls = arr => { if(!arr||!arr.length){val('-');return;}arr.forEach(item=>{chk(6);pdf.setFontSize(9.5);pdf.setFont('helvetica','normal');pdf.setTextColor(30,30,30);const ls=pdf.splitTextToSize('• '+item,CW-4);ls.forEach((l,i)=>{chk(6);pdf.text(l,M+(i>0?4:0),y);y+=5;});});y+=1;};
+  const secT = t => { chk(14);pdf.setFontSize(7.5);pdf.setFont('helvetica','bold');pdf.setTextColor(150,150,150);pdf.text(t,M,y);y+=1.5;rule([210,210,210]); };
+  const sp = () => { y+=4; };
+  return {pdf,W,H,M,CW,y:()=>y,setY:v=>{y=v;},chk,rule,lbl,val,buls,secT,sp};
+}
+
+// ---- PDF text per language (Czech without diacritics as before; English and Spanish) ----
+const PDFT = {
+  cz: { defName:'Modelka', brandOf:n=>n+"'s brand =", born:'nar. ',
+    bc1:'1. Kdo jsi', bc2:'2. Tvuj vibe', bc3:'3. Jak se odlisujes', bc4:'4. Tone of Voice pro reels', bc5:'5. Co bude tocit za obsah', bcSum:'Shrnuti', bcAddr:'Fanousky oslovi: ', bcWords:'Pouziva vyrazy: ', bcNever:'Nikdy: ',
+    h1:'01  Kdo jsi', age:'Vek', pubAge:'Verejny vek', nat:'Narodnost', eng:'Anglictina', from:'Odkud', story:'Pribeh', pers:'Osobnost', diff:'Odliseni od ostatnich',
+    h2:'02  Tvuj vibe', types:'Vybrane typy', vibeOwn:'Vlastni popis vibe', h3:'03  Komunikace & TOV', style:'Styl komunikace', h4:'04  Obsah', favFormats:'Oblibene formaty', profiles:'Inspiracni profily', neverShoot:'Co nikdy nechce tocit',
+    h5:'05  Hranice', taboo:'Tabu temata', noCollab:'Nechce kolaborovat s', h6:'06  Dostupnost', sit:'Situace', enjoys:'Co ji bavi',
+    h7:'07  Chatting', contentDoes:'Obsah ktery dela', delivery:'Doba dodani customu', live:'Live na OF', limits:'Tvrde limity', fansDesc:'Jak ji maji fanousci popsat', h8:'08  Cil' },
+  en: { defName:'Creator', brandOf:n=>n+"'s brand =", born:'born ',
+    bc1:'1. Who she is', bc2:'2. Her vibe', bc3:'3. What makes her different', bc4:'4. Tone of voice for reels', bc5:'5. What content she will shoot', bcSum:'Summary', bcAddr:'Addresses fans as: ', bcWords:'Uses expressions: ', bcNever:'Never: ',
+    h1:'01  Who she is', age:'Age', pubAge:'Public age', nat:'Nationality', eng:'English level', from:'From', story:'Story', pers:'Personality', diff:'What makes her different',
+    h2:'02  Her vibe', types:'Selected types', vibeOwn:'Vibe in her own words', h3:'03  Communication & TOV', style:'Communication style', h4:'04  Content', favFormats:'Favorite formats', profiles:'Inspiration profiles', neverShoot:'Never wants to film',
+    h5:'05  Boundaries', taboo:'Taboo topics', noCollab:'Will not collab with', h6:'06  Availability', sit:'Situation', enjoys:'What she enjoys',
+    h7:'07  Chatting', contentDoes:'Content she does', delivery:'Custom delivery time', live:'Live on OF', limits:'Hard limits', fansDesc:'How fans should describe her', h8:'08  Goal' },
+  es: { defName:'Creadora', brandOf:n=>'La marca de '+n+':', born:'nac. ',
+    bc1:'1. Quién es', bc2:'2. Su vibra', bc3:'3. Qué la hace diferente', bc4:'4. Tono de voz para reels', bc5:'5. Qué contenido va a filmar', bcSum:'Resumen', bcAddr:'Se dirige a sus fans como: ', bcWords:'Usa expresiones: ', bcNever:'Nunca: ',
+    h1:'01  Quién es', age:'Edad', pubAge:'Edad pública', nat:'Nacionalidad', eng:'Nivel de inglés', from:'De dónde es', story:'Historia', pers:'Personalidad', diff:'Qué la hace diferente',
+    h2:'02  Su vibra', types:'Tipos elegidos', vibeOwn:'Su vibra con sus palabras', h3:'03  Comunicación y TOV', style:'Estilo de comunicación', h4:'04  Contenido', favFormats:'Formatos favoritos', profiles:'Perfiles de inspiración', neverShoot:'Lo que nunca quiere filmar',
+    h5:'05  Límites', taboo:'Temas tabú', noCollab:'No quiere colaborar con', h6:'06  Disponibilidad', sit:'Situación', enjoys:'Qué disfruta',
+    h7:'07  Chatting', contentDoes:'Contenido que hace', delivery:'Tiempo de entrega de customs', live:'Live en OF', limits:'Límites firmes', fansDesc:'Cómo quiere que la describan los fans', h8:'08  Meta' }
+};
+
+// ---- BRAND CARD ----
+// Only shown (and only does anything) when the form runs inside Agency OS.
+function continueToDashboard(){
+  try {
+    window.parent.postMessage({ source: 'creator-bible', type: 'continue' }, '*');
+  } catch (e) {}
+}
+if (window.parent !== window) {
+  document.addEventListener('DOMContentLoaded', () => {
+    const b = document.getElementById('btn-continue');
+    if (b) b.style.display = 'flex';
+  });
+}
+
+function exportBrandCard(){
+  const d = collectAll();
+  const P = PDFT[lang];
+  const name = d.model||P.defName;
+  const {jsPDF} = window.jspdf;
+  const pdf = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const W=210,H=297,M=20,CW=W-M*2;
+  let y=M;
+
+  function chk(n){ if(y+n>H-16){pdf.addPage();y=M;} }
+
+  // Big section heading like in reference doc
+  function heading(text){
+    chk(18);
+    pdf.setFontSize(16);
+    pdf.setFont('helvetica','bold');
+    pdf.setTextColor(20,20,20);
+    pdf.text(text,M,y);
+    y+=2;
+    pdf.setDrawColor(220,220,220);
+    pdf.setLineWidth(0.3);
+    pdf.line(M,y,W-M,y);
+    y+=6;
+  }
+
+  // Body text - no labels, just prose paragraphs
+  function body(text){
+    if(!text||!text.trim()) return;
+    chk(8);
+    pdf.setFontSize(10.5);
+    pdf.setFont('helvetica','normal');
+    pdf.setTextColor(40,40,40);
+    const lines = pdf.splitTextToSize(text, CW);
+    lines.forEach(l=>{ chk(6); pdf.text(l,M,y); y+=5.5; });
+    y+=3;
+  }
+
+  // Bullet points
+  function bullets(arr){
+    if(!arr||!arr.length) return;
+    arr.filter(Boolean).forEach(item=>{
+      chk(6);
+      pdf.setFontSize(10.5);
+      pdf.setFont('helvetica','normal');
+      pdf.setTextColor(40,40,40);
+      const ls = pdf.splitTextToSize('* '+item, CW-6);
+      ls.forEach((l,i)=>{ chk(6); pdf.text(l, M+(i>0?6:0), y); y+=5.5; });
+    });
+    y+=2;
+  }
+
+  function sp(){ y+=5; }
+
+  // TITLE
+  pdf.setFontSize(13);
+  pdf.setFont('helvetica','bold');
+  pdf.setTextColor(40,40,40);
+  pdf.text('Brand Identity Book - '+name, M, y);
+  y+=12;
+
+  // 1. KDO JSI
+  heading(P.bc1);
+  const info = [d.s1.vek, d.s1.lokace].filter(Boolean).join('. ');
+  const kdo = [info, d.s1.pribeh, d.s1.osobnost.filter(Boolean).join('. ')].filter(Boolean).join(' ');
+  body(kdo||'-');
+  sp();
+
+  // 2. VIBE
+  heading(P.bc2);
+  const arch = d.s2.archetypy.join(' + ')||d.s2.vlastni||'';
+  const vibeText = [arch ? arch+'.' : '', d.s2.vibe].filter(Boolean).join(' ');
+  body(vibeText||'-');
+  sp();
+
+  // 3. JAK SE ODLISUJES
+  heading(P.bc3);
+  body(d.s1.odliseni||'-');
+  sp();
+
+  // 4. TONE OF VOICE
+  heading(P.bc4);
+  const tovParts = [];
+  if(d.s3.tov) tovParts.push(d.s3.tov+'.');
+  if(d.s3.osloveni.length) tovParts.push(P.bcAddr+d.s3.osloveni.join(', ')+'.');
+  if(d.s3.slova.length) tovParts.push(P.bcWords+d.s3.slova.join(', ')+'.');
+  body(tovParts.join(' ')||'-');
+  sp();
+
+  // 5. CO BUDE DELAT
+  heading(P.bc5);
+  bullets(d.s4.oblibena);
+  if(d.s4.never){
+    chk(8);
+    pdf.setFontSize(10.5);pdf.setFont('helvetica','normal');pdf.setTextColor(40,40,40);
+    const ls=pdf.splitTextToSize(P.bcNever+d.s4.never, CW);
+    ls.forEach(l=>{chk(6);pdf.text(l,M,y);y+=5.5;});
+    y+=3;
+  }
+  sp();
+
+  // SHRNUTI
+  heading(P.bcSum);
+  const shrParts = [
+    P.brandOf(name),
+    arch ? arch+'.' : '',
+    d.s1.pribeh ? d.s1.pribeh.split(/[.!?]/)[0]+'.' : '',
+    d.s1.odliseni ? d.s1.odliseni.split(/[.!?]/)[0]+'.' : '',
+    d.s2.vibe ? d.s2.vibe.split(/[.!?]/)[0]+'.' : '',
+  ].filter(Boolean).join(' ');
+  body(shrParts);
+
+  // FOOTER
+  pdf.setDrawColor(200,200,200);
+  pdf.setLineWidth(0.2);
+  pdf.line(M,H-10,W-M,H-10);
+  pdf.setFontSize(7);pdf.setFont('helvetica','normal');pdf.setTextColor(180,180,180);
+  pdf.text('Brand Identity Book  |  '+name, M, H-6);
+  if(d.date){ pdf.text(P.born+d.date, W-M, H-6, {align:'right'}); }
+
+  pdf.save(name.replace(/\s+/g,'_')+'_brand_card.pdf');
+}
+
+// ---- KOMPLETNI PDF ----
+function exportFullPDF(){
+  const d = collectAll();
+  const P = PDFT[lang];
+  const name = d.model||P.defName;
+  const {jsPDF} = window.jspdf;
+  const pdf = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const W=210,H=297,M=18,CW=W-M*2;
+  let y=M;
+  function chk(n){if(y+n>H-M){pdf.addPage();y=M;}}
+  function title(t){chk(20);pdf.setFontSize(15);pdf.setFont('helvetica','bold');pdf.setTextColor(18,179,76);pdf.text(t,M,y);y+=2;pdf.setDrawColor(18,179,76);pdf.setLineWidth(0.5);pdf.line(M,y,W-M,y);y+=6;}
+  function lbl(t){chk(8);pdf.setFontSize(7.5);pdf.setFont('helvetica','bold');pdf.setTextColor(140,140,140);pdf.text(t,M,y);y+=4;}
+  function val(t){if(!t||!t.trim())t='-';chk(6);pdf.setFontSize(10);pdf.setFont('helvetica','normal');pdf.setTextColor(30,30,30);const ls=pdf.splitTextToSize(t,CW);ls.forEach(l=>{chk(6);pdf.text(l,M,y);y+=5;});y+=2;}
+  function buls(arr){if(!arr||!arr.length){val('-');return;}arr.forEach(item=>{chk(6);pdf.setFontSize(10);pdf.setFont('helvetica','normal');pdf.setTextColor(30,30,30);const ls=pdf.splitTextToSize('• '+item,CW-4);ls.forEach((l,i)=>{chk(6);pdf.text(l,M+(i>0?4:0),y);y+=5;});});y+=2;}
+  function sp(){y+=5;}
+
+  y=M;
+  pdf.setFontSize(18);pdf.setFont('helvetica','bold');pdf.setTextColor(18,179,76);
+  pdf.text('CREATOR BIBLE  |  '+name,M,y);
+  y+=2;pdf.setDrawColor(18,179,76);pdf.setLineWidth(0.5);pdf.line(M,y,W-M,y);y+=8;
+  title(P.h1);
+  lbl(P.age);val(d.s1.vek);
+  lbl(P.pubAge);val(d.s1.stageAge);
+  lbl(P.nat);val(d.s1.nationality);
+  lbl(P.eng);val(d.s1.english);
+  lbl(P.from);val(d.s1.lokace);
+  lbl(P.story);val(d.s1.pribeh);
+  lbl(P.pers);buls(d.s1.osobnost);
+  lbl(P.diff);val(d.s1.odliseni);
+  sp();
+  title(P.h2);
+  lbl(P.types);val(d.s2.archetypy.join(', ')||d.s2.vlastni||'-');
+  lbl(P.vibeOwn);val(d.s2.vibe);
+  sp();
+  title(P.h3);
+  lbl(P.style);val(d.s3.tov);
+  sp();
+  title(P.h4);
+  lbl(P.favFormats);buls(d.s4.oblibena);
+  lbl(P.profiles);buls(d.s4.reference);
+  lbl(P.neverShoot);val(d.s4.never);
+  sp();
+  title(P.h5);
+  lbl(P.taboo);buls(d.s5.temata);
+  lbl(P.noCollab);buls(d.s5.kolaborace);
+  sp();
+  title(P.h6);
+  lbl(P.sit);val(d.s6.dostupnost||'-');
+  lbl(P.enjoys);val(d.s6.love);
+  sp();
+  title(P.h7);
+  lbl(P.contentDoes);buls(d.s8.content);
+  lbl(P.delivery);val(d.s8.delivery);
+  lbl(P.live);val([d.s8.live,d.s8.liveSchedule].filter(Boolean).join(' | '));
+  lbl(P.limits);buls(d.s8.limits);
+  lbl(P.fansDesc);val(d.s8.fansDesc);
+  sp();
+  title(P.h8);
+  val(d.s7.goal);
+
+  pdf.save(name.replace(/\s+/g,'_')+'_creator_bible.pdf');
+}
+
+initEn();
+buildDots();
+</script>
+</body>
+</html>
