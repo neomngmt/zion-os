@@ -23594,6 +23594,146 @@ a:focus-visible, button:focus-visible{ outline:2px solid var(--lp-green); outlin
 .nav-bar .by-neo-tag{ font-size:14px; }
 @media (max-width:700px){ .nav .links{ display:none !important; } .z2-hero{ padding-top:92px; } .z2-kick{ font-size:9px; letter-spacing:2px; padding:7px 12px; white-space:nowrap; } .z2-h1{ margin-top:20px; } }
 @media (prefers-reduced-motion: reduce){ .z2 *{ animation-duration:.01s !important; animation-iteration-count:1 !important; transition-duration:.01s !important; } .z2-h1 .w,.z2-sub,.z2-ctas,.z2-pills{ opacity:1; transform:none; filter:none; } }
+
+/* ---------- who it is for ---------- */
+.zw-split{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+.zw-side{ position:relative; overflow:hidden; border-radius:28px; padding:34px 32px 30px; border:1px solid rgba(255,255,255,.08); background:linear-gradient(160deg, rgba(57,230,115,.09), rgba(255,255,255,.012) 55%), var(--card); min-height:600px; }
+.zw-agency{ background:linear-gradient(200deg, rgba(76,195,255,.09), rgba(255,255,255,.012) 55%), var(--card); }
+.zw-orbit{ position:absolute; right:-120px; top:-120px; width:360px; height:360px; pointer-events:none; }
+.zw-orbit i{ position:absolute; inset:0; border-radius:50%; border:1px solid rgba(57,230,115,.14); animation:zwSpin 22s linear infinite; }
+.zw-orbit i:nth-child(2){ inset:40px; animation-duration:16s; animation-direction:reverse; border-style:dashed; }
+.zw-orbit i:nth-child(3){ inset:90px; animation-duration:30s; }
+.zw-orbit i::after{ content:""; position:absolute; top:-4px; left:50%; width:8px; height:8px; border-radius:50%; background:var(--g); box-shadow:0 0 14px var(--g); }
+.zw-agency .zw-orbit i{ border-color:rgba(76,195,255,.16); } .zw-agency .zw-orbit i::after{ background:#4cc3ff; box-shadow:0 0 14px #4cc3ff; }
+@keyframes zwSpin{ to{ transform:rotate(360deg); } }
+.zw-kick{ display:inline-flex; align-items:center; gap:9px; font-size:11px; letter-spacing:3px; color:var(--g); border:1px solid var(--line); border-radius:99px; padding:7px 13px; background:rgba(57,230,115,.05); }
+.zw-kick span{ width:7px; height:7px; border-radius:50%; background:currentColor; box-shadow:0 0 10px currentColor; animation:z2-pulse 2s ease-in-out infinite; }
+.zw-agency .zw-kick{ color:#4cc3ff; border-color:rgba(76,195,255,.3); background:rgba(76,195,255,.05); }
+@keyframes z2-pulse{ 0%,100%{ opacity:.5; } 50%{ opacity:1; } }
+.zw-side h3{ font-size:clamp(30px,3.4vw,44px); font-weight:900; letter-spacing:-.035em; line-height:1; margin:18px 0 22px; text-transform:uppercase; }
+.zw-side ul{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:12px; max-width:54%; position:relative; z-index:1; }
+.zw-side li{ padding-left:18px; position:relative; opacity:0; transform:translateY(12px); transition:opacity .6s, transform .6s; transition-delay:calc(var(--i) * 90ms + .2s); }
+.zw-side.in-view li{ opacity:1; transform:none; }
+.zw-side li::before{ content:""; position:absolute; left:0; top:8px; width:7px; height:7px; border-radius:2px; transform:rotate(45deg); background:var(--g); box-shadow:0 0 8px var(--g); }
+.zw-agency li::before{ background:#4cc3ff; box-shadow:0 0 8px #4cc3ff; }
+.zw-side li b{ display:block; font-size:15px; } .zw-side li em{ display:block; font-style:normal; font-size:13px; color:var(--dim); line-height:1.5; margin-top:2px; }
+.zw-phone{ position:absolute; right:26px; bottom:-30px; width:190px; height:330px; border-radius:34px; border:2px solid rgba(255,255,255,.14); background:linear-gradient(180deg,#0d1310,#070908); padding:30px 14px 14px; box-shadow:0 30px 70px rgba(0,0,0,.6), 0 0 50px rgba(57,230,115,.12); animation:z2-bob 6s ease-in-out infinite; }
+.zw-notch{ position:absolute; top:10px; left:50%; width:62px; height:16px; margin-left:-31px; border-radius:99px; background:#000; }
+.zw-ph-lab{ font-size:9px; letter-spacing:2px; color:var(--dim); }
+.zw-ph-big{ font-size:34px; font-weight:900; letter-spacing:-1.5px; margin-top:4px; }
+.zw-ph-bar{ height:5px; border-radius:99px; background:rgba(255,255,255,.08); margin:8px 0 14px; overflow:hidden; }
+.zw-ph-bar i{ display:block; height:100%; width:78%; border-radius:99px; background:linear-gradient(90deg,var(--g),var(--lime)); box-shadow:0 0 10px var(--g); animation:zwGrow 3s ease-out both; }
+@keyframes zwGrow{ from{ width:0; } }
+.zw-push{ font-size:11px; padding:9px 10px; border-radius:13px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.09); margin-bottom:7px; backdrop-filter:blur(6px); opacity:0; transform:translateY(-10px) scale(.96); animation:zwPush 7.8s ease-in-out infinite; animation-delay:var(--d); }
+.zw-push b{ display:block; font-size:8.5px; letter-spacing:1.5px; color:var(--g); margin-bottom:2px; }
+@keyframes zwPush{ 0%{ opacity:0; transform:translateY(-10px) scale(.96); } 6%,60%{ opacity:1; transform:none; } 72%,100%{ opacity:0; transform:translateY(-6px); } }
+.zw-roster{ position:absolute; right:24px; bottom:26px; width:min(40%,240px); padding:14px; border-radius:18px; border:1px solid rgba(76,195,255,.2); background:rgba(7,10,9,.7); backdrop-filter:blur(8px); display:flex; flex-direction:column; gap:10px; }
+.zw-r{ display:grid; grid-template-columns:24px 1fr auto; align-items:center; gap:8px; }
+.zw-av{ width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:#0b0f0d; }
+.zw-rb{ height:7px; border-radius:99px; background:rgba(255,255,255,.07); overflow:hidden; }
+.zw-rb i{ display:block; height:100%; width:0; border-radius:99px; background:var(--c,#39e673); box-shadow:0 0 10px var(--c,#39e673); transition:width 1.6s cubic-bezier(.2,.8,.2,1) .3s; }
+.zw-side.in-view .zw-rb i{ width:var(--w); }
+.zw-r b{ font-size:11px; color:var(--text, #f2f5f0); }
+.zw-r-note{ font-size:8.5px; letter-spacing:2px; color:#ffb020; text-align:right; }
+/* ---------- filters on the bento ---------- */
+.zf{ display:flex; flex-wrap:wrap; justify-content:center; gap:6px; margin:-18px auto 26px; padding:6px; border:1px solid var(--line); border-radius:99px; width:max-content; max-width:100%; background:rgba(255,255,255,.02); }
+.zf button{ border:0; background:transparent; color:var(--dim); font:600 11px 'JetBrains Mono',monospace; letter-spacing:2px; text-transform:uppercase; padding:9px 16px; border-radius:99px; cursor:pointer; transition:all .3s; }
+.zf button.on{ background:var(--g); color:#03110a; box-shadow:0 0 24px rgba(57,230,115,.4); }
+.z2-bento.filtered .z2-c{ grid-column:span 4 !important; }
+.z2-c.zf-off{ display:none; }
+.z2-c.zf-in{ animation:zfIn .55s cubic-bezier(.2,.8,.2,1) both; animation-delay:calc(var(--k,0) * 40ms); }
+@keyframes zfIn{ from{ opacity:0; transform:translateY(16px) scale(.97); } to{ opacity:1; transform:none; } }
+/* ---------- neo ---------- */
+.zn{ display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:center; border-radius:32px; padding:46px; border:1px solid rgba(57,230,115,.16); background:radial-gradient(700px 400px at 80% 50%, rgba(57,230,115,.12), transparent 70%), var(--card); overflow:hidden; position:relative; }
+.zn-chips{ display:flex; flex-wrap:wrap; gap:7px; margin-top:22px; }
+.zn-chips span{ font-size:10px; letter-spacing:2px; padding:6px 11px; border-radius:99px; border:1px solid var(--line); color:var(--g); background:rgba(57,230,115,.05); }
+.zn-stage{ position:relative; height:460px; display:flex; align-items:center; justify-content:center; }
+.zn-orb{ position:relative; width:250px; height:250px; z-index:1; }
+.zn-orb canvas{ width:100% !important; height:100% !important; }
+.zn-rings{ position:absolute; left:50%; top:42%; width:0; height:0; }
+.zn-rings i{ position:absolute; left:-150px; top:-150px; width:300px; height:300px; border-radius:50%; border:1px solid rgba(57,230,115,.25); animation:znRing 4.5s ease-out infinite; }
+.zn-rings i:nth-child(2){ animation-delay:1.5s; } .zn-rings i:nth-child(3){ animation-delay:3s; }
+@keyframes znRing{ from{ transform:scale(.7); opacity:.8; } to{ transform:scale(1.6); opacity:0; } }
+.zn-stage .zn-orb{ margin-top:-90px; }
+.zn-wave{ position:absolute; left:50%; top:calc(42% + 140px); transform:translateX(-50%); display:flex; gap:5px; align-items:center; height:34px; }
+.zn-wave i{ width:4px; height:30%; border-radius:4px; background:var(--g); box-shadow:0 0 8px var(--g); animation:znWave 1.1s ease-in-out infinite; animation-delay:calc(var(--i) * -.13s); }
+@keyframes znWave{ 0%,100%{ height:20%; } 50%{ height:100%; } }
+.zn-talk{ position:absolute; left:0; right:0; bottom:0; height:150px; }
+.zn-talk span{ position:absolute; left:0; bottom:0; max-width:78%; font-size:12.5px; line-height:1.45; padding:9px 13px; border-radius:16px 16px 16px 4px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09); opacity:0; animation:znTalk 15s ease-in-out infinite; animation-delay:calc(var(--i) * 3s); }
+.zn-talk span.me{ left:auto; right:0; border-radius:16px 16px 4px 16px; background:rgba(57,230,115,.12); border-color:var(--line); color:#c9ffdc; }
+.zn-talk span.pdf{ background:linear-gradient(135deg, rgba(57,230,115,.2), rgba(57,230,115,.05)); border-color:rgba(57,230,115,.45); color:#f2f5f0; }
+.zn-talk span.pdf b{ display:inline-block; font-size:9px; letter-spacing:1.5px; color:#03110a; background:var(--g); border-radius:5px; padding:2px 5px; margin-right:6px; }
+@keyframes znTalk{ 0%{ opacity:0; transform:translateY(14px); } 3%,17%{ opacity:1; transform:none; } 20%,100%{ opacity:0; transform:translateY(-10px); } }
+/* ---------- onboarding track ---------- */
+.zo{ position:relative; display:grid; grid-template-columns:repeat(5,1fr); gap:14px; padding-top:34px; }
+.zo-line{ position:absolute; left:10%; right:10%; top:55px; height:2px; background:rgba(255,255,255,.08); }
+.zo-line i{ display:block; height:100%; width:calc(100% * var(--p,0)); background:linear-gradient(90deg,var(--g),var(--lime)); box-shadow:0 0 12px var(--g); }
+.zo-step{ position:relative; text-align:center; padding:0 6px; opacity:0; transform:translateY(16px); transition:opacity .6s, transform .6s; transition-delay:calc(var(--i) * 120ms); }
+.zo.in-view .zo-step{ opacity:1; transform:none; }
+.zo-dot{ width:44px; height:44px; margin:0 auto 14px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--g); background:#0b0f0d; border:1px solid var(--line); box-shadow:0 0 0 6px rgba(57,230,115,.04); position:relative; z-index:1; transition:all .5s; transition-delay:calc(var(--i) * 160ms + .3s); }
+.zo.in-view .zo-dot{ background:var(--g); color:#03110a; box-shadow:0 0 0 6px rgba(57,230,115,.08), 0 0 24px rgba(57,230,115,.5); }
+.zo-step h4{ font-size:17px; font-weight:800; }
+.zo-step p{ font-size:13px; color:var(--dim); line-height:1.5; margin-top:6px; }
+/* ---------- devices ---------- */
+.zd{ position:relative; display:flex; justify-content:center; align-items:flex-end; gap:0; padding:10px 0 30px; }
+.zd-mac{ width:min(760px,100%); }
+.zd-screen{ display:grid; grid-template-columns:54px 1fr; gap:14px; aspect-ratio:16/10; border-radius:18px 18px 0 0; border:10px solid #151a17; border-bottom:none; background:linear-gradient(180deg,#0f1512,#080b0a); padding:16px; box-shadow:0 40px 100px rgba(0,0,0,.6), 0 0 80px rgba(57,230,115,.1); }
+.zd-side{ display:flex; flex-direction:column; gap:10px; padding-top:4px; }
+.zd-side i{ height:10px; border-radius:4px; background:rgba(255,255,255,.07); }
+.zd-side i.on{ background:var(--g); box-shadow:0 0 10px var(--g); }
+.zd-main{ display:flex; flex-direction:column; gap:12px; min-width:0; }
+.zd-row{ display:flex; gap:12px; }
+.zd-tile{ flex:1; min-width:0; border-radius:14px; border:1px solid rgba(255,255,255,.07); background:rgba(255,255,255,.02); padding:14px; display:flex; flex-direction:column; gap:6px; }
+.zd-tile.big{ flex:2.2; }
+.zd-tile > span{ font-size:9px; letter-spacing:2px; color:var(--dim); }
+.zd-tile b{ font-size:clamp(18px,2.6vw,30px); font-weight:900; letter-spacing:-1px; }
+.zd-tile svg{ width:100%; height:60px; }
+.zd-l{ fill:none; stroke:var(--g); stroke-width:3; filter:drop-shadow(0 0 6px rgba(57,230,115,.6)); stroke-dasharray:420; stroke-dashoffset:420; animation:zdDraw 3.2s ease-out forwards .4s; }
+@keyframes zdDraw{ to{ stroke-dashoffset:0; } }
+.zd-pg{ height:6px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden; margin-top:auto; }
+.zd-pg i{ display:block; height:100%; width:74%; border-radius:99px; background:linear-gradient(90deg,var(--g),var(--lime)); animation:zwGrow 2.6s ease-out both; }
+.zd-base{ height:16px; margin:0 -6%; border-radius:0 0 18px 18px; background:linear-gradient(180deg,#232a26,#121614); box-shadow:0 20px 40px rgba(0,0,0,.5); position:relative; }
+.zd-base::after{ content:""; position:absolute; left:50%; top:0; width:120px; height:6px; margin-left:-60px; border-radius:0 0 8px 8px; background:#0c0f0d; }
+.zd-iphone{ position:relative; width:200px; height:410px; margin-left:-70px; margin-bottom:-20px; border-radius:38px; border:9px solid #151a17; background:linear-gradient(180deg,#0f1512,#070908); padding:40px 14px 14px; box-shadow:0 40px 90px rgba(0,0,0,.7), 0 0 60px rgba(57,230,115,.14); z-index:2; animation:z2-bob 6s ease-in-out infinite; }
+.zd-island{ position:absolute; top:10px; left:50%; width:70px; height:20px; margin-left:-35px; border-radius:99px; background:#000; }
+.zd-ph-lab{ font-size:9px; letter-spacing:2px; color:var(--g); }
+.zd-ph-big{ font-size:34px; font-weight:900; letter-spacing:-1.5px; margin-top:6px; }
+.zd-ph-sub{ font-size:11px; color:var(--dim); margin-bottom:12px; }
+.zd-ph-card{ border-radius:14px; border:1px solid rgba(255,255,255,.07); background:rgba(255,255,255,.03); padding:10px; margin-bottom:8px; display:flex; flex-direction:column; gap:6px; }
+.zd-ph-card span{ font-size:8.5px; letter-spacing:2px; color:var(--dim); }
+.zd-ph-card em{ font-style:normal; font-size:11.5px; padding-left:14px; position:relative; }
+.zd-ph-card em::before{ content:""; position:absolute; left:0; top:4px; width:8px; height:8px; border-radius:3px; border:1.5px solid var(--g); }
+.zd-ph-push{ position:absolute; left:10px; right:10px; top:36px; font-size:11px; padding:10px 11px; border-radius:14px; background:rgba(30,38,34,.92); border:1px solid rgba(57,230,115,.3); box-shadow:0 10px 30px rgba(0,0,0,.5); animation:zwPush 6s ease-in-out infinite 1.5s; opacity:0; }
+.zd-ph-push b{ display:block; font-size:8.5px; letter-spacing:1.5px; color:var(--g); margin-bottom:2px; }
+/* ---------- phone and tablet ---------- */
+@media (max-width:980px){
+  .zw-split{ grid-template-columns:1fr; }
+  .zn{ grid-template-columns:1fr; padding:30px 22px; gap:10px; }
+  .zn-stage{ height:420px; }
+  .zo{ grid-template-columns:1fr; gap:22px; padding:0 0 0 64px; }
+  .zo-line{ left:22px; right:auto; top:22px; bottom:22px; width:2px; height:auto; }
+  .zo-line i{ width:100%; height:calc(100% * var(--p,0)); }
+  .zo-step{ text-align:left; padding:0; }
+  .zo-dot{ position:absolute; left:-64px; top:-4px; margin:0; }
+}
+@media (max-width:700px){
+  .zw-side{ padding:26px 20px 0; min-height:0; }
+  .zw-side ul{ max-width:100%; }
+  .zw-phone{ position:relative; right:auto; bottom:auto; margin:26px auto -40px; }
+  .zw-roster{ position:relative; right:auto; bottom:auto; width:100%; margin:22px 0 22px; }
+  .zf{ width:100%; justify-content:flex-start; flex-wrap:nowrap; overflow-x:auto; border-radius:16px; scrollbar-width:none; }
+  .zf::-webkit-scrollbar{ display:none; }
+  .zf button{ flex-shrink:0; padding:9px 13px; }
+  .zd{ flex-direction:column; align-items:center; }
+  .zd-mac{ width:100%; }
+  .zd-screen{ grid-template-columns:30px 1fr; padding:10px; gap:8px; border-width:7px; }
+  .zd-row{ gap:7px; } .zd-tile{ padding:8px; border-radius:10px; } .zd-tile svg{ height:34px; }
+  .zd-row:last-child .zd-tile:last-child{ display:none; }
+  .zd-iphone{ margin:-60px 0 0; }
+  .z2-sec{ padding-top:90px; }
+  .z2-money small{ display:block; margin:6px 0 0; }
+}
+@media (prefers-reduced-motion: reduce){ .zw-side li, .zo-step{ opacity:1 !important; transform:none !important; } .zn-talk span:last-child{ opacity:1; } }
 `;
 const LANDING_PAGE_BODY = `
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -23633,13 +23773,13 @@ const LANDING_PAGE_BODY = `
       <span class="w" style="--i:0">Run</span> <span class="w" style="--i:1">the</span> <span class="w" style="--i:2">whole</span> <span class="w" style="--i:3">roster</span><br>
       <span class="w acc" style="--i:4">from</span> <span class="w acc" style="--i:5">one</span> <span class="w acc" style="--i:6">board.</span>
     </h1>
-    <p class="z2-sub">Money, goals, content, edits and every social account of every creator in one place. It syncs on its own, tells you what changed and puts the work in front of the right person.</p>
+    <p class="z2-sub">One app for the creators and the agency behind them. Money, goals, content, edits, every social account and an AI assistant you can talk to. It syncs on its own, tells you what changed and puts the work in front of the right person.</p>
     <div class="z2-ctas">
       <a class="btn-primary" href="https://neomngmt.github.io/agencyos/">Sign in</a>
       <a class="btn-ghost" href="#inside">See everything inside</a>
     </div>
     <div class="z2-pills mono">
-      <span><b>6</b> PLATFORMS</span><span><b>13</b> INSTAGRAM AI AGENTS</span><span><b>10</b> EDITING AGENTS</span><span>NEWS <b>4X</b> A DAY</span><span>PRIVATE, INVITE ONLY</span>
+      <span><b>6</b> PLATFORMS</span><span><b>13</b> INSTAGRAM AI AGENTS</span><span><b>10</b> EDITING AGENTS</span><span>NEO <b>VOICE</b> ASSISTANT</span><span>WEEKLY <b>PDF</b> REPORTS</span><span>PRIVATE, INVITE ONLY</span>
     </div>
   </div>
 </div>
@@ -23681,9 +23821,61 @@ const LANDING_PAGE_BODY = `
 </div>
 
 <div class="z2-marq mono"><div>
-  <span>DASHBOARD</span><b>◆</b><span>AUTO GOALS</span><b>◆</b><span>CONTENT DIRECTOR</span><b>◆</b><span>INSTAGRAM AI STUDIO</span><b>◆</b><span>EDITOR WITH AGENTS</span><b>◆</b><span>CUSTOM REQUESTS</span><b>◆</b><span>CHATTERS</span><b>◆</b><span>NEO ASSISTANT</span><b>◆</b><span>OF NEWS</span><b>◆</b><span>TELEGRAM BOT</span><b>◆</b><span>PUSH ALERTS</span><b>◆</b><span>PHONE APP</span><b>◆</b>
-  <span>DASHBOARD</span><b>◆</b><span>AUTO GOALS</span><b>◆</b><span>CONTENT DIRECTOR</span><b>◆</b><span>INSTAGRAM AI STUDIO</span><b>◆</b><span>EDITOR WITH AGENTS</span><b>◆</b><span>CUSTOM REQUESTS</span><b>◆</b><span>CHATTERS</span><b>◆</b><span>NEO ASSISTANT</span><b>◆</b><span>OF NEWS</span><b>◆</b><span>TELEGRAM BOT</span><b>◆</b><span>PUSH ALERTS</span><b>◆</b><span>PHONE APP</span><b>◆</b>
+  <span>DASHBOARD</span><b>◆</b><span>AUTO GOALS</span><b>◆</b><span>NEO VOICE CALLS</span><b>◆</b><span>WEEKLY REPORTS</span><b>◆</b><span>CONTENT DIRECTOR</span><b>◆</b><span>INSTAGRAM AI STUDIO</span><b>◆</b><span>IG HUB</span><b>◆</b><span>EDITOR WITH AGENTS</span><b>◆</b><span>CUSTOM REQUESTS</span><b>◆</b><span>TRENDS</span><b>◆</b><span>CREATOR + BRAND BIBLE</span><b>◆</b><span>ACQUISITION</span><b>◆</b><span>TELEGRAM REMOTE</span><b>◆</b><span>LINK IN BIO STATS</span><b>◆</b>
+  <span>DASHBOARD</span><b>◆</b><span>AUTO GOALS</span><b>◆</b><span>NEO VOICE CALLS</span><b>◆</b><span>WEEKLY REPORTS</span><b>◆</b><span>CONTENT DIRECTOR</span><b>◆</b><span>INSTAGRAM AI STUDIO</span><b>◆</b><span>IG HUB</span><b>◆</b><span>EDITOR WITH AGENTS</span><b>◆</b><span>CUSTOM REQUESTS</span><b>◆</b><span>TRENDS</span><b>◆</b><span>CREATOR + BRAND BIBLE</span><b>◆</b><span>ACQUISITION</span><b>◆</b><span>TELEGRAM REMOTE</span><b>◆</b><span>LINK IN BIO STATS</span><b>◆</b>
 </div></div>
+
+<div class="wrap" id="who">
+  <div class="z2-sec">
+    <div class="z2-head" data-reveal>
+      <div class="z2-tag mono">BUILT FOR BOTH SIDES</div>
+      <h2 class="z2-h2">Two logins. <span class="acc">One building.</span></h2>
+      <p class="z2-p">Creators see their own world, clean and simple. The agency sees the whole roster. Same data, never mixed.</p>
+    </div>
+    <div class="zw-split">
+      <div class="zw-side zw-creator" data-reveal>
+        <div class="zw-orbit" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="zw-kick mono"><span></span>FOR CREATORS</div>
+        <h3>Your page,<br>your numbers.</h3>
+        <ul>
+          <li style="--i:0"><b>Your money, clearly</b><em>Your share of the month, pace and payout on the first screen.</em></li>
+          <li style="--i:1"><b>A goal built for you</b><em>Set from your own months, with a note on how to reach it.</em></li>
+          <li style="--i:2"><b>Push for every sale</b><em>Tips, customs and new subs, with quiet hours you control.</em></li>
+          <li style="--i:3"><b>What to film this week</b><em>Your tasks, custom requests and shoot list in one place.</em></li>
+          <li style="--i:4"><b>Neo on call</b><em>Ask about your numbers or what to post and get an answer in seconds.</em></li>
+        </ul>
+        <div class="zw-phone" aria-hidden="true">
+          <div class="zw-notch"></div>
+          <div class="zw-ph-lab mono">MY MONEY</div>
+          <div class="zw-ph-big">$<span data-count="3120">0</span></div>
+          <div class="zw-ph-bar"><i></i></div>
+          <div class="zw-push" style="--d:0s"><b class="mono">NEW TIP</b>$40 from a fan</div>
+          <div class="zw-push" style="--d:2.6s"><b class="mono">CUSTOM</b>Request is waiting</div>
+          <div class="zw-push" style="--d:5.2s"><b class="mono">GOAL</b>78% of the month</div>
+        </div>
+      </div>
+      <div class="zw-side zw-agency" data-reveal>
+        <div class="zw-orbit" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="zw-kick mono"><span></span>FOR AGENCIES</div>
+        <h3>The whole roster,<br>on one board.</h3>
+        <ul>
+          <li style="--i:0"><b>Every model side by side</b><em>Revenue by week or month, ranking, goals and pure profit.</em></li>
+          <li style="--i:1"><b>Content on rails</b><em>Boards per platform, AI agents for Instagram and a video editor.</em></li>
+          <li style="--i:2"><b>Reports in a voice call</b><em>Talk to Neo, upload the screens, get the PDF on Telegram.</em></li>
+          <li style="--i:3"><b>Onboarding without typing</b><em>One invite link: password, Creator Bible, Brand Bible, done.</em></li>
+          <li style="--i:4"><b>Growth and recruiting</b><em>Trends, outlier reels, Reddit and X leads scored by AI.</em></li>
+        </ul>
+        <div class="zw-roster" aria-hidden="true">
+          <div class="zw-r"><span class="zw-av" style="background:#39e673">A</span><span class="zw-rb"><i style="--w:92%"></i></span><b class="mono">$8.4K</b></div>
+          <div class="zw-r"><span class="zw-av" style="background:#4cc3ff">B</span><span class="zw-rb"><i style="--w:71%;--c:#4cc3ff"></i></span><b class="mono">$6.1K</b></div>
+          <div class="zw-r"><span class="zw-av" style="background:#ff5db1">C</span><span class="zw-rb"><i style="--w:55%;--c:#ff5db1"></i></span><b class="mono">$4.7K</b></div>
+          <div class="zw-r"><span class="zw-av" style="background:#ffb020">D</span><span class="zw-rb"><i style="--w:38%;--c:#ffb020"></i></span><b class="mono">$3.2K</b></div>
+          <div class="zw-r-note mono">SAMPLE DATA</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="wrap" id="inside">
   <div class="z2-sec">
@@ -23692,22 +23884,34 @@ const LANDING_PAGE_BODY = `
       <h2 class="z2-h2">One system. <span class="acc">Every job.</span></h2>
       <p class="z2-p">This is the whole of Zion OS, nothing hidden behind a sales call. Each card is a real page or a real automation that runs today.</p>
     </div>
-    <div class="z2-bento">
-      <div class="z2-c s8 z2-spot" data-reveal><span class="z2-who mono">MODEL + TEAM</span><div class="z2-ic">$</div><h3>Money dashboard</h3><p>Net revenue of the month, her share, pace to the end of the month, the payout waiting at OnlyFans and a chart for 7 or 30 days. Synced every hour.</p><div class="z2-viz"><i style="--i:0;--h:60%"></i><i style="--i:1;--h:90%"></i><i style="--i:2;--h:45%"></i><i style="--i:3;--h:100%"></i><i style="--i:4;--h:70%"></i><i style="--i:5;--h:85%"></i><i style="--i:6;--h:55%"></i><i style="--i:7;--h:95%"></i></div></div>
-      <div class="z2-c z2-spot" data-reveal><span class="z2-who mono">MODEL</span><div class="z2-ic">◎</div><h3>Goals that set themselves</h3><p>A monthly goal built from her own numbers, with a short note on how to get there.</p></div>
-      <div class="z2-c z2-spot" data-reveal><span class="z2-who mono">MODEL</span><div class="z2-ic">#</div><h3>Standing and top fans</h3><p>Her place this month without naming anyone else, her top fans of the last 30 days and the top fan of all time.</p></div>
-      <div class="z2-c z2-spot" data-reveal><span class="z2-who mono">MODEL + TEAM</span><div class="z2-ic">✎</div><h3>Custom requests</h3><p>A fan pays for a custom, the team logs what he wants and the price, she sees it in the app and gets a push.</p></div>
-      <div class="z2-c z2-spot" data-reveal><span class="z2-who mono">TEAM</span><div class="z2-ic">%</div><h3>Chatters</h3><p>Revenue credited to every chatter for any period, so the team sees who actually sells.</p></div>
-      <div class="z2-c s6 z2-spot" data-reveal><span class="z2-who mono">MODEL + TEAM</span><div class="z2-ic">▶</div><h3>Content Director</h3><p>One board per platform, from idea to posted. Dashboards with views, posts, top reels and a calendar in Prague time.</p><div class="z2-chips"><span style="--i:0">Instagram</span><span style="--i:1">X</span><span style="--i:2">TikTok</span><span style="--i:3">Threads</span><span style="--i:4">Snapchat</span><span style="--i:5">Facebook</span></div></div>
-      <div class="z2-c s6 z2-spot" data-reveal><span class="z2-who mono">TEAM</span><div class="z2-ic">AI</div><h3>Instagram AI Studio</h3><p>Thirteen agents that write in her voice. Nothing is posted for her, the team gets text to copy.</p><div class="z2-chips"><span style="--i:0">Reel</span><span style="--i:1">Week plan</span><span style="--i:2">Audit</span><span style="--i:3">Caption</span><span style="--i:4">Carousel</span><span style="--i:5">Stories</span><span style="--i:6">Profile</span><span style="--i:7">Comments</span><span style="--i:8">Reply</span><span style="--i:9">DM</span><span style="--i:10">Repurpose</span><span style="--i:11">Swipe file</span><span style="--i:12">Humanize</span></div></div>
-      <div class="z2-c s8 z2-spot" data-reveal><span class="z2-who mono">TEAM</span><div class="z2-ic">✂</div><h3>Editor with agents</h3><p>Drop a raw video and a reference, press Edit. The agents transcribe it, cut the silence, add word by word captions, zooms, cards and B-roll, then hand back a preview and a full quality export. The video never leaves the studio Mac.</p><div class="z2-chips"><span style="--i:0">Cutter</span><span style="--i:1">Captions</span><span style="--i:2">Color</span><span style="--i:3">B-roll</span><span style="--i:4">SFX</span><span style="--i:5">Music</span><span style="--i:6">Graphics</span><span style="--i:7">Audio mix</span><span style="--i:8">Checker</span><span style="--i:9">Cover</span></div></div>
-      <div class="z2-c z2-spot" data-reveal><span class="z2-who mono">MODEL + TEAM</span><div class="z2-ic">N</div><h3>Neo, the assistant</h3><p>Ask about the numbers, the plan or what to post, and it answers from the data of the agency.</p><div class="z2-bub"><span class="me" style="--i:0">How is my month?</span><span style="--i:1">71% of the goal, on pace.</span></div></div>
-      <div class="z2-c z2-spot" data-reveal><span class="z2-who mono">MODEL + TEAM</span><div class="z2-ic">✓</div><h3>Tasks and calendar</h3><p>Every ask with a deadline, per model, in one calendar next to the content.</p></div>
-      <div class="z2-c z2-spot" data-reveal><span class="z2-who mono">EVERYONE</span><div class="z2-ic">!</div><h3>OF News</h3><p>What changed in the creator economy, checked four times a day, with the platform numbers from public reports.</p></div>
-      <div class="z2-c z2-spot" data-reveal><span class="z2-who mono">TEAM</span><div class="z2-ic">T</div><h3>Telegram remote</h3><p>Daily and weekly sales digests, plus commands to set goals, add tasks and log customs without opening the app.</p><div class="z2-chips"><span style="--i:0">/goals</span><span style="--i:1">/goal</span><span style="--i:2">/task</span><span style="--i:3">/custom</span></div></div>
-      <div class="z2-c s6 z2-spot" data-reveal><span class="z2-who mono">EVERYONE</span><div class="z2-ic">◈</div><h3>An app on the phone</h3><p>Add Zion to the home screen and it behaves like an app. Push alerts for sales, customs and tasks, with quiet hours she sets herself.</p><div class="z2-phone"><u style="--i:0">NEW SALE</u><u style="--i:1">CUSTOM</u><u style="--i:2">TASK DUE</u><u style="--i:3">OF NEWS</u></div></div>
-      <div class="z2-c s3 z2-spot" data-reveal><span class="z2-who mono">TEAM</span><div class="z2-ic">M</div><h3>Model Manager</h3><p>Every account of every model on one screen. New models appear after the Creator Bible.</p></div>
-      <div class="z2-c s3 z2-spot" data-reveal><span class="z2-who mono">EVERYONE</span><div class="z2-ic">K</div><h3>Private by design</h3><p>Invite only, hashed passwords, signed writes. A model sees her own data only.</p><div class="z2-lock"><b style="--i:0">•</b><b style="--i:1">•</b><b style="--i:2">•</b><b style="--i:3">•</b><b style="--i:4">•</b><b style="--i:5">•</b></div></div>
+    <div class="zf mono" data-reveal>
+      <button class="on" data-zf="all">All</button><button data-zf="money">Money</button><button data-zf="content">Content</button><button data-zf="ai">AI</button><button data-zf="growth">Growth</button><button data-zf="team">Team</button>
+    </div>
+    <div class="z2-bento" id="zBento">
+      <div data-cat="money" class="z2-c s8 z2-spot" data-reveal><span class="z2-who mono">MODEL + TEAM</span><div class="z2-ic">$</div><h3>Money dashboard</h3><p>Net revenue of the month, her share, pace to the end of the month, the payout waiting at OnlyFans and a chart for 7 or 30 days. Synced every hour.</p><div class="z2-viz"><i style="--i:0;--h:60%"></i><i style="--i:1;--h:90%"></i><i style="--i:2;--h:45%"></i><i style="--i:3;--h:100%"></i><i style="--i:4;--h:70%"></i><i style="--i:5;--h:85%"></i><i style="--i:6;--h:55%"></i><i style="--i:7;--h:95%"></i></div></div>
+      <div data-cat="money" class="z2-c z2-spot" data-reveal><span class="z2-who mono">MODEL</span><div class="z2-ic">◎</div><h3>Goals that set themselves</h3><p>A monthly goal built from her own numbers, with a short note on how to get there.</p></div>
+      <div data-cat="money" class="z2-c z2-spot" data-reveal><span class="z2-who mono">MODEL</span><div class="z2-ic">#</div><h3>Standing and top fans</h3><p>Her place this month without naming anyone else, her top fans of the last 30 days and the top fan of all time.</p></div>
+      <div data-cat="money team" class="z2-c z2-spot" data-reveal><span class="z2-who mono">MODEL + TEAM</span><div class="z2-ic">✎</div><h3>Custom requests</h3><p>A fan pays for a custom, the team logs what he wants and the price, she sees it in the app and gets a push.</p></div>
+      <div data-cat="money team" class="z2-c z2-spot" data-reveal><span class="z2-who mono">TEAM</span><div class="z2-ic">%</div><h3>Chatters</h3><p>Revenue credited to every chatter for any period, so the team sees who actually sells.</p></div>
+      <div data-cat="content" class="z2-c s6 z2-spot" data-reveal><span class="z2-who mono">MODEL + TEAM</span><div class="z2-ic">▶</div><h3>Content Director</h3><p>One board per platform, from idea to posted. Dashboards with views, posts, top reels and a calendar in Prague time.</p><div class="z2-chips"><span style="--i:0">Instagram</span><span style="--i:1">X</span><span style="--i:2">TikTok</span><span style="--i:3">Threads</span><span style="--i:4">Snapchat</span><span style="--i:5">Facebook</span></div></div>
+      <div data-cat="ai content" class="z2-c s6 z2-spot" data-reveal><span class="z2-who mono">TEAM</span><div class="z2-ic">AI</div><h3>Instagram AI Studio</h3><p>Thirteen agents that write in her voice. Nothing is posted for her, the team gets text to copy.</p><div class="z2-chips"><span style="--i:0">Reel</span><span style="--i:1">Week plan</span><span style="--i:2">Audit</span><span style="--i:3">Caption</span><span style="--i:4">Carousel</span><span style="--i:5">Stories</span><span style="--i:6">Profile</span><span style="--i:7">Comments</span><span style="--i:8">Reply</span><span style="--i:9">DM</span><span style="--i:10">Repurpose</span><span style="--i:11">Swipe file</span><span style="--i:12">Humanize</span></div></div>
+      <div data-cat="ai content" class="z2-c s8 z2-spot" data-reveal><span class="z2-who mono">TEAM</span><div class="z2-ic">✂</div><h3>Editor with agents</h3><p>Drop a raw video and a reference, press Edit. The agents transcribe it, cut the silence, add word by word captions, zooms, cards and B-roll, then hand back a preview and a full quality export. The video never leaves the studio Mac.</p><div class="z2-chips"><span style="--i:0">Cutter</span><span style="--i:1">Captions</span><span style="--i:2">Color</span><span style="--i:3">B-roll</span><span style="--i:4">SFX</span><span style="--i:5">Music</span><span style="--i:6">Graphics</span><span style="--i:7">Audio mix</span><span style="--i:8">Checker</span><span style="--i:9">Cover</span></div></div>
+      <div data-cat="ai" class="z2-c z2-spot" data-reveal><span class="z2-who mono">MODEL + TEAM</span><div class="z2-ic">N</div><h3>Neo, the assistant</h3><p>Ask about the numbers, the plan or what to post, and it answers from the data of the agency.</p><div class="z2-bub"><span class="me" style="--i:0">How is my month?</span><span style="--i:1">71% of the goal, on pace.</span></div></div>
+      <div data-cat="team" class="z2-c z2-spot" data-reveal><span class="z2-who mono">MODEL + TEAM</span><div class="z2-ic">✓</div><h3>Tasks and calendar</h3><p>Every ask with a deadline, per model, in one calendar next to the content.</p></div>
+      <div data-cat="growth" class="z2-c z2-spot" data-reveal><span class="z2-who mono">EVERYONE</span><div class="z2-ic">!</div><h3>OF News</h3><p>What changed in the creator economy, checked four times a day, with the platform numbers from public reports.</p></div>
+      <div data-cat="team" class="z2-c z2-spot" data-reveal><span class="z2-who mono">TEAM</span><div class="z2-ic">T</div><h3>Telegram remote</h3><p>Daily and weekly sales digests, plus commands to set goals, add tasks and log customs without opening the app.</p><div class="z2-chips"><span style="--i:0">/goals</span><span style="--i:1">/goal</span><span style="--i:2">/task</span><span style="--i:3">/custom</span></div></div>
+      <div data-cat="team" class="z2-c s6 z2-spot" data-reveal><span class="z2-who mono">EVERYONE</span><div class="z2-ic">◈</div><h3>An app on the phone</h3><p>Add Zion to the home screen and it behaves like an app. Push alerts for sales, customs and tasks, with quiet hours she sets herself.</p><div class="z2-phone"><u style="--i:0">NEW SALE</u><u style="--i:1">CUSTOM</u><u style="--i:2">TASK DUE</u><u style="--i:3">OF NEWS</u></div></div>
+      <div data-cat="team" class="z2-c s3 z2-spot" data-reveal><span class="z2-who mono">TEAM</span><div class="z2-ic">M</div><h3>Model Manager</h3><p>Every account of every model on one screen. New models appear after the Creator Bible.</p></div>
+      <div data-cat="team" class="z2-c s3 z2-spot" data-reveal><span class="z2-who mono">EVERYONE</span><div class="z2-ic">K</div><h3>Private by design</h3><p>Invite only, hashed passwords, signed writes. A model sees her own data only.</p><div class="z2-lock"><b style="--i:0">•</b><b style="--i:1">•</b><b style="--i:2">•</b><b style="--i:3">•</b><b style="--i:4">•</b><b style="--i:5">•</b></div></div>
+      <div data-cat="ai team" class="z2-c s6 z2-spot" data-reveal><span class="z2-who mono">TEAM</span><div class="z2-ic">◉</div><h3>Weekly reports by voice</h3><p>Start a call with Neo, drop the dashboard screens into the window and answer a few sharp questions. A designed PDF report is written and sent to Telegram. Works for creators who are not even in Zion.</p><div class="z2-chips"><span style="--i:0">Screens</span><span style="--i:1">Questions</span><span style="--i:2">PDF</span><span style="--i:3">Telegram</span></div></div>
+      <div data-cat="growth content ai" class="z2-c s6 z2-spot" data-reveal><span class="z2-who mono">TEAM</span><div class="z2-ic">IG</div><h3>IG Hub</h3><p>Track any Instagram profile, catch the reels that beat their own average, keep a swipe file with AI breakdowns of why they worked and send a weekly reel plan to every model.</p></div>
+      <div data-cat="growth" class="z2-c z2-spot" data-reveal><span class="z2-who mono">TEAM</span><div class="z2-ic">↗</div><h3>Trends</h3><p>Public creator accounts by niche, scanned on a button, with similar accounts suggested next to them.</p></div>
+      <div data-cat="growth" class="z2-c z2-spot" data-reveal><span class="z2-who mono">TEAM</span><div class="z2-ic">⌖</div><h3>Acquisition</h3><p>Recruiting leads from Reddit and X outreach in one overview, every lead judged by AI, the scouts reply by hand.</p></div>
+      <div data-cat="team" class="z2-c z2-spot" data-reveal><span class="z2-who mono">MODEL + TEAM</span><div class="z2-ic">B</div><h3>Creator and Brand Bible</h3><p>Two questionnaires in her login: persona for the chatters and a brand that sets her apart. All answers on one page for the team.</p></div>
+      <div data-cat="team" class="z2-c z2-spot" data-reveal><span class="z2-who mono">TEAM</span><div class="z2-ic">✉</div><h3>Invite links</h3><p>One link per model, one use, seven days. She sets her own password, a new link resets a forgotten one.</p></div>
+      <div data-cat="content" class="z2-c z2-spot" data-reveal><span class="z2-who mono">TEAM</span><div class="z2-ic">Aa</div><h3>Title Generator</h3><p>Hooks and on screen titles for reels, written for the model and the network in seconds.</p></div>
+      <div data-cat="content" class="z2-c z2-spot" data-reveal><span class="z2-who mono">TEAM</span><div class="z2-ic">⇅</div><h3>Reels Sorter and shoot lists</h3><p>Paste a pile of reference reels, get them grouped, ticked off when filmed and dropped into her Drive folder.</p></div>
+      <div data-cat="growth money" class="z2-c z2-spot" data-reveal><span class="z2-who mono">MODEL + TEAM</span><div class="z2-ic">⧉</div><h3>Link in bio stats</h3><p>Views, clicks and conversion of every link in bio page, per model and per network.</p></div>
     </div>
   </div>
 </div>
@@ -23764,28 +23968,76 @@ const LANDING_PAGE_BODY = `
 </div>
 
 
-<div class="wrap">
+<div class="wrap" id="neo">
+  <div class="z2-sec">
+    <div class="zn" data-reveal>
+      <div class="zn-text">
+        <div class="z2-tag mono">MEET NEO</div>
+        <h2 class="z2-h2" style="text-align:left">An assistant <span class="acc">you talk to.</span></h2>
+        <p class="z2-p">Tap the orb and speak. Neo knows the numbers, the plan and the notes of every model, remembers what you tell it and gives marketing advice when something drops. It runs a full weekly report with you by voice and sends the PDF to Telegram.</p>
+        <div class="zn-chips mono"><span>VOICE CALLS</span><span>REAL MEMORY</span><span>WEEKLY REPORTS</span><span>TASKS + GOALS</span><span>TELEGRAM</span></div>
+      </div>
+      <div class="zn-stage">
+        <div class="zn-rings" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="neo-orb-mount zn-orb"></div>
+        <div class="zn-wave" aria-hidden="true"><i style="--i:0"></i><i style="--i:1"></i><i style="--i:2"></i><i style="--i:3"></i><i style="--i:4"></i><i style="--i:5"></i><i style="--i:6"></i><i style="--i:7"></i><i style="--i:8"></i></div>
+        <div class="zn-talk" aria-hidden="true">
+          <span class="me" style="--i:0">Let's do the weekly report for Model A.</span>
+          <span style="--i:1">Sure. I'll send you a window for the screens, is that fine?</span>
+          <span class="me" style="--i:2">Done, here they are.</span>
+          <span style="--i:3">Thanks! Earnings are up 18%. What drove the spike on Tuesday?</span>
+          <span class="pdf" style="--i:4"><b class="mono">PDF</b> Weekly report sent to your Telegram, boss.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap" id="onboarding">
   <div class="z2-sec">
     <div class="z2-head" data-reveal>
-      <div class="z2-tag mono">TWO DOORS</div>
-      <h2 class="z2-h2">Same building. <span class="acc">Two logins.</span></h2>
+      <div class="z2-tag mono">ONBOARDING</div>
+      <h2 class="z2-h2">From invite <span class="acc">to dashboard.</span></h2>
+      <p class="z2-p">A new creator gets one link. Everything else happens on its own, and the agency sees her answers the moment she sends them.</p>
     </div>
-    <div class="z2-tabs" data-reveal><button class="on" data-z2tab="model">For the model</button><button data-z2tab="team">For the agency</button></div>
-    <div class="z2-pane on" data-z2pane="model">
-      <div style="--i:0"><b>Her money, clearly</b><span>Share of the month, payout, pace and goal on the first screen.</span></div>
-      <div style="--i:1"><b>Her socials</b><span>Instagram, X and the rest with her own numbers, updated daily.</span></div>
-      <div style="--i:2"><b>What to do today</b><span>Tasks, custom requests and the content plan for the week.</span></div>
-      <div style="--i:3"><b>Alerts she controls</b><span>Sales, customs and tasks, with quiet hours.</span></div>
-      <div style="--i:4"><b>Her standing</b><span>Her place this month and a next push to aim for.</span></div>
-      <div style="--i:5"><b>Neo on call</b><span>Questions about her numbers answered in seconds.</span></div>
+    <div class="zo" data-reveal data-prog>
+      <div class="zo-line"><i></i></div>
+      <div class="zo-step" style="--i:0"><div class="zo-dot mono">01</div><h4>Invite link</h4><p>One use, valid 7 days, sent on WhatsApp.</p></div>
+      <div class="zo-step" style="--i:1"><div class="zo-dot mono">02</div><h4>Her password</h4><p>She sets it herself. Nobody else can claim the account.</p></div>
+      <div class="zo-step" style="--i:2"><div class="zo-dot mono">03</div><h4>Creator Bible</h4><p>Persona, voice and limits for the chatting team.</p></div>
+      <div class="zo-step" style="--i:3"><div class="zo-dot mono">04</div><h4>Brand Bible</h4><p>38 questions that make her brand her own.</p></div>
+      <div class="zo-step" style="--i:4"><div class="zo-dot mono">05</div><h4>Her dashboard</h4><p>Money, goals and tasks. Connected to her sales.</p></div>
     </div>
-    <div class="z2-pane" data-z2pane="team">
-      <div style="--i:0"><b>The whole roster</b><span>Agency revenue by week or month, every model side by side.</span></div>
-      <div style="--i:1"><b>Content on rails</b><span>Boards, planners, dashboards and the Friday content plans.</span></div>
-      <div style="--i:2"><b>AI that does the work</b><span>Thirteen Instagram agents and a video editor run by agents.</span></div>
-      <div style="--i:3"><b>Chatters and customs</b><span>Who sells, what was promised and what is still open.</span></div>
-      <div style="--i:4"><b>Remote control</b><span>Telegram digests and commands for goals, tasks and customs.</span></div>
-      <div style="--i:5"><b>Onboarding without typing</b><span>A model fills in the Creator Bible and appears in the system.</span></div>
+  </div>
+</div>
+
+<div class="wrap" id="devices">
+  <div class="z2-sec">
+    <div class="z2-head" data-reveal>
+      <div class="z2-tag mono">EVERY SCREEN</div>
+      <h2 class="z2-h2">On the desk. <span class="acc">In the pocket.</span></h2>
+      <p class="z2-p">The full command room on a laptop, an app on the home screen of the phone with push alerts. No store, no install.</p>
+    </div>
+    <div class="zd" data-reveal>
+      <div class="zd-mac">
+        <div class="zd-screen">
+          <div class="zd-side"><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="zd-main">
+            <div class="zd-row"><div class="zd-tile big"><span class="mono">AGENCY THIS MONTH</span><b>$<span data-count="22480">0</span></b><svg viewBox="0 0 300 70" preserveAspectRatio="none"><path class="zd-l" d="M0,60 C40,55 60,30 100,38 C140,46 160,18 200,24 C240,30 260,10 300,6"/></svg></div><div class="zd-tile"><span class="mono">GOAL</span><b>74%</b><div class="zd-pg"><i></i></div></div></div>
+            <div class="zd-row"><div class="zd-tile"><span class="mono">NEW SUBS</span><b data-count="1284">0</b></div><div class="zd-tile"><span class="mono">REELS POSTED</span><b data-count="96">0</b></div><div class="zd-tile"><span class="mono">TASKS OPEN</span><b data-count="12">0</b></div></div>
+          </div>
+        </div>
+        <div class="zd-base"></div>
+      </div>
+      <div class="zd-iphone">
+        <div class="zd-island"></div>
+        <div class="zd-ph-lab mono">HI, MODEL A</div>
+        <div class="zd-ph-big">$<span data-count="4280">0</span></div>
+        <div class="zd-ph-sub">your share this month</div>
+        <div class="zd-ph-card"><span class="mono">MONTHLY GOAL</span><div class="zd-pg"><i></i></div></div>
+        <div class="zd-ph-card"><span class="mono">TODAY</span><em>Film 3 POV skits</em><em>Reply to 1 custom</em></div>
+        <div class="zd-ph-push"><b class="mono">ZION</b>New sale, $25 tip</div>
+      </div>
     </div>
   </div>
 </div>
@@ -23799,11 +24051,13 @@ const LANDING_PAGE_BODY = `
         <p class="z2-p">Scroll through one ordinary day. Everything here runs on its own schedule.</p>
       </div>
       <div class="z2-steps" data-prog>
+        <div class="z2-step" data-reveal><time>06:00</time><h4>Recruiting scan</h4><p>New Reddit posts from creators who need help are read and scored, the good ones wait for a reply.</p></div>
         <div class="z2-step" data-reveal><time>06:30</time><h4>Instagram numbers refresh</h4><p>Followers, new reels and views of every account are pulled from the public profiles.</p></div>
         <div class="z2-step" data-reveal><time>EVERY HOUR</time><h4>Sales sync</h4><p>Revenue, subscriptions, tips and messages land on the dashboards of the model and the team.</p></div>
         <div class="z2-step" data-reveal><time>ANY TIME</time><h4>A sale happens</h4><p>The model and the team get a push. A custom request shows up in her app with what the fan wants.</p></div>
         <div class="z2-step" data-reveal><time>4X A DAY</time><h4>OF News updates</h4><p>News about the platform and the creator economy is checked and summarised.</p></div>
         <div class="z2-step" data-reveal><time>FRIDAY MORNING</time><h4>Content plans are due</h4><p>The team gets a reminder and drafts next week for each model in the AI Studio.</p></div>
+        <div class="z2-step" data-reveal><time>ANY EVENING</time><h4>A weekly report in ten minutes</h4><p>A voice call with Neo, the screens in a window, a few questions. The PDF lands on Telegram.</p></div>
         <div class="z2-step" data-reveal><time>23:00</time><h4>Daily digest</h4><p>The sales of the day arrive on Telegram. On Monday morning the whole week follows.</p></div>
         <div class="z2-step" data-reveal><time>1ST OF THE MONTH</time><h4>New goals</h4><p>Every model gets a fresh goal built from her last months, with a note on how to reach it.</p></div>
       </div>
@@ -23814,7 +24068,7 @@ const LANDING_PAGE_BODY = `
 <div class="wrap">
   <div class="z2-end" data-reveal>
     <h2 class="z2-h2">Run the roster.<br><span class="acc">Never miss a beat.</span></h2>
-    <p class="z2-p">Built for one agency. Invite only for the models on the roster.</p>
+    <p class="z2-p">Built for creators and the agency behind them. Private and invite only.</p>
     <div class="z2-ctas" style="opacity:1;animation:none"><a class="btn-primary" href="https://neomngmt.github.io/agencyos/">Sign in</a></div>
   </div>
 </div>
@@ -23845,11 +24099,11 @@ const LANDING_PAGE_BODY = `
     <h2>1. Data we store</h2>
     <p>Only what's needed to run the board:</p>
     <ul class="legal-list">
-      <li><b>Account identifiers</b> — name, role (Team or Creator), and the agency (CZ/US) you belong to.</li>
-      <li><b>Authentication data</b> — Team PINs and Creator passwords, verified server-side and never sent to your browser.</li>
-      <li><b>Operational data you enter</b> — model names, social handles, content pipeline cards, task notes.</li>
-      <li><b>Publer &amp; revenue data</b> — post metrics synced hourly via the Publer API, and OnlyFans earnings synced from Infloww.</li>
-      <li><b>Assistant queries</b> — messages sent to Neo, used only to generate an answer from your own data.</li>
+      <li><b>Account identifiers</b>: name, role (Team or Creator), and the agency (CZ/US) you belong to.</li>
+      <li><b>Authentication data</b>: Team PINs and Creator passwords, verified server-side and never sent to your browser.</li>
+      <li><b>Operational data you enter</b>: model names, social handles, content pipeline cards, task notes.</li>
+      <li><b>Publer &amp; revenue data</b>: post metrics synced hourly via the Publer API, and OnlyFans earnings synced from Infloww.</li>
+      <li><b>Assistant queries</b>: messages sent to Neo, used only to generate an answer from your own data.</li>
     </ul>
     <p>We do not collect advertising identifiers, browsing history outside the app, or precise location.</p>
 
@@ -24139,6 +24393,26 @@ function LandingPage({
     };
     spots.forEach(el => el.addEventListener("mousemove", onSpot));
     cleanups.push(() => spots.forEach(el => el.removeEventListener("mousemove", onSpot)));
+    const zfBtns = Array.from(root.querySelectorAll("[data-zf]"));
+    const zBento = root.querySelector("#zBento");
+    const onZf = e => {
+      const k = e.currentTarget.dataset.zf;
+      zfBtns.forEach(b => b.classList.toggle("on", b.dataset.zf === k));
+      if (zBento) zBento.classList.toggle("filtered", k !== "all");
+      let n = 0;
+      root.querySelectorAll("#zBento .z2-c").forEach(c => {
+        const show = k === "all" || (c.dataset.cat || "").split(" ").includes(k);
+        c.classList.toggle("zf-off", !show);
+        c.classList.remove("zf-in");
+        if (show) {
+          void c.offsetWidth;
+          c.style.setProperty("--k", n++);
+          c.classList.add("zf-in", "in-view");
+        }
+      });
+    };
+    zfBtns.forEach(b => b.addEventListener("click", onZf));
+    cleanups.push(() => zfBtns.forEach(b => b.removeEventListener("click", onZf)));
     const tabBtns = Array.from(root.querySelectorAll("[data-z2tab]"));
     const onTab = e => {
       const k = e.currentTarget.dataset.z2tab;
@@ -24979,7 +25253,7 @@ function LoginScreen({
     className: "font-semibold mt-3"
   }, "1. Data we store"), React.createElement("ul", {
     className: "list-disc pl-5 space-y-1 fs-12"
-  }, React.createElement("li", null, React.createElement("b", null, "Account identifiers"), " — name, role (Team or Creator), and the agency (CZ/US) you belong to."), React.createElement("li", null, React.createElement("b", null, "Authentication data"), " — Team PINs and Creator passwords, verified server-side and never sent to your browser."), React.createElement("li", null, React.createElement("b", null, "Operational data you enter"), " — model names, social handles, content pipeline cards, task notes."), React.createElement("li", null, React.createElement("b", null, "Publer & revenue data"), " — post metrics synced hourly via the Publer API, and OnlyFans earnings synced from Infloww."), React.createElement("li", null, React.createElement("b", null, "Assistant queries"), " — messages sent to Neo, used only to generate an answer from your own data.")), React.createElement("p", null, "We do not collect advertising identifiers, browsing history outside the app, or precise location."), React.createElement("p", {
+  }, React.createElement("li", null, React.createElement("b", null, "Account identifiers"), ": name, role (Team or Creator), and the agency (CZ/US) you belong to."), React.createElement("li", null, React.createElement("b", null, "Authentication data"), ": Team PINs and Creator passwords, verified server-side and never sent to your browser."), React.createElement("li", null, React.createElement("b", null, "Operational data you enter"), ": model names, social handles, content pipeline cards, task notes."), React.createElement("li", null, React.createElement("b", null, "Publer & revenue data"), ": post metrics synced hourly via the Publer API, and OnlyFans earnings synced from Infloww."), React.createElement("li", null, React.createElement("b", null, "Assistant queries"), ": messages sent to Neo, used only to generate an answer from your own data.")), React.createElement("p", null, "We do not collect advertising identifiers, browsing history outside the app, or precise location."), React.createElement("p", {
     className: "font-semibold mt-3"
   }, "2. Where it lives"), React.createElement("p", null, "Everything is stored in Supabase (hosted Postgres), encrypted at rest. Serverless functions read and write to that same database — nothing is copied elsewhere."), React.createElement("p", {
     className: "font-semibold mt-3"
@@ -36947,7 +37221,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1n08q0f</script>
+<script type="text/babel" id="zion-version">2ttosh</script>
 <script>
 (function () {
   var last = 0;
