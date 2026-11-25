@@ -223,6 +223,9 @@
   .popup-box { background: linear-gradient(160deg, #13301f, #0d120f 58%); backdrop-filter: none; -webkit-backdrop-filter: none; border-color: rgba(57,230,115,0.24); box-shadow: 0 30px 70px rgba(0,0,0,0.6), 0 0 50px rgba(18,179,76,0.14); }
   .popup-why { background: rgba(18,179,76,0.09); }
   html, body { background: #060908; }
+  /* Safari paints the bar area in the page colour: the top edge of the intro fades into exactly that colour, so screen and bar read as one surface (only a picture, it never catches taps) */
+  .popup-overlay::after { content: ""; position: fixed; left: 0; right: 0; top: 0; height: 110px; z-index: 1; pointer-events: none; background: linear-gradient(180deg, #060908 0%, rgba(6,9,8,0.8) 40%, rgba(6,9,8,0) 100%); }
+  .popup-box { z-index: 2; }
   /* the form never moves sideways, no zoom on a double tap or when a field is tapped (iPhone zooms on text under 16px) */
   body { overflow-x: hidden; overflow-x: clip; max-width: 100%; }
   html, body { touch-action: manipulation; }
@@ -249,7 +252,7 @@
 // ?debug=1 : shows on screen what happens when she taps (taps, start, errors) and which version is loaded
 (function(){
   if (!/[?&]debug=1/.test(location.search)) return;
-  var VERSION = '12:48';
+  var VERSION = '12:52';
   var box = document.createElement('div');
   box.style.cssText = 'position:fixed;left:6px;right:6px;bottom:6px;z-index:2147483647;max-height:38vh;overflow:auto;background:rgba(0,0,0,.88);color:#9ff5b8;font:11px/1.35 ui-monospace,Menlo,monospace;padding:8px;border:1px solid #39e673;border-radius:10px;pointer-events:none;white-space:pre-wrap';
   var lines = ['version ' + VERSION + ' · ' + navigator.userAgent.replace(/^.*?\((.*?)\).*$/, '$1')];
