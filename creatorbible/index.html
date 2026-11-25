@@ -234,6 +234,9 @@
     /* full screen: the background runs under the Safari bars, the panel stays in the visible part */
     .popup-overlay { padding: calc(10px + env(safe-area-inset-top)) 14px calc(10px + env(safe-area-inset-bottom)); height: 100vh; height: 100lvh; overflow: hidden; overflow: clip; display: flex; align-items: center; touch-action: none; overscroll-behavior: none; }
     .popup-overlay .popup-box { max-height: calc(100dvh - 20px); }
+    /* the panel sits in the middle of the part of the screen she actually sees (between the Safari bars) */
+    .popup-overlay { display: block; }
+    .popup-overlay .popup-box { position: absolute; left: 0; right: 0; width: calc(100% - 28px); margin: 0 auto; top: calc(env(safe-area-inset-top) + (100dvh - env(safe-area-inset-top)) / 2); transform: translateY(-50%) !important; }
     .popup-overlay input, .popup-overlay button { touch-action: manipulation; }
     .popup-overlay .popup-box { max-height: calc(100dvh - 20px); }
   }
