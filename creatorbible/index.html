@@ -277,6 +277,27 @@
     .popup-btn { padding: .85rem; font-size: 15px; }
   }
 </style>
+<script>
+// ?debug=1 : shows on screen what happens when she taps (taps, start, errors) and which version is loaded
+(function(){
+  if (!/[?&]debug=1/.test(location.search)) return;
+  var VERSION = '12:46';
+  var box = document.createElement('div');
+  box.style.cssText = 'position:fixed;left:6px;right:6px;bottom:6px;z-index:2147483647;max-height:38vh;overflow:auto;background:rgba(0,0,0,.88);color:#9ff5b8;font:11px/1.35 ui-monospace,Menlo,monospace;padding:8px;border:1px solid #39e673;border-radius:10px;pointer-events:none;white-space:pre-wrap';
+  var lines = ['version ' + VERSION + ' · ' + navigator.userAgent.replace(/^.*?\((.*?)\).*$/, '$1')];
+  function log(t){ lines.push(new Date().toTimeString().slice(0,8) + ' ' + t); if (lines.length > 40) lines.splice(1, 1); box.textContent = lines.join('\n'); }
+  window.__dbg = log;
+  window.addEventListener('error', function(e){ log('ERROR ' + e.message + ' @' + e.lineno + ':' + e.colno); });
+  ['pointerdown','touchstart','touchend','click'].forEach(function(t){
+    document.addEventListener(t, function(e){ var el = e.target; var id = el && (el.id || el.className || el.tagName); log(t + ' -> ' + String(id).slice(0,40) + ' at ' + Math.round(e.clientX || (e.touches && e.touches[0] && e.touches[0].clientX) || 0) + ',' + Math.round(e.clientY || (e.touches && e.touches[0] && e.touches[0].clientY) || 0)); }, true);
+  });
+  document.addEventListener('DOMContentLoaded', function(){
+    document.body.appendChild(box); box.textContent = lines.join('\n');
+    var b = document.getElementById('popup-btn'); if (b) { var r = b.getBoundingClientRect(); log('button at ' + Math.round(r.top) + '-' + Math.round(r.bottom) + ' screen ' + innerHeight + ' visible ' + Math.round(window.visualViewport ? visualViewport.height : 0)); }
+    var orig = window.startForm; if (orig) window.startForm = function(){ log('startForm name="' + document.getElementById('popup-name').value + '" of="' + document.getElementById('popup-of').value + '"'); try { orig(); log('after start: popup ' + (document.getElementById('popup').style.display || 'visible')); } catch(e) { log('START ERROR ' + e.message); } };
+  });
+})();
+</script>
 </head>
 <body>
 
