@@ -1539,9 +1539,12 @@ const fontImport = `
 .inv-actions a { border-color: rgba(37,211,102,0.5); color: #6ff0a0; }
 .inv-note { font-size: 11px; color: #8fa39a; margin: 8px 0 0; }
 .inv-err { font-size: 12px; color: #ff8a8a; margin: 4px 0 0; }
-.mm-invite { cursor: pointer; text-align: left; border-style: dashed !important; }
-.mm-invite .v { display: flex; align-items: center; gap: 6px; color: #39e673; }
-.mm-invite:hover { border-color: rgba(57,230,115,0.6) !important; box-shadow: 0 0 24px rgba(18,179,76,0.18); }
+.mm-invite-card { position: relative; min-height: 220px; border-radius: 22px; border: 1.5px dashed rgba(57,230,115,0.32); background: radial-gradient(260px circle at 50% 30%, rgba(57,230,115,0.08), transparent 70%), rgba(255,255,255,0.012); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 22px; text-align: center; color: inherit; cursor: pointer; transition: border-color .3s, box-shadow .3s, transform .35s cubic-bezier(.2,.8,.2,1); animation: bxUp .55s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i, 0) * 60ms + .1s); }
+.mm-invite-card:hover { border-color: rgba(57,230,115,0.65); box-shadow: 0 0 34px rgba(18,179,76,0.18); transform: translateY(-3px); }
+.mm-inv-plus { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #04140c; background: linear-gradient(135deg, #39e673, #12b34c); box-shadow: 0 0 0 6px rgba(57,230,115,0.08), 0 0 26px rgba(18,179,76,0.45); transition: transform .35s cubic-bezier(.3,1.6,.5,1); }
+.mm-invite-card:hover .mm-inv-plus { transform: rotate(90deg) scale(1.06); }
+.mm-invite-card b { font-size: 16px; font-weight: 800; color: #f2f5f0; margin-top: 4px; }
+.mm-invite-card em { font-style: normal; font-size: 12.5px; line-height: 1.5; color: #8fa39a; max-width: 240px; }
 .inv-veil { position: fixed; inset: 0; z-index: 260; display: flex; align-items: center; justify-content: center; padding: 18px; background: rgba(4,7,5,0.72); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); animation: bbFade .3s ease both; font-family: Inter, -apple-system, sans-serif; }
 .inv-card { position: relative; overflow: hidden; width: 100%; max-width: 440px; padding: 26px 22px 18px; border-radius: 22px; border: 1px solid rgba(57,230,115,0.22); background: linear-gradient(160deg, rgba(18,179,76,0.14), rgba(14,19,16,0.97) 55%); box-shadow: 0 30px 70px rgba(0,0,0,0.55), 0 0 40px rgba(18,179,76,0.14); animation: bbIn .55s cubic-bezier(.2,.8,.2,1) both; max-height: 90vh; overflow-y: auto; }
 .inv-glow { position: absolute; inset: -40% -20% auto; height: 60%; background: radial-gradient(circle, rgba(57,230,115,0.2), transparent 60%); pointer-events: none; animation: bbBreathe 5s ease-in-out infinite; }
@@ -14094,19 +14097,7 @@ function MMRoster({
   }, React.createElement(CountUp, {
     value: missingTotal,
     duration: 1100
-  }))), onInvite && React.createElement("button", {
-    className: "mm-stat mm-invite tap",
-    style: {
-      "--dl": "240ms"
-    },
-    onClick: onInvite
-  }, React.createElement("div", {
-    className: "k"
-  }, "New model"), React.createElement("div", {
-    className: "v"
-  }, React.createElement(Plus, {
-    size: 20
-  }), " Invite"))), models.length === 0 && React.createElement("div", {
+  })))), models.length === 0 && React.createElement("div", {
     className: "fs-12 c-faint font-mono italic py-10 text-center",
     style: {
       position: "relative",
@@ -14120,7 +14111,17 @@ function MMRoster({
     color: colorFor(m.name),
     index: i,
     onEdit: onEdit
-  }))));
+  })), onInvite && React.createElement("button", {
+    className: "mm-invite-card tap",
+    style: {
+      "--i": models.length
+    },
+    onClick: onInvite
+  }, React.createElement("span", {
+    className: "mm-inv-plus"
+  }, React.createElement(Plus, {
+    size: 22
+  })), React.createElement("b", null, "Invite a model"), React.createElement("em", null, "One link: she sets her password, fills in the Creator Bible and lands on her dashboard."))));
 }
 function ModelManager({
   models,
@@ -14326,7 +14327,7 @@ function ModelManager({
     className: "flex items-start justify-between gap-3 mb-1 flex-wrap"
   }, React.createElement("div", null, React.createElement("p", {
     className: "c-muted text-sm mt-1.5"
-  }, models.length, " model", models.length === 1 ? "" : "s", ". New models appear here by themselves when they fill in the Creator Bible.")), React.createElement("div", {
+  }, models.length, " model", models.length === 1 ? "" : "s", ". Invite a new model with one link, she appears here right away.")), React.createElement("div", {
     className: "text-right flex-shrink-0"
   }, React.createElement("div", {
     className: "flex items-center justify-end gap-1.5 fs-10 font-mono uppercase tracking-wide",
@@ -37236,7 +37237,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1v6zh2m</script>
+<script type="text/babel" id="zion-version">175wbml</script>
 <script>
 (function () {
   var last = 0;
