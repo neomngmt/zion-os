@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Creator Bible | Zion Management</title>
 <meta name="theme-color" content="#060908">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -224,7 +224,10 @@
   .popup-why { background: rgba(18,179,76,0.09); }
   /* the form never moves sideways: no horizontal overflow, no zoom when a field is tapped (iPhone zooms on text under 16px) */
   body { overflow-x: hidden; overflow-x: clip; overscroll-behavior-x: none; max-width: 100%; }
+  /* no double-tap zoom anywhere (iPhone zoomed in and the page looked cut off) */
+  html, body { touch-action: manipulation; }
   .main { touch-action: pan-y; }
+  .nav-bar, .app-header, .nav-bar *, .app-header * { touch-action: manipulation; }
   @media (max-width: 520px) { input[type=text], textarea, select { font-size: 16px !important; } }
   /* phone: the intro is exactly one screen, no scrolling, everything visible */
   html.intro-open, html.intro-open body { overflow: hidden; height: 100dvh; }
@@ -281,7 +284,7 @@
 // ?debug=1 : shows on screen what happens when she taps (taps, start, errors) and which version is loaded
 (function(){
   if (!/[?&]debug=1/.test(location.search)) return;
-  var VERSION = '12:46';
+  var VERSION = '12:47';
   var box = document.createElement('div');
   box.style.cssText = 'position:fixed;left:6px;right:6px;bottom:6px;z-index:2147483647;max-height:38vh;overflow:auto;background:rgba(0,0,0,.88);color:#9ff5b8;font:11px/1.35 ui-monospace,Menlo,monospace;padding:8px;border:1px solid #39e673;border-radius:10px;pointer-events:none;white-space:pre-wrap';
   var lines = ['version ' + VERSION + ' · ' + navigator.userAgent.replace(/^.*?\((.*?)\).*$/, '$1')];
