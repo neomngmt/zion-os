@@ -13632,7 +13632,7 @@ const LANDING_PAGE_BODY = `
         <span class="by-neo-tag">by neomngmt</span>
       </div>
       <div class="right">
-        <a class="cta" href="https://neomngmt.github.io/agencyos/">Sign in</a>
+        <a class="cta" href="#signin">Sign in</a>
       </div>
     </div>
   </div>
@@ -13648,7 +13648,7 @@ const LANDING_PAGE_BODY = `
     </h1>
     <p class="z2-sub">One app for creators and the agency behind them. Money, content, socials and an AI you can talk to, always in sync.</p>
     <div class="z2-ctas">
-      <a class="btn-primary" href="https://neomngmt.github.io/agencyos/">Sign in</a>
+      <a class="btn-primary" href="#signin">Sign in</a>
       <a class="btn-ghost" href="#inside">See everything inside</a>
     </div>
     <div class="z2-pills mono">
@@ -13942,7 +13942,7 @@ const LANDING_PAGE_BODY = `
   <div class="z2-end" data-reveal>
     <h2 class="z2-h2">Run the roster.<br><span class="acc">Never miss a beat.</span></h2>
     <p class="z2-p">Built for creators and the agency behind them. Private and invite only.</p>
-    <div class="z2-ctas" style="opacity:1;animation:none"><a class="btn-primary" href="https://neomngmt.github.io/agencyos/">Sign in</a></div>
+    <div class="z2-ctas" style="opacity:1;animation:none"><a class="btn-primary" href="#signin">Sign in</a></div>
   </div>
 </div>
 </div>
@@ -13954,7 +13954,7 @@ const LANDING_PAGE_BODY = `
     <a href="#" data-page="terms">Terms</a>
     <a href="#" data-page="status">Status</a>
     <a href="#" data-page="contact">Contact</a>
-    <a href="https://neomngmt.github.io/agencyos/" class="footer-signin">Sign in</a>
+    <a href="#signin" class="footer-signin">Sign in</a>
     <span class="footer-copy">© 2026</span>
   </div>
 </footer>
@@ -14063,7 +14063,7 @@ function LandingPage({ onSignIn }) {
     const signInEls = Array.from(root.querySelectorAll("a")).filter((a) => {
       const text = (a.textContent || "").trim().toLowerCase();
       const href = a.getAttribute("href") || "";
-      return text === "sign in" || href.includes("neomngmt.github.io/agencyos");
+      return text === "sign in" || href === "#signin";
     });
     const onSignInClick = (e) => {
       e.preventDefault();
