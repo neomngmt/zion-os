@@ -13447,6 +13447,18 @@ a:focus-visible, button:focus-visible{ outline:2px solid var(--lp-green); outlin
 
 .z2-end{ text-align:center; padding:140px 0 110px; }
 .z2-end .z2-h2{ font-size:clamp(40px,7vw,92px); }
+@property --zna { syntax:'<angle>'; initial-value:0deg; inherits:false; }
+/* phone: the window stays flat, a green neon runs around its edge and breathes */
+@keyframes znaSpin{ to{ --zna:360deg; } }
+@keyframes znaGlow{ 0%,100%{ box-shadow:0 40px 100px rgba(0,0,0,.7), 0 0 40px rgba(57,230,115,.18); } 50%{ box-shadow:0 40px 100px rgba(0,0,0,.7), 0 0 80px rgba(57,230,115,.45), 0 0 140px rgba(57,230,115,.18); } }
+@media (max-width:980px){
+  .z2-win{ animation:znaGlow 3.2s ease-in-out infinite; }
+  .z2-win::after{ content:""; position:absolute; inset:0; border-radius:inherit; padding:2px; pointer-events:none; z-index:4;
+    background:conic-gradient(from var(--zna), rgba(57,230,115,0) 0deg, rgba(57,230,115,0) 200deg, #39e673 270deg, #c6f432 300deg, rgba(57,230,115,0) 340deg);
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+    filter:drop-shadow(0 0 6px #39e673) drop-shadow(0 0 14px rgba(57,230,115,.6)); animation:znaSpin 3.6s linear infinite; }
+}
+@media (max-width:980px) and (prefers-reduced-motion: reduce){ .z2-win, .z2-win::after{ animation:none; } }
 @media (max-width:980px){ .z2-win{ transform:none !important; } .z2-app{ grid-template-columns:1fr; } .z2-side,.z2-right{ display:none; } .z2-c,.z2-c.s6,.z2-c.s8,.z2-c.s3{ grid-column:span 12; } .z2-pane{ grid-template-columns:1fr; } .z2-day{ grid-template-columns:1fr; gap:30px; } .z2-sticky{ position:static; } .z2-hero{ padding-top:120px; } }
 .nav-bar .by-neo-tag{ font-size:14px; }
 @media (max-width:700px){ .nav .links{ display:none !important; } .z2-hero{ padding-top:92px; } .z2-kick{ font-size:9px; letter-spacing:2px; padding:7px 12px; white-space:nowrap; } .z2-h1{ margin-top:20px; } }
