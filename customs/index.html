@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Customs | Zion</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#060908">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  :root { --bg: #060908; --panel: #0d130f; --panel2: #111a14; --line: rgba(57,230,115,0.16); --line2: rgba(57,230,115,0.32); --g: #39e673; --g2: #12b34c; --text: #f2f5f0; --muted: #8fa39a; --hint: #55665d; --warn: #f2c76b; --bad: #ff7b7b; --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); touch-action: manipulation; }
+  body { color: var(--text); font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; font-size: 15px; line-height: 1.55; min-height: 100vh; overflow-x: hidden; overflow-x: clip; }
+  body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; background: radial-gradient(700px circle at 50% -10%, rgba(18,179,76,0.16), transparent 65%); }
+  .wrap { position: relative; z-index: 1; max-width: 560px; margin: 0 auto; padding: calc(18px + env(safe-area-inset-top)) 16px calc(40px + env(safe-area-inset-bottom)); }
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .zw { display: inline-flex; flex-direction: column; align-items: flex-end; line-height: 1; }
+  .zw svg { height: 20px; width: auto; display: block; }
+  .zw span { font-family: 'Dancing Script', cursive; font-weight: 700; font-size: 11px; color: var(--g); margin-top: 3px; text-shadow: 0 0 2px var(--g), 0 0 6px var(--g), 0 0 14px rgba(57,230,115,0.55); }
+  .tag { font-family: var(--mono); font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--g); border: 1px solid var(--line); border-radius: 999px; padding: .25rem .7rem; }
+  h1 { font-size: 26px; font-weight: 800; letter-spacing: -.6px; line-height: 1.15; }
+  .sub { color: var(--muted); font-size: 13.5px; margin: 6px 0 18px; }
+  .card { background: linear-gradient(160deg, #11261a, var(--panel) 55%); border: 1px solid var(--line); border-radius: 20px; padding: 18px 16px; margin-bottom: 14px; animation: up .5s cubic-bezier(.2,.8,.2,1) both; }
+  .card:nth-of-type(2) { animation-delay: .05s; } .card:nth-of-type(3) { animation-delay: .1s; }
+  @keyframes up { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  .step { display: flex; align-items: center; gap: 9px; font-family: var(--mono); font-size: 10.5px; letter-spacing: 2px; text-transform: uppercase; color: var(--g); margin-bottom: 12px; }
+  .step b { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--g); color: #04140c; font-size: 11px; letter-spacing: 0; }
+  label { display: block; font-size: 12.5px; font-weight: 600; color: #c9d6cd; margin: 12px 0 6px; }
+  label:first-child { margin-top: 0; }
+  input, select, textarea { width: 100%; font: inherit; font-size: 16px; color: var(--text); background: #0a100c; border: 1px solid var(--line); border-radius: 12px; padding: .75rem .9rem; outline: none; -webkit-appearance: none; appearance: none; transition: border-color .15s, box-shadow .15s; }
+  textarea { min-height: 140px; resize: vertical; line-height: 1.5; }
+  input:focus, select:focus, textarea:focus { border-color: var(--g); box-shadow: 0 0 0 3px rgba(18,179,76,0.18); }
+  .ai { border-color: rgba(57,230,115,0.5); background: #0c1a11; }
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip { font: inherit; font-size: 14px; font-weight: 600; padding: .55rem .9rem; border-radius: 999px; border: 1px solid var(--line); background: #0a100c; color: var(--muted); cursor: pointer; transition: all .15s; }
+  .chip.on { border-color: var(--g); background: rgba(57,230,115,0.14); color: var(--g); box-shadow: 0 0 14px rgba(18,179,76,0.2); }
+  .drop { position: relative; border: 1.5px dashed var(--line2); border-radius: 16px; padding: 22px 14px; text-align: center; cursor: pointer; background: rgba(57,230,115,0.03); transition: border-color .2s, background .2s; }
+  .drop.over { border-color: var(--g); background: rgba(57,230,115,0.08); }
+  .drop .big { font-weight: 700; font-size: 15px; margin-top: 8px; }
+  .drop .small { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+  .drop svg { color: var(--g); }
+  .thumbs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .thumb { position: relative; aspect-ratio: 9/16; border-radius: 10px; background: #000 center/cover no-repeat; border: 1px solid var(--line); }
+  .thumb button { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; border: none; background: rgba(0,0,0,0.75); color: #fff; font-size: 15px; line-height: 1; cursor: pointer; }
+  .add { aspect-ratio: 9/16; border-radius: 10px; border: 1.5px dashed var(--line2); background: transparent; color: var(--g); font-size: 26px; cursor: pointer; }
+  .reading { display: flex; align-items: center; justify-content: center; gap: 9px; margin-top: 12px; font-size: 13.5px; color: var(--g); }
+  .spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(57,230,115,0.25); border-top-color: var(--g); animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .hint { margin-top: 10px; font-size: 13px; color: var(--warn); background: rgba(242,199,107,0.07); border: 1px solid rgba(242,199,107,0.25); border-radius: 12px; padding: .6rem .8rem; }
+  .err { margin-top: 12px; font-size: 13.5px; color: var(--bad); }
+  .btn { width: 100%; font: inherit; font-size: 16px; font-weight: 800; color: #04140c; background: linear-gradient(135deg, var(--g), var(--g2)); border: none; border-radius: 999px; padding: .95rem; cursor: pointer; box-shadow: 0 0 22px rgba(18,179,76,0.35); margin-top: 4px; }
+  .btn:disabled { opacity: .5; }
+  .ghost { width: 100%; font: inherit; font-size: 14px; font-weight: 600; color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: .7rem; cursor: pointer; margin-top: 10px; }
+  .done { text-align: center; padding: 30px 10px; }
+  .done .ok { width: 64px; height: 64px; margin: 0 auto 14px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; color: #04140c; background: linear-gradient(135deg, var(--g), var(--g2)); box-shadow: 0 0 0 8px rgba(57,230,115,0.1), 0 0 34px rgba(18,179,76,0.5); animation: pop .6s cubic-bezier(.2,1.5,.4,1) both; }
+  @keyframes pop { from { transform: scale(.3); opacity: 0; } to { transform: none; opacity: 1; } }
+  .bad-link { text-align: center; padding: 40px 10px; color: var(--muted); }
+  .hidden { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="zw"><svg viewBox="-6 0 788 180" fill="none" stroke="#fff" stroke-width="12" role="img" aria-label="ZION"><path d="M0 6H160"/><path d="M160 6L92.8 76.6"/><path d="M76.8 93.4L0 174"/><path d="M0 174H160"/><path d="M252 6V174"/><path d="M344 90V128Q344 174 390 174H458Q504 174 504 128V52Q504 6 458 6H390Q344 6 344 52"/><path d="M596 6V174"/><path d="M596 6L660.8 66.5"/><path d="M678.8 83.3L776 174"/><path d="M776 6V174"/></svg><span>by neomngmt</span></span>
+    <span class="tag">Customs</span>
+  </header>
+
+  <div id="loading" class="reading" style="margin-top:40px"><div class="spin"></div>Načítám…</div>
+  <div id="badLink" class="bad-link hidden"><h1 style="margin-bottom:8px">Odkaz neplatí</h1><p>Napiš o nový odkaz.</p></div>
+
+  <div id="form" class="hidden">
+    <h1>Nový custom</h1>
+    <p class="sub">Nahraj screeny chatu s fanouškem, AI vyplní, co chce. Zkontroluj a odešli. Modelka ho uvidí, až ho šéf schválí.</p>
+
+    <div class="card">
+      <div class="step"><b>1</b>Kdo a pro koho</div>
+      <label for="chatter">Tvoje jméno</label>
+      <select id="chatter"></select>
+      <input id="chatterOther" class="hidden" placeholder="Napiš své jméno" autocomplete="off" style="margin-top:8px">
+      <label>Modelka</label>
+      <div class="chips" id="models"></div>
+    </div>
+
+    <div class="card">
+      <div class="step"><b>2</b>Screeny chatu</div>
+      <div class="drop" id="drop">
+        <input type="file" id="file" accept="image/*" multiple class="hidden">
+        <div id="dropEmpty">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
+          <div class="big">Přidej screeny chatu</div>
+          <div class="small">Klepni a vyber je z fotek (až 8). Na počítači můžeš i vložit přes Cmd+V.</div>
+        </div>
+        <div class="thumbs hidden" id="thumbs"></div>
+      </div>
+      <div class="reading hidden" id="reading"><div class="spin"></div>AI čte chat…</div>
+    </div>
+
+    <div class="card">
+      <div class="step"><b>3</b>Co chce fanoušek</div>
+      <label for="desc">Co má modelka natočit (vidí to ona)</label>
+      <textarea id="desc" placeholder="5 min video v červeném prádle&#10;• Na začátku řekni jeho jméno &quot;Mike&quot;&#10;• Hlavně zezadu"></textarea>
+      <div class="hint hidden" id="unclear"></div>
+      <div class="row">
+        <div><label for="fan">Fanoušek</label><input id="fan" placeholder="Jméno fanouška" autocomplete="off"></div>
+        <div><label for="price">Cena (USD)</label><input id="price" type="number" inputmode="decimal" placeholder="0"></div>
+      </div>
+      <label>Zaplaceno?</label>
+      <div class="chips" id="paid">
+        <button type="button" class="chip" data-v="true">Ano, zaplatil</button>
+        <button type="button" class="chip" data-v="false">Ještě ne</button>
+      </div>
+      <label for="deadline">Termín</label>
+      <input id="deadline" type="date">
+      <div class="err hidden" id="err"></div>
+      <button class="btn" id="send" type="button" style="margin-top:18px">Odeslat custom</button>
+    </div>
+  </div>
+
+  <div id="done" class="done hidden">
+    <div class="ok">✓</div>
+    <h1>Odesláno, díky!</h1>
+    <p class="sub" style="margin-top:8px">Šéf custom zkontroluje a pošle modelce.</p>
+    <button class="btn" id="again" type="button">Poslat další custom</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  var API = 'https://kvwwjyvkoiqsvpyzbcmn.supabase.co/functions/v1/custom-chatter';
+  var K = new URLSearchParams(location.search).get('k') || '';
+  var $ = function (id) { return document.getElementById(id); };
+  var state = { model: '', paid: null, shots: [], ai: false, reading: false, unclear: '' };
+  var NAME_KEY = 'zion-customs-chatter';
+
+  function call(body) {
+    body.k = K;
+    return fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok || j.error) { var e = new Error(j.error || ('HTTP ' + r.status)); e.status = r.status; throw e; } return j; }); });
+  }
+  function show(id, on) { $(id).classList.toggle('hidden', !on); }
+  function err(t) { $('err').textContent = t || ''; show('err', !!t); }
+  function in3() { var d = new Date(); d.setDate(d.getDate() + 3); return d.toISOString().slice(0, 10); }
+
+  // screenshots are made smaller on the phone before they are sent (fast upload, same text)
+  function shrink(file) {
+    return new Promise(function (res, rej) {
+      var img = new Image(), url = URL.createObjectURL(file);
+      img.onload = function () {
+        var max = 1600, w = img.width, h = img.height, s = Math.min(1, max / Math.max(w, h));
+        var c = document.createElement('canvas'); c.width = Math.round(w * s); c.height = Math.round(h * s);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', 0.82));
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); rej(new Error('Tenhle obrázek nejde načíst.')); };
+      img.src = url;
+    });
+  }
+  function renderShots() {
+    var t = $('thumbs'); t.innerHTML = '';
+    state.shots.forEach(function (u, i) {
+      var d = document.createElement('div'); d.className = 'thumb'; d.style.backgroundImage = 'url(' + u + ')';
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = '×';
+      b.onclick = function (e) { e.stopPropagation(); state.shots.splice(i, 1); state.ai = false; renderShots(); };
+      d.appendChild(b); t.appendChild(d);
+    });
+    if (state.shots.length && state.shots.length < 8) {
+      var a = document.createElement('button'); a.type = 'button'; a.className = 'add'; a.textContent = '+';
+      a.onclick = function (e) { e.stopPropagation(); $('file').click(); }; t.appendChild(a);
+    }
+    show('thumbs', state.shots.length > 0); show('dropEmpty', state.shots.length === 0);
+  }
+  function addFiles(files) {
+    var imgs = Array.prototype.filter.call(files, function (f) { return /^image\//.test(f.type); }).slice(0, 8 - state.shots.length);
+    if (!imgs.length) return;
+    err('');
+    Promise.all(imgs.map(shrink)).then(function (urls) { state.shots = state.shots.concat(urls).slice(0, 8); state.ai = false; renderShots(); read(); }).catch(function (e) { err(e.message); });
+  }
+  var readTimer = null;
+  function read() {
+    clearTimeout(readTimer);
+    readTimer = setTimeout(function () {
+      if (!state.shots.length || state.reading) return;
+      state.reading = true; show('reading', true);
+      call({ action: 'read', images: state.shots }).then(function (j) {
+        var desc = [j.title].concat((j.notes || []).map(function (x) { return '• ' + x; })).filter(Boolean).join('\n');
+        if (desc) { $('desc').value = desc; $('desc').classList.add('ai'); }
+        if (j.fan_name) { $('fan').value = j.fan_name; $('fan').classList.add('ai'); }
+        if (j.price != null) { $('price').value = j.price; $('price').classList.add('ai'); }
+        if (j.deadline) { $('deadline').value = j.deadline; $('deadline').classList.add('ai'); }
+        if (typeof j.paid === 'boolean') setPaid(j.paid);
+        if (j.model_guess && !state.model) setModel(j.model_guess);
+        state.unclear = j.unclear || '';
+        $('unclear').textContent = state.unclear ? 'Ověř s fanouškem: ' + state.unclear : ''; show('unclear', !!state.unclear);
+        state.ai = true;
+      }).catch(function (e) { err('AI screeny nepřečetla (' + e.message + '). Vyplň to prosím ručně.'); })
+        .then(function () { state.reading = false; show('reading', false); });
+    }, 500);
+  }
+  function setModel(name) {
+    state.model = name;
+    Array.prototype.forEach.call($('models').children, function (b) { b.classList.toggle('on', b.dataset.v === name); });
+  }
+  function setPaid(v) {
+    state.paid = v;
+    Array.prototype.forEach.call($('paid').children, function (b) { b.classList.toggle('on', b.dataset.v === String(v)); });
+  }
+  function chatterName() { return $('chatter').value === '__other' ? $('chatterOther').value.trim() : $('chatter').value; }
+
+  function send() {
+    var name = chatterName();
+    if (name.length < 2) return err('Vyber nebo napiš své jméno.');
+    if (!state.model) return err('Vyber modelku.');
+    if ($('desc').value.trim().length < 3) return err('Napiš, co fanoušek chce.');
+    err(''); $('send').disabled = true; $('send').textContent = 'Odesílám…';
+    try { localStorage.setItem(NAME_KEY, name); } catch (e) {}
+    call({ action: 'submit', chatter: name, model: state.model, fan: $('fan').value, description: $('desc').value, price: $('price').value,
+      paid: state.paid, deadline: $('deadline').value, unclear: state.unclear, images: state.shots })
+      .then(function () { show('form', false); show('done', true); window.scrollTo(0, 0); })
+      .catch(function (e) { err(e.message); })
+      .then(function () { $('send').disabled = false; $('send').textContent = 'Odeslat custom'; });
+  }
+  function reset() {
+    state.shots = []; state.ai = false; state.unclear = ''; renderShots();
+    ['desc', 'fan', 'price'].forEach(function (id) { $(id).value = ''; $(id).classList.remove('ai'); });
+    $('deadline').value = in3(); $('deadline').classList.remove('ai'); setPaid(null); setModel(''); show('unclear', false); err('');
+    show('done', false); show('form', true); window.scrollTo(0, 0);
+  }
+
+  // wiring
+  $('drop').addEventListener('click', function () { if (!state.shots.length) $('file').click(); });
+  $('file').addEventListener('change', function (e) { addFiles(e.target.files); e.target.value = ''; });
+  $('drop').addEventListener('dragover', function (e) { e.preventDefault(); $('drop').classList.add('over'); });
+  $('drop').addEventListener('dragleave', function () { $('drop').classList.remove('over'); });
+  $('drop').addEventListener('drop', function (e) { e.preventDefault(); $('drop').classList.remove('over'); addFiles(e.dataTransfer.files); });
+  window.addEventListener('paste', function (e) { var f = (e.clipboardData && e.clipboardData.files) || []; if (f.length) { e.preventDefault(); addFiles(f); } });
+  $('paid').addEventListener('click', function (e) { var b = e.target.closest('.chip'); if (b) setPaid(state.paid === (b.dataset.v === 'true') ? null : b.dataset.v === 'true'); });
+  $('chatter').addEventListener('change', function () { show('chatterOther', $('chatter').value === '__other'); if ($('chatter').value === '__other') $('chatterOther').focus(); });
+  $('send').addEventListener('click', send);
+  $('again').addEventListener('click', reset);
+  $('deadline').value = in3();
+
+  if (!K) { show('loading', false); show('badLink', true); return; }
+  call({ action: 'config' }).then(function (cfg) {
+    var sel = $('chatter'), saved = '';
+    try { saved = localStorage.getItem(NAME_KEY) || ''; } catch (e) {}
+    sel.innerHTML = '<option value="">Vyber své jméno</option>' + (cfg.chatters || []).map(function (n) { return '<option>' + n.replace(/</g, '&lt;') + '</option>'; }).join('') + '<option value="__other">Jiné jméno…</option>';
+    if (saved && (cfg.chatters || []).indexOf(saved) >= 0) sel.value = saved;
+    else if (saved) { sel.value = '__other'; $('chatterOther').value = saved; show('chatterOther', true); }
+    var m = $('models');
+    (cfg.models || []).forEach(function (n) { var b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.dataset.v = n; b.textContent = n; b.onclick = function () { setModel(n); }; m.appendChild(b); });
+    show('loading', false); show('form', true);
+  }).catch(function () { show('loading', false); show('badLink', true); });
+})();
+</script>
+</body>
+</html>

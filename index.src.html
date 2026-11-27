@@ -19818,6 +19818,7 @@ function clearSavedSession() {
 
 // ---------- custom content requests ----------
 const CUSTOM_STATUS = {
+  pending: { label: "From a chatter, waiting for your OK", color: "#f2a35b" },
   requested: { label: "Not paid yet", color: "#e0b050" },
   sold: { label: "Sold, to make", color: "#39e673" },
   in_progress: { label: "In progress", color: "#5cc8f5" },
@@ -19841,7 +19842,7 @@ function useCustoms(modelFilter) {
   const load = useCallback(async () => {
     try {
       let q = supabaseClient.from("customs").select("*").order("created_at", { ascending: false });
-      if (modelFilter) q = q.eq("model", modelFilter);
+      if (modelFilter) q = q.eq("model", modelFilter).neq("status", "pending"); // chatter customs wait for the owner
       const { data, error } = await q;
       if (error) throw error;
       setRows(data || []);
@@ -20268,9 +20269,29 @@ function CustomsAdminPage({ models }) {
     reload();
   };
 
-  const groups = [[["sold", "in_progress", "requested"], "To make"], [["delivered"], "Already made"], [["cancelled"], "Cancelled"]];
+  const groups = [[["pending"], "From chatters, waiting for your OK"], [["sold", "in_progress", "requested"], "To make"], [["delivered"], "Already made"], [["cancelled"], "Cancelled"]];
+  // a chatter custom: approve sends it to the model (sold if the fan paid, otherwise "not paid yet"), reject cancels it
+  const approve = async (c) => {
+    const paidNow = c.paid !== false;
+    await update(c, { status: paidNow ? "sold" : "requested", sold_at: paidNow ? new Date().toISOString() : null, approved_at: new Date().toISOString() }, "created");
+    cuDrive({ action: "folder", id: c.id }).catch(() => {});
+  };
+  // the one link for all chatters (zionbyneo.com/customs/?k=...)
+  const [linkMsg, setLinkMsg] = useState("");
+  const chatterLink = async (rotate) => {
+    if (rotate && !window.confirm("Make a new link? The old one stops working, send the new one to the chatters.")) return;
+    try {
+      let token = ""; try { token = (JSON.parse(localStorage.getItem("agencyos_session") || "{}")).token || ""; } catch (e) {}
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/custom-chatter`, { method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, "x-zion-token": token }, body: JSON.stringify({ action: "link", rotate: !!rotate }) });
+      const j = await r.json();
+      if (!r.ok || !j.key) throw new Error(j.error || "No link");
+      const url = `https://zionbyneo.com/customs/?k=${j.key}`;
+      try { await navigator.clipboard.writeText(url); setLinkMsg(rotate ? "New link copied, the old one no longer works" : "Link copied, send it to the chatters"); } catch (e) { window.prompt("Copy the link for the chatters:", url); }
+      setTimeout(() => setLinkMsg(""), 3500);
+    } catch (e) { setErr(e.message); }
+  };
   const month = new Date().toISOString().slice(0, 7);
-  const soldMonth = list.filter((c) => c.status !== "cancelled" && c.status !== "requested" && String(c.sold_at || c.created_at).slice(0, 7) === month).reduce((t, c) => t + (Number(c.price) || 0), 0);
+  const soldMonth = list.filter((c) => c.status !== "cancelled" && c.status !== "requested" && c.status !== "pending" && String(c.sold_at || c.created_at).slice(0, 7) === month).reduce((t, c) => t + (Number(c.price) || 0), 0);
   const cnt = (st) => list.filter((c) => c.status === st).length;
 
   return (
@@ -20282,8 +20303,12 @@ function CustomsAdminPage({ models }) {
           <div className="cu-stat"><b>{cnt("delivered")}</b><span>Already made</span></div>
           <div className="cu-stat"><b style={{ color: "#a8f5c4" }}>${Math.round(soldMonth).toLocaleString("en-US")}</b><span>Sold this month</span></div>
         </div>
-        <button onClick={() => { if (open) reset(); setOpen((v) => !v); }} className="hb-btn">{open ? "Close" : "+ New custom"}</button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <button onClick={() => chatterLink(false)} className="hb-btn ghost" title="One link for all chatters: they send customs from fan chats, you approve them here">Link for chatters</button>
+          <button onClick={() => { if (open) reset(); setOpen((v) => !v); }} className="hb-btn">{open ? "Close" : "+ New custom"}</button>
+        </div>
       </div>
+      {linkMsg && <div className="cu-hint" style={{ marginBottom: 12 }}>{linkMsg}. <button onClick={() => chatterLink(true)} className="hb-btn ghost sm" style={{ marginLeft: 8 }}>Make a new link</button></div>}
 
       {open && (
         <div className="cu-new">
@@ -20356,7 +20381,7 @@ function CustomsAdminPage({ models }) {
                       <div className="cu-ava">{String(c.model || "?").slice(0, 1)}</div>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontWeight: 800 }}>{c.model}</div>
-                        <div className="hb-note" style={{ fontSize: 11 }}>{c.fan_label ? `for ${c.fan_label}, ` : ""}{new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
+                        <div className="hb-note" style={{ fontSize: 11 }}>{c.fan_label ? `for ${c.fan_label}, ` : ""}{new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}{c.submitted_by ? `, from ${c.submitted_by}` : ""}{c.status === "pending" && c.paid === true ? ", paid" : c.status === "pending" && c.paid === false ? ", not paid yet" : ""}</div>
                       </div>
                       {c.price != null && <div className="cu-price">${Number(c.price).toLocaleString("en-US")}</div>}
                     </div>
@@ -20371,8 +20396,10 @@ function CustomsAdminPage({ models }) {
                     {c.drive_url && <a href={c.drive_url} target="_blank" rel="noopener noreferrer" className="cu-drive">Drive folder{c.drive_files ? `, ${c.drive_files} file${c.drive_files === 1 ? "" : "s"}` : ""} &rarr;</a>}
                     {c.delivery_url && c.delivery_url !== c.drive_url && <a href={c.delivery_url} target="_blank" rel="noopener noreferrer" className="fs-12 font-mono c-accent">Open delivered custom &rarr;</a>}
                     {c.delivery_note && <div className="fs-11 c-muted">Note from the model: {c.delivery_note}</div>}
-                    {!["cancelled", "delivered"].includes(c.status) && <CuUpload c={c} compact onUploaded={async () => { try { await cuDrive({ action: "files", id: c.id }); } catch (e) {} reload(); }} />}
+                    {!["cancelled", "delivered", "pending"].includes(c.status) && <CuUpload c={c} compact onUploaded={async () => { try { await cuDrive({ action: "files", id: c.id }); } catch (e) {} reload(); }} />}
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {c.status === "pending" && <button onClick={() => approve(c)} className="hb-btn sm">Approve, send to {c.model}</button>}
+                      {c.status === "pending" && <button onClick={() => { if (window.confirm("Reject this custom? The model will not see it.")) update(c, { status: "cancelled" }); }} className="hb-btn ghost sm">Reject</button>}
                       {c.status === "requested" && <button onClick={() => update(c, { status: "sold", sold_at: new Date().toISOString() }, "sold")} className="hb-btn sm">Mark as paid</button>}
                       {(c.status === "requested" || c.status === "sold" || c.status === "in_progress") && <button onClick={() => { if (window.confirm("Cancel this custom?")) update(c, { status: "cancelled" }); }} className="hb-btn ghost sm">Cancel</button>}
                       {c.status !== "delivered" && <button onClick={async () => { if (!window.confirm(`Delete this custom for ${c.model} for good? The model will not see it anymore. Its Drive folder stays, delete that in Drive if you want.`)) return; try { await cuDrive({ action: "delete", id: c.id }); reload(); } catch (e) { setErr(e.message); } }} className="hb-btn ghost sm" style={{ color: "#ff9b85" }}>Delete</button>}

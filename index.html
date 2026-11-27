@@ -33664,6 +33664,10 @@ function clearSavedSession() {
   } catch {}
 }
 const CUSTOM_STATUS = {
+  pending: {
+    label: "From a chatter, waiting for your OK",
+    color: "#f2a35b"
+  },
   requested: {
     label: "Not paid yet",
     color: "#e0b050"
@@ -33709,7 +33713,7 @@ function useCustoms(modelFilter) {
       let q = supabaseClient.from("customs").select("*").order("created_at", {
         ascending: false
       });
-      if (modelFilter) q = q.eq("model", modelFilter);
+      if (modelFilter) q = q.eq("model", modelFilter).neq("status", "pending");
       const {
         data,
         error
@@ -34437,9 +34441,56 @@ function CustomsAdminPage({
     if (event) await customNotify(c.id, event);
     reload();
   };
-  const groups = [[["sold", "in_progress", "requested"], "To make"], [["delivered"], "Already made"], [["cancelled"], "Cancelled"]];
+  const groups = [[["pending"], "From chatters, waiting for your OK"], [["sold", "in_progress", "requested"], "To make"], [["delivered"], "Already made"], [["cancelled"], "Cancelled"]];
+  const approve = async c => {
+    const paidNow = c.paid !== false;
+    await update(c, {
+      status: paidNow ? "sold" : "requested",
+      sold_at: paidNow ? new Date().toISOString() : null,
+      approved_at: new Date().toISOString()
+    }, "created");
+    cuDrive({
+      action: "folder",
+      id: c.id
+    }).catch(() => {});
+  };
+  const [linkMsg, setLinkMsg] = useState("");
+  const chatterLink = async rotate => {
+    if (rotate && !window.confirm("Make a new link? The old one stops working, send the new one to the chatters.")) return;
+    try {
+      let token = "";
+      try {
+        token = JSON.parse(localStorage.getItem("agencyos_session") || "{}").token || "";
+      } catch (e) {}
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/custom-chatter`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          "x-zion-token": token
+        },
+        body: JSON.stringify({
+          action: "link",
+          rotate: !!rotate
+        })
+      });
+      const j = await r.json();
+      if (!r.ok || !j.key) throw new Error(j.error || "No link");
+      const url = `https://zionbyneo.com/customs/?k=${j.key}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        setLinkMsg(rotate ? "New link copied, the old one no longer works" : "Link copied, send it to the chatters");
+      } catch (e) {
+        window.prompt("Copy the link for the chatters:", url);
+      }
+      setTimeout(() => setLinkMsg(""), 3500);
+    } catch (e) {
+      setErr(e.message);
+    }
+  };
   const month = new Date().toISOString().slice(0, 7);
-  const soldMonth = list.filter(c => c.status !== "cancelled" && c.status !== "requested" && String(c.sold_at || c.created_at).slice(0, 7) === month).reduce((t, c) => t + (Number(c.price) || 0), 0);
+  const soldMonth = list.filter(c => c.status !== "cancelled" && c.status !== "requested" && c.status !== "pending" && String(c.sold_at || c.created_at).slice(0, 7) === month).reduce((t, c) => t + (Number(c.price) || 0), 0);
   const cnt = st => list.filter(c => c.status === st).length;
   return React.createElement("div", {
     className: "cu-wrap"
@@ -34457,13 +34508,35 @@ function CustomsAdminPage({
     style: {
       color: "#a8f5c4"
     }
-  }, "$", Math.round(soldMonth).toLocaleString("en-US")), React.createElement("span", null, "Sold this month"))), React.createElement("button", {
+  }, "$", Math.round(soldMonth).toLocaleString("en-US")), React.createElement("span", null, "Sold this month"))), React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      alignItems: "center"
+    }
+  }, React.createElement("button", {
+    onClick: () => chatterLink(false),
+    className: "hb-btn ghost",
+    title: "One link for all chatters: they send customs from fan chats, you approve them here"
+  }, "Link for chatters"), React.createElement("button", {
     onClick: () => {
       if (open) reset();
       setOpen(v => !v);
     },
     className: "hb-btn"
-  }, open ? "Close" : "+ New custom")), open && React.createElement("div", {
+  }, open ? "Close" : "+ New custom"))), linkMsg && React.createElement("div", {
+    className: "cu-hint",
+    style: {
+      marginBottom: 12
+    }
+  }, linkMsg, ". ", React.createElement("button", {
+    onClick: () => chatterLink(true),
+    className: "hb-btn ghost sm",
+    style: {
+      marginLeft: 8
+    }
+  }, "Make a new link")), open && React.createElement("div", {
     className: "cu-new"
   }, React.createElement("div", {
     className: "cu-grid"
@@ -34686,7 +34759,7 @@ function CustomsAdminPage({
       }, c.fan_label ? `for ${c.fan_label}, ` : "", new Date(c.created_at).toLocaleDateString("en-US", {
         month: "short",
         day: "numeric"
-      }))), c.price != null && React.createElement("div", {
+      }), c.submitted_by ? `, from ${c.submitted_by}` : "", c.status === "pending" && c.paid === true ? ", paid" : c.status === "pending" && c.paid === false ? ", not paid yet" : "")), c.price != null && React.createElement("div", {
         className: "cu-price"
       }, "$", Number(c.price).toLocaleString("en-US"))), p2.title && React.createElement("div", {
         className: "cu-title"
@@ -34719,7 +34792,7 @@ function CustomsAdminPage({
         className: "fs-12 font-mono c-accent"
       }, "Open delivered custom →"), c.delivery_note && React.createElement("div", {
         className: "fs-11 c-muted"
-      }, "Note from the model: ", c.delivery_note), !["cancelled", "delivered"].includes(c.status) && React.createElement(CuUpload, {
+      }, "Note from the model: ", c.delivery_note), !["cancelled", "delivered", "pending"].includes(c.status) && React.createElement(CuUpload, {
         c: c,
         compact: true,
         onUploaded: async () => {
@@ -34737,7 +34810,17 @@ function CustomsAdminPage({
           gap: 8,
           flexWrap: "wrap"
         }
-      }, c.status === "requested" && React.createElement("button", {
+      }, c.status === "pending" && React.createElement("button", {
+        onClick: () => approve(c),
+        className: "hb-btn sm"
+      }, "Approve, send to ", c.model), c.status === "pending" && React.createElement("button", {
+        onClick: () => {
+          if (window.confirm("Reject this custom? The model will not see it.")) update(c, {
+            status: "cancelled"
+          });
+        },
+        className: "hb-btn ghost sm"
+      }, "Reject"), c.status === "requested" && React.createElement("button", {
         onClick: () => update(c, {
           status: "sold",
           sold_at: new Date().toISOString()
@@ -37264,7 +37347,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1x2hei9</script>
+<script type="text/babel" id="zion-version">kl21ct</script>
 <script>
 (function () {
   var last = 0;
