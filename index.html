@@ -10941,9 +10941,46 @@ const shootOrdered = list => {
   });
   return out.filter(g => g.items.length);
 };
+const SH_T = {
+  en: {
+    title: "Reels to film",
+    reel: n => `${n} reel${n === 1 ? "" : "s"}`,
+    need: "Need",
+    note: "Note",
+    hidden: "Instagram did not show this reel without a login, sorted by the note only.",
+    mark: "Mark as filmed",
+    undo: "Filmed ✓, undo",
+    filmed: "Filmed",
+    views: "views",
+    of: (d, t) => `${d} of ${t} filmed`,
+    sent: "sent",
+    howto: "Reels in the same group need the same setup, film them in one go. Upload the videos to the Drive folder below. Name a video with its number, for example 3.mp4, and it is ticked off by itself within an hour.",
+    upload: "Upload videos to Drive",
+    openFolder: "Open my Drive folder",
+    uploaded: n => `${n} video${n === 1 ? "" : "s"} uploaded`
+  },
+  cs: {
+    title: "Reels k natočení",
+    reel: n => `${n} ${n === 1 ? "reel" : n < 5 ? "reels" : "reelsů"}`,
+    need: "Potřebuješ",
+    note: "Poznámka",
+    hidden: "Instagram tenhle reel bez přihlášení neukázal, seřazeno jen podle poznámky.",
+    mark: "Natočeno",
+    undo: "Natočeno ✓, vrátit",
+    filmed: "Natočeno",
+    views: "zhlédnutí",
+    of: (d, t) => `${d} z ${t} natočeno`,
+    sent: "posláno",
+    howto: "Reels ve stejné skupině potřebují stejnou přípravu, natoč je najednou. Videa nahraj do složky na Drive níže. Pojmenuj video jeho číslem, třeba 3.mp4, a do hodiny se samo odškrtne.",
+    upload: "Nahrát videa na Drive",
+    openFolder: "Otevřít moji složku na Drive",
+    uploaded: n => `${n} ${n === 1 ? "video nahráno" : n < 5 ? "videa nahrána" : "videí nahráno"}`
+  }
+};
+const shT = list => SH_T[list && list.lang === "cs" ? "cs" : "en"];
 const shootText = (list, withNotes) => {
   let n = 0;
-  const parts = [list.title || "Reels to film"];
+  const parts = [list.title || shT(list).title];
   for (const g of shootOrdered(list)) {
     if (g.name) parts.push("", g.name.toUpperCase());
     for (const i of g.items) {
@@ -10955,6 +10992,10 @@ const shootText = (list, withNotes) => {
   return parts.join("\n");
 };
 const SHOOT_CSS = `
+.sh-lang{ display:inline-flex; padding:3px; border-radius:999px; border:1px solid rgba(57,230,115,.28); background:rgba(255,255,255,.02); }
+.sh-lang button{ display:inline-flex; align-items:center; justify-content:center; min-width:38px; padding:4px 10px; border-radius:999px; font:700 11px 'JetBrains Mono',monospace; letter-spacing:1px; color:#8fa39a; background:transparent; border:0; cursor:pointer; transition:all .2s; }
+.sh-lang button.on{ color:#03110a; background:#39e673; box-shadow:0 0 14px rgba(57,230,115,.4); }
+.sh-lang button:disabled{ cursor:default; }
 .sh-grp{ margin-top:16px; }
 .sh-grp:first-child{ margin-top:4px; }
 .sh-gh{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; padding-bottom:6px; border-bottom:1px solid rgba(57,230,115,.22); }
@@ -10976,12 +11017,13 @@ function ShootItems({
   onToggle
 }) {
   let n = 0;
+  const t = shT(list);
   return React.createElement(React.Fragment, null, shootOrdered(list).map((g, gi) => React.createElement("div", {
     key: gi,
     className: "sh-grp"
   }, g.name && React.createElement("div", {
     className: "sh-gh"
-  }, React.createElement("b", null, g.name), React.createElement("span", null, g.items.length, " reel", g.items.length === 1 ? "" : "s", g.tip ? `, ${g.tip}` : "")), g.items.map(it => {
+  }, React.createElement("b", null, g.name), React.createElement("span", null, t.reel(g.items.length), g.tip ? `, ${g.tip}` : "")), g.items.map(it => {
     n += 1;
     return React.createElement("div", {
       key: it.shortcode,
@@ -11017,11 +11059,11 @@ function ShootItems({
       }
     }, it.what) : null, it.needs ? React.createElement("div", {
       className: "sh-needs"
-    }, "Need: ", it.needs) : null, showNotes && it.note ? React.createElement("div", {
+    }, t.need, ": ", it.needs) : null, showNotes && it.note ? React.createElement("div", {
       className: "sh-tnote"
-    }, "Note: ", it.note) : null, it.missing && !it.note ? null : it.missing ? React.createElement("div", {
+    }, t.note, ": ", it.note) : null, it.missing && !it.note ? null : it.missing ? React.createElement("div", {
       className: "sh-tnote"
-    }, "Instagram did not show this reel without a login, sorted by the note only.") : null, React.createElement("a", {
+    }, t.hidden) : null, React.createElement("a", {
       href: it.url,
       target: "_blank",
       rel: "noopener noreferrer",
@@ -11035,20 +11077,20 @@ function ShootItems({
       style: {
         marginLeft: 8
       }
-    }, "@", it.handle, it.views ? `, ${igK(it.views)} views` : "") : null, onToggle ? React.createElement("div", {
+    }, "@", it.handle, it.views ? `, ${igK(it.views)} ${t.views}` : "") : null, onToggle ? React.createElement("div", {
       style: {
         marginTop: 9
       }
     }, React.createElement("button", {
       className: `hb-btn sm${it.done ? " ghost" : ""}`,
       onClick: () => onToggle(it)
-    }, it.done ? "Filmed ✓, undo" : "Mark as filmed")) : it.done ? React.createElement("div", {
+    }, it.done ? t.undo : t.mark)) : it.done ? React.createElement("div", {
       className: "hb-note",
       style: {
         color: "#39e673",
         marginTop: 4
       }
-    }, "Filmed ", it.done_at ? hubDate(String(it.done_at).slice(0, 10)) : "") : null));
+    }, t.filmed, " ", it.done_at ? hubDate(String(it.done_at).slice(0, 10)) : "") : null));
   }))));
 }
 function ShootLists({
@@ -11254,7 +11296,23 @@ function ShootLists({
         flex: 1,
         minWidth: 160
       }
-    }, l.title || "Reels to film"), React.createElement("span", {
+    }, l.title || shT(l).title), React.createElement("div", {
+      className: "sh-lang",
+      title: "Language of the list the model gets"
+    }, ["cs", "en"].map(lg => React.createElement("button", {
+      key: lg,
+      className: (l.lang || "en") === lg ? "on" : "",
+      disabled: run || busy === "lg" + l.id,
+      onClick: () => {
+        if ((l.lang || "en") !== lg) act("lg" + l.id, {
+          action: "shoot-lang",
+          id: l.id,
+          lang: lg
+        }, j => setLists(cur => cur.map(x => x.id === l.id ? j.list : x)));
+      }
+    }, busy === "lg" + l.id && (l.lang || "en") !== lg ? React.createElement("span", {
+      className: "hb-spin"
+    }) : lg === "cs" ? "CZ" : "EN"))), React.createElement("span", {
       className: `hb-status ${l.status}`
     }, l.status === "sent" ? `Sent ${hubDate(String(l.sent_at || "").slice(0, 10))}` : "Draft"), React.createElement("span", {
       className: "hb-note"
@@ -11402,14 +11460,14 @@ function CreatorShootLists({
         fontWeight: 800,
         letterSpacing: "-.01em"
       }
-    }, l.title || "Reels to film"), React.createElement("span", {
+    }, l.title || shT(l).title), React.createElement("span", {
       className: "hb-note"
-    }, done, " of ", total, " filmed, sent ", hubDate(String(l.sent_at || "").slice(0, 10)))), React.createElement("p", {
+    }, shT(l).of(done, total), ", ", shT(l).sent, " ", hubDate(String(l.sent_at || "").slice(0, 10)))), React.createElement("p", {
       className: "hb-note",
       style: {
         marginBottom: 8
       }
-    }, "Reels in the same group need the same setup, film them in one go. Upload the videos to the Drive folder below. Name a video with its number, for example 3.mp4, and it is ticked off by itself within an hour."), (l.drive?.url || driveUrl) && React.createElement("a", {
+    }, shT(l).howto), (l.drive?.url || driveUrl) && React.createElement("a", {
       href: l.drive?.url || driveUrl,
       target: "_blank",
       rel: "noopener noreferrer",
@@ -11417,12 +11475,12 @@ function CreatorShootLists({
       style: {
         marginBottom: 6
       }
-    }, l.drive?.url ? "Upload videos to Drive" : "Open my Drive folder"), l.drive?.videos ? React.createElement("span", {
+    }, l.drive?.url ? shT(l).upload : shT(l).openFolder), l.drive?.videos ? React.createElement("span", {
       className: "hb-note",
       style: {
         marginLeft: 10
       }
-    }, l.drive.videos, " video", l.drive.videos === 1 ? "" : "s", " uploaded") : null, err && React.createElement("div", {
+    }, shT(l).uploaded(l.drive.videos)) : null, err && React.createElement("div", {
       className: "hb-err"
     }, err), React.createElement(ShootItems, {
       list: l,
@@ -37373,7 +37431,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1xwa9q9</script>
+<script type="text/babel" id="zion-version">pmpv2x</script>
 <script>
 (function () {
   var last = 0;
