@@ -36588,6 +36588,21 @@ function App() {
   const [previewFrom, setPreviewFrom] = useState(null);
   const editWorker = useEditWorker(!!session && session.role === "admin");
   const [showLanding, setShowLanding] = useState(true);
+  const openSignIn = () => {
+    try {
+      if (window.location.hash !== "#signin") window.history.pushState({
+        zion: "signin"
+      }, "", "#signin");
+    } catch (e) {}
+    setShowLanding(false);
+  };
+  useEffect(() => {
+    const onPop = () => {
+      if (window.location.hash !== "#signin") setShowLanding(true);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
   const [view, setView] = useState(() => zionOpenFromUrl(window.location.href));
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
   useEffect(() => {
@@ -36706,7 +36721,7 @@ function App() {
   if (!session) {
     if (showLanding) {
       return React.createElement(LandingPage, {
-        onSignIn: () => setShowLanding(false)
+        onSignIn: openSignIn
       });
     }
     return React.createElement(LoginScreen, {
@@ -37237,7 +37252,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">1outobd</script>
+<script type="text/babel" id="zion-version">10c7btd</script>
 <script>
 (function () {
   var last = 0;

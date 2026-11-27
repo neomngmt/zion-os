@@ -20998,6 +20998,14 @@ function App() {
   const [previewFrom, setPreviewFrom] = useState(null); // admin session while previewing as a creator
   const editWorker = useEditWorker(!!session && session.role === "admin");
   const [showLanding, setShowLanding] = useState(true);
+  // the sign in screen is a real step in the browser history: Back (or the swipe) returns to the landing page,
+  // not to whatever page was open before Zion (an old address in Safari's history)
+  const openSignIn = () => { try { if (window.location.hash !== "#signin") window.history.pushState({ zion: "signin" }, "", "#signin"); } catch (e) {} setShowLanding(false); };
+  useEffect(() => {
+    const onPop = () => { if (window.location.hash !== "#signin") setShowLanding(true); };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
   const [view, setView] = useState(() => zionOpenFromUrl(window.location.href));
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
   // a tap on a notification while Zion is already open: the service worker tells this window what to show
@@ -21086,7 +21094,7 @@ function App() {
   }
   if (!session) {
     if (showLanding) {
-      return <LandingPage onSignIn={() => setShowLanding(false)} />;
+      return <LandingPage onSignIn={openSignIn} />;
     }
     return (
       <LoginScreen
