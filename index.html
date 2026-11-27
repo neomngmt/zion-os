@@ -9968,6 +9968,12 @@ const HUB_CSS = `
 .hb-btn:hover{ box-shadow:0 8px 26px -10px rgba(57,230,115,.8); }
 .hb-btn:active{ transform:scale(.97); }
 .hb-btn:disabled{ opacity:.5; cursor:default; box-shadow:none; }
+/* a button that is working: moving light and a glow, so it never looks stuck */
+.hb-btn.hb-sending, .hb-btn.hb-sending:disabled{ opacity:1; color:#03110a; background:linear-gradient(90deg,#2fcf63 0%,#c9ffdc 45%,#2fcf63 90%); background-size:220% 100%; animation:hbSend 1.3s linear infinite; box-shadow:0 0 22px rgba(57,230,115,.45); }
+@keyframes hbSend{ from{ background-position:120% 0; } to{ background-position:-100% 0; } }
+.hb-btn.hb-sending .hb-spin{ border-color:rgba(3,17,10,.25); border-top-color:#03110a; }
+.z-toast{ position:fixed; left:50%; bottom:calc(26px + env(safe-area-inset-bottom)); z-index:400; transform:translate(-50%, 16px); opacity:0; padding:12px 18px; border-radius:999px; font:700 14px Inter,sans-serif; color:#03110a; background:linear-gradient(135deg,#39e673,#12b34c); box-shadow:0 12px 34px rgba(0,0,0,.45), 0 0 26px rgba(57,230,115,.45); transition:opacity .3s, transform .35s cubic-bezier(.2,.8,.2,1); white-space:nowrap; pointer-events:none; }
+.z-toast.on{ opacity:1; transform:translate(-50%, 0); }
 .hb-btn.ghost{ color:#d9e2dd; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12); }
 .hb-btn.ghost:hover{ box-shadow:none; background:rgba(255,255,255,.1); }
 .hb-btn.sm{ padding:6px 11px; font-size:12px; border-radius:10px; }
@@ -10738,15 +10744,20 @@ function IgHub({
       id: plan.id
     })
   }, "Take back") : React.createElement("button", {
-    className: "hb-btn",
     disabled: busy === "send" || !(plan.items || []).length,
     onClick: () => {
       if (window.confirm(`Send this plan to ${model}? She gets a notification and sees it in her Zion.`)) act("send", {
         action: "plan-send",
         id: plan.id
+      }, async () => {
+        await load();
+        zionToast(`Sent to ${model} ✓`);
       });
-    }
-  }, busy === "send" ? "Sending" : `Send to ${model}`))), showProfiles && React.createElement("div", {
+    },
+    className: `hb-btn ${busy === "send" ? "hb-sending" : ""}`
+  }, busy === "send" ? React.createElement(React.Fragment, null, React.createElement("span", {
+    className: "hb-spin"
+  }), "Sending to ", model, ", making the Drive folder…") : `Send to ${model}`))), showProfiles && React.createElement("div", {
     style: {
       marginBottom: 14
     }
@@ -11280,16 +11291,18 @@ function ShootLists({
         id: l.id
       })
     }, "Take back") : React.createElement("button", {
-      className: "hb-btn sm",
+      className: `hb-btn sm ${busy === "s" + l.id ? "hb-sending" : ""}`,
       disabled: run || busy === "s" + l.id,
       onClick: () => act("s" + l.id, {
         action: "shoot-send",
         id: l.id
       }, async j => {
         await load();
-        if (j.driveError) setErr(`Sent, but the Drive folder was not created: ${j.driveError}`);
+        if (j.driveError) setErr(`Sent, but the Drive folder was not created: ${j.driveError}`);else zionToast(`Sent to ${l.model} ✓ Drive folder ready`);
       })
-    }, "Send to ", l.model), l.status === "sent" && (l.drive?.url ? React.createElement("a", {
+    }, busy === "s" + l.id ? React.createElement(React.Fragment, null, React.createElement("span", {
+      className: "hb-spin"
+    }), "Sending to ", l.model, ", making the Drive folder…") : `Send to ${l.model}`), l.status === "sent" && (l.drive?.url ? React.createElement("a", {
       href: l.drive.url,
       target: "_blank",
       rel: "noopener noreferrer",
@@ -33689,6 +33702,19 @@ const CUSTOM_STATUS = {
     color: "#8B93A1"
   }
 };
+function zionToast(text) {
+  try {
+    const el = document.createElement("div");
+    el.className = "z-toast";
+    el.textContent = text;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => el.classList.add("on"));
+    setTimeout(() => {
+      el.classList.remove("on");
+      setTimeout(() => el.remove(), 400);
+    }, 3200);
+  } catch (e) {}
+}
 async function customNotify(id, event) {
   try {
     await fetch(`${SUPABASE_URL}/functions/v1/custom-notify`, {
@@ -37347,7 +37373,7 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
-<script type="text/babel" id="zion-version">kl21ct</script>
+<script type="text/babel" id="zion-version">1xwa9q9</script>
 <script>
 (function () {
   var last = 0;
